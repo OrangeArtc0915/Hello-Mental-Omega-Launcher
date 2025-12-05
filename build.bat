@@ -1,0 +1,1 @@
+pyinstaller --onefile --windowed --icon=icon.ico mo_mod_manager.py
