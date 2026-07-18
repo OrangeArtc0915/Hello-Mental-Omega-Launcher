@@ -3,7 +3,7 @@ HMOL Launcher Non-Commercial, No-Modification Source-Available License
 HMOL 启动器 非商用 · 禁止二次修改 源代码可见许可证
 =========================================================================
 
-Version 2.2  ·  Effective Date: 2026-07-17  ·  Copyright (c) 2026 HMOL Contributors
+  Effective Date: 2026-07-17  ·  Copyright (c) 2026 HMOL Contributors
 
 本软件采用「源代码可见但禁止二次修改」(Source-Available, No-Modification)
 许可证发布。请仔细阅读以下条款,安装、复制或以其他方式使用本软件即表示
@@ -18,7 +18,6 @@ Version 2.2  ·  Effective Date: 2026-07-17  ·  Copyright (c) 2026 HMOL Contrib
 可撤销的、非排他性的**权利:
 
   ✅ 查看、阅读、研究源代码
-  ✅ 为个人备份目的制作一份存档副本
   ✅ 在个人、非商业设备上安装并使用本软件
   ✅ 在 GitHub Issues 提交 bug 报告(但不得附带修改后的代码)
 
@@ -66,9 +65,6 @@ Version 2.2  ·  Effective Date: 2026-07-17  ·  Copyright (c) 2026 HMOL Contrib
   • 为个人备份目的复制本软件;
   • 阅读、学习、研究源代码;
   • 在 GitHub Issues 提交 bug 报告(但不附带修改后的代码);
-  • 适用法律明确允许的、为实现互操作性所必需的最小范围反向工程;
-  • 在 GitHub Fork 仓库中**仅用于个人学习、阅读、研究**(不进行任何
-    代码修改,且 Fork 仓库的描述必须显著标注「仅供学习,请勿修改分发」)。
 
 
 ──────────────────────────────────────────────────────────────────────────
@@ -98,19 +94,12 @@ Version 2.2  ·  Effective Date: 2026-07-17  ·  Copyright (c) 2026 HMOL Contrib
   • 作为其他软件包的依赖项;
   • 通过 CDN、镜像、代理等方式提供访问。
 
-【例外】以下情况允许在**未修改**的前提下再分发:
-
-  • 许可方在官方网站、GitHub 官方仓库提供的原始下载;
-  • 经许可方事先书面授权的渠道。
-
-任何再分发必须包含完整的版权声明、许可声明、免责声明。
-
 
 ──────────────────────────────────────────────────────────────────────────
 §5. 知识产权 (Intellectual Property Rights)
 ──────────────────────────────────────────────────────────────────────────
 
-  • 本软件源代码、UI 设计、图标、文档、算法、架构归 HMOL 贡献者所有;
+  • 本软件源代码、UI 设计、文档、算法、架构归 HMOL 贡献者所有;
   • "Red Alert 2"、"Command & Conquer"、"Yuri's Revenge" 及其相关标志、
     角色、名称均为 Electronic Arts Inc. 的商标和/或注册商标;
   • "Mental Omega" 是独立的同人 mod 项目,相关权利归 Mental Omega
