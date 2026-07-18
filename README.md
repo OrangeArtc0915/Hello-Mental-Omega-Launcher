@@ -1,88 +1,154 @@
 # Hello Mental Omega Launcher (HMOL)
 
-> 一个为《心灵终结》玩家打造的现代化启动与管理工具，让模组安装、游戏管理、资源下载变得简单直观。
+> 🚫 **本项目采用「源代码可见但禁止二次修改」许可证。任何形式的修改、二次开发、二次封装、二次分发均被严格禁止。**
+>
+> 🚫 **This project uses a "Source-Available, No-Modification" license. Any form of modification, derivative work, repackaging, or redistribution is strictly prohibited.**
+
+[![Version](https://img.shields.io/badge/version-2.2-blue.svg)](version.json)
+[![License](https://img.shields.io/badge/license-HMOL-red.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
 ---
 
-## HMOL 是什么？
+## ⚠️ 重要声明 / Important Disclaimers
 
-HMOL（Hello Mental Omega Launcher）是一款专为《命令与征服：红色警戒2 - 心灵终结》玩家设计的桌面程序。它将原本繁琐的模组安装、游戏版本管理、资源下载等操作整合到一个简洁美观的界面中，让您专注于游戏本身。
+**本启动器与 EA (Electronic Arts)、红色警戒 2 开发团队、心灵终结 (Mental Omega) 开发团队不存在任何关联、授权、赞助或背书关系。**
 
-### HMOL 能帮您做什么？
+"Red Alert 2"、"Command & Conquer"、"Yuri's Revenge" 是 Electronic Arts Inc. 的注册商标。
+"Mental Omega" 是独立的同人 mod 项目。
 
-- 一键安装/卸载模组，告别手动复制粘贴
-- 在电脑上保留多个游戏配置，随时切换不同版本
-- 从云端下载游戏资源和运行环境
-- 自动备份重要文件，轻松恢复原始游戏状态
-- 通过 QQ 频道与社区玩家实时互动
+**This launcher is NOT affiliated with EA (Electronic Arts), the Red Alert 2 development team, or the Mental Omega development team.**
 
 ---
 
-## 核心功能
+## 📜 关于许可证 / About the License
 
-### 1. 模组管理
+本项目使用 **HMOL Non-Commercial, No-Modification Source-Available License v2.2**(HMOL 非商用 · 禁止二次修改许可证)。
 
-轻松管理所有模组包。
+### ✅ 允许的行为 / Permitted
 
-- **安装模组**：选择模组压缩包，自动识别文件结构并安装到正确位置
-- **卸载模组**：一键移除已安装模组，自动还原被覆盖的原始文件
-- **冲突检测**：安装前扫描文件冲突，避免意外覆盖
+- 📖 查看、阅读、研究源代码
+- 🖥️ 在个人、非商业设备上安装并使用
+- 🐛 在 GitHub Issues 提交 bug 报告
 
-### 2. 实例管理
+### ❌ 严禁的行为 / Strictly Prohibited
 
-创建多个独立的游戏"实例"，各自拥有独立的配置、存档和模组。
+| # | 行为 / Action | 说明 / Description |
+|---|--------------|-------------------|
+| 1 | 修改源代码 | 任何对 .py、.json、.md、.bat 等源文件的改动 |
+| 2 | 修改二进制 | 反编译后修改、补丁、热更新 |
+| 3 | 反向工程 | 反编译、反汇编、静态分析、动态跟踪(除法律明确允许外) |
+| 4 | 创建衍生作品 | Fork 后修改、改编、翻译、汇编、演绎 |
+| 5 | 代码复用 | 将代码、算法、逻辑用于其他项目 |
+| 6 | 重新分发 | 上传至任何代码托管平台或分发渠道 |
+| 7 | 商业使用 | 用于商业产品、服务、营利活动 |
+| 8 | 安全绕过 | 绕过、破解、规避安全机制、加密、版权保护 |
+| 9 | 标识移除 | 移除、隐藏、修改版权声明、商标、许可声明 |
 
-- **创建实例**：新建游戏副本，自由命名和管理
-- **切换实例**：在不同实例间一键切换，互不影响
-- **导入/导出**：打包实例分享给好友，或导入他人配置
+**完整许可条款请参见 [LICENSE](LICENSE) 文件。**
 
-### 3. 云资源下载（笨蛋广场）
-
-通过 HMOL 从云端获取游戏资源。
-
-- **游戏资源**：下载基础资源文件
-- **运行环境**：下载游戏运行所需的组件
-- **程序扩展（DLC）**：获取地图包、任务包等扩展内容
-
-### 4. 游戏备份与还原
-
-- **自动备份**：安装模组前自动备份原始文件
-- **手动备份**：随时创建完整备份
-- **一键还原**：出错了随时恢复
-
-### 5. 联机喊话
-
-通过 HMOL 向 QQ 频道发送消息，在游戏内与社区互动。支持消息编辑、字数统计和发送状态反馈。
-
-### 6. 个性化主题
-
-内置多套精美主题方案（含雾感弥散光效果），支持浅色/深色模式切换，按钮、侧边栏、控件颜色全面协调。
+**For the full license terms, see the [LICENSE](LICENSE) file.**
 
 ---
 
-## 社区支持
+## 🌟 项目简介 / Project Overview
 
-### QQ 群
+Hello Mental Omega Launcher (HMOL) 是一个**专为 Mental Omega 玩家打造**的启动器,提供以下功能:
 
-- **群号**：1034243331
-- **链接**：[点击加入](https://qm.qq.com/q/E1YzVGzxjU)
+- 🎮 **游戏启动** — 一键启动 Mental Omega 客户端
+- 📦 **实例管理** — 创建、管理、切换多个游戏实例
+- 📚 **包管理** — 安装、卸载、更新包
+- 🎨 **多主题** — 6 套精心设计的主题
 
-在 QQ 群中您可以：
-- 提问使用问题，热心群友为您解答
-- 提交功能建议，帮助 HMOL 变得更好
-- 与其他玩家交流游戏心得
-- 获取最新版本更新通知
+### 🆚 与 Mental Omega 官方启动器的关系
 
-
+- ❌ **不**是 Mental Omega 官方启动器
+- ❌ **不**提供 Mental Omega 盗版下载
+- ✅ **仅**是一个非官方的、社区开发的辅助工具
+- ✅ 旨在改善 Mental Omega 玩家社区的体验
 
 ---
 
-## 快速入门
 
-1. 下载并运行 HMOL
-2. 首次启动时设置游戏目录路径
-3. 通过"包管理"安装您需要的模组
-4. 在"实例"页面切换或创建游戏实例
-5. 前往设置页面调整主题和偏好
+## 📥 下载与安装 / Download and Install
 
-有疑问？加入 QQ 群，我们会帮您解决！
+### 系统要求 / System Requirements
+
+| 项目 / Item | 要求 / Requirement |
+|------------|-------------------|
+| 操作系统 | Windows 10 / 11 (x64) |
+| 磁盘空间 | 至少 200 MB 可用空间 |
+
+### 开启奇妙之旅~
+
+1. 访问 [Releases 页面](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases)
+2. 下载最新版本
+3. 运行安装程序,按照向导完成安装
+4. 双击桌面图标启动 HMOL
+
+> ⚠️ **请仅从官方 GitHub Releases 和 微软商店 下载!**任何其他渠道提供的二进制均可能
+> 已被修改,违反本许可证,可能包含恶意代码。
+
+
+## 📋 使用协议 / EULA
+
+使用本软件前,**必须**阅读并同意 [EULA.md](EULA.md) 中的条款。
+
+协议核心条款:
+
+- §3 **二次修改禁令** — 严禁任何形式的二次修改
+- §4 许可授予 — 仅限个人非商业用途
+- §7 责任限制 — "原样"提供,无担保
+- §9 禁止行为 — 不得用于非法活动
+
+---
+
+## 🤝 贡献 / Contributing
+
+> 🚫 **本项目不接受任何形式的代码贡献、PR、Issue 中的代码修改。**
+
+由于许可证禁止二次修改,本项目**不接受 Pull Request**。
+
+但欢迎以下类型的贡献(无需修改代码):
+
+- 🐛 **Bug 报告** — 在 [Issues](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/issues) 中描述
+- 💡 **功能建议** — 在 Issues 中提出
+
+**请不要**提交包含代码修改的 Pull Request(会被直接关闭)。
+
+
+## 📞 联系方式 / Contact
+
+| 渠道            | 链接 / Link                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| GitHub 仓库     | <https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher>                                              |
+| GitHub Issues | <https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/issues>                                       |
+| 漏洞报告          | [Security Advisories](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/security/advisories/new) |
+| QQ 群          | 1034243331                                                                                                   |
+
+***
+
+## 📜 许可证 / License
+
+本项目采用 **HMOL Non-Commercial, No-Modification Source-Available License v2.2**。
+
+🚫 **严禁任何形式的二次修改、二次开发、二次封装、二次分发。**
+
+完整条款请参见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 🙏 致谢 / Acknowledgments
+
+- **Command & Conquer: Red Alert 2 - Yuri's Revenge** — © 2001-2026 Electronic Arts Inc.
+- **Mental Omega** — 独立同人 mod 项目
+- **HMOL 贡献者** — 感谢所有提交 bug 报告和功能建议的社区成员
+
+---
+
+**© 2026 HMOL Contributors. All Rights Reserved.**
+
+**Made with ❤️ for the Mental Omega community.**
+
+
+[def]: SECURITY.md
