@@ -5,8 +5,7 @@
 > 🚫 **This project uses a "Source-Available, No-Modification" license. Any form of modification, derivative work, repackaging, or redistribution is strictly prohibited.**
 
 [![Version](https://img.shields.io/badge/version-2.2-blue.svg)](version.json)
-[![License](https://img.shields.io/badge/license-HMOL--NoMod-red.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-HMOL-red.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
 ---
