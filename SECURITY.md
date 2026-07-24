@@ -7,9 +7,8 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 2.2.x   | :white_check_mark: |
-| 2.1.x   | :white_check_mark: |
-| < 2.1   | :x:                |
+| HMOL        | :white_check_mark: |
+| HMOL-wine   | :white_check_mark: |
 
 ---
 
