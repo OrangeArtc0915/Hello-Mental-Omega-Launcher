@@ -9,6 +9,7 @@
 |---------|--------------------|
 | HMOL        | :white_check_mark: |
 | HMOL-wine   | :white_check_mark: |
+| HMOL-DLC    | :white_check_mark: |
 
 ---
 
