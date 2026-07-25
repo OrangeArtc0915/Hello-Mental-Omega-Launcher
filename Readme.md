@@ -4,7 +4,7 @@
 >
 > 🚫 **This project uses a "Source-Available, No-Modification" license. Any form of modification, derivative work, repackaging, or redistribution is strictly prohibited.**
 
-[![Version](https://img.shields.io/badge/version-2.2-blue.svg)](version.json)
+[![Version](https://img.shields.io/badge/version-2.4-blue.svg)](version.json)
 [![License](https://img.shields.io/badge/license-HMOL-red.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
