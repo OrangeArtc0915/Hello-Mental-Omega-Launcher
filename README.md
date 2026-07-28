@@ -9,7 +9,50 @@
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
 ---
+# HMOL Auto-Update
 
+HMOL 启动器自动更新清单分支。
+
+## Manifest
+
+| 平台 | 文件 |
+|------|------|
+| Windows | `update/HMOL.update.json` |
+| Wine | `update/HMOL.wine.update.json` |
+
+## CDN 地址
+
+### HMOL
+```
+https://cdn.jsdelivr.net/gh/OrangeArtc0915/Hello-Mental-Omega-Launcher@update/update/HMOL.update.json
+```
+### HMOL-wine
+```
+https://cdn.jsdelivr.net/gh/OrangeArtc0915/Hello-Mental-Omega-Launcher@update/update/HMOL.wine.update.json
+```
+
+## 强制刷新 CDN 缓存
+
+如果 CDN 返回的 manifest 版本滞后，访问以下 URL 即可强制 jsDelivr 重新拉取：
+
+### HMOL
+```
+https://purge.jsdelivr.net/gh/OrangeArtc0915/Hello-Mental-Omega-Launcher@update/update/HMOL.update.json
+```
+### HMOL-wine
+```
+https://purge.jsdelivr.net/gh/OrangeArtc0915/Hello-Mental-Omega-Launcher@update/update/HMOL.wine.update.json
+```
+浏览器打开即刷新，无需参数。最长生效时间 24 小时，一般几分钟内完成。
+
+## 工作原理
+
+1. GitHub Release 发布 → 触发 `Auto-Update Manifest` Actions workflow
+2. Workflow 自动下载 .exe asset、计算 SHA256、更新两个 manifest 文件
+3. 推送到本分支 (update)
+4. 启动器通过 jsDelivr CDN / raw GitHub 拉取 manifest 比对版本
+
+---
 ## ⚠️ 重要声明 / Important Disclaimers
 
 **本启动器与 EA (Electronic Arts)、红色警戒 2 开发团队、心灵终结 (Mental Omega) 开发团队不存在任何关联、授权、赞助或背书关系。**
