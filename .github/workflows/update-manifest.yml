@@ -47,7 +47,7 @@ jobs:
           import json, subprocess, os, sys
 
           result = subprocess.run(
-              ['gh', 'release', view, os.environ['TAG'], '--json', 'assets,body'],
+              ['gh', 'release', 'view', os.environ['TAG'], '--json', 'assets,body'],
               capture_output=True, text=True, check=True
           )
           try:
