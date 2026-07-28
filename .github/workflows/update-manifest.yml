@@ -62,20 +62,35 @@ jobs:
           with open('/tmp/release_body.md', 'w', encoding='utf-8') as f:
               f.write(body)
 
+          print('Total assets in release: ' + str(len(data.get('assets', []))), file=sys.stderr)
           url = ''
           size = 0
-          for a in data.get('assets', []):
-              n = a.get('name', '').lower()
-              if n.endswith('.exe') and 'wine' not in n:
-                  url = a.get('browser_download_url', '')
-                  size = a.get('size', 0)
-                  break
+          fallback_url = ''
+          fallback_size = 0
+          for idx, a in enumerate(data.get('assets', [])):
+              raw_name = a.get('name', '')
+              n = raw_name.lower().strip()
+              print('Asset[' + str(idx) + ']: raw=' + repr(raw_name) + ' lower=' + repr(n) + ' endswith_exe=' + str(n.endswith('.exe')) + ' has_wine=' + str('wine' in n), file=sys.stderr)
+              if n.endswith('.exe'):
+                  if 'wine' not in n:
+                      url = a.get('browser_download_url', '')
+                      size = a.get('size', 0)
+                      print('Asset[' + str(idx) + '] MATCHED (primary): url=' + url, file=sys.stderr)
+                      break
+                  elif not fallback_url:
+                      fallback_url = a.get('browser_download_url', '')
+                      fallback_size = a.get('size', 0)
+
+          if not url and fallback_url:
+              print('WARNING: no exact HMOL.exe match, using fallback .exe', file=sys.stderr)
+              url = fallback_url
+              size = fallback_size
 
           if not url:
-              print('::error::No HMOL.exe asset found in release ' + os.environ['TAG'], file=sys.stderr)
-              print('Available assets:', file=sys.stderr)
+              print('::error::No .exe asset found in release ' + os.environ['TAG'], file=sys.stderr)
+              print('Available assets (raw names):', file=sys.stderr)
               for a in data.get('assets', []):
-                  print('  -', a.get('name', ''), file=sys.stderr)
+                  print('  - ' + repr(a.get('name', '')), file=sys.stderr)
               sys.exit(1)
 
           date_result = subprocess.run(
