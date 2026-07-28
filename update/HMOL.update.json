@@ -1,0 +1,20 @@
+{
+  "version": "2.5.0",
+  "release_date": "2026-07-28",
+  "min_version": "2.5.0",
+  "mandatory": false,
+  "variant": "windows",
+  "exe": {
+    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.5.0/HMOL.exe",
+    "size": 0,
+    "sha256": "REPLACE_AFTER_BUILD"
+  },
+  "changelog_zh": "首版自动更新框架发布。当前版本无功能变更。",
+  "changelog_en": "Initial auto-update framework release. No functional changes in this version.",
+  "cleanup": {
+    "reset_config": true,
+    "clear_logs": true,
+    "clear_cache": true,
+    "clear_backups": true
+  }
+}
