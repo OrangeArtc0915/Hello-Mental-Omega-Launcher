@@ -1,16 +1,15 @@
 {
   "version": "2.5.2",
   "release_date": "2026-07-28",
-  "min_version": "2.5.0",
-  "mandatory": false,
-  "variant": "windows",
   "exe": {
-    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.5.2/HMOL.exe",
-    "size": 52747191,
-    "sha256": "4da178cae98d0f20cb45f2b6a432237b32047c6d41e7d7f250763e70f1e06294"
+    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.5.2/HMOL-wine.exe",
+    "size": 72877228,
+    "sha256": "9d6e8f98828bdef1825a30c7ad97da1d5ce3e06cfa8589596393704ca35b1ba2"
   },
+  "mandatory": true,
   "changelog_zh": "## 🚀 HMOL v2.5.2 发布！\n\n### 版本分发\n- Windows用户请下载 HMOL.exe\n- Winlator（wine）模拟器用户请下载 HMOL-wine.exe\n\n\n### 自动更新功能测试，无实际更新内容\n\n\n## 🛠️ 安装要求\n\n- **操作系统**: Windows 7+（HMOL） wine7.8+（HMOL-wine）\n- **游戏版本**: 心灵终结 3.3.3+ 或兼容版本\n\n## **⭐ 如果这个项目对您有帮助，请给我们一个Star！ ⭐**",
-  "changelog_en": "Initial auto-update framework release. No functional changes in this version.",
+  "min_version": "2.5.0",
+  "variant": "wine",
   "cleanup": {
     "reset_config": true,
     "clear_logs": true,
