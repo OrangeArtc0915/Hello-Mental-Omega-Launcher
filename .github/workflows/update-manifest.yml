@@ -17,11 +17,26 @@ jobs:
   update-manifest:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout main branch first
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure update branch exists on remote
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --heads origin update | grep -q update; then
+            echo "update branch already exists on remote, checking out..."
+            git checkout update
+            git pull origin update
+          else
+            echo "update branch not found, creating from main..."
+            git checkout -b update
+            git push origin update
+            echo "update branch created and pushed"
+          fi
 
       - name: Resolve release tag
         id: tag
@@ -222,8 +237,8 @@ jobs:
             echo "No changes detected, skip commit"
           else
             git commit -m "chore: auto-update manifest to v${{ steps.info.outputs.version }}"
-            git push
-            echo "Manifest committed and pushed"
+            git push origin update
+            echo "Manifest committed and pushed to update branch"
             echo ""
-            echo "Verify at: https://cdn.jsdelivr.net/gh/${{ github.repository }}@main/update/HMOL.update.json"
+            echo "Verify at: https://cdn.jsdelivr.net/gh/${{ github.repository }}@update/update/HMOL.update.json"
           fi
