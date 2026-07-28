@@ -70,16 +70,20 @@ jobs:
           for idx, a in enumerate(data.get('assets', [])):
               raw_name = a.get('name', '')
               n = raw_name.lower().strip()
-              print('Asset[' + str(idx) + ']: raw=' + repr(raw_name) + ' lower=' + repr(n) + ' endswith_exe=' + str(n.endswith('.exe')) + ' has_wine=' + str('wine' in n), file=sys.stderr)
+              keys = list(a.keys()) if isinstance(a, dict) else []
+              print('Asset[' + str(idx) + ']: raw=' + repr(raw_name) + ' keys=' + repr(keys), file=sys.stderr)
               if n.endswith('.exe'):
+                  # gh CLI uses camelCase: browserDownloadUrl
+                  asset_url = a.get('browserDownloadUrl') or a.get('browser_download_url') or a.get('url') or ''
+                  asset_size = a.get('size', 0)
                   if 'wine' not in n:
-                      url = a.get('browser_download_url', '')
-                      size = a.get('size', 0)
+                      url = asset_url
+                      size = asset_size
                       print('Asset[' + str(idx) + '] MATCHED (primary): url=' + url, file=sys.stderr)
                       break
                   elif not fallback_url:
-                      fallback_url = a.get('browser_download_url', '')
-                      fallback_size = a.get('size', 0)
+                      fallback_url = asset_url
+                      fallback_size = asset_size
 
           if not url and fallback_url:
               print('WARNING: no exact HMOL.exe match, using fallback .exe', file=sys.stderr)
@@ -87,10 +91,10 @@ jobs:
               size = fallback_size
 
           if not url:
-              print('::error::No .exe asset found in release ' + os.environ['TAG'], file=sys.stderr)
-              print('Available assets (raw names):', file=sys.stderr)
+              print('::error::No usable .exe asset (no download URL) in release ' + os.environ['TAG'], file=sys.stderr)
+              print('Full asset dump:', file=sys.stderr)
               for a in data.get('assets', []):
-                  print('  - ' + repr(a.get('name', '')), file=sys.stderr)
+                  print('  ' + repr(a), file=sys.stderr)
               sys.exit(1)
 
           date_result = subprocess.run(
