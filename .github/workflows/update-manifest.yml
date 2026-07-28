@@ -32,7 +32,10 @@ jobs:
             TAG="${{ github.event.release.tag_name }}"
           fi
           VERSION=$(echo "$TAG" | sed 's/^v//')
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
           echo "Using tag=$TAG, version=$VERSION"
 
       - name: Extract release info
@@ -130,12 +133,17 @@ jobs:
 
       - name: Update update/HMOL.update.json
         env:
-          VERSION: ${{ steps.info.outputs.version }}
+          VERSION: ${{ steps.tag.outputs.version }}
           DATE: ${{ steps.info.outputs.date }}
           URL: ${{ steps.info.outputs.url }}
           SIZE: ${{ steps.info.outputs.size }}
           SHA: ${{ steps.hash.outputs.sha }}
         run: |
+          if [ -z "$VERSION" ] || [ "$VERSION" = "1" ]; then
+            echo "::error::VERSION env var is invalid: '$VERSION' (expected e.g. 2.5.0)"
+            exit 1
+          fi
+          echo "Updating manifest for version: $VERSION"
           python3 << 'PYEOF'
           import json, os, re
 
@@ -213,7 +221,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes detected, skip commit"
           else
-            git commit -m "chore: auto-update manifest to v${{ steps.info.outputs.version }}"
+            git commit -m "chore: auto-update manifest to v${{ steps.tag.outputs.version }}"
             git push
             echo "Manifest committed and pushed"
             echo ""
