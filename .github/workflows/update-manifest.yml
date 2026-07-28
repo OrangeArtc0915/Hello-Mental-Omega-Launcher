@@ -1,0 +1,189 @@
+name: Auto-Update Manifest
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag for testing (e.g. v2.5.1)'
+        required: true
+        default: 'v2.5.0'
+
+permissions:
+  contents: write
+
+jobs:
+  update-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          VERSION=$(echo "$TAG" | sed 's/^v//')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag=$TAG, version=$VERSION"
+
+      - name: Extract release info
+        id: info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          ASSET_JSON=$(gh release view "$TAG" --json assets,body)
+          echo "$ASSET_JSON" | python3 << 'PYEOF'
+          import json, sys
+          try:
+              data = json.loads(sys.stdin.read())
+          except Exception as e:
+              print(f"PARSE_ERROR:{e}", file=sys.stderr)
+              sys.exit(1)
+          for a in data.get('assets', []):
+              n = a.get('name', '').lower()
+              if n.endswith('.exe') and 'wine' not in n:
+                  print(f"URL={a.get('browser_download_url','')}")
+                  print(f"SIZE={a.get('size',0)}")
+                  break
+          body = data.get('body', '') or ''
+          with open('/tmp/release_body.md', 'w', encoding='utf-8') as f:
+              f.write(body)
+          PYEOF
+          {
+            read -r URL_LINE
+            read -r SIZE_LINE
+          } < <(gh release view "$TAG" --json assets | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for a in data.get('assets', []):
+              n = a.get('name', '').lower()
+              if n.endswith('.exe') and 'wine' not in n:
+                  print(a.get('browser_download_url',''))
+                  print(a.get('size',0))
+                  break
+          ")
+          DATE=$(date -u +%Y-%m-%d)
+          if [ -z "$URL_LINE" ]; then
+            echo "::error::No HMOL.exe asset found in release $TAG"
+            exit 1
+          fi
+          echo "url=$URL_LINE" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE_LINE" >> "$GITHUB_OUTPUT"
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+          echo "Download URL: $URL_LINE"
+          echo "Asset size:   $SIZE_LINE bytes"
+
+      - name: Download and compute SHA256
+        id: hash
+        run: |
+          curl -fsSL --retry 3 -o /tmp/HMOL.exe "${{ steps.info.outputs.url }}"
+          SHA=$(sha256sum /tmp/HMOL.exe | awk '{print $1}')
+          ACTUAL=$(stat -c%s /tmp/HMOL.exe)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "SHA256:  $SHA"
+          echo "Size:    $ACTUAL bytes (expected ${{ steps.info.outputs.size }})"
+          if [ "$ACTUAL" != "${{ steps.info.outputs.size }}" ]; then
+            echo "::warning::Downloaded size differs from release asset size"
+          fi
+
+      - name: Update update/HMOL.update.json
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+          DATE: ${{ steps.info.outputs.date }}
+          URL: ${{ steps.info.outputs.url }}
+          SIZE: ${{ steps.info.outputs.size }}
+          SHA: ${{ steps.hash.outputs.sha }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, re
+
+          PATH = 'update/HMOL.update.json'
+          DEFAULTS = {
+              "min_version": "2.5.0",
+              "variant": "windows",
+              "cleanup": {
+                  "reset_config": True,
+                  "clear_logs": True,
+                  "clear_cache": True,
+                  "clear_backups": True
+              }
+          }
+
+          def parse_v(s):
+              nums = re.findall(r'\d+', str(s))
+              return tuple(int(n) for n in nums[:3]) if nums else (0, 0, 0)
+
+          def is_major_bump(old_v, new_v):
+              return (new_v[0], new_v[1]) > (old_v[0], old_v[1])
+
+          if os.path.exists(PATH):
+              with open(PATH, 'r', encoding='utf-8') as f:
+                  data = json.load(f)
+          else:
+              data = {}
+
+          new_v = parse_v(os.environ['VERSION'])
+          old_min = parse_v(data.get('min_version', '0.0.0'))
+
+          data['version'] = os.environ['VERSION']
+          data['release_date'] = os.environ['DATE']
+          data['exe'] = {
+              'url': os.environ['URL'],
+              'size': int(os.environ['SIZE']),
+              'sha256': os.environ['SHA']
+          }
+
+          if is_major_bump(old_min, new_v):
+              data['mandatory'] = True
+              print(f"[auto] Major bump {old_min} -> {new_v}, mandatory=true")
+          elif 'mandatory' not in data:
+              data['mandatory'] = False
+
+          body = ''
+          if os.path.exists('/tmp/release_body.md'):
+              with open('/tmp/release_body.md', 'r', encoding='utf-8') as f:
+                  body = f.read().strip()
+          if body and '<!-- skip-changelog -->' not in body:
+              data['changelog_zh'] = body
+              print(f"[auto] Changelog updated from release notes ({len(body)} chars)")
+          elif '<!-- skip-changelog -->' in body:
+              print("[auto] Changelog preserved (<!-- skip-changelog --> marker)")
+          else:
+              print("[auto] Changelog preserved (release body empty)")
+
+          for k, v in DEFAULTS.items():
+              data.setdefault(k, v)
+
+          os.makedirs('update', exist_ok=True)
+          with open(PATH, 'w', encoding='utf-8') as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+
+          print(f"\n=== {PATH} ===")
+          print(json.dumps(data, ensure_ascii=False, indent=2))
+          PYEOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update/HMOL.update.json
+          if git diff --staged --quiet; then
+            echo "No changes detected, skip commit"
+          else
+            git commit -m "chore: auto-update manifest to v${{ steps.info.outputs.version }}"
+            git push
+            echo "Manifest committed and pushed"
+            echo ""
+            echo "Verify at: https://cdn.jsdelivr.net/gh/${{ github.repository }}@main/update/HMOL.update.json"
+          fi
