@@ -41,47 +41,37 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          ASSET_JSON=$(gh release view "$TAG" --json assets,body)
-          echo "$ASSET_JSON" | python3 << 'PYEOF'
+          set -euo pipefail
+          echo "Querying release: $TAG"
+          URL_AND_SIZE=$(gh release view "$TAG" --json assets,body | python3 -c "
           import json, sys
-          try:
-              data = json.loads(sys.stdin.read())
-          except Exception as e:
-              print(f"PARSE_ERROR:{e}", file=sys.stderr)
-              sys.exit(1)
-          for a in data.get('assets', []):
-              n = a.get('name', '').lower()
-              if n.endswith('.exe') and 'wine' not in n:
-                  print(f"URL={a.get('browser_download_url','')}")
-                  print(f"SIZE={a.get('size',0)}")
-                  break
+          data = json.load(sys.stdin)
           body = data.get('body', '') or ''
           with open('/tmp/release_body.md', 'w', encoding='utf-8') as f:
               f.write(body)
-          PYEOF
-          {
-            read -r URL_LINE
-            read -r SIZE_LINE
-          } < <(gh release view "$TAG" --json assets | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
           for a in data.get('assets', []):
               n = a.get('name', '').lower()
               if n.endswith('.exe') and 'wine' not in n:
-                  print(a.get('browser_download_url',''))
-                  print(a.get('size',0))
+                  print(a.get('browser_download_url', ''))
+                  print(a.get('size', 0))
                   break
           ")
-          DATE=$(date -u +%Y-%m-%d)
-          if [ -z "$URL_LINE" ]; then
+          if [ -z "$URL_AND_SIZE" ]; then
             echo "::error::No HMOL.exe asset found in release $TAG"
+            echo "Available assets:"
+            gh release view "$TAG" --json assets --jq '.assets[].name'
             exit 1
           fi
-          echo "url=$URL_LINE" >> "$GITHUB_OUTPUT"
-          echo "size=$SIZE_LINE" >> "$GITHUB_OUTPUT"
-          echo "date=$DATE" >> "$GITHUB_OUTPUT"
-          echo "Download URL: $URL_LINE"
-          echo "Asset size:   $SIZE_LINE bytes"
+          URL=$(echo "$URL_AND_SIZE" | head -1)
+          SIZE=$(echo "$URL_AND_SIZE" | tail -1)
+          DATE=$(date -u +%Y-%m-%d)
+          {
+            echo "url=$URL"
+            echo "size=$SIZE"
+            echo "date=$DATE"
+          } >> "$GITHUB_OUTPUT"
+          echo "Download URL: $URL"
+          echo "Asset size:   $SIZE bytes"
 
       - name: Download and compute SHA256
         id: hash
