@@ -38,30 +38,72 @@ jobs:
       - name: Extract release info
         id: info
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          echo "Querying release: $TAG"
-          URL_AND_SIZE=$(gh release view "$TAG" --json assets,body | python3 -c "
+          echo "Querying release: $TAG in $REPO"
+          API_URL="https://api.github.com/repos/${REPO}/releases/tags/${TAG}"
+          echo "API URL: $API_URL"
+          HTTP_CODE=$(curl -sS -o /tmp/release.json -w "%{http_code}" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "User-Agent: HMOL-AutoUpdater" \
+            "${API_URL}")
+          echo "HTTP code: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Failed to fetch release (HTTP $HTTP_CODE)"
+            echo "Response body:"
+            cat /tmp/release.json 2>/dev/null || echo "(empty)"
+            echo ""
+            echo "Available releases in this repo:"
+            curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/releases" \
+              | python3 -c "
           import json, sys
-          data = json.load(sys.stdin)
+          try:
+              data = json.load(sys.stdin)
+              if not data:
+                  print('  (no releases found)')
+              for r in data:
+                  print(f\"  - {r.get('tag_name')} ({r.get('name')})  published={r.get('published_at')}\")
+          except Exception as e:
+              print(f'  (parse error: {e})')
+          " || echo "  (failed to list releases)"
+            exit 1
+          fi
+          python3 - <<'PYEOF' > /tmp/url_and_size.txt
+          import json
+          with open('/tmp/release.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
           body = data.get('body', '') or ''
           with open('/tmp/release_body.md', 'w', encoding='utf-8') as f:
               f.write(body)
+          found = False
           for a in data.get('assets', []):
               n = a.get('name', '').lower()
               if n.endswith('.exe') and 'wine' not in n:
                   print(a.get('browser_download_url', ''))
                   print(a.get('size', 0))
+                  found = True
                   break
-          ")
-          if [ -z "$URL_AND_SIZE" ]; then
+          if not found:
+              print('NO_MATCH', file=__import__('sys').stderr)
+          PYEOF
+          if grep -q "NO_MATCH" /tmp/url_and_size.txt 2>/dev/null; then
             echo "::error::No HMOL.exe asset found in release $TAG"
             echo "Available assets:"
-            gh release view "$TAG" --json assets --jq '.assets[].name'
+            python3 -c "
+          import json
+          d = json.load(open('/tmp/release.json', 'r', encoding='utf-8'))
+          for a in d.get('assets', []):
+              print(f\"  - {a.get('name')}  ({a.get('size')} bytes)\")
+          "
             exit 1
           fi
+          URL_AND_SIZE=$(cat /tmp/url_and_size.txt)
           URL=$(echo "$URL_AND_SIZE" | head -1)
           SIZE=$(echo "$URL_AND_SIZE" | tail -1)
           DATE=$(date -u +%Y-%m-%d)
