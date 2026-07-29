@@ -1,13 +1,13 @@
 {
-  "version": "2.5.2",
-  "release_date": "2026-07-28",
+  "version": "2.6.0",
+  "release_date": "2026-07-29",
   "exe": {
-    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.5.2/HMOL-wine.exe",
-    "size": 72877228,
-    "sha256": "9d6e8f98828bdef1825a30c7ad97da1d5ce3e06cfa8589596393704ca35b1ba2"
+    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.6.0/HMOL-wine.exe",
+    "size": 74153428,
+    "sha256": "83685caa54c70af1041800beb7459c3ff4a03ec60a1cb3a6f4514fe34b120bce"
   },
   "mandatory": true,
-  "changelog_zh": "## 🚀 HMOL v2.5.2 发布！\n\n### 版本分发\n- Windows用户请下载 HMOL.exe\n- Winlator（wine）模拟器用户请下载 HMOL-wine.exe\n\n\n### 自动更新功能测试，无实际更新内容\n\n\n## 🛠️ 安装要求\n\n- **操作系统**: Windows 7+（HMOL） wine7.8+（HMOL-wine）\n- **游戏版本**: 心灵终结 3.3.3+ 或兼容版本\n\n## **⭐ 如果这个项目对您有帮助，请给我们一个Star！ ⭐**",
+  "changelog_zh": "## 🚀 HMOL v2.6.0 发布！\n\n### 版本分发\n- Windows用户请下载 HMOL.exe\n- Winlator（wine）模拟器用户请下载 HMOL-wine.exe\n\n# HMOL(wine) v2.6.0\n- 全新底部下载状态栏，更新时可隐藏弹窗\n- 下载过程显示实时速度和剩余时间\n- 弹窗与下载栏可来回切换，不阻塞主窗口操作\n- 下载完成后自动弹出对话框提示重启\n- 优化更新对话框 UI，支持窗口缩放\n# HMOL v2.6.0\n###主题与主题色\n\n- 新增「自定义强调色」：预设色 + QColorDialog 自由取色器，应用于按钮/高亮条/开关/进度条/侧边栏激活项等关键元素\n- 主题色实时预览，即时生效\n###背景自定义\n\n- 支持 JPG / PNG / BMP / GIF / WebP 等常见图片格式作为主界面背景\n- GIF 动画背景支持（QMovie 循环播放）\n###窗口透明度\n\n- 新增窗口透明度滑块（20%-100%），独立调节启动器窗口透明度\n###背景音乐 (BGM)\n\n- 支持添加本地音乐文件（mp3/ogg/wav/flac/m4a/aac）\n- 播放列表管理、上一首/下一首/播放暂停/停止\n- 随机播放模式、独立音量调节\n### DLC 系统增强\n- DLC 页新增「主题包制作教程」按钮（4 步教程 + QSS 示例代码）\n- DLC.json 新增字段： type （美化/优化/功能分类）、 has_qss 、 qss_file\n- DLC 卡片显示分类标签（美化=紫色/优化=蓝色/功能=绿色）\n### 设置页重构\n- 外观 / 背景 / 音效合并为「个性化设置」标签页（嵌套子标签页）\n- 协议标签页内置完整 EULA（14 条款 + 中英双语，v2.2）\n- 保留全部原版设置功能（主题模式/渐变方案/路径检测/布局编辑器/日志查看器）\n### 性能优化\n- 窗口透明度和 BGM 音量滑块移除逐 tick 写磁盘，改为窗口关闭时统一持久化\n- 导航按钮 QSS 样式缓存按 theme_key 分键，避免每次主题切换重建\n- 背景模糊缓存 key 改用 pix.cacheKey() ，消除 Python GC 重用风险\n### UX 改进\n- 「保存设置」移除阻塞式 QMessageBox 弹窗，仅保留状态栏提示\n- 主题包教程窗口改用 QDialog + QTextEdit（可滚动），避免 QMessageBox 溢出\n- 自定义强调色标签改用直接引用存储，消除 findChild 树遍历\n### BUG 修复\n- 修复背景系统双写 config 导致的重复渲染\n- 修复 _nav_btn_style 缓存无条件失效 bug\n- 修复首次启动时 _last_theme_key 未初始化的 AttributeError\n- 修复 _show_dlc_json_spec 缺少新增字段说明\n\n## 🛠️ 安装要求\n\n- **操作系统**: Windows 10+（HMOL） wine7.8+（HMOL-wine）\n- **游戏版本**: 心灵终结 3.3.3+ 或兼容版本\n\n## **⭐ 如果这个项目对您有帮助，请给我们一个Star！ ⭐**",
   "min_version": "2.5.0",
   "variant": "wine",
   "cleanup": {
