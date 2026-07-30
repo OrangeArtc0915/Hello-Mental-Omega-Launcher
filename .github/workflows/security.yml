@@ -1,0 +1,79 @@
+name: security
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit pip-audit
+
+      - name: Run HMOL security audit
+        run: python security_audit.py
+
+      - name: pip-audit (dependency CVE check)
+        run: pip-audit -r requirements.txt --strict
+        continue-on-error: true
+
+      - name: Bandit (Python security linter)
+        run: |
+          bandit -r . -f json -o bandit-report.json || true
+          bandit -r . -lll
+        continue-on-error: true
+
+      - name: Verify .bat scripts are UTF-8 BOM
+        shell: pwsh
+        run: |
+          foreach ($f in @('build.bat', 'clean.bat', 'test_clean.bat', 'build_enhanced.bat')) {
+            if (Test-Path $f) {
+              $head = [System.IO.File]::ReadAllBytes($f)[0..2]
+              $hasBOM = ($head[0] -eq 0xEF -and $head[1] -eq 0xBB -and $head[2] -eq 0xBF)
+              if (-not $hasBOM) { Write-Host "[FAIL] $f missing UTF-8 BOM"; exit 1 }
+              else { Write-Host "[OK]   $f has UTF-8 BOM" }
+            }
+          }
+
+      - name: Verify no secrets in repo
+        shell: pwsh
+        run: |
+          $fail = $false
+          foreach ($pattern in @('AKIA[0-9A-Z]{16}', 'ghp_[A-Za-z0-9]{36}', 'sk_live_[A-Za-z0-9]+')) {
+            $hits = Get-ChildItem -Recurse -Include *.py,*.md,*.bat,*.json,*.yml,*.yaml |
+                    Select-String -Pattern $pattern
+            if ($hits) {
+              Write-Host "[FAIL] Found secret pattern: $pattern"
+              $fail = $true
+            }
+          }
+          if ($fail) { exit 1 }
+          Write-Host "[OK] No AWS/GitHub/Stripe secrets detected"
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          if-no-files-found: ignore

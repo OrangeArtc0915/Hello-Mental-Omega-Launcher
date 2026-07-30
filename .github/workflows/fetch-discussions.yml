@@ -1,0 +1,42 @@
+name: Fetch Discussions
+
+on:
+  push:
+    branches: [Web]
+    paths:
+      - '.github/workflows/fetch-discussions.yml'
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: Web
+
+      - name: Fetch discussions via GraphQL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/scripts/fetch_discussions.py \
+            --owner "${{ github.repository_owner }}" \
+            --repo "Hello-Mental-Omega-Launcher" \
+            --out "WEB/data"
+
+      - name: Commit & Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add WEB/data/
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update discussions data"
+            git push
+          fi
