@@ -145,6 +145,11 @@ Hello Mental Omega Launcher (HMOL) 是一个**专为 Mental Omega 玩家打造**
 - **HMOL 贡献者** — 感谢所有提交 bug 报告和功能建议的社区成员
 
 ---
+## ❤️ 支持HMOL
+如果这个社区对你有帮助，可以请作者喝杯咖啡：
+
+![微信赞赏](docs/wechat.jpg)
+![支付宝](docs/alipay.jpg)
 
 **© 2026 HMOL Contributors. All Rights Reserved.**
 
