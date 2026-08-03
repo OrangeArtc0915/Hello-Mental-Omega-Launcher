@@ -2,5 +2,4 @@ site_name: HMOL wiki
 theme: readthedocs   # 先用内置主题，后面可换成 material
 nav:
   - 首页: docs/index.md
-  - 快速开始: docs/getting-started.md
   # 按你的文件结构继续添加
