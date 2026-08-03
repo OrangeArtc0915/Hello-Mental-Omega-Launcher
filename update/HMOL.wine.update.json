@@ -1,13 +1,13 @@
 {
-  "version": "2.6.0",
-  "release_date": "2026-07-29",
+  "version": "2.6.2",
+  "release_date": "2026-08-03",
   "exe": {
-    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.6.0/HMOL-wine.exe",
-    "size": 74153428,
-    "sha256": "83685caa54c70af1041800beb7459c3ff4a03ec60a1cb3a6f4514fe34b120bce"
+    "url": "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/download/v2.6.2/HMOL-wine.exe",
+    "size": 74162270,
+    "sha256": "5fab67d247e3b201cec0d0ad3aee098ac80009c38c448083277c7dc4867b8cda"
   },
   "mandatory": true,
-  "changelog_zh": "## 🚀 HMOL v2.6.0 发布！\n\n### 版本分发\n- Windows用户请下载 HMOL.exe\n- Winlator（wine）模拟器用户请下载 HMOL-wine.exe\n\n# HMOL(wine) v2.6.0\n- 全新底部下载状态栏，更新时可隐藏弹窗\n- 下载过程显示实时速度和剩余时间\n- 弹窗与下载栏可来回切换，不阻塞主窗口操作\n- 下载完成后自动弹出对话框提示重启\n- 优化更新对话框 UI，支持窗口缩放\n# HMOL v2.6.0\n###主题与主题色\n\n- 新增「自定义强调色」：预设色 + QColorDialog 自由取色器，应用于按钮/高亮条/开关/进度条/侧边栏激活项等关键元素\n- 主题色实时预览，即时生效\n###背景自定义\n\n- 支持 JPG / PNG / BMP / GIF / WebP 等常见图片格式作为主界面背景\n- GIF 动画背景支持（QMovie 循环播放）\n###窗口透明度\n\n- 新增窗口透明度滑块（20%-100%），独立调节启动器窗口透明度\n###背景音乐 (BGM)\n\n- 支持添加本地音乐文件（mp3/ogg/wav/flac/m4a/aac）\n- 播放列表管理、上一首/下一首/播放暂停/停止\n- 随机播放模式、独立音量调节\n### DLC 系统增强\n- DLC 页新增「主题包制作教程」按钮（4 步教程 + QSS 示例代码）\n- DLC.json 新增字段： type （美化/优化/功能分类）、 has_qss 、 qss_file\n- DLC 卡片显示分类标签（美化=紫色/优化=蓝色/功能=绿色）\n### 设置页重构\n- 外观 / 背景 / 音效合并为「个性化设置」标签页（嵌套子标签页）\n- 协议标签页内置完整 EULA（14 条款 + 中英双语，v2.2）\n- 保留全部原版设置功能（主题模式/渐变方案/路径检测/布局编辑器/日志查看器）\n### 性能优化\n- 窗口透明度和 BGM 音量滑块移除逐 tick 写磁盘，改为窗口关闭时统一持久化\n- 导航按钮 QSS 样式缓存按 theme_key 分键，避免每次主题切换重建\n- 背景模糊缓存 key 改用 pix.cacheKey() ，消除 Python GC 重用风险\n### UX 改进\n- 「保存设置」移除阻塞式 QMessageBox 弹窗，仅保留状态栏提示\n- 主题包教程窗口改用 QDialog + QTextEdit（可滚动），避免 QMessageBox 溢出\n- 自定义强调色标签改用直接引用存储，消除 findChild 树遍历\n### BUG 修复\n- 修复背景系统双写 config 导致的重复渲染\n- 修复 _nav_btn_style 缓存无条件失效 bug\n- 修复首次启动时 _last_theme_key 未初始化的 AttributeError\n- 修复 _show_dlc_json_spec 缺少新增字段说明\n\n## 🛠️ 安装要求\n\n- **操作系统**: Windows 10+（HMOL） wine7.8+（HMOL-wine）\n- **游戏版本**: 心灵终结 3.3.3+ 或兼容版本\n\n## **⭐ 如果这个项目对您有帮助，请给我们一个Star！ ⭐**",
+  "changelog_zh": "## 🚀 HMOL v2.6.2 发布！\n\n### 版本分发\n- Windows用户请下载 HMOL.exe\n- Linux（wine）和Winlator（wine）模拟器用户请下载 HMOL-wine.exe\n\n# HMOL(wine) v2.6.2\n- 全新底部下载状态栏，更新时可隐藏弹窗，不阻塞主窗口\n- 下载过程显示实时速度和剩余时间\n- 弹窗与下载栏可来回切换，下载完成自动弹出对话框提示重启\n- 修复安装资源包时 KeyError 'resource' 导致崩溃的问题（反馈：烟消ゞ云散  修复：恍梦境°）\n- 修复自动更新 GitHub 配置文件路径错误\n- 统一所有版本号至 v2.6.0，清理无用测试/审计/构建文件\n- 新增 DLC 示例，优化下载对话框 UI 支持窗口缩放\n\n# HMOL v2.6.2\n\n### Bug 修复\n下载资源时启动器卡死 （反馈：鱼钓鱼 修复:mmm、恍梦境°）\n\n- 修复了从 OneDrive 下载文件时 on_dl 进度回调在后台线程直接操作 QProgressDialog 导致的 UI 卡死问题。现在所有 UI 更新统一通过 _run_on_main_thread 投递到主线程执行。\n- OneDriveBrowser.download_file / _sp_download_file 新增 cancel_check 参数，用户取消下载时可立即中断网络流、清理半成品文件。\n\n备份游戏不包含已安装包信息  （反馈：绮梦 修复：mmm）\n\n- _backup_game_impl 写入 backup_info.json 时现在会完整记录 installed_packages 字段，备份不再丢失已安装的插件包列表。\n\n双击 exe 静默后台不显示主页面    （反馈：EXLZX 修复:mmm）\n\n- 新增全局异常钩子 _install_fatal_error_hook() ，覆盖主线程和 Qt 工作线程，确保任何未捕获异常都会弹出可见的错误对话框。\n- 新增 _show_startup_error() 三级降级错误显示（QMessageBox → tkinter → Windows 原生 MessageBox），即使 Qt 初始化失败也能让用户看到错误。\n- MainWindow 构造、 auth.is_logged_in() 、登录对话框均增加 try/except 降级处理，避免单个模块失败导致进程静默存活。\n### DLC 功能\n- 新增 DLC 示例文件夹 DLC/Example_MyTheme/ 及标准的 DLC.json 示例文件，包含完整字段说明。\n\n## 🛠️ 安装要求\n\n- **操作系统**: Windows 10+（HMOL） wine7.8+（HMOL-wine）\n- **游戏版本**: 心灵终结 3.3.3+ 或兼容版本\n\n## **⭐ 如果这个项目对您有帮助，请给我们一个Star！ ⭐**",
   "min_version": "2.5.0",
   "variant": "wine",
   "cleanup": {
