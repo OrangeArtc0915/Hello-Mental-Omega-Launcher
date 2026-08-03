@@ -1,5 +1,8 @@
 site_name: HMOL wiki
-theme: readthedocs   # 先用内置主题，后面可换成 material
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - search.suggest
 nav:
   - 首页: docs/index.md
-  # 按你的文件结构继续添加
