@@ -1,8 +1,0 @@
-site_name: HMOL wiki
-theme:
-  name: material
-  features:
-    - navigation.tabs
-    - search.suggest
-nav:
-  - 首页: docs/index.md
