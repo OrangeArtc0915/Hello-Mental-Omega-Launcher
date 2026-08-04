@@ -1,309 +1,184 @@
-# 🌸 Mizuki  
-![Node.js >= 20](https://img.shields.io/badge/node.js-%3E%3D20-brightgreen) 
-![pnpm >= 9](https://img.shields.io/badge/pnpm-%3E%3D9-blue) 
-![Astro](https://img.shields.io/badge/Astro-5.12.8-orange)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+# Hello Mental Omega Launcher (HMOL)
 
-![Mizuki Preview](./README.webp)
+> 🚫 **本项目采用「源代码可见但禁止二次修改」许可证。任何形式的修改、二次开发、二次封装、二次分发均被严格禁止。**
+>
+> 🚫 **This project uses a "Source-Available, No-Modification" license. Any form of modification, derivative work, repackaging, or redistribution is strictly prohibited.**
 
-<table>
-  <tr>
-    <td><img alt="" src="docs/image/1.webp"></td>
-    <td><img alt="" src="docs/image/2.webp"></td>
-    <td><img alt="" src="docs/image/3.webp"></td>
-  <tr>
-  <tr>
-    <td><img alt="" src="docs/image/4.webp"></td>
-    <td><img alt="" src="docs/image/5.webp"></td>
-    <td><img alt="" src="docs/image/6.webp"></td>
-  <tr>
-</table>
-
-
-A modern, feature-rich static blog template built with [Astro](https://astro.build), featuring advanced functionality and beautiful design.
-
-[**🖥️ Live Demo**](https://mizuki.mysqil.com/)
-[**📝 Documentation**](https://docs.mizuki.mysqil.com/)
-
-🌏 README Languages
-[**English**](./README.md) /
-[**中文**](./README.zh.md) /
-[**日本語**](./docs/README.ja.md) /
-[**中文繁体**](./docs/README.tw.md) /
-
-## 🆕 v6.0 Update
-- **Page Refactoring**: Completely refactored anime, timeline, projects, skills, albums, friends, diary, and about pages for better performance and user experience.
-- **Page Toggle Feature**: Added page toggle functionality with SEO optimization modules, allowing control over feature page visibility.
-- **New Grid Layout**: Introduced new grid article list layout for improved content presentation.
-- **Ripple Management**: Added ripple effect management module for enhanced visual interactions.
-
-## 🆕 v5.0 Update
-- **Pio Live2D Integration**: Added Pio Live2D character, providing a cute interactive companion to enhance user engagement.
-- **Highly Configurable**: Supports detailed configuration in `src/config.ts`, including model path, position, size, dialogue content, etc., to meet personalized needs.
-- **Seamless Navigation**: The "Back to Home" feature now uses the theme's built-in Swup for smooth, no-refresh page transitions.
-
-## 🆕 v4.3 Update
-- **Anime Page:** Redesigned a cuter and more attractive anime page, including anime list, details, and timeline.
-- **Album Page:** Restructured the album page using pagination + folder data indexing solution.
-
-## 🆕 v3.4 Update
-- **New Pages:** Added project showcase, skills showcase, and timeline pages to display your work, professional skills, and growth journey.
-- **Dropdown Menu Fix:** Resolved the issue of border outlines appearing when clicking dropdown menus, improving interface consistency.
-- **Search Optimization:** Enhanced search functionality performance and accuracy.
-- **Footer HTML Injection:** Introduced a new feature allowing custom HTML content injection at the bottom of pages, providing greater flexibility.
-
-## 🆕 v3.3 Update
-- **Mermaid Syntax Support:** Added support for Mermaid chart syntax, now you can embed flowcharts, sequence diagrams, Gantt charts, etc. directly in Markdown.
-- **Umami Analytics:** Added support for Umami analytics, making it easy to integrate website visit data analysis.
-
-![Configuration](configuration.svg)
-
-### 🔧 Component Configuration System Restructuring
-- **Unified Configuration Architecture:** Brand new modular component configuration system, supporting dynamic component management and order configuration
-- **Configuration-Driven Component Loading:** Restructured SideBar component, implementing fully configuration-based component loading mechanism
-- **Unified Control Switches:** Removed independent enable switches for music player and announcement components, unified control through sidebarLayoutConfig
-- **Responsive Layout Adaptation:** Components support responsive layouts, automatically adjusting display based on device type
-
-### 📐 Layout System Optimization
-- **Dynamic Sidebar Position Adjustment:** Support for left/right sidebar switching, with automatic layout adaptation
-- **Intelligent Article Directory Positioning:** When sidebar is on the right, article navigation automatically moves to the left, providing a better reading experience
-- **Grid Layout Improvements:** Optimized CSS Grid layout, resolving container width anomaly issues
-
-### 🎛️ Configuration File Format Standardization
-- **Standardized Configuration Format:** Created unified component configuration file format specifications
-- **Type Safety:** Comprehensive TypeScript type definitions ensuring configuration type safety
-- **Extensibility:** Support for custom component types and configuration options
-
-### 🧹 Code Optimization
-- **Test File Cleanup:** Removed unused test configurations and dependencies, reducing project size
-- **Code Structure Optimization:** Improved component architecture, enhancing code maintainability
-- **Performance Improvement:** Optimized component loading logic, improving page rendering performance
+[![Version](https://img.shields.io/badge/version-2.4-blue.svg)](version.json)
+[![License](https://img.shields.io/badge/license-HMOL-red.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
 ---
+# HMOL Website
 
-## ✨ Features
+HMOL 启动器官网源码，通过 GitHub Pages 部署。
 
-### 🎨 Design & Interface
-- [x] Built with [Astro](https://astro.build) and [Tailwind CSS](https://tailwindcss.com)
-- [x] Smooth animations and page transitions using [Swup](https://swup.js.org/)
-- [x] Light/dark theme switching with system preference detection
-- [x] Customizable theme colors and dynamic banner carousel
-- [x] Fullscreen background images with carousel, opacity, and blur effects
-- [x] Fully responsive design for all devices
-- [x] Beautiful typography with JetBrains Mono font
+## 线上地址
 
-### 🔍 Content & Search
-- [x] Advanced search functionality based on [Pagefind](https://pagefind.app/)
-- [x] [Enhanced Markdown features](#-markdown-extensions) with syntax highlighting
-- [x] Interactive table of contents with auto-scrolling
-- [x] RSS feed generation
-- [x] Reading time estimation
-- [x] Article categorization and tagging system
-
-
-
-### 📱 Special Pages
-- [x] **Anime Tracking Page** - Track anime watching progress and ratings
-- [x] **Friends Page** - Beautiful cards showcasing friend websites
-- [x] **Diary Page** - Share life moments, similar to social media
-- [x] **Archive Page** - Organized timeline view of articles
-- [x] **About Page** - Customizable personal introduction
-
-### 🛠 Technical Features
-- [x] **Enhanced code blocks** based on [Expressive Code](https://expressive-code.com/)
-- [x] **Math formula support** with KaTeX rendering
-- [x] **Image optimization** with PhotoSwipe gallery integration
-- [x] **SEO optimization** including sitemaps and meta tags
-- [x] **Performance optimization** with lazy loading and caching
-- [x] **Comment system** with Twikoo integration
-
-## 🚀 Quick Start
-
-### 📦 Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/matsuzaka-yuki/mizuki.git
-   cd mizuki
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   # Install pnpm if not already installed
-   npm install -g pnpm
-   
-   # Install project dependencies
-   pnpm install
-   ```
-
-3. **Configure your blog:**
-   - Edit `src/config.ts` to customize blog settings
-   - Update site information, theme colors, banner images, and social links
-   - Configure feature page functionality
-
-4. **Start the development server:**
-   ```bash
-   pnpm dev
-   ```
-   Your blog will be available at `http://localhost:4321`
-
-### 📝 Content Management
-
-- **Create new posts:** `pnpm new-post <filename>`
-- **Edit posts:** Modify files in `src/content/posts/`
-- **Customize special pages:** Edit files in `src/content/spec/`
-- **Add images:** Place images in `src/assets/` or `public/`
-
-### 🚀 Deployment
-
-Deploy your blog to any static hosting platform:
-
-- **Vercel:** Connect your GitHub repository to Vercel
-- **Netlify:** Deploy directly from GitHub
-- **GitHub Pages:** Use the included GitHub Actions workflow
-- **Cloudflare Pages:** Connect your repository
-
-Before deployment, update the `site` URL in `astro.config.mjs`.
- 
- - **Umami API key (optional):** If you plan to use Umami analytics, we recommend setting the environment variable `UMAMI_API_KEY` on your deployment platform, or alternatively configure the key directly in the project's configuration files.
-
-## 📝 Post Frontmatter Format
-
-```yaml
----
-title: My First Blog Post
-published: 2023-09-09
-description: This is the first post of my new blog.
-image: ./cover.jpg
-tags: [tag1, tag2]
-category: Frontend
-draft: false
-pinned: false
-lang: en      # Only set when article language differs from site language in config.ts
----
+```
+https://orangeartc0915.github.io/Hello-Mental-Omega-Launcher/
 ```
 
-### Frontmatter Field Descriptions
+## 结构
 
-- **title**: Article title (required)
-- **published**: Publication date (required)
-- **description**: Article description for SEO and previews
-- **image**: Cover image path (relative to article file)
-- **tags**: Array of tags for categorization
-- **category**: Article category
-- **draft**: Set to `true` to hide article in production
-- **pinned**: Set to `true` to pin article to top
-- **lang**: Article language (only set when different from site default)
-
-### Pinned Articles Feature
-
-The `pinned` field allows you to pin important articles to the top of your blog list. Pinned articles will always appear before regular articles regardless of their publication date.
-
-**Usage:**
-```yaml
-pinned: true  # Pin this article to the top
-pinned: false # Regular article (default)
+```
+website/
+├── index.html      # 首页
+├── css/
+│   └── styles.css  # 样式
+├── js/
+│   └── main.js     # 交互
+├── assets/
+│   └── favicon.svg # 网站图标
+└── File/
+    ├── 111.png     # 截图
+    └── HMOL.jpg    # 封面
 ```
 
-**Sorting Rules:**
-1. Pinned articles appear first, sorted by publication date (newest first)
-2. Regular articles follow, sorted by publication date (newest first)
+## 部署
 
-## 🧩 Markdown Extensions
+本分支推送到 GitHub 后，在仓库 Settings → Pages 中将 Source 设为 `Web` 分支，目录选择 `/ (root)` 或 `/website` 即可自动部署。
 
-Mizuki supports enhanced features beyond standard GitHub Flavored Markdown:
+---
+## ⚠️ 重要声明 / Important Disclaimers
 
-### 📝 Enhanced Writing
-- **Callouts:** Create beautiful annotation boxes using `> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, etc.
-- **Math Formulas:** Write LaTeX math formulas using `$inline$` and `$$block$$` syntax
-- **Code Highlighting:** Advanced syntax highlighting with line numbers and copy buttons
-- **GitHub Cards:** Embed repository cards using `::github{repo="user/repo"}`
+**本启动器与 EA (Electronic Arts)、红色警戒 2 开发团队、心灵终结 (Mental Omega) 开发团队不存在任何关联、授权、赞助或背书关系。**
 
-### 🎨 Visual Elements
-- **Image Gallery:** Automatic PhotoSwipe integration for image viewing
-- **Collapsible Sections:** Create expandable content blocks
-- **Custom Components:** Enhance content with special directives
+"Red Alert 2"、"Command & Conquer"、"Yuri's Revenge" 是 Electronic Arts Inc. 的注册商标。
+"Mental Omega" 是独立的同人 mod 项目。
 
-### 📊 Content Organization
-- **Table of Contents:** Automatically generated from headings with smooth scrolling
-- **Reading Time:** Automatically calculated and displayed
-- **Article Metadata:** Rich frontmatter support with categories and tags
-
-## ⚡ Commands
-
-All commands are run from the project root:
-
-| Command                    | Action                                   |
-|:---------------------------|:-----------------------------------------|
-| `pnpm install`             | Install dependencies                     |
-| `pnpm dev`                 | Start local dev server at `localhost:4321` |
-| `pnpm build`               | Build production site to `./dist/`       |
-| `pnpm preview`             | Preview build locally before deployment  |
-| `pnpm check`               | Run Astro error checking                 |
-| `pnpm format`              | Format code with Biome                   |
-| `pnpm lint`                | Check and fix code issues                |
-| `pnpm new-post <filename>` | Create a new blog post                   |
-| `pnpm astro ...`           | Run Astro CLI commands                   |
-
-## 🎯 Configuration Guide
-
-### 🔧 Basic Configuration
-
-Edit `src/config.ts` to customize your blog:
-
-```typescript
-export const siteConfig: SiteConfig = {
-  title: "Your Blog Name",
-  subtitle: "Your Blog Description",
-  lang: "en", // or "zh-CN", "ja", etc.
-  themeColor: {
-    hue: 210, // 0-360, theme hue
-    fixed: false, // Hide theme color picker
-  },
-  banner: {
-    enable: true,
-    src: ["assets/banner/1.webp"], // Banner images
-    carousel: {
-      enable: true,
-      interval: 0.8, // seconds
-    },
-  },
-};
-```
-
-### 📱 Feature Page Configuration
-
-- **Anime Page:** Edit anime list in `src/pages/anime.astro`
-- **Friends Page:** Edit friend data in `src/content/spec/friends.md`
-- **Diary Page:** Edit moments in `src/pages/diary.astro`
-- **About Page:** Edit content in `src/content/spec/about.md`
-
-## ✏️ Contributing
-
-Contributions are welcome! Feel free to submit issues and pull requests.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgements
-
-- Based on the original [Fuwari](https://github.com/saicaca/fuwari) template
-- Built with [Astro](https://astro.build) and [Tailwind CSS](https://tailwindcss.com)
-- Inspired by [Yukina](https://github.com/WhitePaper233/yukina) - a beautiful and elegant blog template
-- Icons from [Iconify](https://iconify.design/)
-
-### Special Thanks
-
-- **[Yukina](https://github.com/WhitePaper233/yukina)** - Thanks for providing design inspiration and creativity that helped shape this project. Yukina is an elegant blog template that demonstrates excellent design principles and user experience.
+**This launcher is NOT affiliated with EA (Electronic Arts), the Red Alert 2 development team, or the Mental Omega development team.**
 
 ---
 
-⭐ If you find this project helpful, please consider giving it a star!
+## 📜 关于许可证 / About the License
+
+本项目使用 **HMOL Non-Commercial, No-Modification Source-Available License v2.2**(HMOL 非商用 · 禁止二次修改许可证)。
+
+### ✅ 允许的行为 / Permitted
+
+- 📖 查看、阅读、研究源代码
+- 🖥️ 在个人、非商业设备上安装并使用
+- 🐛 在 GitHub Issues 提交 bug 报告
+
+### ❌ 严禁的行为 / Strictly Prohibited
+
+| # | 行为 / Action | 说明 / Description |
+|---|--------------|-------------------|
+| 1 | 修改源代码 | 任何对 .py、.json、.md、.bat 等源文件的改动 |
+| 2 | 修改二进制 | 反编译后修改、补丁、热更新 |
+| 3 | 反向工程 | 反编译、反汇编、静态分析、动态跟踪(除法律明确允许外) |
+| 4 | 创建衍生作品 | Fork 后修改、改编、翻译、汇编、演绎 |
+| 5 | 代码复用 | 将代码、算法、逻辑用于其他项目 |
+| 6 | 重新分发 | 上传至任何代码托管平台或分发渠道 |
+| 7 | 商业使用 | 用于商业产品、服务、营利活动 |
+| 8 | 安全绕过 | 绕过、破解、规避安全机制、加密、版权保护 |
+| 9 | 标识移除 | 移除、隐藏、修改版权声明、商标、许可声明 |
+
+**完整许可条款请参见 [LICENSE](LICENSE) 文件。**
+
+**For the full license terms, see the [LICENSE](LICENSE) file.**
+
+---
+
+## 🌟 项目简介 / Project Overview
+
+Hello Mental Omega Launcher (HMOL) 是一个**专为 Mental Omega 玩家打造**的启动器,提供以下功能:
+
+- 🎮 **游戏启动** — 一键启动 Mental Omega 客户端
+- 📦 **实例管理** — 创建、管理、切换多个游戏实例
+- 📚 **包管理** — 安装、卸载、更新包
+- 🎨 **多主题** — 6 套精心设计的主题
+
+### 🆚 与 Mental Omega 官方启动器的关系
+
+- ❌ **不**是 Mental Omega 官方启动器
+- ❌ **不**提供 Mental Omega 盗版下载
+- ✅ **仅**是一个非官方的、社区开发的辅助工具
+- ✅ 旨在改善 Mental Omega 玩家社区的体验
+
+---
+
+
+## 📥 下载与安装 / Download and Install
+
+### 系统要求 / System Requirements
+
+| 项目 / Item | 要求 / Requirement |
+|------------|-------------------|
+| 操作系统 | Windows 10 / 11 (x64) |
+| 磁盘空间 | 至少 200 MB 可用空间 |
+
+### 开启奇妙之旅~
+
+1. 访问 [Releases 页面](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases)
+2. 下载最新版本
+3. 运行安装程序,按照向导完成安装
+4. 双击桌面图标启动 HMOL
+
+> ⚠️ **请仅从官方 GitHub Releases 和 微软商店 下载!**任何其他渠道提供的二进制均可能
+> 已被修改,违反本许可证,可能包含恶意代码。
+
+
+## 📋 使用协议 / EULA
+
+使用本软件前,**必须**阅读并同意 [EULA.md](EULA.md) 中的条款。
+
+协议核心条款:
+
+- §3 **二次修改禁令** — 严禁任何形式的二次修改
+- §4 许可授予 — 仅限个人非商业用途
+- §7 责任限制 — "原样"提供,无担保
+- §9 禁止行为 — 不得用于非法活动
+
+---
+
+## 🤝 贡献 / Contributing
+
+> 🚫 **本项目不接受任何形式的代码贡献、PR、Issue 中的代码修改。**
+
+由于许可证禁止二次修改,本项目**不接受 Pull Request**。
+
+但欢迎以下类型的贡献(无需修改代码):
+
+- 🐛 **Bug 报告** — 在 [Issues](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/issues) 中描述
+- 💡 **功能建议** — 在 Issues 中提出
+
+**请不要**提交包含代码修改的 Pull Request(会被直接关闭)。
+
+
+## 📞 联系方式 / Contact
+
+| 渠道            | 链接 / Link                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| GitHub 仓库     | <https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher>                                              |
+| GitHub Issues | <https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/issues>                                       |
+| 漏洞报告          | [Security Advisories](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/security/advisories/new) |
+| QQ 群          | 1034243331                                                                                                   |
+
+***
+
+## 📜 许可证 / License
+
+本项目采用 **HMOL Non-Commercial, No-Modification Source-Available License v2.2**。
+
+🚫 **严禁任何形式的二次修改、二次开发、二次封装、二次分发。**
+
+完整条款请参见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 🙏 致谢 / Acknowledgments
+
+- **Command & Conquer: Red Alert 2 - Yuri's Revenge** — © 2001-2026 Electronic Arts Inc.
+- **Mental Omega** — 独立同人 mod 项目
+- **HMOL 贡献者** — 感谢所有提交 bug 报告和功能建议的社区成员
+
+---
+
+**© 2026 HMOL Contributors. All Rights Reserved.**
+
+**Made with ❤️ for the Mental Omega community.**
+
+
+[def]: SECURITY.md
