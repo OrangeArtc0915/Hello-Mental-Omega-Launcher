@@ -290,12 +290,12 @@ export const commentConfig: CommentConfig = {
 export const announcementConfig: AnnouncementConfig = {
 	title: "HMOL",
 	content: "欢迎访问 HMOL (Hello Mental Omega Launcher) 官方网站。请仅从官方渠道下载。",
-	closable: true,
+	closable: false,
 	link: {
 		enable: true,
 		text: "前往下载",
-		url: "/download/",
-		external: false,
+		url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/latest",
+		external: true,
 	},
 };
 
