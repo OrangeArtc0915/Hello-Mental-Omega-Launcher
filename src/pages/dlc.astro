@@ -1,0 +1,115 @@
+---
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { dlcItems } from "../data/dlc";
+
+const standardDLC = dlcItems.filter((d) => d.badge === "标准版");
+const wineDLC = dlcItems.filter((d) => d.badge === "Wine 版");
+---
+
+<MainGridLayout title="HMOL DLC 插件包">
+  <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+
+      <header class="mb-10 mt-4">
+        <span class="text-sm font-medium text-[var(--primary)] tracking-wider uppercase">DLC Package</span>
+        <h1 class="text-3xl font-bold text-black/90 dark:text-white/90 mt-2 mb-3">
+          HMOL <span class="text-[var(--primary)]">DLC</span> 插件包与扩展内容
+        </h1>
+        <p class="text-black/50 dark:text-white/50 max-w-2xl">
+          官方 DLC 包合集，包含程序拓展、主题包、工具等追加内容，自由安装与管理。
+          DLC 分普通版（含个性化设置 / 美化支持）和 Wine 版两种格式，按需选择。
+        </p>
+      </header>
+
+      <div class="card-base !p-6 border border-black/5 dark:border-white/5 mb-6">
+        <p class="text-sm text-black/50 dark:text-white/50 text-center">
+          DLC 分两种格式，对应 HMOL 普通版与 Wine 版，请根据你的启动器版本选择
+        </p>
+      </div>
+
+      <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-4">DLC 配置格式</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div class="card-base !p-6 border border-black/5 dark:border-white/5">
+          <h3 class="font-semibold text-black/85 dark:text-white/85 mb-2">HMOL 普通版 DLC (DLC.json)</h3>
+          <p class="text-xs text-black/35 dark:text-white/35 mb-4">支持个性化设置 / QSS 美化</p>
+          <pre class="text-xs bg-black/5 dark:bg-white/5 rounded-lg p-4 overflow-x-auto font-mono text-black/60 dark:text-white/60">{`{
+    "name": "示例主题包",
+    "version": "1.0.0",
+    "description": "展示主题包的基本结构",
+    "author": "YourName",
+    "contact": "qq:123456789",
+    "main": "bin/example.exe",
+    "type": "美化",
+    "has_qss": true,
+    "qss_file": "theme/style.qss"
+}`}</pre>
+        </div>
+        <div class="card-base !p-6 border border-black/5 dark:border-white/5">
+          <h3 class="font-semibold text-black/85 dark:text-white/85 mb-2">HMOL Wine 版 DLC (DLC-wine.json)</h3>
+          <p class="text-xs text-black/35 dark:text-white/35 mb-4">不含个性化设置，仅核心扩展功能</p>
+          <pre class="text-xs bg-black/5 dark:bg-white/5 rounded-lg p-4 overflow-x-auto font-mono text-black/60 dark:text-white/60">{`{
+    "name": "Hello World 示例",
+    "version": "v1.0.0",
+    "description": "一个 DLC 示例项目",
+    "author": "制作人：你的名字",
+    "contact": "QQ群：1034243331",
+    "main": "HelloWorld.bat"
+}`}</pre>
+        </div>
+      </div>
+
+      <div class="card-base !p-6 border border-black/5 dark:border-white/5 mb-10">
+        <h3 class="font-semibold text-black/85 dark:text-white/85 mb-3">字段说明</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-black/50 dark:text-white/50">
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">name</code> — DLC 显示名称</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">version</code> — 版本号</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">description</code> — 简要描述</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">author</code> — 作者</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">contact</code> — 联系方式</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">main</code> — DLC 主入口文件（相对路径）</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">has_qss / qss_file</code> — 仅普通版，QSS 样式文件</p>
+          <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">type</code> — 仅普通版，分类标签</p>
+        </div>
+      </div>
+
+      <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-4">DLC 插件包列表</h2>
+      <p class="text-sm text-black/45 dark:text-white/45 mb-4">以下为官方提供的 DLC 包，点击了解详情。DLC 仅支持在启动器内下载。</p>
+
+      {
+        wineDLC.length > 0 && (
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {wineDLC.map((dlc) => (
+              <a href={`/dlc/${dlc.id}/`} class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+                 style={{ borderTopColor: dlc.accent, borderTopWidth: "2px" }}>
+                <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full mb-2"
+                      style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
+                  {dlc.badge}
+                </span>
+                <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1">{dlc.name}</h3>
+                <p class="text-sm text-black/45 dark:text-white/45">{dlc.description}</p>
+              </a>
+            ))}
+          </div>
+        )
+      }
+
+      <div class="border-t border-black/5 dark:border-white/5 my-4"></div>
+
+      <h3 class="text-lg font-semibold text-black/70 dark:text-white/70 mb-4">红警开发工具</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {standardDLC.map((dlc) => (
+          <a href={`/dlc/${dlc.id}/`} class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+             style={{ borderTopColor: dlc.accent, borderTopWidth: "2px" }}>
+            <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full mb-2"
+                  style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
+              {dlc.badge}
+            </span>
+            <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1">{dlc.name}</h3>
+            <p class="text-sm text-black/45 dark:text-white/45">{dlc.description}</p>
+          </a>
+        ))}
+      </div>
+
+    </div>
+  </div>
+</MainGridLayout>

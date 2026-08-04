@@ -34,14 +34,9 @@ if (footerConfig.enable) {
         {customFooterHtml && (
             <div class="mb-2" set:html={customFooterHtml}></div>
         )}
-        &copy; <span id="copyright-year">{currentYear}</span> {profileConfig.name}. All Rights Reserved. /
-        <a class="transition link text-[var(--primary)] font-medium" href={url('rss/')} onclick={`event.preventDefault(); navigateToPage('${url('rss/')}')`}>RSS</a> /
-		<a class="transition link text-[var(--primary)] font-medium" href={url('atom/')} onclick={`event.preventDefault(); navigateToPage('${url('atom/')}')`}>Atom</a> /
-        <a class="transition link text-[var(--primary)] font-medium" target="_blank" href={url('sitemap-index.xml')}>Sitemap</a><br>
-        Powered by
-        <a class="transition link text-[var(--primary)] font-medium" target="_blank" href="https://astro.build">Astro</a> &
-        <a class="transition link text-[var(--primary)] font-medium" target="_blank" href="https://github.com/matsuzaka-yuki/mizuki">Mizuki</a>&nbsp; Version <a class="transition link text-[var(--primary)] font-medium" target="_blank" href="https://github.com/matsuzaka-yuki/mizuki">6.1</a><br>
-        
+        &copy; <span id="copyright-year">{currentYear}</span> HMOL Contributors. / HMOL Non-Commercial, No-Modification License. /
+        <a class="transition link text-[var(--primary)] font-medium" target="_blank" href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher">GitHub</a><br>
+        HMOL 独立第三方启动器，与 EA 及 Mental Omega 开发团队无关联。
 
     </div>
 </div>

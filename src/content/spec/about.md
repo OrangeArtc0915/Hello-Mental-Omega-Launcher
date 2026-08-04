@@ -1,49 +1,31 @@
 
-This website is built with the **Astro** framework using the [Mizuki](https://github.com/matsuzaka-yuki/mizuki) theme.
+## 关于 HMOL
 
-::github{repo="matsuzaka-yuki/Mizuki"}
+HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的轻量级独立启动器。
+提供一键启动、多实例管理、主题切换、双语支持等功能。
 
-## 🌟 Theme Features
+::github{repo="OrangeArtc0915/Hello-Mental-Omega-Launcher"}
 
-### 🎨 Design & User Experience
-- **Modern & Elegant Design** - Clean, minimalist interface with beautiful typography
-- **Fully Responsive** - Optimized for all devices from mobile to desktop
-- **Dark/Light Mode** - Automatic theme switching with smooth transitions
-- **Beautiful Typography** - Enhanced readability with JetBrains Mono font
-- **Smooth Animations** - Fluid page transitions and interactive elements
+### 安装前请确认
 
-### 🔍 Content & Search
-- **Advanced Search** - Powered by [Pagefind](https://pagefind.app/) for fast, accurate results
-- **Enhanced Markdown** - Extended syntax with code highlighting and math support
-- **Interactive Table of Contents** - Auto-scroll navigation for long articles
-- **RSS Feed Generation** - Stay updated with automatic feed generation
-- **Reading Time Estimation** - Know how long articles take to read
-- **Post Categorization** - Organize content with tags and categories
+1. 仅从本页面或 GitHub Releases 下载，拒绝一切二次封包版本。
+2. 核对发行版的 SHA-256 校验值是否与公告一致。
+3. 首次运行会弹出 EULA，阅读后勾选「不同意」将自动退出并清理本地数据。
+4. 本程序遵循 CC BY-ND-NC 1.0 许可，禁止用于商业用途与二次分发。
 
+### QQ 交流群
 
+- **1 群**: 1034243331 — [一键加群](https://qm.qq.com/q/sftaO5bri0)
+- **2 群**: 1092671790 — [一键加群](https://qm.qq.com/q/RHb7OFi5Uq)
 
-### 📱 Special Pages
-- **Anime Tracking Page** - Track your anime watching progress with ratings
-- **Friends Links Page** - Showcase friend websites with beautiful cards
-- **Diary/Moments Page** - Share life moments like social media posts
-- **Archive Page** - Organized timeline view of all posts
-- **About Page** - Customizable personal introduction (this page!)
+### 赞助支持
 
-### 🛠 Technical Features
-- **Enhanced Code Blocks** - Powered by [Expressive Code](https://expressive-code.com/)
-- **Math Support** - LaTeX rendering with KaTeX for mathematical expressions
-- **Image Optimization** - PhotoSwipe gallery with lazy loading
-- **SEO Optimized** - Built-in sitemap and meta tags for better search visibility
-- **Performance Optimized** - Fast loading with caching and optimization
-- **Comment System Ready** - Integration support for Twikoo comments
+如果本项目对你有帮助，欢迎赞助支持我们的服务器和开发。
 
-### 🎯 Advanced Markdown Features
-- **Callouts & Admonitions** - Beautiful info boxes with `> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`
-- **Mathematical Equations** - Write LaTeX math with `$inline$` and `$$block$$` syntax
-- **GitHub Cards** - Embed repository cards with `::github{repo="user/repo"}`
-- **Syntax Highlighting** - Advanced code highlighting with line numbers
-- **Copy Code Buttons** - Easy code copying functionality
+| 支付宝 | 微信 |
+|--------|------|
+| ![](/docs/alipay.png) | ![](/docs/wechat.jpg) |
 
 ---
 
-*Built with ❤️ using Astro and inspired by modern web design principles.*
+*HMOL 独立第三方启动器，与 EA 及 Mental Omega 开发团队无关联。*

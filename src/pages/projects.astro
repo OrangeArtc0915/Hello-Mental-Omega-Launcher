@@ -1,10 +1,8 @@
 ---
 import { siteConfig } from "../config";
-import { getCollection } from "astro:content";
 import { UNCATEGORIZED } from "../constants/constants";
 import {
 	getAllTechStack,
-	getFeaturedProjects,
 	getProjectStats,
 	getProjectsByCategory,
 	projectsData,
@@ -12,31 +10,20 @@ import {
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
-import { loadIconify } from "../utils/icon-loader";
+import { url } from "../utils/url-utils";
 
-// 检查项目页面是否启用
 if (!siteConfig.featurePages.projects) {
 	return Astro.redirect("/404/");
 }
 
 const { lang } = Astro.props;
-
-// 加载Iconify图标库
-loadIconify().catch((error) => {
-	console.error("Failed to load Iconify:", error);
-});
-
-// 获取项目统计信息
 const stats = getProjectStats();
-const featuredProjects = getFeaturedProjects();
 const allTechStack = getAllTechStack();
 
-// 获取所有分类
 const categories = [
 	...new Set(projectsData.map((project) => project.category)),
 ];
 
-// 按分类获取项目
 const projectsByCategory = categories.reduce(
 	(acc, category) => {
 		acc[category] = getProjectsByCategory(category);
@@ -45,232 +32,94 @@ const projectsByCategory = categories.reduce(
 	{} as Record<string, typeof projectsData>,
 );
 
-const title = i18n(I18nKey.projects);
-const subtitle = i18n(I18nKey.projectsSubtitle);
-
-// 获取分类文本的国际化翻译
 const getCategoryText = (category: string) => {
 	switch (category) {
-		case "web":
-			return i18n(I18nKey.projectsWeb);
-		case "mobile":
-			return i18n(I18nKey.projectsMobile);
-		case "desktop":
-			return i18n(I18nKey.projectsDesktop);
-		case "other":
-			return i18n(I18nKey.projectsOther);
-		case UNCATEGORIZED:
-			return i18n(I18nKey.uncategorized);
-		default:
-			return category;
+		case "web": return i18n(I18nKey.projectsWeb);
+		case "mobile": return i18n(I18nKey.projectsMobile);
+		case "desktop": return i18n(I18nKey.projectsDesktop);
+		case "other": return i18n(I18nKey.projectsOther);
+		case UNCATEGORIZED: return i18n(I18nKey.uncategorized);
+		default: return category;
 	}
 };
+
+const GITHUB = "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher";
+const GITHUB_RELEASES = `${GITHUB}/releases/latest`;
 ---
 
-<MainGridLayout title={title} description={subtitle}>
+<MainGridLayout title={i18n(I18nKey.projects)} description={i18n(I18nKey.projectsSubtitle)}>
   <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
     <div class="card-base z-10 px-9 py-6 relative w-full">
-      <!-- 页面标题 -->
+
       <div class="flex flex-col items-start justify-center mb-8">
-        <h1 class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+        <h1 class="text-3xl font-bold text-black/90 dark:text-white/90 mb-2 relative
                   before:w-1 before:h-8 before:rounded-md before:bg-[var(--primary)]
                   before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4">
-          {i18n(I18nKey.projects)}
+          HMOL 下载
         </h1>
-        <p class="text-lg text-black/60 dark:text-white/60">
-          {i18n(I18nKey.projectsSubtitle)}
+        <p class="text-sm text-black/50 dark:text-white/50">
+          请仅从官方渠道下载。第三方分发版本可能已被修改。
         </p>
       </div>
 
-      <!-- 统计信息 -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4">
           <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
-          <div class="text-sm text-blue-600/70 dark:text-blue-400/70">{i18n(I18nKey.projectsTotal)}</div>
+          <div class="text-sm text-blue-600/70 dark:text-blue-400/70">版本总数</div>
         </div>
         <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4">
           <div class="text-2xl font-bold text-green-600 dark:text-green-400">{stats.byStatus.completed}</div>
-          <div class="text-sm text-green-600/70 dark:text-green-400/70">{i18n(I18nKey.projectsCompleted)}</div>
-        </div>
-        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg p-4">
-          <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.byStatus.inProgress}</div>
-          <div class="text-sm text-yellow-600/70 dark:text-yellow-400/70">{i18n(I18nKey.projectsInProgress)}</div>
-        </div>
-        <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-4">
-          <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{allTechStack.length}</div>
-          <div class="text-sm text-purple-600/70 dark:text-purple-400/70">{i18n(I18nKey.projectsTechStack)}</div>
+          <div class="text-sm text-green-600/70 dark:text-green-400/70">稳定版本</div>
         </div>
       </div>
 
-      <!-- 特色项目 -->
-      {featuredProjects.length > 0 && (
-        <div class="mb-8">
-          <h2 class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
-                    before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
-                    before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4">
-            {i18n(I18nKey.projectsFeatured)}
-          </h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {featuredProjects.map((project) => (
-              <div class="bg-white dark:bg-transparent rounded-lg border border-black/10 dark:border-white/10 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                {project.image && (
-                  <div class="aspect-video overflow-hidden">
-                    <img 
-                      src={project.image} 
-                      alt={project.title}
-                      class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                )}
-                <div class="p-6">
-                  <div class="flex items-start justify-between mb-3">
-                    <h3 class="text-xl font-semibold text-black/90 dark:text-white/90">
-                      {project.title}
-                    </h3>
-                    <span class={`px-2 py-1 text-xs rounded-full ${
-                      project.status === 'completed' 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : project.status === 'in-progress'
-                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                    }`}>
-                      {i18n(project.status === 'completed' ? I18nKey.projectsCompleted : 
-                            project.status === 'in-progress' ? I18nKey.projectsInProgress : 
-                            I18nKey.projectsPlanned)}
-                    </span>
-                  </div>
-                  <p class="text-black/60 dark:text-white/60 mb-4 line-clamp-2">
-                    {project.description}
-                  </p>
-                  <div class="flex flex-wrap gap-2 mb-4">
-                    {project.techStack.slice(0, 4).map((tech) => (
-                      <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-                        {tech}
-                      </span>
-                    ))}
-                    {project.techStack.length > 4 && (
-                      <span class="px-2 py-1 text-xs bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400 rounded">
-                        +{project.techStack.length - 4}
-                      </span>
-                    )}
-                  </div>
-                  <div class="flex flex-wrap gap-2 text-sm">
-                    {project.visitUrl && (
-                      <a 
-                        href={project.visitUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        class="btn-gradient btn-gradient-primary btn-gradient-md"
-                      >
-                        <iconify-icon icon="material-symbols:open-in-new" width="18" height="18"></iconify-icon>
-                        {i18n(I18nKey.projectsVisit)}
-                      </a>
-                    )}
-                    {project.sourceCode && (
-                      <a 
-                        href={project.sourceCode} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        class="btn-gradient btn-github btn-gradient-md"
-                      >
-                        <iconify-icon icon="mdi:github" width="18" height="18"></iconify-icon>
-                        {i18n(I18nKey.projectsGitHub)}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <!-- 按分类展示项目 -->
       <div class="space-y-8">
         {categories.map((category) => {
           const categoryProjects = projectsByCategory[category];
           if (categoryProjects.length === 0) return null;
-          
           return (
             <div>
-              <h2 class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
-                        before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+              <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-4 relative
+                        before:w-1 before:h-5 before:rounded-md before:bg-[var(--primary)]
                         before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4">
                 {getCategoryText(category)}
-                <span class="text-lg font-normal text-black/60 dark:text-white/60 ml-2">
-                  ({categoryProjects.length})
-                </span>
               </h2>
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {categoryProjects.map((project) => (
-                  <div class="bg-white dark:bg-transparent rounded-lg border border-black/10 dark:border-white/10 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                    {project.image && (
-                      <div class="aspect-video overflow-hidden">
-                        <img 
-                          src={project.image} 
-                          alt={project.title}
-                          class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    )}
-                    <div class="p-4">
-                      <div class="flex items-start justify-between mb-2">
-                        <h3 class="text-lg font-semibold text-black/90 dark:text-white/90 line-clamp-1">
-                          {project.title}
-                        </h3>
-                        <span class={`px-2 py-1 text-xs rounded-full shrink-0 ml-2 ${
-                          project.status === 'completed' 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : project.status === 'in-progress'
-                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                        }`}>
-                          {i18n(project.status === 'completed' ? I18nKey.projectsCompleted : 
-                                project.status === 'in-progress' ? I18nKey.projectsInProgress : 
-                                I18nKey.projectsPlanned)}
-                        </span>
-                      </div>
-                      <p class="text-black/60 dark:text-white/60 mb-3 text-sm line-clamp-2">
-                        {project.description}
-                      </p>
-                      <div class="flex flex-wrap gap-1 mb-3">
-                        {project.techStack.slice(0, 3).map((tech) => (
-                          <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-                            {tech}
-                          </span>
-                        ))}
-                        {project.techStack.length > 3 && (
-                          <span class="px-2 py-1 text-xs bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400 rounded">
-                            +{project.techStack.length - 3}
-                          </span>
-                        )}
-                      </div>
-                      <div class="flex flex-wrap gap-2 text-sm">
-                        {project.visitUrl && (
-                          <a 
-                            href={project.visitUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            class="btn-gradient btn-gradient-primary btn-gradient-md"
-                          >
-                            <iconify-icon icon="material-symbols:open-in-new" width="18" height="18"></iconify-icon>
-                            {i18n(I18nKey.projectsVisit)}
-                          </a>
-                        )}
-                        {project.sourceCode && (
-                          <a 
-                            href={project.sourceCode} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            class="btn-gradient btn-github btn-gradient-md"
-                          >
-                            <iconify-icon icon="mdi:github" width="18" height="18"></iconify-icon>
-                            {i18n(I18nKey.projectsGitHub)}
-                          </a>
-                        )}
+                  <a href={project.visitUrl?.startsWith("/") ? project.visitUrl : url(`/projects/${project.id}/`)} class="block group">
+
+
+                    <div class="bg-white dark:bg-transparent rounded-lg border border-black/10 dark:border-white/10 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                      {project.image && (
+                        <div class="aspect-video overflow-hidden">
+                          <img src={project.image} alt={project.title}
+                               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                        </div>
+                      )}
+                      <div class="p-5">
+                        <div class="flex items-start justify-between mb-2">
+                          <h3 class="text-lg font-semibold text-black/90 dark:text-white/90 line-clamp-1">
+                            {project.title}
+                          </h3>
+                          {project.badge && (
+                            <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0 ml-2">
+                              {project.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p class="text-black/60 dark:text-white/60 mb-3 text-sm line-clamp-2">
+                          {project.description}
+                        </p>
+                        <div class="flex flex-wrap gap-1.5">
+                          {project.techStack.map((tech) => (
+                            <span class="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded">
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>
@@ -278,19 +127,16 @@ const getCategoryText = (category: string) => {
         })}
       </div>
 
-      <!-- 技术栈统计 -->
-      <div class="mt-12 pt-8 border-t border-black/10 dark:border-white/10">
-        <h2 class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4">
-          {i18n(I18nKey.projectsTechStack)}
-        </h2>
-        <div class="flex flex-wrap gap-2">
-          {allTechStack.map((tech) => (
-            <span class="px-3 py-1 text-sm bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded-full">
-              {tech}
-            </span>
-          ))}
-        </div>
+      <!-- 安装前确认 -->
+      <div class="mt-10 p-5 rounded-lg border border-black/5 dark:border-white/5">
+        <h3 class="font-bold text-black/85 dark:text-white/85 mb-3">安装前请确认</h3>
+        <ol class="space-y-1.5 text-sm text-black/50 dark:text-white/50">
+          <li>1. 仅从本页面或 GitHub Releases 下载，拒绝一切二次封包版本。</li>
+          <li>2. 核对发行版的 SHA-256 校验值是否与公告一致。</li>
+          <li>3. 首次运行会弹出 EULA，不同意将自动退出并清理本地数据。</li>
+        </ol>
       </div>
+
     </div>
   </div>
 </MainGridLayout>
@@ -302,7 +148,6 @@ const getCategoryText = (category: string) => {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;

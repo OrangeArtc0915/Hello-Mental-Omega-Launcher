@@ -1,0 +1,89 @@
+---
+import MainGridLayout from "../../layouts/MainGridLayout.astro";
+import { dlcItems } from "../../data/dlc";
+
+export function getStaticPaths() {
+	return dlcItems.map((dlc) => ({ params: { id: dlc.id } }));
+}
+
+const { id } = Astro.params;
+const dlc = dlcItems.find((d) => d.id === id);
+
+if (!dlc) {
+	return Astro.redirect("/dlc/");
+}
+---
+
+<MainGridLayout title={`${dlc.name} | HMOL DLC`}>
+  <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+
+      <div class="text-center max-w-xl mx-auto">
+
+        <div class="w-28 h-28 mx-auto mb-8 rounded-2xl flex items-center justify-center border"
+             style={{
+               background: `linear-gradient(135deg, ${dlc.accent}26, ${dlc.accent2}1a)`,
+               borderColor: `${dlc.accent}33`,
+               boxShadow: `0 0 60px -16px ${dlc.accent}40`,
+             }}>
+          <span class="iconify text-4xl" style={{ color: dlc.accent }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={dlc.icon}></svg>
+          </span>
+        </div>
+
+        <span class="inline-block text-[10px] font-mono px-3 py-1 rounded-full mb-4"
+              style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent, border: `1px solid ${dlc.accent}26` }}>
+          {dlc.badge} DLC
+        </span>
+
+        <h1 class="text-3xl font-bold text-black/90 dark:text-white/90 mb-4">
+          {dlc.name.split(" ").slice(0, -1).join(" ")} <span style={{ color: dlc.accent }}>{dlc.name.split(" ").slice(-1)}</span>
+        </h1>
+
+        <p class="text-black/45 dark:text-white/45 leading-relaxed mb-2">{dlc.description}</p>
+        {dlc.isThirdParty && (
+          <p class="text-xs text-black/25 dark:text-white/25 mb-10">此 DLC 为第三方作品搬运，非 HMOL 原创</p>
+        )}
+
+        <div class="card-base !p-8 border border-black/5 dark:border-white/5 max-w-md mx-auto mb-8 text-left"
+             style={{ borderTopColor: dlc.accent, borderTopWidth: "2px" }}>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-black/35 dark:text-white/35 mb-5">下载方式</h3>
+          <ol class="space-y-3">
+            {[
+              "打开 <em>HMOL 启动器</em>",
+              "进入 <em>DLC 下载</em>",
+              `找到 <em>${dlc.name}</em> → 点击下载`,
+              "重启启动器完成安装",
+            ].map((step, i) => (
+              <li class="flex items-start gap-3 text-sm text-black/55 dark:text-white/55">
+                <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-mono shrink-0"
+                      style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
+                  {i + 1}
+                </span>
+                <span class="pt-1" set:html={step}></span>
+              </li>
+            ))}
+          </ol>
+          <div class="mt-5 pt-4 border-t border-black/5 dark:border-white/5">
+            <p class="text-xs text-black/30 dark:text-white/30">DLC 包只能在启动器内下载</p>
+          </div>
+        </div>
+
+        <div class="flex justify-center gap-3">
+          <a href="/dlc/" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium
+                             border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60
+                             hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            返回列表
+          </a>
+          <a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki" target="_blank" rel="noopener"
+             class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium text-white transition-all hover:opacity-90"
+             style={{ background: `linear-gradient(135deg, ${dlc.accent}, ${dlc.accent2})` }}>
+            查看 Wiki
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</MainGridLayout>

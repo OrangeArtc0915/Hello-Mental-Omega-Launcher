@@ -1,0 +1,80 @@
+---
+import MainGridLayout from "../../layouts/MainGridLayout.astro";
+import { projectsData } from "../../data/projects";
+import { url } from "../../utils/url-utils";
+
+export function getStaticPaths() {
+	return projectsData.map((p) => ({ params: { id: p.id } }));
+}
+
+const { id } = Astro.params;
+const project = projectsData.find((p) => p.id === id);
+
+if (!project) {
+	return Astro.redirect("/projects/");
+}
+
+const GITHUB = "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher";
+const GITHUB_RELEASES = `${GITHUB}/releases/latest`;
+const GITEE = "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher";
+---
+
+<MainGridLayout title={`${project.title} | HMOL`}>
+  <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+
+      <div class="text-center max-w-xl mx-auto mb-10 mt-4">
+        {project.image && (
+          <img src={project.image} alt={project.title} class="w-24 h-24 rounded-2xl mx-auto mb-6 border border-black/5 dark:border-white/5 object-cover" loading="lazy" />
+        )}
+        {project.badge && (
+          <span class="inline-block text-xs font-mono px-3 py-1 rounded-full mb-4 bg-[var(--primary)]/10 text-[var(--primary)]">
+            {project.badge}
+          </span>
+        )}
+        <h1 class="text-3xl font-bold text-black/90 dark:text-white/90 mb-3">{project.title}</h1>
+        <p class="text-black/50 dark:text-white/50">{project.description}</p>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mb-8 justify-center">
+        {project.techStack.map((t) => (
+          <span class="px-3 py-1 text-sm bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-full">{t}</span>
+        ))}
+      </div>
+
+      <div class="flex justify-center gap-3 mb-10">
+        <a href={GITHUB_RELEASES} target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--primary)] text-white font-medium text-sm hover:opacity-90 transition-opacity">
+          GitHub 下载
+        </a>
+        <a href={GITEE} target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60 font-medium text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+          Gitee 主页
+        </a>
+        {project.visitUrl && project.visitUrl !== GITHUB_RELEASES && (
+          <a href={project.visitUrl} class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60 font-medium text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            查看详情
+          </a>
+        )}
+      </div>
+
+      {project.sections && project.sections.length > 0 && (
+        <div class="space-y-6 max-w-xl mx-auto">
+          {project.sections.map((section) => (
+            <div class="p-5 rounded-lg border border-black/5 dark:border-white/5">
+              <h3 class="font-semibold text-black/85 dark:text-white/85 mb-3">{section.title}</h3>
+              <div class="text-sm text-black/50 dark:text-white/50 whitespace-pre-line">{section.content}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div class="text-center mt-8">
+        <a href={url("/projects/")} class="text-sm text-[var(--primary)] hover:underline">
+          &larr; 返回下载页
+        </a>
+      </div>
+
+    </div>
+  </div>
+</MainGridLayout>

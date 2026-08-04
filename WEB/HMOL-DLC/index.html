@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+  <title>HMOL DLC | Hello Mental Omega Launcher</title>
+  <meta name="description" content="HMOL DLC 插件包合集，包含程序拓展、主题包等追加内容，分普通版和 Wine 版两种格式。" />
+  <meta name="theme-color" content="#0b0b14" />
+  <meta name="robots" content="index, follow" />
+
+  <link rel="icon" type="image/svg+xml" href="../HMOL-wine/assets/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/forum.css" />
+</head>
+<body>
+  <div class="noise-overlay" aria-hidden="true"></div>
+  <a class="skip-link" href="#main">跳到主内容</a>
+
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a href="../" class="brand" aria-label="HMOL">
+        <div class="brand-logo">HM</div>
+        <span class="brand-text">
+          <strong>HMOL DLC</strong>
+          <small>插件包 &amp; 扩展</small>
+        </span>
+      </a>
+
+      <nav class="primary-nav" aria-label="主导航">
+        <ul>
+          <li><a href="../">论坛</a></li>
+          <li><a href="../download.html">下载</a></li>
+          <li><a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki" target="_blank" rel="noopener">Wiki</a></li>
+          <li><a href="../sponsor.html">关于</a></li>
+          <li><a href="#formats">配置格式</a></li>
+          <li><a href="#download">下载</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-actions">
+        <button class="icon-btn theme-toggle" id="theme-toggle" aria-label="切换主题">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="#download">下载</a>
+        <button class="icon-btn nav-toggle" id="nav-toggle" aria-label="打开菜单" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-nav" id="mobile-nav" hidden>
+      <ul>
+        <li><a href="../">论坛</a></li>
+        <li><a href="../download.html">下载</a></li>
+        <li><a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki" target="_blank" rel="noopener">Wiki</a></li>
+        <li><a href="../sponsor.html">关于</a></li>
+        <li><a href="#formats">配置格式</a></li>
+        <li><a href="#download">下载</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <section class="product-hero" id="hero" aria-labelledby="hero-title">
+      <div class="hero-bg" aria-hidden="true">
+        <div class="hero-orb hero-orb-1"></div>
+        <div class="hero-orb hero-orb-2"></div>
+        <div class="hero-orb hero-orb-3"></div>
+        <div class="hero-grid"></div>
+      </div>
+
+      <div class="container product-hero-inner">
+        <div class="product-hero-copy">
+          <h1 id="hero-title">HMOL <span>DLC</span><br />插件包与扩展内容</h1>
+          <p class="hero-desc">
+            官方 DLC 包合集，包含程序拓展、主题包、工具等追加内容，自由安装与管理。
+            DLC 分普通版（含个性化设置 / 美化支持）和 Wine 版两种格式，按需选择。
+          </p>
+          <div class="hero-ctas" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+            <a class="btn btn-primary btn-lg" href="#formats">了解格式</a>
+            <a class="btn btn-ghost btn-lg" href="#download">下载 DLC</a>
+          </div>
+        </div>
+
+        <div class="product-hero-visual" aria-hidden="true">
+          <div style="aspect-ratio:4/3;background:var(--brand-grad-soft);border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);">
+            <div style="text-align:center;color:var(--brand-1);">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </svg>
+              <div style="font-size:14px;font-weight:600;margin-top:8px;">DLC Package</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="product-strip" aria-label="说明">
+      <div class="container">
+        <p>DLC 分两种格式，对应 HMOL 普通版与 Wine 版，请根据你的启动器版本选择</p>
+      </div>
+    </div>
+
+    <section class="product-features" id="formats" aria-labelledby="formats-title">
+      <div class="container">
+        <header class="section-head reveal">
+          <h2 id="formats-title">DLC 配置格式</h2>
+          <p>两种格式的配置文件结构，照着写即可制作自己的 DLC。</p>
+        </header>
+
+        <div class="dlc-sub-grid" style="margin-bottom:32px;">
+          <div class="dlc-sub-card reveal reveal-delay-1">
+            <h4>HMOL 普通版 DLC (DLC.json)</h4>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">支持个性化设置 / QSS 美化</p>
+            <div class="dlc-config-block">{
+    "name": "示例主题包",
+    "version": "1.0.0",
+    "description": "展示主题包的基本结构。包含自定义QSS样式。",
+    "author": "YourName",
+    "contact": "qq:123456789",
+    "main": "bin/example.exe",
+    "type": "美化",
+    "has_qss": true,
+    "qss_file": "theme/style.qss"
+}</div>
+          </div>
+
+          <div class="dlc-sub-card reveal reveal-delay-2">
+            <h4>HMOL Wine 版 DLC (DLC-wine.json)</h4>
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:12px;">不含个性化设置，仅核心扩展功能</p>
+            <div class="dlc-config-block">{
+    "name": "Hello World 示例",
+    "version": "v1.0.0",
+    "description": "一个 DLC 示例项目，展示 DLC 的基本结构。",
+    "author": "制作人：你的名字",
+    "contact": "QQ群：1034243331",
+    "main": "HelloWorld.bat"
+}</div>
+          </div>
+        </div>
+
+        <div class="info-card reveal">
+          <h3>字段说明</h3>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--text-2);">
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">name</code> — DLC 显示名称</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">version</code> — 版本号</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">description</code> — 简要描述</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">author</code> — 作者</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">contact</code> — 联系方式</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">main</code> — DLC 主入口文件（相对路径）</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">has_qss / qss_file</code> — 仅普通版，是否包含 QSS 样式文件</p>
+            <p><code style="font-family:var(--font-mono);font-size:13px;padding:2px 6px;background:var(--surface-strong);border-radius:4px;">type</code> — 仅普通版，分类标签（如"美化""工具"）</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="product-download" id="dlc-list" aria-labelledby="dlc-list-title" style="padding-top:80px;padding-bottom:0;">
+      <div class="container">
+        <header class="section-head reveal">
+          <h2 id="dlc-list-title">DLC 插件包列表</h2>
+          <p>以下为官方提供的 DLC 包，点击了解详情。</p>
+        </header>
+
+        <div class="dlc-sub-grid" style="margin-bottom:20px;grid-template-columns:1fr 1fr;">
+          <a href="memreduct.html" class="dlc-sub-card reveal reveal-delay-1" style="text-decoration:none;display:block;border-top:2px solid #14b8a6;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(20,184,166,.12);color:#14b8a6;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>Mem Reduct 内存优化</h4>
+            <p>轻量级内存清理工具，优化游戏运行时的内存占用。</p>
+          </a>
+          <a href="theworld.html" class="dlc-sub-card reveal reveal-delay-2" style="text-decoration:none;display:block;border-top:2px solid #a78bfa;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(167,139,250,.12);color:#a78bfa;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">Wine 版</span>
+            <h4>TheWorld 浏览器</h4>
+            <p>轻量浏览器，专为 HMOL Wine 版 / Linux / Winlator 环境适配。</p>
+          </a>
+        </div>
+
+        <div class="section-divider" style="margin:12px 0 20px;"></div>
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:14px;color:var(--text-2);">红警开发工具</h3>
+        <div class="dlc-sub-grid" style="grid-template-columns:1fr 1fr;">
+          <a href="fa2sp.html" class="dlc-sub-card reveal reveal-delay-1" style="text-decoration:none;display:block;border-top:2px solid #22c55e;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(34,197,94,.12);color:#22c55e;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>FA2SP 地图编辑器</h4>
+            <p>心灵终结专用地图编辑器，支持 MO 地形与建筑。版本 v1.4.4。</p>
+          </a>
+          <a href="ra2cstr.html" class="dlc-sub-card reveal reveal-delay-2" style="text-decoration:none;display:block;border-top:2px solid #f59e0b;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(245,158,11,.12);color:#f59e0b;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>RA2CStrEditor INI编辑器</h4>
+            <p>红警 2 INI 配置编辑器，支持直观编辑单位属性和武器参数。</p>
+          </a>
+          <a href="3ds2vxl.html" class="dlc-sub-card reveal reveal-delay-3" style="text-decoration:none;display:block;border-top:2px solid #3b82f6;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(59,130,246,.12);color:#3b82f6;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>3DS2VXL 模型转换</h4>
+            <p>3DS 模型转 VXL 体素格式，制作自定义单位的必备工具。</p>
+          </a>
+          <a href="hvabuilder.html" class="dlc-sub-card reveal reveal-delay-4" style="text-decoration:none;display:block;border-top:2px solid #f97316;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(249,115,22,.12);color:#f97316;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>HvaBuilder 动画编辑</h4>
+            <p>HVA 动画文件编辑器，调整炮塔旋转与帧动画参数。</p>
+          </a>
+          <a href="shpbuilder.html" class="dlc-sub-card reveal reveal-delay-1" style="text-decoration:none;display:block;border-top:2px solid #ec4899;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(236,72,153,.12);color:#ec4899;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>SHP-Builder 图像编辑</h4>
+            <p>SHP 图像编辑器，支持帧动画、调色板与色系转换。</p>
+          </a>
+          <a href="aieditor.html" class="dlc-sub-card reveal reveal-delay-2" style="text-decoration:none;display:block;border-top:2px solid #ef4444;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(239,68,68,.12);color:#ef4444;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>AI 编辑器</h4>
+            <p>红警电脑 AI 行为编辑器，控制建造序列与攻击倾向。</p>
+          </a>
+          <a href="csfeditor.html" class="dlc-sub-card reveal reveal-delay-3" style="text-decoration:none;display:block;border-top:2px solid #eab308;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(234,179,8,.12);color:#eab308;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>CSF 字符串编辑器</h4>
+            <p>编辑游戏中所有文本资源，支持多语言管理与批量修改。</p>
+          </a>
+          <a href="covermaker.html" class="dlc-sub-card reveal reveal-delay-4" style="text-decoration:none;display:block;border-top:2px solid #a855f7;">
+            <span class="tag" style="font-family:var(--font-mono);font-size:10px;padding:3px 8px;background:rgba(168,85,247,.12);color:#a855f7;border-radius:var(--r-pill);display:inline-block;margin-bottom:10px;">标准版</span>
+            <h4>封面制作器</h4>
+            <p>游戏载入图批量生成工具，内置大量红警风格模板。</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="product-download" id="download" aria-labelledby="download-title-sec">
+      <div class="container">
+        <header class="section-head reveal">
+          <h2 id="download-title-sec">获取 DLC</h2>
+          <p>DLC 仅支持在 HMOL 启动器内下载与管理。</p>
+        </header>
+
+        <article class="product-download-card reveal">
+          <h3>HMOL DLC</h3>
+          <p>打开 HMOL 启动器 → DLC 下载 → 找到对应 DLC → 点击下载 → 重启启动器</p>
+          <p style="font-size:14px;position:relative;opacity:.8;">DLC 仅支持在启动器内下载</p>
+        </article>
+      </div>
+    </section>
+
+  </main>
+
+  <button class="to-top" id="to-top" aria-label="返回顶部">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+  </button>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand">
+          <div class="brand-logo">HM</div>
+          <span class="brand-text"><strong>HMOL DLC</strong><small>Mental Omega Launcher</small></span>
+        </span>
+        <p>独立第三方启动器，与 EA 及 Mental Omega 开发团队无关联。</p>
+      </div>
+
+      <nav class="footer-nav" aria-label="页脚导航">
+        <div>
+          <h4>导航</h4>
+          <ul>
+            <li><a href="../">论坛首页</a></li>
+            <li><a href="../download.html">下载</a></li>
+            <li><a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki" target="_blank" rel="noopener">Wiki</a></li>
+            <li><a href="../sponsor.html">关于</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>项目</h4>
+          <ul>
+            <li><a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher" rel="noopener">GitHub</a></li>
+            <li><a href="../LICENSE">许可证</a></li>
+            <li><a href="../EULA.md">EULA</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>社区</h4>
+          <ul>
+            <li><a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/issues" rel="noopener">Issues</a></li>
+            <li><a href="https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/discussions" rel="noopener">Discussions</a></li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+
+    <div class="container footer-bottom">
+      <p>&copy; 2026 HMOL Contributors. HMOL Non-Commercial, No-Modification Source-Available License v2.2.</p>
+      <p>Made with care for the Mental Omega community.</p>
+    </div>
+  </footer>
+
+  <script>
+    /* Scroll reveal */
+    (function () {
+      'use strict';
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-revealed');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      document.querySelectorAll('.reveal').forEach(function (el) {
+        observer.observe(el);
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      'use strict';
+
+      var navToggle = document.getElementById('nav-toggle');
+      var mobileNav = document.getElementById('mobile-nav');
+      if (navToggle && mobileNav) {
+        navToggle.addEventListener('click', function () {
+          var expanded = navToggle.getAttribute('aria-expanded') === 'true';
+          navToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+          mobileNav.hidden = expanded;
+        });
+        mobileNav.querySelectorAll('a').forEach(function (a) {
+          a.addEventListener('click', function () {
+            navToggle.setAttribute('aria-expanded', 'false');
+            mobileNav.hidden = true;
+          });
+        });
+      }
+
+      var STORAGE_KEY = 'hmol-theme';
+      var root = document.documentElement;
+      var themeBtn = document.getElementById('theme-toggle');
+      function applyTheme(theme) { root.setAttribute('data-theme', theme); }
+      (function () {
+        var s;
+        try { s = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+        applyTheme(s || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+      })();
+      if (themeBtn) {
+        themeBtn.addEventListener('click', function () {
+          var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+          applyTheme(next);
+          try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
+        });
+      }
+
+      var header = document.getElementById('site-header');
+      if (header) {
+        window.addEventListener('scroll', function () {
+          header.style.boxShadow = window.scrollY > 4 ? '0 1px 0 var(--border)' : 'none';
+        }, { passive: true });
+      }
+
+      var toTop = document.getElementById('to-top');
+      if (toTop) {
+        window.addEventListener('scroll', function () {
+          toTop.classList.toggle('show', window.scrollY > 600);
+        }, { passive: true });
+        toTop.addEventListener('click', function () {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      }
+
+      document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+          var href = link.getAttribute('href');
+          if (!href || href === '#' || href.length < 2) return;
+          var target = document.querySelector(href);
+          if (!target) return;
+          e.preventDefault();
+          var h = header ? header.offsetHeight : 0;
+          var y = target.getBoundingClientRect().top + window.scrollY - h - 8;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

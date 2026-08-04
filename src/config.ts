@@ -17,11 +17,11 @@ import { LinkPreset } from "./types/config";
 // 移除i18n导入以避免循环依赖
 
 // 定义站点语言
-const SITE_LANG = "en"; // 语言代码，例如：'en', 'zh_CN', 'ja' 等。
+const SITE_LANG = "zh_CN";
 
 export const siteConfig: SiteConfig = {
-	title: "Mizuki",
-	subtitle: "One demo website",
+	title: "HMOL",
+	subtitle: "Hello Mental Omega Launcher",
 
 	lang: SITE_LANG,
 
@@ -30,22 +30,18 @@ export const siteConfig: SiteConfig = {
 		fixed: false, // 对访问者隐藏主题色选择器
 	},
 
-	// 特色页面开关配置(关闭不在使用的页面有助于提升SEO,关闭后直接在顶部导航删除对应的页面就行)
 	featurePages: {
-		anime: true, // 番剧页面开关
-		diary: true, // 日记页面开关
-		friends: true, // 友链页面开关
-		projects: true, // 项目页面开关
-		skills: true, // 技能页面开关
-		timeline: true, // 时间线页面开关
-		albums: true, // 相册页面开关
+		anime: false,
+		diary: false,
+		friends: false,
+		projects: true,
+		skills: false,
+		timeline: false,
+		albums: false,
 	},
 
-	// 顶栏标题配置
 	navbarTitle: {
-		// 顶栏标题文本
-		text: "MizukiUI",
-		// 顶栏标题图标路径，默认使用 public/assets/home/home.png
+		text: "HMOL",
 		icon: "assets/home/home.png",
 	},
 
@@ -116,14 +112,13 @@ export const siteConfig: SiteConfig = {
 		// 请自行搭建API
 
 		homeText: {
-			enable: true, // 在主页显示自定义文本
-			title: "Beautiful Mizuki!", // 主页横幅主标题
+			enable: true,
+			title: "Hello Mental Omega Launcher",
 
 			subtitle: [
-				"A Showcase Demo Site",
-				"Carousel Highlight: Innovation",
-				"Carousel Focus: User Experience",
-				"Carousel Spot: Core Advantages",
+				"为心灵终结玩家打造的轻量级启动器",
+				"一键启动 · 多实例管理 · 主题切换",
+				"开源 · 安全 · 社区驱动",
 			],
 			typewriter: {
 				enable: true, // 启用副标题打字机效果
@@ -207,72 +202,38 @@ export const fullscreenWallpaperConfig: FullscreenWallpaperConfig = {
 export const navBarConfig: NavBarConfig = {
 	links: [
 		LinkPreset.Home,
-		LinkPreset.Archive,
-		// 支持自定义导航栏链接,并且支持多级菜单,3.1版本新加
 		{
-			name: "Links",
-			url: "/links/",
-			icon: "material-symbols:link",
-			children: [
-				{
-					name: "GitHub",
-					url: "https://github.com/matsuzaka-yuki/Mizuki",
-					external: true,
-					icon: "fa6-brands:github",
-				},
-				{
-					name: "Bilibili",
-					url: "https://space.bilibili.com/701864046",
-					external: true,
-					icon: "fa6-brands:bilibili",
-				},
-				{
-					name: "Gitee",
-					url: "https://gitee.com/matsuzakayuki/Mizuki",
-					external: true,
-					icon: "mdi:git",
-				},
-			],
+			name: "下载",
+			url: "/projects/",
+			icon: "material-symbols:download",
 		},
 		{
-			name: "My",
-			url: "/content/",
-			icon: "material-symbols:person",
-			children: [
-				LinkPreset.Anime,
-				LinkPreset.Diary,
-				{
-					name: "Gallery",
-					url: "/albums/",
-					icon: "material-symbols:photo-library",
-				},
-			],
+			name: "DLC",
+			url: "/dlc/",
+			icon: "material-symbols:extension",
 		},
 		{
-			name: "About",
-			url: "/content/",
+			name: "Wiki",
+			url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki",
+			external: true,
+			icon: "material-symbols:menu-book",
+		},
+		{
+			name: "关于",
+			url: "/about/",
 			icon: "material-symbols:info",
-			children: [LinkPreset.About, LinkPreset.Friends],
 		},
 		{
-			name: "Others",
+			name: "More",
 			url: "#",
 			icon: "material-symbols:more-horiz",
 			children: [
+				LinkPreset.Archive,
 				{
-					name: "Projects",
-					url: "/projects/",
-					icon: "material-symbols:work",
-				},
-				{
-					name: "Skills",
-					url: "/skills/",
-					icon: "material-symbols:psychology",
-				},
-				{
-					name: "Timeline",
-					url: "/timeline/",
-					icon: "material-symbols:timeline",
+					name: "GitHub",
+					url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher",
+					external: true,
+					icon: "fa6-brands:github",
 				},
 			],
 		},
@@ -280,46 +241,36 @@ export const navBarConfig: NavBarConfig = {
 };
 
 export const profileConfig: ProfileConfig = {
-	avatar: "assets/images/avatar.webp", // 相对于 /src 目录。如果以 '/' 开头，则相对于 /public 目录
-	name: "Matsuzaka Yuki",
-	bio: "The world is big, you have to go and see",
+	avatar: "/docs/作者头像.jpg",
+	name: "mmm",
+	bio: "Hello Mental Omega Launcher",
 	typewriter: {
-		enable: true, // 启用个人简介打字机效果
-		speed: 80, // 打字速度（毫秒）
+		enable: false,
+		speed: 80,
 	},
 	links: [
 		{
-			name: "Bilibli",
-			icon: "fa6-brands:bilibili",
-			url: "https://space.bilibili.com/701864046",
+			name: "GitHub",
+			icon: "fa6-brands:github",
+			url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher",
 		},
 		{
 			name: "Gitee",
-			icon: "mdi:git",
-			url: "https://gitee.com/matsuzakayuki",
+			icon: "simple-icons:gitee",
+			url: "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher",
 		},
 		{
-			name: "GitHub",
-			icon: "fa6-brands:github",
-			url: "https://github.com/matsuzaka-yuki",
-		},
-		{
-			name: "Codeberg",
-			icon: "simple-icons:codeberg",
-			url: "https://codeberg.org",
-		},
-		{
-			name: "Discord",
-			icon: "fa6-brands:discord",
-			url: "https://discord.gg/MqW6TcQtVM",
+			name: "Wiki",
+			icon: "material-symbols:menu-book",
+			url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki",
 		},
 	],
 };
 
 export const licenseConfig: LicenseConfig = {
 	enable: true,
-	name: "CC BY-NC-SA 4.0",
-	url: "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+	name: "HMOL Non-Commercial, No-Modification",
+	url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE",
 };
 
 export const expressiveCodeConfig: ExpressiveCodeConfig = {
@@ -337,19 +288,20 @@ export const commentConfig: CommentConfig = {
 };
 
 export const announcementConfig: AnnouncementConfig = {
-	title: "Announcement", // 公告标题
-	content: "Welcome to my blog! This is a sample announcement.", // 公告内容
-	closable: true, // 允许用户关闭公告
+	title: "HMOL",
+	content: "欢迎访问 HMOL (Hello Mental Omega Launcher) 官方网站。请仅从官方渠道下载。",
+	closable: true,
 	link: {
-		enable: true, // 启用链接
-		text: "Learn More", // 链接文本
-		url: "/about/", // 链接 URL
-		external: false, // 内部链接
+		enable: true,
+		text: "前往下载",
+		url: "/download/",
+		external: false,
 	},
 };
 
 export const musicPlayerConfig: MusicPlayerConfig = {
-	enable: true, // 启用音乐播放器功能
+	enable: true,
+	mode: "local",
 };
 
 export const footerConfig: FooterConfig = {
