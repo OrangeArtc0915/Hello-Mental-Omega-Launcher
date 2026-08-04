@@ -1,4 +1,4 @@
-name: Deploy to Pages Branch
+name: Deploy to GitHub Pages
 
 on:
   push:
@@ -6,32 +6,27 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout your repository using git
         uses: actions/checkout@v4
+      - name: Install, build, and upload your site
+        uses: withastro/action@v3
         with:
-          ref: Web
+          node-version: 22
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.14.4
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - run: pnpm install --no-frozen-lockfile
-
-      - run: pnpm run build
-
-      - uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          branch: pages
-          folder: dist
-          clean: true
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
