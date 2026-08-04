@@ -168,7 +168,6 @@ export default defineConfig({
 	},
 	vite: {
 		build: {
-			cssMinify: "lightningcss",
 			rollupOptions: {
 				output: {
 					manualChunks(id) {
