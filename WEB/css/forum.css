@@ -815,7 +815,7 @@ p { margin: 0; }
 
 @media (max-width: 768px) {
   :root { --gutter: 18px; }
-  .primary-nav, .header-actions .btn { display: none; }
+  .primary-nav { display: none; }
   .nav-toggle { display: flex; }
   .board-grid { grid-template-columns: 1fr 1fr; }
   .post-item { flex-wrap: wrap; gap: 10px; }
