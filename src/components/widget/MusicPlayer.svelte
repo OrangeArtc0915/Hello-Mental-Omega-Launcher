@@ -54,7 +54,7 @@ let showError = false;
 let currentSong = {
 	title: "示例歌曲",
 	artist: "示例艺术家",
-	cover: "/favicon/favicon-light-192.png",
+	cover: `${import.meta.env.BASE_URL}favicon/favicon-light-192.png`,
 	url: "",
 	duration: 0,
 };
@@ -210,10 +210,11 @@ function playSong(index: number) {
 	}
 }
 
+const MUSIC_BASE = import.meta.env.BASE_URL;
 function getAssetPath(path: string): string {
 	if (path.startsWith("http://") || path.startsWith("https://")) return path;
-	if (path.startsWith("/")) return path;
-	return `/${path}`;
+	if (path.startsWith("/")) return MUSIC_BASE + path.slice(1);
+	return MUSIC_BASE + path;
 }
 
 function loadSong(song: typeof currentSong) {

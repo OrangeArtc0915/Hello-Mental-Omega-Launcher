@@ -224,7 +224,7 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		<slot name="head"></slot>
 
 		<!-- Pio 看板娘样式 -->
-		<link rel="stylesheet" href="/pio/static/pio.css" />
+		<link rel="stylesheet" href={url("/pio/static/pio.css")} />
 
 		<link rel="alternate" type="application/rss+xml" title={profileConfig.name} href={`${Astro.site}rss.xml`}/>
 
@@ -232,8 +232,8 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		{umamiEnabled && umamiScripts && <Fragment set:html={umamiScripts} />}
 
 		<!-- 引入全局处理脚本 -->
-		<script src="/js/timeline-scroll-handler.js" defer></script>
-		<script src="/js/skills-progress-handler.js" defer></script>
+		<script src={url("/js/timeline-scroll-handler.js")} defer></script>
+		<script src={url("/js/skills-progress-handler.js")} defer></script>
 </head>
 	<body class=" min-h-screen " class:list={[{"lg:is-home": isHomePage, "enable-banner": enableBanner, "zen-maru-gothic-enabled": siteConfig.font.zenMaruGothic.enable, "hanalei-enabled": siteConfig.font.hanalei.enable}]}
 		  data-overlayscrollbars-initialize
@@ -258,7 +258,7 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 
 		<!-- Sakura Effect -->
 		{(widgetConfigs.sakura as SakuraConfig)?.enable && (
-			<script define:vars={{ sakuraConfig: widgetConfigs.sakura }}>
+			<script define:vars={{ sakuraConfig: widgetConfigs.sakura, BASE_URL: import.meta.env.BASE_URL }}>
 				// 樱花对象类
 				class Sakura {
 					constructor(x, y, s, r, a, fn, idx, img, limitArray, config) {
@@ -427,7 +427,7 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 
 						// 创建图片对象
 						this.img = new Image();
-						this.img.src = '/sakura.png'; // 使用樱花图片
+						this.img.src = BASE_URL + 'sakura.png'; // 使用樱花图片
 
 						// 等待图片加载完成
 						await new Promise((resolve, reject) => {

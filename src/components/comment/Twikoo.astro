@@ -1,5 +1,6 @@
 ---
 import { commentConfig } from "@/config";
+import { url } from "../../utils/url-utils";
 
 interface Props {
 	path: string;
@@ -13,8 +14,8 @@ const config = {
 ---
 
 <div id="tcomment"></div>
-<script is:inline src="/scroll-protection.js"></script>
-<script is:inline src="/assets/js/twikoo.all.min.js"></script>
+<script is:inline src={url("/scroll-protection.js")}></script>
+<script is:inline src={url("/assets/js/twikoo.all.min.js")}></script>
 <script is:inline define:vars={{ config }}>
   // 获取当前页面路径
   function getCurrentPath() {
