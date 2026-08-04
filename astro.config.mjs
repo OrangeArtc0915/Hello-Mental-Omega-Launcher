@@ -168,7 +168,21 @@ export default defineConfig({
 	},
 	vite: {
 		build: {
+			cssMinify: "lightningcss",
 			rollupOptions: {
+				output: {
+					manualChunks(id) {
+						if (id.includes("node_modules")) {
+							if (id.includes("svelte")) return "svelte";
+							if (id.includes("swup")) return "swup";
+							if (id.includes("overlayscrollbars")) return "overlayscrollbars";
+							if (id.includes("@fancyapps")) return "fancybox";
+							if (id.includes("katex")) return "katex";
+							if (id.includes("mermaid")) return "mermaid";
+							return "vendor";
+						}
+					},
+				},
 				onwarn(warning, warn) {
 					// temporarily suppress this warning
 					if (
