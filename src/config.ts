@@ -98,7 +98,7 @@ export const siteConfig: SiteConfig = {
 
 		waves: {
 			enable: true, // 是否启用水波纹效果(这个功能比较吃性能)
-			performanceMode: false, // 性能模式：减少动画复杂度(性能提升40%)
+			performanceMode: true, // 性能模式：减少动画复杂度(性能提升40%)
 			mobileDisable: false, // 移动端禁用
 		},
 
