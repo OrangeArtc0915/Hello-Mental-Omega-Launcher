@@ -1,0 +1,20 @@
+{
+  "version": "0.0.0",
+  "release_date": "",
+  "min_version": "2.6.2",
+  "mandatory": false,
+  "variant": "wine",
+  "exe": {
+    "url": "",
+    "size": 0,
+    "sha256": ""
+  },
+  "changelog_zh": "Wine 版初始 manifest (Gitee镜像)。",
+  "changelog_en": "Initial Wine variant manifest (Gitee mirror).",
+  "cleanup": {
+    "reset_config": true,
+    "clear_logs": true,
+    "clear_cache": true,
+    "clear_backups": true
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": "2.6.2",
+  "release_date": "2026-07-29",
+  "min_version": "2.5.0",
+  "mandatory": false,
+  "variant": "windows",
+  "exe": {
+    "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/v2.6.2/HMOL.exe",
+    "size": 0,
+    "sha256": "REPLACE_AFTER_BUILD"
+  },
+  "changelog_zh": "全面优化启动器性能与稳定性。修复若干已知问题，提升用户体验。更新 EULA 协议至 v2.6。",
+  "changelog_en": "Performance and stability improvements. Fixed several known issues and enhanced user experience. Updated EULA to v2.6.",
+  "cleanup": {
+    "reset_config": true,
+    "clear_logs": true,
+    "clear_cache": true,
+    "clear_backups": true
+  }
+}

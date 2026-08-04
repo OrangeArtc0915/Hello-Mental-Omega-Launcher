@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag for testing (e.g. v2.5.1)'
+        description: 'Release tag for testing (e.g. v2.6.2)'
         required: true
-        default: 'v2.5.0'
+        default: 'v2.6.2'
 
 permissions:
   contents: write
@@ -157,11 +157,11 @@ jobs:
           }
           DEFAULTS = {
               'windows': {
-                  "min_version": "2.5.0",
+                  "min_version": "2.6.2",
                   "variant": "windows",
               },
               'wine': {
-                  "min_version": "2.5.0",
+                  "min_version": "2.6.2",
                   "variant": "wine",
               },
           }
@@ -258,3 +258,185 @@ jobs:
             echo "  https://cdn.jsdelivr.net/gh/${{ github.repository }}@update/update/HMOL.update.json"
             echo "  https://cdn.jsdelivr.net/gh/${{ github.repository }}@update/update/HMOL.wine.update.json"
           fi
+
+      # =============================================
+      # Gitee automation (requires GITEE_TOKEN secret)
+      # =============================================
+
+      - name: Check Gitee token
+        id: gitee_check
+        run: |
+          if [ -n "${{ secrets.GITEE_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Gitee automation enabled"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Gitee automation skipped (GITEE_TOKEN not set)"
+          fi
+
+      - name: Generate Gitee manifests
+        if: steps.gitee_check.outputs.enabled == 'true'
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          DATE: ${{ steps.assets.outputs.date }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import json, os
+
+          VERSION = os.environ['VERSION']
+          DATE = os.environ['DATE']
+          TAG = os.environ['TAG']
+          GITEE_OWNER = "orangearc655743"
+          GITEE_REPO = "Hello-Mental-Omega-Launcher"
+
+          RESULTS = json.loads(open('/tmp/asset_results.json').read())
+          body = ''
+          if os.path.exists('/tmp/release_body.md'):
+              body = open('/tmp/release_body.md', encoding='utf-8').read().strip()
+
+          GITEE_PATHS = {
+              'windows': 'update/HMOL.gitee.update.json',
+              'wine':    'update/HMOL.gitee.wine.update.json',
+          }
+
+          for r in RESULTS:
+              variant = r['variant']
+              path = GITEE_PATHS[variant]
+              gitee_url = f"https://gitee.com/{GITEE_OWNER}/{GITEE_REPO}/releases/download/{TAG}/{r['name']}"
+
+              if os.path.exists(path):
+                  with open(path, 'r', encoding='utf-8') as f:
+                      data = json.load(f)
+              else:
+                  data = {}
+
+              data['version'] = VERSION
+              data['release_date'] = DATE
+              data['exe'] = {
+                  'url': gitee_url,
+                  'size': int(r['actual_size']),
+                  'sha256': r['sha256'],
+              }
+              data.setdefault('min_version', '2.6.2')
+              data.setdefault('variant', variant)
+              data.setdefault('mandatory', False)
+              data.setdefault('cleanup', {
+                  "reset_config": True, "clear_logs": True,
+                  "clear_cache": True, "clear_backups": True,
+              })
+              if body and '<!-- skip-changelog -->' not in body:
+                  data['changelog_zh'] = body
+
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, 'w', encoding='utf-8') as f:
+                  json.dump(data, f, ensure_ascii=False, indent=2)
+                  f.write('\n')
+              print(f"[gitee:{variant}] {path} -> {gitee_url}")
+              print(json.dumps(data, ensure_ascii=False, indent=2))
+          PYEOF
+
+      - name: Commit and push to Gitee update branch
+        if: steps.gitee_check.outputs.enabled == 'true'
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add update/HMOL.gitee.update.json update/HMOL.gitee.wine.update.json 2>/dev/null || true
+
+          if git diff --staged --quiet; then
+            echo "No gitee manifest changes, skip push"
+          else
+            git commit -m "chore: auto-update gitee manifest to v${{ steps.tag.outputs.version }}"
+            GITEE_REMOTE="https://oauth2:${GITEE_TOKEN}@gitee.com/orangearc655743/Hello-Mental-Omega-Launcher.git"
+            git push "$GITEE_REMOTE" update
+            echo "Gitee manifests pushed to update branch"
+          fi
+
+      - name: Create Gitee Release and upload EXE
+        if: steps.gitee_check.outputs.enabled == 'true'
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import json, os, requests, sys
+
+          TOKEN = os.environ['GITEE_TOKEN']
+          TAG = os.environ['TAG']
+          VERSION = os.environ['VERSION']
+          OWNER = "orangearc655743"
+          REPO = "Hello-Mental-Omega-Launcher"
+          API = "https://gitee.com/api/v5"
+
+          RESULTS = json.loads(open('/tmp/asset_results.json').read())
+          body = ''
+          if os.path.exists('/tmp/release_body.md'):
+              body = open('/tmp/release_body.md', encoding='utf-8').read().strip()
+          if not body:
+              body = f'HMOL v{VERSION}'
+
+          headers = {"Content-Type": "application/json;charset=UTF-8"}
+
+          # Create release
+          print(f"Creating Gitee release {TAG} ...")
+          resp = requests.post(
+              f"{API}/repos/{OWNER}/{REPO}/releases",
+              params={"access_token": TOKEN},
+              headers=headers,
+              json={
+                  "tag_name": TAG,
+                  "name": f"HMOL v{VERSION}",
+                  "body": body,
+                  "target_commitish": "update",
+                  "prerelease": False,
+              },
+              timeout=30,
+          )
+          if resp.status_code == 409:
+              print("Release already exists, fetching existing...")
+              resp2 = requests.get(
+                  f"{API}/repos/{OWNER}/{REPO}/releases/tags/{TAG}",
+                  params={"access_token": TOKEN},
+                  headers=headers,
+                  timeout=30,
+              )
+              resp2.raise_for_status()
+              release = resp2.json()
+          elif resp.status_code >= 400:
+              print(f"Create release error {resp.status_code}: {resp.text}", file=sys.stderr)
+              resp.raise_for_status()
+          else:
+              release = resp.json()
+              print(f"Release created: id={release.get('id')}")
+
+          release_id = release['id']
+
+          # Upload assets
+          for r in RESULTS:
+              local_path = f"/tmp/assets/asset_{RESULTS.index(r)}.exe"
+              if not os.path.exists(local_path):
+                  print(f"Skip: {local_path} not found")
+                  continue
+              fname = r['name']
+              print(f"Uploading {fname} ({r['actual_size']} bytes) ...")
+              with open(local_path, 'rb') as fh:
+                  upload_resp = requests.post(
+                      f"{API}/repos/{OWNER}/{REPO}/releases/{release_id}/attach_files",
+                      params={"access_token": TOKEN, "name": fname},
+                      files={"file": (fname, fh, "application/octet-stream")},
+                      timeout=120,
+                  )
+              if upload_resp.status_code >= 400:
+                  print(f"Upload {fname} error {upload_resp.status_code}: {upload_resp.text}", file=sys.stderr)
+              else:
+                  print(f"Uploaded {fname} OK")
+
+          print("Gitee release done.")
+          PYEOF
