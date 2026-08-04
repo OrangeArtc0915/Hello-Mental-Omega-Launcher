@@ -30,7 +30,7 @@ const style = Astro.props.style;
         
         <!-- 可选链接和关闭按钮 -->
         <div class="flex items-center justify-between gap-3">
-            <div>
+            <div class="flex gap-2 flex-wrap">
                 {config.link && config.link.enable !== false && (
                     <a 
                         href={config.link.url} 
@@ -39,7 +39,16 @@ const style = Astro.props.style;
                         class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
                     >
                         {config.link.text}
-
+                    </a>
+                )}
+                {config.link2 && config.link2.enable !== false && (
+                    <a 
+                        href={config.link2.url} 
+                        target={config.link2.external ? "_blank" : "_self"}
+                        rel={config.link2.external ? "noopener noreferrer" : undefined}
+                        class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
+                    >
+                        {config.link2.text}
                     </a>
                 )}
             </div>

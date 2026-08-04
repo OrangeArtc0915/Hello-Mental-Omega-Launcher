@@ -297,6 +297,12 @@ export const announcementConfig: AnnouncementConfig = {
 		url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/latest",
 		external: true,
 	},
+	link2: {
+		enable: true,
+		text: "前往论坛",
+		url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/discussions",
+		external: true,
+	},
 };
 
 export const musicPlayerConfig: MusicPlayerConfig = {

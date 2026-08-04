@@ -216,6 +216,12 @@ export type AnnouncementConfig = {
 		url: string; // 链接地址
 		external?: boolean; // 是否外部链接
 	};
+	link2?: {
+		enable: boolean;
+		text: string;
+		url: string;
+		external?: boolean;
+	};
 };
 
 export type MusicPlayerConfig = {
