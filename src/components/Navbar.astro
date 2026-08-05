@@ -203,9 +203,18 @@ async function loadPagefind() {
     }
 }
 
+// 延迟到浏览器空闲时再加载搜索索引，避免影响首屏加载
+function deferLoadPagefind() {
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(loadPagefind, { timeout: 5000 });
+    } else {
+        setTimeout(loadPagefind, 2000);
+    }
+}
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadPagefind);
+    document.addEventListener('DOMContentLoaded', deferLoadPagefind);
 } else {
-    loadPagefind();
+    deferLoadPagefind();
 }
 </script>}

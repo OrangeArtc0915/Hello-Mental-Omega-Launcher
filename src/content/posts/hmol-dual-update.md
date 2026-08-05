@@ -1,8 +1,8 @@
 ---
-title: HMOL标准版 双线路更新功能详解
+title: HMOL 双线路更新功能详解
 published: 2026-07-30
 description: 详细介绍 v2.6.2 新增的 Github / Gitee 双线路自动更新机制，包括用户使用方式和后台自动同步流程。
-tags: [自动更新, Github, Gitee, 教程]
+tags: [自动更新, Github, Gitee, 教程, 双版本]
 category: 功能介绍
 draft: false
 ---
@@ -33,13 +33,3 @@ v2.6.2 引入了双线路更新系统，国内用户可以通过 Gitee 线路获
         └─ 可切换 Gitee 线路
 ```
 
-## 后台自动化
-
-每次在 Github 发布新版本时，CI 工作流会自动：
-
-1. 计算文件 SHA256 校验值
-2. 更新 Github manifest 清单
-3. 同步更新 Gitee manifest 清单
-4. 在 Gitee 创建 Release 并上传安装包
-
-整个过程全自动，无需手动干预。两个平台的更新通道始终保持同步。

@@ -9,25 +9,24 @@
 @import './gradient-buttons.css';
 /* 加密内容样式已移除，现在直接使用非加密文章的样式 */
 
-/* 导入 ZenMaruGothic-Medium 字体 */
+/* 导入 ZenMaruGothic-Medium 字体（子集化，仅包含站点实际使用字符） */
 @font-face {
   font-family: 'ZenMaruGothic-Medium';
-  src: url('/assets/font/ZenMaruGothic-Medium.woff2') format('woff2'),
-       url('/assets/font/ZenMaruGothic-Medium.ttf') format('truetype');
+  src: url('/assets/font/ZenMaruGothic-Medium.woff2') format('woff2');
   font-weight: 500;
   font-display: swap;
 }
 
 
 
-/* 导入 Hanalei 字体 */
-@font-face {
+/* 导入 Hanalei 字体（未启用，如需使用请重新添加字体文件） */
+/* @font-face {
 	font-family: "Hanalei";
 	src: url("/assets/font/Hanalei.woff2") format("woff2");
 	font-style: normal;
 	font-weight: 400;
 	font-display: swap;
-}
+} */
 
 @tailwind base;
 @tailwind components;

@@ -5,7 +5,7 @@ import "@fontsource/roboto/latin-700.css";
 
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import MusicPlayer from "@components/widget/MusicPlayer.svelte";
-import Pio from "@components/widget/Pio.svelte"; // 使用 Svelte 版本的 Pio 组件
+import FireflyLive2D from "@components/widget/FireflyLive2D.svelte";
 import { profileConfig, siteConfig } from "@/config";
 import { widgetConfigs } from "../config";
 import { umamiConfig } from "../config.ts";
@@ -136,9 +136,6 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 	  data-overlayscrollbars-initialize
 >
 	<head>
-		<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-KRX3XGVH');</script>
-		<script type="text/javascript">(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "tjr3vkhj8i");</script>
-
 		<title>{pageTitle}</title>
 
 		<meta charset="UTF-8" />
@@ -223,9 +220,6 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 
 		<slot name="head"></slot>
 
-		<!-- Pio 看板娘样式 -->
-		<link rel="stylesheet" href={url("/pio/static/pio.css")} />
-
 		<link rel="alternate" type="application/rss+xml" title={profileConfig.name} href={`${Astro.site}rss.xml`}/>
 
 		<!-- Umami Analytics -->
@@ -238,7 +232,6 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 	<body class=" min-h-screen " class:list={[{"lg:is-home": isHomePage, "enable-banner": enableBanner, "zen-maru-gothic-enabled": siteConfig.font.zenMaruGothic.enable, "hanalei-enabled": siteConfig.font.hanalei.enable}]}
 		  data-overlayscrollbars-initialize
 	>
-		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KRX3XGVH" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 		
 		<!-- 页面顶部渐变高光效果 - 只在full和semifull模式下显示 -->
 		{shouldShowTopHighlight && <div class="top-gradient-highlight"></div>}
@@ -248,10 +241,8 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		<!-- Music Player -->
 		<MusicPlayer client:idle />
 		
-		<!-- Pio 看板娘组件 -->
-		<!-- 注意：Pio 组件需要放在 body 标签内，但要在其他内容之前 -->
-		<!-- 如果启用了侧边栏，可能需要调整 z-index -->
-		<Pio client:idle />
+		<!-- 流萤 Live2D 看板娘组件 -->
+		<FireflyLive2D client:idle />
 		
 		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
 		<div id="page-height-extend" class="hidden h-[300vh]"></div>

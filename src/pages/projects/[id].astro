@@ -25,7 +25,7 @@ const GITEE = "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher";
 
       <div class="text-center max-w-xl mx-auto mb-10 mt-4">
         {project.image && (
-          <img src={project.image} alt={project.title} class="w-24 h-24 rounded-2xl mx-auto mb-6 border border-black/5 dark:border-white/5 object-cover" loading="lazy" />
+          <img src={url(project.image)} alt={project.title} class="w-24 h-24 rounded-2xl mx-auto mb-6 border border-black/5 dark:border-white/5 object-cover" loading="lazy" decoding="async" />
         )}
         {project.badge && (
           <span class="inline-block text-xs font-mono px-3 py-1 rounded-full mb-4 bg-[var(--primary)]/10 text-[var(--primary)]">

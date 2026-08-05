@@ -54,7 +54,7 @@ let showError = false;
 let currentSong = {
 	title: "示例歌曲",
 	artist: "示例艺术家",
-	cover: `${import.meta.env.BASE_URL}favicon/favicon-light-192.png`,
+	cover: "favicon/favicon-light-192.png",
 	url: "",
 	duration: 0,
 };
@@ -135,7 +135,21 @@ function togglePlay() {
 	if (isPlaying) {
 		audio.pause();
 	} else {
-		audio.play();
+		if (!audio.src) {
+			// 首次播放才真正加载音频，避免页面打开时预下载整首歌
+			loadSong(currentSong);
+			if (audio.readyState >= 2) {
+				audio.play().catch(() => {});
+			} else {
+				audio.addEventListener(
+					"canplay",
+					() => audio.play().catch(() => {}),
+					{ once: true },
+				);
+			}
+		} else {
+			audio.play();
+		}
 	}
 }
 
@@ -337,6 +351,8 @@ function handleAudioEvents() {
 onMount(() => {
 	audio = new Audio();
 	audio.volume = volume;
+	// 只预读元数据，不下载完整音频，等用户点击播放时才加载
+	audio.preload = "metadata";
 	handleAudioEvents();
 	if (!musicPlayerConfig.enable) {
 		return;
@@ -347,7 +363,9 @@ onMount(() => {
 		// 使用本地播放列表，不发送任何API请求
 		playlist = [...localPlaylist];
 		if (playlist.length > 0) {
-			loadSong(playlist[0]);
+			// 只展示第一首歌的信息，不触发音频下载
+			currentSong = { ...playlist[0] };
+			duration = playlist[0].duration ?? 0;
 		} else {
 			showErrorMessage("本地播放列表为空");
 		}

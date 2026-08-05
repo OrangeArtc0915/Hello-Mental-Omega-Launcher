@@ -92,8 +92,8 @@ const GITHUB_RELEASES = `${GITHUB}/releases/latest`;
                     <div class="bg-white dark:bg-transparent rounded-lg border border-black/10 dark:border-white/10 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                       {project.image && (
                         <div class="aspect-video overflow-hidden">
-                          <img src={project.image} alt={project.title}
-                               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                          <img src={url(project.image)} alt={project.title}
+                               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" />
                         </div>
                       )}
                       <div class="p-5">

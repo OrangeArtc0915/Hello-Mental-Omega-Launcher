@@ -17,8 +17,20 @@ const { preloadIcons = [], timeout = 10000, retryCount = 3 } = Astro.props;
   (function() {
     'use strict';
     
-    // 避免重复加载
+    // 避免重复加载；swup 页面切换后可能新增 iconify-icon 元素，需要按需重试
     if (window.__iconifyLoaderInitialized) {
+      if (window.__iconifyLoader && !window.__iconifyLoader.isLoaded) {
+        const retry = () => {
+          if (document.querySelector('iconify-icon') && !window.__iconifyLoader.isLoaded) {
+            window.__iconifyLoader.load().catch(console.error);
+          }
+        };
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(retry, { timeout: 2000 });
+        } else {
+          setTimeout(retry, 500);
+        }
+      }
       return;
     }
     window.__iconifyLoaderInitialized = true;
@@ -232,10 +244,20 @@ const { preloadIcons = [], timeout = 10000, retryCount = 3 } = Astro.props;
     // 创建全局实例
     window.__iconifyLoader = new IconifyLoader();
 
-    // 立即开始加载
-    window.__iconifyLoader.load().catch(error => {
-      console.error('Failed to initialize Iconify:', error);
-    });
+    // 空闲时按需加载：仅在页面存在 iconify-icon 组件时才请求外部 CDN，避免每次打开都拖慢页面
+    const needsIconify = () => document.querySelector('iconify-icon') !== null;
+    const loadWhenReady = () => {
+      if (needsIconify() && !window.__iconifyLoader.isLoaded) {
+        window.__iconifyLoader.load().catch(error => {
+          console.error('Failed to initialize Iconify:', error);
+        });
+      }
+    };
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(loadWhenReady, { timeout: 3000 });
+    } else {
+      setTimeout(loadWhenReady, 1500);
+    }
 
     // 如果有预加载图标，添加到队列
     if (preloadIcons && preloadIcons.length > 0) {
@@ -247,9 +269,9 @@ const { preloadIcons = [], timeout = 10000, retryCount = 3 } = Astro.props;
     window.preloadIcons = (icons) => window.__iconifyLoader.addToPreloadQueue(icons);
     window.onIconifyReady = (callback) => window.__iconifyLoader.onLoad(callback);
 
-    // 页面可见性变化时重新检查
+    // 页面可见性变化时重新检查（仍按需加载）
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && !window.__iconifyLoader.isLoaded) {
+      if (!document.hidden && needsIconify() && !window.__iconifyLoader.isLoaded) {
         window.__iconifyLoader.load().catch(console.error);
       }
     });
