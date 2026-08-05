@@ -1,6 +1,7 @@
 ---
 
 import { siteConfig } from "../config";
+import { url } from "../utils/url-utils";
 ---
 
 <!-- 全局配置载体 -->
@@ -8,4 +9,4 @@ import { siteConfig } from "../config";
 </div>
 
 <!-- 引入Umami Share工具脚本 -->
-<script is:inline src="/js/umami-share.js"></script>
+<script is:inline src={url("/js/umami-share.js")}></script>

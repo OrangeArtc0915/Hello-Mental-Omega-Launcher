@@ -178,6 +178,10 @@ export default defineConfig({
 							if (id.includes("@fancyapps")) return "fancybox";
 							if (id.includes("katex")) return "katex";
 							if (id.includes("mermaid")) return "mermaid";
+							// pixi 相关库由 FireflyLive2D 在客户端动态加载（需先注入 Cubism Core）。
+							// 若并入 vendor 会在页面加载时立即执行顶层 window 检查而抛错，
+							// 因此保持独立懒加载 chunk。
+							if (id.includes("pixi")) return;
 							return "vendor";
 						}
 					},
