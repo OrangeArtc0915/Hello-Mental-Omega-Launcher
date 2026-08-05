@@ -1256,10 +1256,23 @@ if (document.readyState === 'loading') {
 </script>
 
 <script>
-import { Fancybox } from "@fancyapps/ui";
-import "@fancyapps/ui/dist/fancybox/fancybox.css";
+let fancyboxPromise = null;
+function getFancybox() {
+  if (!fancyboxPromise) {
+    // 按需加载 fancybox，仅当页面存在相册/文章图片时才引入其 JS 与 CSS
+    fancyboxPromise = import("@fancyapps/ui").then((mod) => mod.Fancybox);
+  }
+  return fancyboxPromise;
+}
+function hasFancyboxContent() {
+  return !!document.querySelector(
+    ".custom-md img, #post-cover img, .moment-images img, [data-fancybox]"
+  );
+}
 
-function initFancybox() {
+async function initFancybox() {
+  if (!hasFancyboxContent()) return;
+  const Fancybox = await getFancybox();
   // 销毁现有的 Fancybox 实例（如果存在）
   Fancybox.close();
   

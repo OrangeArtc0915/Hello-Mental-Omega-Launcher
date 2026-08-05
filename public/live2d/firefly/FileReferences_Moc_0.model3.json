@@ -5,7 +5,7 @@
     "FileReferences": {
         "Moc": "FileReferences_Moc_0.moc3",
         "Textures": [
-            "textures/FileReferences_Textures_0_0.png"
+            "textures/FileReferences_Textures_0_0.webp"
         ],
         "Physics": "physics/FileReferences_Physics_0.physic3.json",
         "PhysicsV2": {

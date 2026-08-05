@@ -12,7 +12,7 @@
 /* 导入 ZenMaruGothic-Medium 字体（子集化，仅包含站点实际使用字符） */
 @font-face {
   font-family: 'ZenMaruGothic-Medium';
-  src: url('/assets/font/ZenMaruGothic-Medium.woff2') format('woff2');
+  src: url('../assets/font/ZenMaruGothic-Medium.woff2') format('woff2');
   font-weight: 500;
   font-display: swap;
 }
