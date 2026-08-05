@@ -343,10 +343,4 @@ onDestroy(() => {
 		white-space: pre-wrap;
 		pointer-events: none;
 	}
-
-	@media screen and (max-width: 768px) {
-		.firefly-container {
-			display: none;
-		}
-	}
 </style>
