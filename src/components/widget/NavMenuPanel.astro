@@ -129,5 +129,14 @@ const processedLinks = Astro.props.links.map(
                 trigger.setAttribute('aria-expanded', newState.toString());
             });
         });
+
+        // 点击面板内的导航链接后自动关闭面板
+        const panel = document.getElementById('nav-menu-panel');
+        panel?.addEventListener('click', function(e) {
+            const target = e.target as HTMLElement;
+            if (target.closest('a')) {
+                panel.classList.add('float-panel-closed');
+            }
+        });
     });
 </script>

@@ -4,6 +4,7 @@ import { onMount } from "svelte";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 import { navigateToPage } from "../utils/navigation-utils";
+import { pathsEqual, url } from "../utils/url-utils";
 
 let tocItems: Array<{ id: string; text: string; level: number }> = [];
 let postItems: Array<{
@@ -82,8 +83,7 @@ const generatePostList = () => {
 };
 
 const checkIsHomePage = () => {
-	isHomePage =
-		window.location.pathname === "/" || window.location.pathname === "";
+	isHomePage = pathsEqual(window.location.pathname, url("/"));
 };
 
 const scrollToHeading = (id: string) => {

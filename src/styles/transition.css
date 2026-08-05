@@ -190,4 +190,14 @@ html.is-animating .transition-swup-fade {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+
+    /* 兜底：即使动画被冻结/暂停，关键内容也必须可见 */
+    .onload-animation,
+    .onload-animation-fade-in,
+    .transition-slide-in,
+    .card-animation,
+    .nav-animation {
+        opacity: 1 !important;
+        transform: none !important;
+    }
 }

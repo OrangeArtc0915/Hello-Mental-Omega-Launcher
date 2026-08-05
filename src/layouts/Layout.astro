@@ -1220,8 +1220,8 @@ function scrollFunction() {
 			}
 		}
 
-		if (bannerEnabled && navbar) {
-			const isHome = document.body.classList.contains('lg:is-home') && window.innerWidth >= 1024;
+		if (bannerEnabled && navbar && window.innerWidth >= 1024) {
+			const isHome = document.body.classList.contains('lg:is-home');
 			const currentBannerHeight = isHome ? BANNER_HEIGHT_HOME : BANNER_HEIGHT;
 			const threshold = window.innerHeight * (currentBannerHeight / 100) - 88;
 			

@@ -21,6 +21,7 @@ import {
 	MAIN_PANEL_OVERLAPS_BANNER_HEIGHT,
 } from "../constants/constants";
 import { widgetManager } from "../utils/widget-manager";
+import { pathsEqual, url } from "../utils/url-utils";
 import Layout from "./Layout.astro";
 
 interface Props {
@@ -104,8 +105,8 @@ const hasBannerCredit =
 	siteConfig.banner.enable && siteConfig.banner.credit.enable;
 const hasBannerLink = !!siteConfig.banner.credit.url;
 
-// 检查是否为首页
-const isHomePage = Astro.url.pathname === "/" || Astro.url.pathname === "";
+// 检查是否为首页（考虑 base 子路径部署）
+const isHomePage = pathsEqual(Astro.url.pathname, url("/"));
 const showHomeText = siteConfig.banner.homeText?.enable && isHomePage;
 // 手机端非首页不显示banner的CSS类
 const mobileNonHomeBannerClass = !isHomePage ? "mobile-hide-banner" : "";
