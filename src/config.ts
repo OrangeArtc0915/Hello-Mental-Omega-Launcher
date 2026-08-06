@@ -464,7 +464,7 @@ export const pioConfig: import("./types/config").PioConfig = {
 	models: ["live2d/firefly/FileReferences_Moc_0.model3.json"], // 看板娘模型路径（相对 public 的路径）
 	position: "left", // 默认位置在右侧
 	width: 280, // 默认宽度
-	height: 320, // 默认高度
+	height: 280, // 默认高度
 	mode: "draggable", // 默认为可拖拽模式
 	hiddenOnMobile: false, // 默认在移动设备上隐藏
 	dialog: {
