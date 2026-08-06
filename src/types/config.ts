@@ -222,6 +222,12 @@ export type AnnouncementConfig = {
 		url: string;
 		external?: boolean;
 	};
+	link3?: {
+		enable: boolean;
+		text: string;
+		url: string;
+		external?: boolean;
+	};
 };
 
 export type MusicPlayerConfig = {

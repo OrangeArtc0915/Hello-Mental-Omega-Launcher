@@ -3,9 +3,17 @@ import { Icon } from "astro-icon/components";
 import { announcementConfig } from "../../config";
 import I18nKey from "../../i18n/i18nKey";
 import { i18n } from "../../i18n/translation";
+import { url } from "../../utils/url-utils";
 import WidgetLayout from "./WidgetLayout.astro";
 
 const config = announcementConfig;
+
+// 站内链接补全 base 前缀并保留锚点，外部链接原样返回
+const resolveHref = (link: { url: string; external?: boolean }) => {
+	if (link.external) return link.url;
+	const [path, hash = ""] = link.url.split("#");
+	return url(path) + (hash ? `#${hash}` : "");
+};
 
 interface Props {
 	class?: string;
@@ -33,7 +41,7 @@ const style = Astro.props.style;
             <div class="flex gap-2 flex-wrap">
                 {config.link && config.link.enable !== false && (
                     <a 
-                        href={config.link.url} 
+                        href={resolveHref(config.link)} 
                         target={config.link.external ? "_blank" : "_self"}
                         rel={config.link.external ? "noopener noreferrer" : undefined}
                         class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
@@ -43,12 +51,22 @@ const style = Astro.props.style;
                 )}
                 {config.link2 && config.link2.enable !== false && (
                     <a 
-                        href={config.link2.url} 
+                        href={resolveHref(config.link2)} 
                         target={config.link2.external ? "_blank" : "_self"}
                         rel={config.link2.external ? "noopener noreferrer" : undefined}
                         class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
                     >
                         {config.link2.text}
+                    </a>
+                )}
+                {config.link3 && config.link3.enable !== false && (
+                    <a 
+                        href={resolveHref(config.link3)} 
+                        target={config.link3.external ? "_blank" : "_self"}
+                        rel={config.link3.external ? "noopener noreferrer" : undefined}
+                        class="btn-regular rounded-lg px-3 py-1.5 text-sm font-medium active:scale-95 transition-transform"
+                    >
+                        {config.link3.text}
                     </a>
                 )}
             </div>

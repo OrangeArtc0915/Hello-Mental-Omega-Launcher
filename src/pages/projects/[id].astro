@@ -52,7 +52,7 @@ const GITEE = "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher";
           Gitee 主页
         </a>
         {project.visitUrl && project.visitUrl !== GITHUB_RELEASES && (
-          <a href={project.visitUrl} class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60 font-medium text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+          <a href={project.visitUrl.startsWith("/") ? url(project.visitUrl) : project.visitUrl} class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60 font-medium text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
             查看详情
           </a>
         )}

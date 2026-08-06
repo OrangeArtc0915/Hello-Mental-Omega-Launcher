@@ -303,6 +303,12 @@ export const announcementConfig: AnnouncementConfig = {
 		url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/discussions",
 		external: true,
 	},
+	link3: {
+		enable: true,
+		text: "QQ群",
+		url: "/about/#qq-交流群",
+		external: false,
+	},
 };
 
 export const musicPlayerConfig: MusicPlayerConfig = {
