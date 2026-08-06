@@ -1,9 +1,13 @@
 ---
 import MainGridLayout from "../layouts/MainGridLayout.astro";
 import { dlcItems } from "../data/dlc";
+import { url } from "../utils/url-utils";
 
-const standardDLC = dlcItems.filter((d) => d.badge === "标准版");
-const wineDLC = dlcItems.filter((d) => d.badge === "Wine 版");
+const originalDLC = dlcItems.filter((d) => d.original);
+const thirdPartyDLC = dlcItems.filter((d) => !d.original);
+const categories = ["实用工具", "红警开发工具"].filter((c) =>
+	thirdPartyDLC.some((d) => d.category === c),
+);
 ---
 
 <MainGridLayout title="HMOL DLC 插件包">
@@ -21,11 +25,70 @@ const wineDLC = dlcItems.filter((d) => d.badge === "Wine 版");
         </p>
       </header>
 
-      <div class="card-base !p-6 border border-black/5 dark:border-white/5 mb-6">
-        <p class="text-sm text-black/50 dark:text-white/50 text-center">
-          DLC 分两种格式，对应 HMOL 普通版与 Wine 版，请根据你的启动器版本选择
+      <div class="card-base !p-5 border border-amber-500/30 dark:border-amber-400/30 mb-8 text-center"
+           style="background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(234,179,8,0.04));">
+        <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
+          ⚠️ 提示：无 <strong>[HMOL原创]</strong> 标记的 DLC 包均为第三方搬运，仅供学习参考
         </p>
       </div>
+
+      <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-1 flex items-center gap-2">
+        <span style="color:#eab308">★</span> HMOL 原创专区
+      </h2>
+      <p class="text-sm text-black/45 dark:text-white/45 mb-4">由 HMOL 团队原创开发的 DLC，点击卡片查看详细介绍。</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-10">
+        {originalDLC.map((dlc) => (
+          <a href={url(`/dlc/${dlc.id}/`)} class="card-base group !p-5 border border-amber-500/40 dark:border-amber-400/40 hover:!-translate-y-0.5 transition-all duration-200 relative overflow-hidden"
+             style="background: linear-gradient(135deg, rgba(234,179,8,0.08), rgba(245,158,11,0.02));">
+            <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full mb-2 font-semibold"
+                  style="background: rgba(234,179,8,0.15); color:#d97706; border: 1px solid rgba(234,179,8,0.35);">
+              [HMOL原创]
+            </span>
+            <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1 group-hover:text-[var(--primary)] transition-colors">
+              {dlc.name}
+            </h3>
+            <p class="text-sm text-black/45 dark:text-white/45 mb-3">{dlc.description}</p>
+            <span class="text-xs font-medium text-amber-600 dark:text-amber-400 group-hover:underline">
+              查看详情 →
+            </span>
+          </a>
+        ))}
+      </div>
+
+      <div class="border-t border-black/5 dark:border-white/5 my-6"></div>
+
+      <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-1">第三方搬运</h2>
+      <p class="text-sm text-black/45 dark:text-white/45 mb-4">
+        以下 DLC 均为第三方搬运，非 HMOL 原创，不提供详细介绍与官方支持。
+      </p>
+
+      {categories.map((category) => (
+        <div class="mb-8">
+          <h3 class="text-lg font-semibold text-black/70 dark:text-white/70 mb-4">{category}</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {thirdPartyDLC
+              .filter((d) => d.category === category)
+              .map((dlc) => (
+                <div class="card-base !p-5 border border-black/5 dark:border-white/5 opacity-80 cursor-default">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
+                      {dlc.badge}
+                    </span>
+                    <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-black/40 dark:text-white/40">
+                      搬运
+                    </span>
+                  </div>
+                  <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1">{dlc.name}</h3>
+                  <p class="text-sm text-black/45 dark:text-white/45">{dlc.description}</p>
+                </div>
+              ))}
+          </div>
+        </div>
+      ))}
+
+      <div class="border-t border-black/5 dark:border-white/5 my-8"></div>
 
       <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-4">DLC 配置格式</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -70,44 +133,6 @@ const wineDLC = dlcItems.filter((d) => d.badge === "Wine 版");
           <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">has_qss / qss_file</code> — 仅普通版，QSS 样式文件</p>
           <p><code class="text-xs px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono">type</code> — 仅普通版，分类标签</p>
         </div>
-      </div>
-
-      <h2 class="text-xl font-bold text-black/85 dark:text-white/85 mb-4">DLC 插件包列表</h2>
-      <p class="text-sm text-black/45 dark:text-white/45 mb-4">以下为官方提供的 DLC 包，点击了解详情。DLC 仅支持在启动器内下载。</p>
-
-      {
-        wineDLC.length > 0 && (
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            {wineDLC.map((dlc) => (
-              <a href={`/dlc/${dlc.id}/`} class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
-                 style={{ borderTopColor: dlc.accent, borderTopWidth: "2px" }}>
-                <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full mb-2"
-                      style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
-                  {dlc.badge}
-                </span>
-                <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1">{dlc.name}</h3>
-                <p class="text-sm text-black/45 dark:text-white/45">{dlc.description}</p>
-              </a>
-            ))}
-          </div>
-        )
-      }
-
-      <div class="border-t border-black/5 dark:border-white/5 my-4"></div>
-
-      <h3 class="text-lg font-semibold text-black/70 dark:text-white/70 mb-4">红警开发工具</h3>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {standardDLC.map((dlc) => (
-          <a href={`/dlc/${dlc.id}/`} class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
-             style={{ borderTopColor: dlc.accent, borderTopWidth: "2px" }}>
-            <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full mb-2"
-                  style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
-              {dlc.badge}
-            </span>
-            <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1">{dlc.name}</h3>
-            <p class="text-sm text-black/45 dark:text-white/45">{dlc.description}</p>
-          </a>
-        ))}
       </div>
 
     </div>

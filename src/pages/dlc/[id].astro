@@ -1,9 +1,11 @@
 ---
 import MainGridLayout from "../../layouts/MainGridLayout.astro";
 import { dlcItems } from "../../data/dlc";
+import { url } from "../../utils/url-utils";
 
+// 仅原创 DLC 拥有详细介绍页，搬运包不支持点击跳转
 export function getStaticPaths() {
-	return dlcItems.map((dlc) => ({ params: { id: dlc.id } }));
+	return dlcItems.filter((d) => d.original).map((dlc) => ({ params: { id: dlc.id } }));
 }
 
 const { id } = Astro.params;
@@ -31,10 +33,18 @@ if (!dlc) {
           </span>
         </div>
 
-        <span class="inline-block text-[10px] font-mono px-3 py-1 rounded-full mb-4"
-              style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent, border: `1px solid ${dlc.accent}26` }}>
-          {dlc.badge} DLC
-        </span>
+        <div class="flex items-center justify-center gap-2 mb-4">
+          <span class="inline-block text-[10px] font-mono px-3 py-1 rounded-full"
+                style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent, border: `1px solid ${dlc.accent}26` }}>
+            {dlc.badge} DLC
+          </span>
+          {dlc.original && (
+            <span class="inline-block text-[10px] font-mono px-3 py-1 rounded-full font-semibold"
+                  style={{ background: "rgba(234,179,8,0.15)", color: "#d97706", border: "1px solid rgba(234,179,8,0.35)" }}>
+              [HMOL原创]
+            </span>
+          )}
+        </div>
 
         <h1 class="text-3xl font-bold text-black/90 dark:text-white/90 mb-4">
           {dlc.name.split(" ").slice(0, -1).join(" ")} <span style={{ color: dlc.accent }}>{dlc.name.split(" ").slice(-1)}</span>
@@ -43,6 +53,40 @@ if (!dlc) {
         <p class="text-black/45 dark:text-white/45 leading-relaxed mb-2">{dlc.description}</p>
         {dlc.isThirdParty && (
           <p class="text-xs text-black/25 dark:text-white/25 mb-10">此 DLC 为第三方作品搬运，非 HMOL 原创</p>
+        )}
+
+        {dlc.quickStart && (
+          <div class="card-base !p-8 border border-black/5 dark:border-white/5 max-w-md mx-auto mb-8 text-left"
+               style={{ borderTopColor: dlc.accent, borderTopWidth: "2px" }}>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-black/35 dark:text-white/35 mb-5">快速开始</h3>
+            <ol class="space-y-3">
+              {dlc.quickStart.map((step, i) => (
+                <li class="flex items-start gap-3 text-sm text-black/55 dark:text-white/55">
+                  <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-mono shrink-0"
+                        style={{ backgroundColor: `${dlc.accent}1a`, color: dlc.accent }}>
+                    {i + 1}
+                  </span>
+                  <span class="pt-1">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {dlc.features && (
+          <div class="card-base !p-8 border border-black/5 dark:border-white/5 max-w-md mx-auto mb-8 text-left">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-black/35 dark:text-white/35 mb-5">功能特性</h3>
+            <ul class="space-y-3">
+              {dlc.features.map((feature) => (
+                <li class="flex items-start gap-3 text-sm text-black/55 dark:text-white/55">
+                  <svg class="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style={{ color: dlc.accent }}>
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div class="card-base !p-8 border border-black/5 dark:border-white/5 max-w-md mx-auto mb-8 text-left"
@@ -70,7 +114,7 @@ if (!dlc) {
         </div>
 
         <div class="flex justify-center gap-3">
-          <a href="/dlc/" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium
+          <a href={url("/dlc/")} class="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium
                              border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60
                              hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
             返回列表
