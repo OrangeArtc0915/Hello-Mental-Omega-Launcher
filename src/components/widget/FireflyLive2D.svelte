@@ -1,10 +1,16 @@
 <script>
 import { onMount, onDestroy } from "svelte";
 import { pioConfig } from "@/config";
+import { url } from "../../utils/url-utils";
 
 const base = import.meta.env.BASE_URL;
-const modelUrl = `${base}live2d/firefly/FileReferences_Moc_0.model3.json`;
 const coreUrl = `${base}live2d/Core/live2dcubismcore.min.js`;
+// 换装皮肤列表：来自 pioConfig.models（相对 public 的模型路径），未配置时回退到流萤默认
+const defaultModelPath = "live2d/firefly/FileReferences_Moc_0.model3.json";
+const skinList = (pioConfig.models || [])
+	.map((p) => (p.startsWith("/") ? p.slice(1) : p))
+	.filter(Boolean);
+const modelList = skinList.length ? skinList : [defaultModelPath];
 
 let containerEl;
 let canvasEl;
@@ -15,6 +21,9 @@ let dialogVisible = false;
 let dialogTimer = null;
 let dragData = null;
 let isLoaded = false;
+let menuVisible = false;
+let lastHitTime = 0;
+let skinIndex = 0;
 
 // pixi 相关库只在客户端加载（其模块顶层引用了 window，不能在 SSR 中静态导入）
 let PIXI = null;
@@ -70,6 +79,8 @@ async function playMotion(group, name, priority = 3 /* MotionPriority.FORCE */) 
 
 async function handleHit(names) {
 	if (!model || !names?.length) return;
+	// 记录命中时间，用于区分"部位互动点击"与"菜单点击"
+	lastHitTime = Date.now();
 	// 多个命中区域重叠时，按优先级处理一个（动作带语音的区域优先，饮料"回正"最后）
 	const priority = ["蛋糕", "左侧后发", "刘海", "右侧后发", "饮料"];
 	const name = [...names].sort(
@@ -133,13 +144,52 @@ function onPointerMove(e) {
 	}
 }
 
-function onPointerUp() {
+function onPointerUp(e) {
+	const wasDragging = dragData?.dragging || false;
 	dragData = null;
+	// 点击菜单自身不触发开关
+	if (e.target?.closest?.(".firefly-menu")) return;
+	// 单击（未拖拽）且最近 300ms 内未触发部位互动 → 弹出/切换功能菜单
+	if (!wasDragging && Date.now() - lastHitTime > 300) {
+		toggleMenu();
+	}
 }
 
-async function init() {
-	if (!pioConfig.enable) return;
-	if (pioConfig.hiddenOnMobile && window.innerWidth <= 768) return;
+function toggleMenu(force) {
+	menuVisible = typeof force === "boolean" ? force : !menuVisible;
+}
+
+// 返回首页
+function goHome() {
+	toggleMenu(false);
+	showDialog(dialog.home || "Click here to go back to homepage!", 2000);
+	const home = url("/");
+	// 优先使用 swup 无刷新导航，回退到整页跳转
+	setTimeout(() => {
+		if (window.swup?.navigate) {
+			window.swup.navigate(window.location.origin + home);
+		} else {
+			window.location.href = home;
+		}
+	}, 600);
+}
+
+// 换装：在皮肤模型列表间轮换（向 pioConfig.models 添加皮肤 model3.json 路径即可启用多套皮肤）
+async function switchSkin() {
+	if (!modelList.length || !app) return;
+	toggleMenu(false);
+	skinIndex = (skinIndex + 1) % modelList.length;
+	showDialog(dialog.skin?.[1] || "The new outfit looks great~", 3000);
+	try {
+		await loadSkin(skinIndex);
+	} catch (e) {
+		console.error("Firefly switch skin error:", e);
+	}
+}
+
+// 初始化渲染环境（Cubism Core + Pixi + 渲染器），仅执行一次
+async function ensureRenderer() {
+	if (app) return true;
 
 	// 1. 加载 Live2D Cubism Core（Cubism 3 运行时）
 	if (!window.Live2DCubismCore) {
@@ -147,12 +197,12 @@ async function init() {
 			await loadScript(coreUrl);
 		} catch (e) {
 			console.error("Failed to load Live2D Cubism Core:", e);
-			return;
+			return false;
 		}
 	}
 	if (!window.Live2DCubismCore) {
 		console.error("Live2DCubismCore is not available");
-		return;
+		return false;
 	}
 
 	// 2. 动态加载 PixiJS 与 Live2D 渲染库（仅客户端）
@@ -165,7 +215,7 @@ async function init() {
 		Live2DModel.registerTicker(PIXI.Ticker);
 	} catch (e) {
 		console.error("Failed to load pixi libraries:", e);
-		return;
+		return false;
 	}
 
 	// 3. 创建 Pixi 渲染器
@@ -177,9 +227,27 @@ async function init() {
 		autoDensity: true,
 		resolution: window.devicePixelRatio || 1,
 	});
+	return true;
+}
 
-	// 4. 加载流萤模型
-	model = await Live2DModel.from(modelUrl, {
+// 加载指定皮肤模型（index 为 modelList 下标）并适配容器
+async function loadSkin(index) {
+	if (!app || !Live2DModel) return;
+
+	// 卸载旧模型
+	if (model) {
+		model.off("hit", handleHit);
+		try {
+			model.destroy({ children: true });
+		} catch (e) {
+			// 忽略销毁异常
+		}
+		model = null;
+	}
+	app.stage.removeChildren();
+
+	// 4. 加载模型
+	model = await Live2DModel.from(url(modelList[index % modelList.length]), {
 		autoInteract: true,
 		idleMotionGroup: "Tick2",
 		motionPreload: "IDLE",
@@ -260,7 +328,19 @@ async function init() {
 
 	// 7. 点击互动
 	model.on("hit", handleHit);
+}
 
+async function init() {
+	if (!pioConfig.enable) return;
+	if (pioConfig.hiddenOnMobile && window.innerWidth <= 768) return;
+
+	if (!(await ensureRenderer())) return;
+	try {
+		await loadSkin(0);
+	} catch (e) {
+		console.error("Firefly Live2D init error:", e);
+		return;
+	}
 	// 8. 欢迎语
 	showDialog(dialog.welcome || "Welcome to Mizuki Website!", 5000);
 }
@@ -289,6 +369,12 @@ onDestroy(() => {
 		on:pointerup={onPointerUp}
 		on:pointercancel={onPointerUp}
 	>
+		{#if menuVisible}
+			<div class="firefly-menu">
+				<button class="firefly-menu-item" on:click={goHome}>🏠 返回首页</button>
+				<button class="firefly-menu-item" on:click={switchSkin}>👗 换装</button>
+			</div>
+		{/if}
 		{#if dialogVisible}
 			<div class="firefly-dialog">{dialogText}</div>
 		{/if}
@@ -305,7 +391,6 @@ onDestroy(() => {
 		pointer-events: none;
 		opacity: 0;
 		transition: opacity 0.5s ease;
-		overflow: hidden;
 		-webkit-user-select: none;
 	}
 
@@ -342,5 +427,44 @@ onDestroy(() => {
 		word-break: break-all;
 		white-space: pre-wrap;
 		pointer-events: none;
+	}
+
+	.firefly-menu {
+		position: absolute;
+		bottom: calc(100% + 0.5em);
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		flex-direction: column;
+		gap: 0.35em;
+		min-width: 7em;
+		font-size: 0.8em;
+		background: rgba(255, 255, 255, 0.95);
+		padding: 0.4em;
+		border-radius: 0.8em;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		pointer-events: auto;
+	}
+
+	.firefly-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 0.4em;
+		width: 100%;
+		padding: 0.4em 0.7em;
+		border: none;
+		border-radius: 0.5em;
+		background: transparent;
+		color: #333;
+		font-size: 1em;
+		line-height: 1.4;
+		text-align: left;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.firefly-menu-item:hover {
+		background: rgba(0, 0, 0, 0.06);
 	}
 </style>

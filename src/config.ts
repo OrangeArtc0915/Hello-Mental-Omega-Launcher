@@ -461,7 +461,7 @@ export const sakuraConfig: SakuraConfig = {
 // Pio 看板娘配置
 export const pioConfig: import("./types/config").PioConfig = {
 	enable: true, // 启用看板娘
-	models: ["/pio/models/pio/model.json"], // 默认模型路径
+	models: ["live2d/firefly/FileReferences_Moc_0.model3.json"], // 看板娘皮肤模型列表（相对 public 的路径）；换装功能在列表间轮换，向数组添加新皮肤 model3.json 路径即可启用
 	position: "left", // 默认位置在右侧
 	width: 280, // 默认宽度
 	height: 320, // 默认高度
