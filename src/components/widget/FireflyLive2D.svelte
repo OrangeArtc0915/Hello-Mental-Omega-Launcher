@@ -5,12 +5,10 @@ import { url } from "../../utils/url-utils";
 
 const base = import.meta.env.BASE_URL;
 const coreUrl = `${base}live2d/Core/live2dcubismcore.min.js`;
-// 换装皮肤列表：来自 pioConfig.models（相对 public 的模型路径），未配置时回退到流萤默认
-const defaultModelPath = "live2d/firefly/FileReferences_Moc_0.model3.json";
-const skinList = (pioConfig.models || [])
-	.map((p) => (p.startsWith("/") ? p.slice(1) : p))
-	.filter(Boolean);
-const modelList = skinList.length ? skinList : [defaultModelPath];
+// 看板娘模型（相对 public 的路径，取自 pioConfig.models 首项，未配置时回退到流萤默认）
+const modelUrl = url(
+	(pioConfig.models?.[0]) || "live2d/firefly/FileReferences_Moc_0.model3.json",
+);
 
 let containerEl;
 let canvasEl;
@@ -23,7 +21,6 @@ let dragData = null;
 let isLoaded = false;
 let menuVisible = false;
 let lastHitTime = 0;
-let skinIndex = 0;
 
 // pixi 相关库只在客户端加载（其模块顶层引用了 window，不能在 SSR 中静态导入）
 let PIXI = null;
@@ -174,19 +171,6 @@ function goHome() {
 	}, 600);
 }
 
-// 换装：在皮肤模型列表间轮换（向 pioConfig.models 添加皮肤 model3.json 路径即可启用多套皮肤）
-async function switchSkin() {
-	if (!modelList.length || !app) return;
-	toggleMenu(false);
-	skinIndex = (skinIndex + 1) % modelList.length;
-	showDialog(dialog.skin?.[1] || "The new outfit looks great~", 3000);
-	try {
-		await loadSkin(skinIndex);
-	} catch (e) {
-		console.error("Firefly switch skin error:", e);
-	}
-}
-
 // 初始化渲染环境（Cubism Core + Pixi + 渲染器），仅执行一次
 async function ensureRenderer() {
 	if (app) return true;
@@ -230,8 +214,8 @@ async function ensureRenderer() {
 	return true;
 }
 
-// 加载指定皮肤模型（index 为 modelList 下标）并适配容器
-async function loadSkin(index) {
+// 加载看板娘模型并适配容器
+async function loadModel() {
 	if (!app || !Live2DModel) return;
 
 	// 卸载旧模型
@@ -247,7 +231,7 @@ async function loadSkin(index) {
 	app.stage.removeChildren();
 
 	// 4. 加载模型
-	model = await Live2DModel.from(url(modelList[index % modelList.length]), {
+	model = await Live2DModel.from(modelUrl, {
 		autoInteract: true,
 		idleMotionGroup: "Tick2",
 		motionPreload: "IDLE",
@@ -307,7 +291,9 @@ async function loadSkin(index) {
 	maxY += pad;
 
 	// 6. 按配置高度缩放并定位（像素坐标：原点在画布左上角，Y 轴向下）
-	const targetHeight = pioConfig.height || 300;
+	// 手机端按比例缩小（约 75%），避免超出窄屏
+	const isMobile = window.innerWidth <= 768;
+	const targetHeight = (pioConfig.height || 300) * (isMobile ? 0.75 : 1);
 	const scale = targetHeight / (maxY - minY);
 	wrapper.scale.set(scale);
 	wrapper.x = -minX * scale;
@@ -336,13 +322,13 @@ async function init() {
 
 	if (!(await ensureRenderer())) return;
 	try {
-		await loadSkin(0);
+		await loadModel();
 	} catch (e) {
 		console.error("Firefly Live2D init error:", e);
 		return;
 	}
 	// 8. 欢迎语
-	showDialog(dialog.welcome || "Welcome to Mizuki Website!", 5000);
+	showDialog(dialog.welcome || "欢迎来到HMOL官方网站", 5000);
 }
 
 onMount(() => {
@@ -372,7 +358,6 @@ onDestroy(() => {
 		{#if menuVisible}
 			<div class="firefly-menu">
 				<button class="firefly-menu-item" on:click={goHome}>🏠 返回首页</button>
-				<button class="firefly-menu-item" on:click={switchSkin}>👗 换装</button>
 			</div>
 		{/if}
 		{#if dialogVisible}

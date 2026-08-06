@@ -461,14 +461,14 @@ export const sakuraConfig: SakuraConfig = {
 // Pio 看板娘配置
 export const pioConfig: import("./types/config").PioConfig = {
 	enable: true, // 启用看板娘
-	models: ["live2d/firefly/FileReferences_Moc_0.model3.json"], // 看板娘皮肤模型列表（相对 public 的路径）；换装功能在列表间轮换，向数组添加新皮肤 model3.json 路径即可启用
+	models: ["live2d/firefly/FileReferences_Moc_0.model3.json"], // 看板娘模型路径（相对 public 的路径）
 	position: "left", // 默认位置在右侧
 	width: 280, // 默认宽度
 	height: 320, // 默认高度
 	mode: "draggable", // 默认为可拖拽模式
 	hiddenOnMobile: false, // 默认在移动设备上隐藏
 	dialog: {
-		welcome: "Welcome to Mizuki Website!", // 欢迎词
+		welcome: "欢迎来到HMOL官方网站", // 欢迎词
 		touch: [
 			"What are you doing?",
 			"Stop touching me!",
@@ -476,7 +476,6 @@ export const pioConfig: import("./types/config").PioConfig = {
 			"Don't bully me like that!",
 		], // 触摸提示
 		home: "Click here to go back to homepage!", // 首页提示
-		skin: ["Want to see my new outfit?", "The new outfit looks great~"], // 换装提示
 		close: "QWQ See you next time~", // 关闭提示
 		link: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/helpus.md", // 关于链接
 	},
