@@ -353,7 +353,6 @@ export type PioConfig = {
 	dialog?: {
 		welcome?: string | string[]; // 欢迎词
 		touch?: string | string[]; // 触摸提示
-		home?: string; // 首页提示
 		skin?: [string, string]; // 换装提示 [切换前, 切换后]
 		close?: string; // 关闭提示
 		link?: string; // 关于链接

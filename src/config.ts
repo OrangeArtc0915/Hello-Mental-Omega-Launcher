@@ -476,13 +476,12 @@ export const pioConfig: import("./types/config").PioConfig = {
 	dialog: {
 		welcome: "欢迎来到HMOL官方网站", // 欢迎词
 		touch: [
-			"What are you doing?",
-			"Stop touching me!",
-			"HENTAI!",
-			"Don't bully me like that!",
+			"呜……不要乱摸啦～",
+			"再碰我就要生气啦！",
+			"那里不可以碰哦～",
+			"痒痒的，快住手啦！",
 		], // 触摸提示
-		home: "Click here to go back to homepage!", // 首页提示
-		close: "QWQ See you next time~", // 关闭提示
+		close: "QWQ 下次再见啦~", // 关闭提示
 		link: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/helpus.md", // 关于链接
 	},
 };

@@ -19,7 +19,6 @@ let dialogVisible = false;
 let dialogTimer = null;
 let dragData = null;
 let isLoaded = false;
-let menuVisible = false;
 let lastHitTime = 0;
 
 // pixi 相关库只在客户端加载（其模块顶层引用了 window，不能在 SSR 中静态导入）
@@ -27,7 +26,7 @@ let PIXI = null;
 let Live2DModel = null;
 
 const dialog = pioConfig.dialog || {};
-const touchMsgs = dialog.touch || ["Do not touch me~"];
+const touchMsgs = dialog.touch || ["呜……不要乱摸啦～"];
 
 function loadScript(src) {
 	return new Promise((resolve, reject) => {
@@ -76,7 +75,7 @@ async function playMotion(group, name, priority = 3 /* MotionPriority.FORCE */) 
 
 async function handleHit(names) {
 	if (!model || !names?.length) return;
-	// 记录命中时间，用于区分"部位互动点击"与"菜单点击"
+	// 记录命中时间，用于区分"部位互动点击"与"空白区域单击"
 	lastHitTime = Date.now();
 	// 多个命中区域重叠时，按优先级处理一个（动作带语音的区域优先，饮料"回正"最后）
 	const priority = ["蛋糕", "左侧后发", "刘海", "右侧后发", "饮料"];
@@ -144,31 +143,10 @@ function onPointerMove(e) {
 function onPointerUp(e) {
 	const wasDragging = dragData?.dragging || false;
 	dragData = null;
-	// 点击菜单自身不触发开关
-	if (e.target?.closest?.(".firefly-menu")) return;
-	// 单击（未拖拽）且最近 300ms 内未触发部位互动 → 弹出/切换功能菜单
+	// 单击（未拖拽）且最近 300ms 内未触发部位互动 → 弹出随机触摸语
 	if (!wasDragging && Date.now() - lastHitTime > 300) {
-		toggleMenu();
+		showDialog(touchMsgs[Math.floor(Math.random() * touchMsgs.length)]);
 	}
-}
-
-function toggleMenu(force) {
-	menuVisible = typeof force === "boolean" ? force : !menuVisible;
-}
-
-// 返回首页
-function goHome() {
-	toggleMenu(false);
-	showDialog(dialog.home || "Click here to go back to homepage!", 2000);
-	const home = url("/");
-	// 优先使用 swup 无刷新导航，回退到整页跳转
-	setTimeout(() => {
-		if (window.swup?.navigate) {
-			window.swup.navigate(window.location.origin + home);
-		} else {
-			window.location.href = home;
-		}
-	}, 600);
 }
 
 // 初始化渲染环境（Cubism Core + Pixi + 渲染器），仅执行一次
@@ -355,11 +333,6 @@ onDestroy(() => {
 		on:pointerup={onPointerUp}
 		on:pointercancel={onPointerUp}
 	>
-		{#if menuVisible}
-			<div class="firefly-menu">
-				<button class="firefly-menu-item" on:click={goHome}>🏠 返回首页</button>
-			</div>
-		{/if}
 		{#if dialogVisible}
 			<div class="firefly-dialog">{dialogText}</div>
 		{/if}
@@ -412,44 +385,5 @@ onDestroy(() => {
 		word-break: break-all;
 		white-space: pre-wrap;
 		pointer-events: none;
-	}
-
-	.firefly-menu {
-		position: absolute;
-		bottom: calc(100% + 0.5em);
-		left: 50%;
-		transform: translateX(-50%);
-		display: flex;
-		flex-direction: column;
-		gap: 0.35em;
-		min-width: 7em;
-		font-size: 0.8em;
-		background: rgba(255, 255, 255, 0.95);
-		padding: 0.4em;
-		border-radius: 0.8em;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
-		border: 1px solid rgba(0, 0, 0, 0.06);
-		pointer-events: auto;
-	}
-
-	.firefly-menu-item {
-		display: flex;
-		align-items: center;
-		gap: 0.4em;
-		width: 100%;
-		padding: 0.4em 0.7em;
-		border: none;
-		border-radius: 0.5em;
-		background: transparent;
-		color: #333;
-		font-size: 1em;
-		line-height: 1.4;
-		text-align: left;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.firefly-menu-item:hover {
-		background: rgba(0, 0, 0, 0.06);
 	}
 </style>
