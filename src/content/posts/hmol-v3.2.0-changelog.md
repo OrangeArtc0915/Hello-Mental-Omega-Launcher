@@ -7,9 +7,10 @@ category: 更新日志
 draft: false
 ---
 
-## 🚀 HMOL v3.2.0 发布！
+## 🚀 HMOL LTS v3.2.0 发布！
 
 ### 版本分发
+- 注意：这是一个LTS长期支持版本，意味着未来半年不会有大更新！
 - Windows用户请下载 HMOL.exe
 - Linux（wine）和Winlator（wine）模拟器用户请下载 HMOL-wine.exe
 
