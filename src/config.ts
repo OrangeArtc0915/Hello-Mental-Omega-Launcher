@@ -214,9 +214,29 @@ export const navBarConfig: NavBarConfig = {
 		},
 		{
 			name: "Wiki",
-			url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki",
+			url: "/wiki/",
 			external: true,
 			icon: "material-symbols:menu-book",
+			children: [
+				{
+					name: "去Github查看",
+					url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki",
+					external: true,
+					icon: "fa6-brands:github",
+				},
+				{
+					name: "查看本站wiki",
+					url: "/Hello-Mental-Omega-Launcher/wiki/",
+					external: true,
+					icon: "material-symbols:menu-book",
+				},
+			],
+		},
+		{
+			name: "资源",
+			url: "#",
+			icon: "material-symbols:folder-open",
+			disabled: true, // 占位按钮，后续再补充内容
 		},
 		{
 			name: "关于",
@@ -482,7 +502,7 @@ export const pioConfig: import("./types/config").PioConfig = {
 			"痒痒的，快住手啦！",
 		], // 触摸提示
 		close: "QWQ 下次再见啦~", // 关闭提示
-		link: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/helpus.md", // 关于链接
+		link: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher", // 关于链接
 	},
 };
 

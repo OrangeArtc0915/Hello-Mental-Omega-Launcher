@@ -26,7 +26,15 @@ const processedLinks = Astro.props.links.map(
 <div id="nav-menu-panel" class:list={["float-panel float-panel-closed absolute transition-all fixed right-4 px-2 py-2 max-h-[80vh] overflow-y-auto"]}>
     {processedLinks.map((link) => (
         <div class="mobile-menu-item">
-            {link.children && link.children.length > 0 ? (
+            {link.disabled ? (
+                <!-- 占位按钮（不可点击） -->
+                <div class="group flex justify-between items-center py-2 pl-3 pr-1 rounded-lg gap-8 opacity-40 cursor-not-allowed">
+                    <div class="flex items-center text-black/75 dark:text-white/75 font-bold">
+                        {link.icon && <Icon name={link.icon} class="text-[1.1rem] mr-2" />}
+                        {link.name}
+                    </div>
+                </div>
+            ) : link.children && link.children.length > 0 ? (
                 <!-- 有子菜单的项目 -->
                 <div class="mobile-dropdown" data-mobile-dropdown>
                     <button 
