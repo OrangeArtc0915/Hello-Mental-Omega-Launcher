@@ -37,7 +37,12 @@ def resource_dir():
         exe_dir = os.path.dirname(sys.executable)
     else:
         exe_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.dirname(exe_dir)
+    # 程序放在 Resource\#TOOLS 时，返回上级的 Resource 目录
+    parent = os.path.dirname(exe_dir)
+    if os.path.basename(parent) == "Resource" and os.path.isdir(parent):
+        return parent
+    # 其他位置：使用程序目录下的 Resource 目录（生成时自动创建）
+    return os.path.join(exe_dir, "Resource")
 
 
 def clean_filename(name):
@@ -119,6 +124,7 @@ class App:
         self.screenshots = []
 
         self._build_ui()
+        self._init_official_links()
         self._load_categories()
 
     def _build_ui(self):
@@ -215,7 +221,7 @@ class App:
         ttk.Button(link_frame, text="添加", command=self._add_link).grid(row=1, column=2, padx=4, pady=3)
         ttk.Button(link_frame, text="删除选中", command=self._del_link).grid(row=1, column=3, padx=4, pady=3)
         ttk.Button(link_frame, text="添加 QQ 群", command=self._add_qq).grid(row=2, column=0, columnspan=2, sticky="w", padx=4, pady=3)
-        ttk.Label(link_frame, text="名称 + 链接，如：B站 https://...", font=FONT_SMALL, foreground="#888").grid(row=2, column=2, columnspan=2, sticky="w", padx=4, pady=3)
+        ttk.Label(link_frame, text="HMOL 官方群为必填（不可删除），其他链接可自定义", font=FONT_SMALL, foreground="#888").grid(row=2, column=2, columnspan=2, sticky="w", padx=4, pady=3)
         link_frame.columnconfigure(1, weight=1)
 
         # 截图
@@ -249,25 +255,22 @@ class App:
         self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def _load_categories(self):
-        if not os.path.isdir(self.resource):
-            messagebox.showerror("错误", f"未找到 Resource 目录：\n{self.resource}\n\n请把本程序放在 Resource\\#TOOLS 文件夹内运行。")
-            return
-        folders = []
-        try:
-            for name in os.listdir(self.resource):
-                if name.startswith("#") or name.startswith("."):
-                    continue
-                full = os.path.join(self.resource, name)
-                if os.path.isdir(full):
-                    folders.append(name)
-        except OSError as e:
-            messagebox.showerror("错误", f"读取 Resource 目录失败：{e}")
-            return
-        folders.sort()
+        # 固定内置 8 个类别，不随目录变化
         items = []
-        for f in folders:
-            cn = CATEGORY_NAMES.get(f, f)
-            items.append(f"{cn} ({f})" if cn != f else f)
+        for key, cn in CATEGORY_NAMES.items():
+            items.append(f"{cn} ({key})")
+        # 若确实位于 Resource 目录内，附加自定义文件夹
+        existing = set(CATEGORY_NAMES.keys())
+        if os.path.isdir(self.resource):
+            try:
+                for name in os.listdir(self.resource):
+                    if name.startswith("#") or name.startswith("."):
+                        continue
+                    full = os.path.join(self.resource, name)
+                    if os.path.isdir(full) and name not in existing:
+                        items.append(name)
+            except OSError:
+                pass
         self.cat_combo["values"] = items
         if items:
             self.cat_combo.current(0)
@@ -283,20 +286,52 @@ class App:
         self.link_name_var.set("")
         self.link_url_var.set("")
 
+    def _init_official_links(self):
+        for name, num, url in QQ_GROUPS:
+            self.links.append((name, url))
+            self.link_list.insert("end", f"{name}（{num}） - {url}（官方）")
+
     def _del_link(self):
         sel = self.link_list.curselection()
         if not sel:
             return
         idx = sel[0]
+        if self.links[idx][1] in {url for _, _, url in QQ_GROUPS}:
+            messagebox.showwarning("提示", "HMOL 官方 QQ 群为必填项，不可删除。")
+            return
         self.link_list.delete(idx)
         del self.links[idx]
 
     def _add_qq(self):
-        existing = {name for name, _ in self.links}
-        for name, num, url in QQ_GROUPS:
-            if name not in existing:
-                self.links.append((name, url))
-                self.link_list.insert("end", f"{name}（{num}） - {url}")
+        dlg = tk.Toplevel(self.root)
+        dlg.title("添加自定义 QQ 群")
+        dlg.resizable(False, False)
+        dlg.geometry("360x170")
+        dlg.configure(bg=BG)
+        frm = ttk.Frame(dlg, padding=16)
+        frm.pack(fill="both", expand=True)
+        ttk.Label(frm, text="群名称", font=FONT).grid(row=0, column=0, sticky="w", pady=4)
+        name_var = tk.StringVar(value="QQ群")
+        ttk.Entry(frm, textvariable=name_var, font=FONT, width=24).grid(row=0, column=1, padx=8, pady=4)
+        ttk.Label(frm, text="群号", font=FONT).grid(row=1, column=0, sticky="w", pady=4)
+        num_var = tk.StringVar()
+        ttk.Entry(frm, textvariable=num_var, font=FONT, width=24).grid(row=1, column=1, padx=8, pady=4)
+
+        def on_add():
+            name = name_var.get().strip()
+            num = num_var.get().strip()
+            if not name or not num.isdigit():
+                messagebox.showwarning("提示", "请填写群名称和纯数字群号。", parent=dlg)
+                return
+            url = f"https://qm.qq.com/q/{num}"
+            self.links.append((name, url))
+            self.link_list.insert("end", f"{name}（{num}） - {url}")
+            dlg.destroy()
+
+        ttk.Button(frm, text="添加", command=on_add).grid(row=2, column=0, columnspan=2, pady=14)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.focus_set()
 
     def _pick_images(self):
         files = filedialog.askopenfilenames(
