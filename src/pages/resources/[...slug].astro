@@ -2,16 +2,20 @@
 import MainGridLayout from "../../layouts/MainGridLayout.astro";
 import Icon from "../../components/misc/Icon.astro";
 import { getCollection, render } from "astro:content";
-import { getResourceCategory } from "../../utils/resource-category";
+import { getResourceCategory, RESOURCE_CATEGORY_MAP } from "../../utils/resource-category";
 import { url } from "../../utils/url-utils";
 
 export async function getStaticPaths() {
 	const entries = (await getCollection("resources")).filter(
 		(entry) => !entry.id.startsWith("#TOOLS/"),
 	);
-	const folders = [...new Set(entries.map((entry) => entry.id.split("/")[0]))];
+	// 内置分类固定生成页面（即使暂无 md），自定义文件夹也生成
+	const allFolders = new Set([
+		...Object.keys(RESOURCE_CATEGORY_MAP),
+		...entries.map((entry) => entry.id.split("/")[0]),
+	]);
 	return [
-		...folders.map((folder) => ({
+		...[...allFolders].map((folder) => ({
 			params: { slug: folder },
 			props: { folder },
 		})),
@@ -68,7 +72,14 @@ const { Content } = entry ? await render(entry) : { Content: null };
             </p>
           </header>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {folderEntries.length === 0 ? (
+            <div class="border-t border-black/5 dark:border-white/5 pt-12 pb-16 text-center">
+              <p class="text-black/45 dark:text-white/60">
+                该分类下暂无资源，敬请期待。
+              </p>
+            </div>
+          ) : (
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {folderEntries.map((item) => {
               const { data } = item;
               return (
@@ -104,7 +115,8 @@ const { Content } = entry ? await render(entry) : { Content: null };
                 </a>
               );
             })}
-          </div>
+            </div>
+          )}
         </>
       ) : (
         <>

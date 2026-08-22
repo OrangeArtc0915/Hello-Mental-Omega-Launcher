@@ -21,15 +21,12 @@ for (const entry of allResources) {
 	if (!byFolder.has(folder)) byFolder.set(folder, []);
 	byFolder.get(folder).push(entry);
 }
+// 默认显示全部内置类别，即使暂无文档也保留卡片；自定义文件夹追加在最后
 const categoryOrder = Object.keys(RESOURCE_CATEGORY_MAP);
-const folders = [...byFolder.keys()].sort((a, b) => {
-	const ia = categoryOrder.indexOf(a);
-	const ib = categoryOrder.indexOf(b);
-	if (ia === -1 && ib === -1) return a.localeCompare(b);
-	if (ia === -1) return 1;
-	if (ib === -1) return -1;
-	return ia - ib;
-});
+const extraFolders = [...byFolder.keys()]
+	.filter((f) => !categoryOrder.includes(f))
+	.sort();
+const folders = [...categoryOrder, ...extraFolders];
 ---
 
 <MainGridLayout title="HMOL 资源库">
@@ -77,7 +74,7 @@ const folders = [...byFolder.keys()].sort((a, b) => {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {folders.map((folder) => {
-          const count = byFolder.get(folder).length;
+          const count = (byFolder.get(folder) || []).length;
           const category = getResourceCategory(folder);
           return (
             <a
