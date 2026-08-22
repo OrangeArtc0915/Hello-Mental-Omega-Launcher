@@ -1,0 +1,138 @@
+---
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import Icon from "../components/misc/Icon.astro";
+import { getCollection } from "astro:content";
+import { getResourceCategory, RESOURCE_CATEGORY_MAP } from "../utils/resource-category";
+import { url } from "../utils/url-utils";
+
+const onedriveUrl =
+	"https://1343766898qq-my.sharepoint.com/:f:/g/personal/mo-mod-manager-op_1343766898qq_onmicrosoft_com/IgBw34NFJPUgRLErWgu25pPIAceneV_9rq23nUXfRTziq_E?e=JFLcAr";
+const contributeUrl =
+	"https://1343766898qq-my.sharepoint.com/:f:/g/personal/mo-mod-manager-op_1343766898qq_onmicrosoft_com/IgB4snEFAx6KRYOFdbpamL0vAXx3uBzf3Hnoii1ZwZ7HMyQ?e=QUSx7f";
+
+const allResources = (await getCollection("resources")).filter(
+	(entry) => !entry.id.startsWith("#TOOLS/"),
+);
+
+// 按分类文件夹聚合，每个分类一张卡片
+const byFolder = new Map();
+for (const entry of allResources) {
+	const folder = entry.id.split("/")[0];
+	if (!byFolder.has(folder)) byFolder.set(folder, []);
+	byFolder.get(folder).push(entry);
+}
+const categoryOrder = Object.keys(RESOURCE_CATEGORY_MAP);
+const folders = [...byFolder.keys()].sort((a, b) => {
+	const ia = categoryOrder.indexOf(a);
+	const ib = categoryOrder.indexOf(b);
+	if (ia === -1 && ib === -1) return a.localeCompare(b);
+	if (ia === -1) return 1;
+	if (ib === -1) return -1;
+	return ia - ib;
+});
+---
+
+<MainGridLayout title="HMOL 资源库">
+  <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
+    <div class="card-base z-10 px-9 py-6 relative w-full">
+
+      <header class="mb-8 mt-4">
+        <span class="text-sm font-medium text-[var(--primary)] tracking-wider uppercase">Resource Library</span>
+        <h1 class="text-3xl font-bold text-black/90 dark:text-white/90 mt-2 mb-3">
+          HMOL <span class="text-[var(--primary)]">资源库</span>
+        </h1>
+        <p class="text-black/50 dark:text-white/65 max-w-2xl">
+          集中整理 HMOL 相关的各类资源包，点击卡片查看详情，需要更多资源请前往 OneDrive 查看或贡献。
+        </p>
+      </header>
+
+      <div class="flex flex-wrap gap-3 mb-8">
+        <a
+          href={onedriveUrl}
+          target="_blank"
+          class="inline-flex items-center gap-2 rounded-lg px-5 h-11 font-bold text-white bg-[var(--primary)] hover:opacity-90 transition"
+        >
+          <Icon name="material-symbols:cloud" class="text-[1.1rem]" />
+          去OneDrive查看
+        </a>
+        <a
+          href={contributeUrl}
+          target="_blank"
+          class="inline-flex items-center gap-2 rounded-lg px-5 h-11 font-bold border border-black/10 dark:border-white/15 text-black/70 dark:text-white/70 hover:border-[var(--primary)] hover:text-[var(--primary)] transition"
+        >
+          <Icon name="material-symbols:add-circle" class="text-[1.1rem]" />
+          贡献资源
+        </a>
+      </div>
+
+      <div class="relative max-w-md mb-10">
+        <Icon name="material-symbols:search" class="absolute left-4 top-1/2 -translate-y-1/2 text-black/30 dark:text-white/45" />
+        <input
+          type="search"
+          data-resource-search
+          placeholder="搜索类别..."
+          class="w-full h-12 rounded-lg pl-11 pr-4 border border-black/10 dark:border-white/15 bg-transparent focus:border-[var(--primary)] focus:outline-none transition text-black/75 dark:text-white/75"
+        />
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {folders.map((folder) => {
+          const count = byFolder.get(folder).length;
+          const category = getResourceCategory(folder);
+          return (
+            <a
+              href={url(`/resources/${folder}/`)}
+              data-resource-card
+              data-search={category.toLowerCase()}
+              class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200 relative overflow-hidden"
+            >
+              <div class="flex items-center justify-between mb-3">
+                <span class="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/15 text-black/55 dark:text-white/75">
+                  {category}
+                </span>
+                <Icon name="material-symbols:folder-open" class="text-2xl text-[var(--primary)]" />
+              </div>
+              <h3 class="font-semibold text-black/85 dark:text-white/85 mb-1 group-hover:text-[var(--primary)] transition-colors">
+                {category}
+              </h3>
+              <p class="text-sm text-black/45 dark:text-white/65 mb-3">
+                共 {count} 个资源
+              </p>
+              <span class="text-xs font-medium text-[var(--primary)] group-hover:underline">
+                查看全部 →
+              </span>
+            </a>
+          );
+        })}
+      </div>
+
+      <p data-resource-empty class="hidden text-sm text-black/40 dark:text-white/60 text-center py-12">
+        没有匹配的资源类别。
+      </p>
+
+      <div class="border-t border-black/5 dark:border-white/5 my-8"></div>
+      <p class="text-sm text-black/35 dark:text-white/50 text-center">资源内容持续补充中，敬请期待。</p>
+
+    </div>
+  </div>
+
+  <script is:inline>
+    (function () {
+      const input = document.querySelector("[data-resource-search]");
+      const empty = document.querySelector("[data-resource-empty]");
+      if (!input) return;
+      const cards = Array.from(document.querySelectorAll("[data-resource-card]"));
+      function apply() {
+        const q = input.value.trim().toLowerCase();
+        let visible = 0;
+        cards.forEach(function (card) {
+          const match = !q || card.getAttribute("data-search").includes(q);
+          card.hidden = !match;
+          if (match) visible++;
+        });
+        if (empty) empty.hidden = visible > 0;
+      }
+      input.addEventListener("input", apply);
+    })();
+  </script>
+</MainGridLayout>

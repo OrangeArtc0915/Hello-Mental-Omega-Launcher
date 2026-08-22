@@ -234,9 +234,8 @@ export const navBarConfig: NavBarConfig = {
 		},
 		{
 			name: "资源",
-			url: "#",
+			url: "/resources/",
 			icon: "material-symbols:folder-open",
-			disabled: true, // 占位按钮，后续再补充内容
 		},
 		{
 			name: "关于",

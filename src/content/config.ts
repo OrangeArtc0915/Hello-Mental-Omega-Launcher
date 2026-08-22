@@ -1,4 +1,5 @@
 import { defineCollection, z } from "astro:content";
+import { glob } from "astro/loaders";
 
 const postsCollection = defineCollection({
 	schema: z.object({
@@ -33,7 +34,31 @@ const postsCollection = defineCollection({
 const specCollection = defineCollection({
 	schema: z.object({}),
 });
+const resourcesCollection = defineCollection({
+	// 从项目根 Resource 目录自动读取：Resource/<分类文件夹>/*.md
+	loader: glob({
+		pattern: ["**/*.md", "!#TOOLS/**"],
+		base: "./Resource",
+	}),
+	schema: z.object({
+		title: z.string(),
+		icon: z.string().default(""),
+		description: z.string().default(""),
+		link: z.string().optional().default(""),
+		image: z.string().optional().default(""),
+		tags: z.array(z.string()).default([]),
+		order: z.number().optional().default(0),
+		author: z.string().default(""),
+		gameVersion: z.string().default(""),
+		version: z.string().default(""),
+		mode: z.enum(["", "single", "multi", "both"]).default(""),
+		links: z
+			.array(z.object({ name: z.string(), url: z.string() }))
+			.default([]),
+	}),
+});
 export const collections = {
 	posts: postsCollection,
 	spec: specCollection,
+	resources: resourcesCollection,
 };
