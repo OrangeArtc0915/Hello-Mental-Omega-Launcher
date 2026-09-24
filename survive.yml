@@ -1,4 +1,4 @@
 # HMOL 门锁开关
 # true  = 正常放行
 # false = 暂停支持，启动器会提示「此版本HMOL暂停支持！请联系域管理员！」并停止启动
-HMOL_survive: true
+HMOL_survive: false
