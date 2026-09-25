@@ -1,0 +1,394 @@
+---
+/**
+ * /download/ 下载页
+ *
+ * 事实来源（全部取自仓库，页面不手写版本号）：
+ * - 版本号 / 作者 / 仓库 / QQ 群：src/HMOL.Core/App/AppInfo.cs（构建时自动读取，见 src/data/hmol-info.ts）
+ * - 产物名、目标平台、运行方式、压缩包组成：build.bat
+ * - 平台与权限：src/HMOL.App/app.manifest（supportedOS = Windows 10/11）
+ * - 随包组件：docs/third-party.md、仓库根 runtime/ 目录清单
+ * - 安装后的游戏侧流程：src/content/posts/hmol-install-guide.md
+ *
+ * 版式沿用主题原有页面（同 archive / projects / resources 的卡片与配色写法），
+ * 未引入新的视觉样式。
+ */
+import { latestChangelogDate } from "../data/hmol-changelog";
+import { docsUrl } from "../data/hmol-docs";
+import {
+	hmol,
+	packageContents,
+	releaseLinks,
+	systemRequirements,
+} from "../data/hmol-info";
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { url } from "../utils/url-utils";
+
+const installGuideHref = url("/posts/hmol-install-guide/");
+const faqHref = url("/faq/");
+const changelogHref = url("/changelog/");
+const docsHref = url("/docs/");
+const iconSrc = url("/brand/app-icon.png");
+
+const screenshots = [
+	{ src: url("/brand/screenshots/home.png"), alt: "HMOL 主页界面" },
+	{ src: url("/brand/screenshots/instances.png"), alt: "HMOL 实例管理界面" },
+	{ src: url("/brand/screenshots/packages.png"), alt: "HMOL 包管理界面" },
+	{ src: url("/brand/screenshots/multiplayer.png"), alt: "HMOL 联机界面" },
+];
+
+// 发行信息（表格行）
+const releaseRows = [
+	{
+		label: "版本号",
+		value: `${hmol.versionDisplay}（AppInfo.Version = ${hmol.version}）`,
+	},
+	{ label: "发行包", value: hmol.zipName },
+	{ label: "目标平台", value: "win-x64（64 位）" },
+	{
+		label: "构建方式",
+		value:
+			"dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true",
+	},
+];
+
+// 与 hmol-install-guide.md 相衔接的「本发行方式」步骤（压缩包 / 绿色版流程）
+const installSteps = [
+	{
+		title: "下载压缩包",
+		desc: `从上方任一渠道下载最新版发行包（文件名形如 ${hmol.zipName}）。`,
+	},
+	{
+		title: "完整解压",
+		desc: "把压缩包**整体解压**到一个可写目录（例如 D:\\HMOL\\）。不要只把 HMOL.exe 单独拖出来，runtime\\ 必须一起解压，否则联机与 7z 导出不可用。",
+	},
+	{
+		title: "双击运行",
+		desc: "双击目录内的 HMOL.exe 启动（无需安装程序、无需另装 .NET；未签名程序被 SmartScreen 拦下时选「仍要运行」）。",
+	},
+	{
+		title: "首次启动",
+		desc: "双击后程序按普通权限启动并进入主界面（无需安装程序）。实例、备份、配置与日志都保存**在启动器目录内**，卸载时直接删除目录即可。",
+	},
+	{
+		title: "备份原版游戏文件",
+		desc: "进入实例管理页面，点「备份原版」，选择原版游戏根目录并等待备份完成（视机器性能约 1~3 分钟）。",
+	},
+	{
+		title: "添加实例并安装资源包",
+		desc: "在实例管理页添加游戏实例（游戏目录需含 MentalOmegaClient.exe / Mental Omega.exe，或存在 Mental_Omega 子目录）；随后在「包管理」导入资源包并选择实例安装。",
+	},
+];
+---
+
+<MainGridLayout
+	title="下载"
+	description={`下载 Hello Mental Omega Launcher（HMOL）${hmol.versionDisplay} —— Windows 10 1809+ / 11 x64 自包含发行包，含 GitHub 与 Gitee 官方渠道。`}
+>
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32"
+	>
+		<div class="card-base z-10 px-9 py-6 relative w-full">
+			<!-- 页面标题 -->
+			<div class="flex flex-col items-start justify-center mb-8">
+				<h1
+					class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+						before:w-1 before:h-8 before:rounded-md before:bg-[var(--primary)]
+						before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+				>
+					下载 HMOL
+				</h1>
+				<p class="text-lg text-black/60 dark:text-white/60">
+					请仅从本页给出的官方渠道下载。第三方分发版本可能已被修改，请勿使用。
+				</p>
+			</div>
+
+			<!-- 当前版本 -->
+			<div
+				class="card-base !p-5 border border-black/5 dark:border-white/5 mb-8"
+			>
+				<div class="flex flex-col md:flex-row md:items-center gap-5">
+					<img
+						src={iconSrc}
+						alt="HMOL 程序图标"
+						width="80"
+						height="80"
+						class="w-20 h-20 rounded-lg object-contain shrink-0"
+						loading="eager"
+					/>
+					<div class="flex-1">
+						<div class="flex flex-wrap items-center gap-2 mb-2">
+							<span class="text-2xl font-bold text-black/90 dark:text-white/90">
+								{hmol.versionDisplay}
+							</span>
+							<span class="btn-regular h-6 text-xs px-2 rounded-lg">
+								Windows x64
+							</span>
+							<span class="btn-regular h-6 text-xs px-2 rounded-lg">
+								自包含 · 免安装 .NET
+							</span>
+						</div>
+						<p class="text-sm text-black/60 dark:text-white/60">
+							{hmol.name}（HMOL）· 当前源码版本 {hmol.versionDisplay}
+							{latestChangelogDate && (
+								<>
+									· 站内更新日志最近一条：<a
+										class="link text-[var(--primary)]"
+										href={changelogHref}>{latestChangelogDate}</a
+									>
+								</>
+							)}
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<!-- 下载按钮 -->
+			<div class="flex flex-wrap gap-3 mb-4">
+				<a
+					href={releaseLinks.githubLatest}
+					target="_blank"
+					rel="noopener"
+					class="inline-flex items-center gap-2 rounded-lg px-6 h-12 font-bold text-white bg-[var(--primary)] hover:opacity-90 transition"
+				>
+					从 GitHub 下载（最新版）
+				</a>
+				<a
+					href={releaseLinks.giteeReleases}
+					target="_blank"
+					rel="noopener"
+					class="inline-flex items-center gap-2 rounded-lg px-6 h-12 font-bold border border-black/10 dark:border-white/15 text-black/70 dark:text-white/75 hover:border-[var(--primary)] hover:text-[var(--primary)] transition"
+				>
+					从 Gitee 下载（国内推荐）
+				</a>
+			</div>
+			<p class="text-sm text-black/45 dark:text-white/65 mb-10">
+				两个按钮分别指向 GitHub 的「releases/latest」（最新版页面）与 Gitee
+				的发行版列表页，不绑定任何具体版本标签，因此永远落在当前最新发行版上。
+			</p>
+
+			<!-- 发行信息 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				发行信息
+			</h2>
+			<dl class="mb-10">
+				{
+					releaseRows.map((row) => (
+						<div class="flex flex-col sm:flex-row gap-x-4 gap-y-1 py-3 border-t border-black/5 dark:border-white/5">
+							<dt class="text-sm text-black/45 dark:text-white/65 sm:w-32 sm:shrink-0">
+								{row.label}
+							</dt>
+							<dd class="text-sm text-black/75 dark:text-white/75 break-all">
+								{row.value}
+							</dd>
+						</div>
+					))
+				}
+			</dl>
+
+			<!-- 系统要求 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				系统要求
+			</h2>
+			<dl class="mb-10">
+				{
+					systemRequirements.map((item) => (
+						<div class="flex flex-col sm:flex-row gap-x-4 gap-y-1 py-3 border-t border-black/5 dark:border-white/5">
+							<dt class="text-sm text-black/45 dark:text-white/65 sm:w-32 sm:shrink-0">
+								{item.label}
+							</dt>
+							<dd class="text-sm text-black/75 dark:text-white/75">{item.value}</dd>
+						</div>
+					))
+				}
+			</dl>
+
+			<!-- 为什么是压缩包 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				为什么是压缩包
+			</h2>
+			<div
+				class="card-base !p-5 border border-black/5 dark:border-white/5 mb-4"
+			>
+				<p class="font-bold text-black/85 dark:text-white/85 mb-2">
+					必须完整解压，不能只取 HMOL.exe。
+				</p>
+				<p class="text-sm text-black/60 dark:text-white/60">
+					组网组件（EasyTier / n2n / TAP 驱动等，约 35 MB 的第三方二进制）与 7-Zip
+					不内嵌进 exe，而是随包放在 <code>runtime\</code> 目录里供程序就近调用。
+					只解压出 HMOL.exe 会导致联机功能与 7z 导出不可用。
+				</p>
+			</div>
+			<dl class="mb-10">
+				{
+					packageContents.map((item) => (
+						<div class="flex flex-col sm:flex-row gap-x-4 gap-y-1 py-3 border-t border-black/5 dark:border-white/5">
+							<dt class="text-sm font-medium text-black/85 dark:text-white/85 sm:w-32 sm:shrink-0 break-all">
+								{item.name}
+							</dt>
+							<dd class="text-sm text-black/60 dark:text-white/60">{item.desc}</dd>
+						</div>
+					))
+				}
+			</dl>
+
+			<!-- 安装步骤 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				安装步骤
+			</h2>
+			<ol class="mb-4">
+				{
+					installSteps.map((step, index) => (
+						<li class="flex gap-3 py-3 border-t border-black/5 dark:border-white/5">
+							<span class="meta-icon shrink-0 text-sm font-bold">{index + 1}</span>
+							<div>
+								<div class="font-bold text-black/85 dark:text-white/85 mb-1">
+									{step.title}
+								</div>
+								<div
+									class="text-sm text-black/60 dark:text-white/60"
+									set:html={step.desc.replace(
+										/\*\*(.+?)\*\*/g,
+										'<strong class="text-black/80 dark:text-white/80">$1</strong>',
+									)}
+								/>
+							</div>
+						</li>
+					))
+				}
+			</ol>
+			<p class="text-sm text-black/60 dark:text-white/60 mb-10">
+				第 5~6 步与站内文章
+				<a class="link text-[var(--primary)]" href={installGuideHref}>
+					《HMOL 安装与初始化指南》
+				</a>
+				以及文档里的
+				<a class="link text-[var(--primary)]" href={docsUrl("installation")}>
+					安装指南
+				</a>
+				一致，可直接对照图文阅读。
+			</p>
+
+			<!-- 校验与求助 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				校验与求助
+			</h2>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+				<div class="card-base !p-5 border border-black/5 dark:border-white/5">
+					<div class="font-bold text-black/85 dark:text-white/85 mb-2">
+						校验下载文件
+					</div>
+					<p class="text-sm text-black/60 dark:text-white/60 mb-3">
+						下载完成后用 PowerShell 计算 SHA-256，与 Release
+						页面公布的哈希逐位比对：
+					</p>
+					<div class="custom-md">
+						<p><code>Get-FileHash .\{hmol.zipName} -Algorithm SHA256</code></p>
+					</div>
+					<p class="text-sm text-black/45 dark:text-white/65 mt-2">
+						本站不展示哈希值本身 —— 请以 Release 页面公布的值为准，避免中间环节被改写。
+					</p>
+				</div>
+				<div class="card-base !p-5 border border-black/5 dark:border-white/5">
+					<div class="font-bold text-black/85 dark:text-white/85 mb-2">遇到问题</div>
+					<ul class="text-sm space-y-2">
+						<li>
+							<a class="link text-[var(--primary)]" href={faqHref}>本站常见问题</a>
+							<span class="text-black/50 dark:text-white/65"
+								>（安装 / 启动 / 包管理 / 联机）</span
+							>
+						</li>
+						<li>
+							<a class="link text-[var(--primary)]" href={docsHref}>文档入口</a>
+							<span class="text-black/50 dark:text-white/65"
+								>（安装 / 使用 / 联机 / 排查）</span
+							>
+						</li>
+						<li>
+							<a
+								class="link text-[var(--primary)]"
+								href={hmol.githubIssuesUrl}
+								target="_blank"
+								rel="noopener">提交 Issue</a
+							>
+							<span class="text-black/50 dark:text-white/65"
+								>（附版本号、系统版本、复现步骤与日志）</span
+							>
+						</li>
+						<li>
+							QQ 群：
+							<a
+								class="link text-[var(--primary)]"
+								href={hmol.qqGroupUrl}
+								target="_blank"
+								rel="noopener">{hmol.qqGroup}</a
+							>
+						</li>
+					</ul>
+				</div>
+			</div>
+
+			<!-- 版本说明 -->
+			<div
+				class="card-base !p-5 border border-black/5 dark:border-white/5 mb-10"
+			>
+				<p class="font-bold text-black/85 dark:text-white/85 mb-2">版本说明</p>
+				<p class="text-sm text-black/60 dark:text-white/60">
+					{hmol.versionDisplay} 是当前版本：C# / .NET 8
+					版，以自包含压缩包发行（<code>{hmol.zipName}</code>）。安装、解压与目录约定都以本页
+					和站内《安装与初始化指南》为准；更细的功能说明与排错见
+					<a class="link text-[var(--primary)]" href={docsHref}>文档</a>。
+				</p>
+			</div>
+
+			<!-- 界面预览 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				界面预览
+			</h2>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				{
+					screenshots.map((shot) => (
+						<figure class="card-base !p-0 border border-black/5 dark:border-white/5">
+							<img
+								src={shot.src}
+								alt={shot.alt}
+								class="w-full h-auto"
+								loading="lazy"
+								decoding="async"
+							/>
+							<figcaption class="px-4 py-2 text-xs text-black/45 dark:text-white/65">
+								{shot.alt}
+							</figcaption>
+						</figure>
+					))
+				}
+			</div>
+			<p class="text-sm text-black/45 dark:text-white/65 mt-4">
+				截图来自仓库 docs/page-previews（程序界面实际截图）。
+			</p>
+		</div>
+	</div>
+</MainGridLayout>

@@ -1,0 +1,200 @@
+---
+/**
+ * /faq/ 常见问题
+ *
+ * 内容来源（构建时自动解析，见 src/data/hmol-faq.ts，页面不手工誊抄答案）：
+ * - src/content/posts/hmol-faq.md
+ * - src/content/docs/faq.md
+ * - src/content/docs/multiplayer/faq.md
+ * 错误码分类：src/content/docs/error-codes.md 的「章节索引」
+ *
+ * 版式沿用主题原有页面（同 archive / projects / resources 的卡片与配色写法），
+ * 答案正文直接套用主题的 custom-md 排版。
+ */
+import {
+	errorCodeDocLinks,
+	errorCodeIndex,
+	faqGroups,
+	faqStats,
+} from "../data/hmol-faq";
+import { hmol } from "../data/hmol-info";
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { url } from "../utils/url-utils";
+
+const docsHref = url("/docs/");
+const downloadHref = url("/download/");
+---
+
+<MainGridLayout
+	title="常见问题"
+	description="HMOL 常见问题解答：安装、启动、包管理、联机等，内容汇总自仓库内现有问答文档。"
+>
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32"
+	>
+		<div class="card-base z-10 px-9 py-6 relative w-full">
+			<!-- 页面标题 -->
+			<div class="flex flex-col items-start justify-center mb-8">
+				<h1
+					class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+						before:w-1 before:h-8 before:rounded-md before:bg-[var(--primary)]
+						before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+				>
+					常见问题
+				</h1>
+				<p class="text-lg text-black/60 dark:text-white/60">
+					共 {faqStats.groups} 组 / {faqStats.items} 条问答，全部汇总自仓库内现有的三份问答文档
+					（站内文章 + 文档的 常见问题 / 联机常见问题）。每组都给出原文入口，
+					答案文字未作改写。
+				</p>
+			</div>
+
+			<!-- 目录：按来源分组跳转 -->
+			<nav
+				class="card-base !p-5 border border-black/5 dark:border-white/5 mb-10"
+				aria-label="常见问题目录"
+			>
+				<div class="text-sm font-bold text-black/85 dark:text-white/85 mb-3">目录</div>
+				<ul class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+					{
+						faqGroups.map((group, index) => (
+							<li>
+								<a class="link text-[var(--primary)]" href={`#faq-group-${index}`}>
+									{group.title}
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</nav>
+
+			<!-- 问答列表 -->
+			{
+				faqStats.items === 0 ? (
+					<div class="card-base !p-5 border border-black/5 dark:border-white/5 text-sm text-black/60 dark:text-white/60">
+						没有从仓库内的问答文档解析到问答内容，请前往{" "}
+						<a class="link text-[var(--primary)]" href={docsHref}>
+							文档
+						</a>{" "}
+						查看。
+					</div>
+				) : (
+					faqGroups.map((group, index) => (
+						<section id={`faq-group-${index}`} class="mb-10 scroll-mt-24">
+							<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-3">
+								<h2 class="text-2xl font-bold text-black/90 dark:text-white/90 relative
+									before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+									before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4">
+									{group.title}
+									<span class="ml-2 text-sm font-normal text-black/45 dark:text-white/65">
+										{group.items.length} 条
+									</span>
+								</h2>
+								<a
+									class="link text-sm text-[var(--primary)]"
+									href={group.docHref}
+								>
+									原文 · {group.docName} →
+								</a>
+							</div>
+							<div>
+								{group.items.map((item) => (
+									<details class="group border-t border-black/5 dark:border-white/5">
+										<summary class="list-none cursor-pointer select-none py-3 flex items-start gap-3 text-sm font-medium text-black/85 dark:text-white/85 hover:text-[var(--primary)] transition-colors">
+											<span
+												class="mt-[3px] text-[var(--primary)] text-xs transition-transform group-open:rotate-90"
+												aria-hidden="true"
+											>
+												▶
+											</span>
+											<span class="flex-1" set:html={item.questionHtml} />
+										</summary>
+										<div class="pb-4 pl-6 prose dark:prose-invert prose-base !max-w-none custom-md">
+											<Fragment set:html={item.answerHtml} />
+										</div>
+									</details>
+								))}
+							</div>
+						</section>
+					))
+				)
+			}
+
+			<!-- 错误码 -->
+			<section class="mt-12">
+				<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-3">
+					<h2
+						class="text-2xl font-bold text-black/90 dark:text-white/90 relative
+							before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+							before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+					>
+						错误信息速查
+					</h2>
+					<div class="flex flex-wrap gap-4 text-sm">
+						<a
+							class="link text-[var(--primary)]"
+							href={errorCodeDocLinks.errorCodes}>错误信息与解决 →</a
+						>
+					</div>
+				</div>
+				<p class="text-sm text-black/60 dark:text-white/60 mb-4">
+					完整的提示信息（含原始提示、可能原因、解决方法）在文档页里维护，本页只给分区入口：
+				</p>
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+					{
+						errorCodeIndex.map((item) => (
+							<a
+								class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+								href={item.href}
+							>
+								<div class="flex items-center gap-2 mb-1">
+									<span class="btn-regular h-6 text-xs px-2 rounded-lg">{item.code}</span>
+									<span class="text-sm font-medium text-black/85 dark:text-white/85 group-hover:text-[var(--primary)] transition-colors">
+										{item.category}
+									</span>
+								</div>
+								{item.scene && (
+									<div class="text-sm text-black/45 dark:text-white/65">{item.scene}</div>
+								)}
+							</a>
+						))
+					}
+				</div>
+			</section>
+
+			<!-- 仍未解决 -->
+			<div class="card-base !p-5 border border-black/5 dark:border-white/5 mt-10">
+				<p class="font-bold text-black/85 dark:text-white/85 mb-2">仍未解决？</p>
+				<ul class="text-sm text-black/60 dark:text-white/60 space-y-2">
+					<li>
+						1. 先看
+						<a
+							class="link text-[var(--primary)]"
+							href={errorCodeDocLinks.errorCodes}>错误信息与解决</a
+						>
+						与
+						<a
+							class="link text-[var(--primary)]"
+							href={docsHref}>文档</a
+						>里的故障排查章节。
+					</li>
+					<li>
+						2. 在
+						<a
+							class="link text-[var(--primary)]"
+							href={hmol.githubIssuesUrl}
+							target="_blank"
+							rel="noopener">GitHub Issues</a
+						>
+						提交问题，并附版本号、Windows 版本、复现步骤与日志文件。
+					</li>
+					<li>
+						3. 或者先回到 <a class="link text-[var(--primary)]" href={downloadHref}>下载页</a
+						>
+						确认自己装的是哪个版本、有没有完整解压。
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+</MainGridLayout>

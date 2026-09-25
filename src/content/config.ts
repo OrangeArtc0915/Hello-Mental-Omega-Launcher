@@ -1,5 +1,4 @@
 import { defineCollection, z } from "astro:content";
-import { glob } from "astro/loaders";
 
 const postsCollection = defineCollection({
 	schema: z.object({
@@ -34,31 +33,23 @@ const postsCollection = defineCollection({
 const specCollection = defineCollection({
 	schema: z.object({}),
 });
-const resourcesCollection = defineCollection({
-	// 从项目根 Resource 目录自动读取：Resource/<分类文件夹>/*.md
-	loader: glob({
-		pattern: ["**/*.md", "!#TOOLS/**"],
-		base: "./Resource",
-	}),
+/**
+ * 文档集合：`src/content/docs/**` 下的 Markdown 就是官网文档正文，
+ * 由 `src/pages/docs/[...slug].astro` 渲染到 `/docs/<slug>/`
+ * （`xxx.md` → `/docs/xxx/`，`multiplayer/index.md` → `/docs/multiplayer/`）。
+ */
+const docsCollection = defineCollection({
 	schema: z.object({
 		title: z.string(),
-		icon: z.string().default(""),
-		description: z.string().default(""),
-		link: z.string().optional().default(""),
-		image: z.string().optional().default(""),
-		tags: z.array(z.string()).default([]),
-		order: z.number().optional().default(0),
-		author: z.string().default(""),
-		gameVersion: z.string().default(""),
-		version: z.string().default(""),
-		mode: z.enum(["", "single", "multi", "both"]).default(""),
-		links: z
-			.array(z.object({ name: z.string(), url: z.string() }))
-			.default([]),
+		description: z.string().optional().default(""),
+		/** 所属章节 id，取值见 src/data/hmol-docs.ts 的 DOC_SECTIONS */
+		section: z.string(),
+		/** 全书顺序，决定文档首页的排列与文档页的「上一篇 / 下一篇」 */
+		order: z.number(),
 	}),
 });
 export const collections = {
 	posts: postsCollection,
 	spec: specCollection,
-	resources: resourcesCollection,
+	docs: docsCollection,
 };

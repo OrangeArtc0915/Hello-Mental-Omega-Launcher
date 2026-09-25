@@ -15,6 +15,7 @@ import remarkDirective from "remark-directive"; /* Handle directives */
 import remarkGithubAdmonitionsToDirectives from "remark-github-admonitions-to-directives";
 import remarkMath from "remark-math";
 import remarkSectionize from "remark-sectionize";
+import { visit } from "unist-util-visit";
 import { expressiveCodeConfig } from "./src/config.ts";
 import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-copy-button.js";
 import { pluginLanguageBadge } from "./src/plugins/expressive-code/language-badge.ts";
@@ -25,10 +26,33 @@ import { parseDirectiveNode } from "./src/plugins/remark-directive-rehype.js";
 import { remarkExcerpt } from "./src/plugins/remark-excerpt.js";
 import { remarkMermaid } from "./src/plugins/remark-mermaid.js";
 import { remarkReadingTime } from "./src/plugins/remark-reading-time.mjs";
+
+// 站点部署在子路径下（见下面的 base），Markdown 正文里的站内绝对链接（如 /docs/faq/）
+// 不会被 Astro 自动补上 base，这里统一补一次，否则文档内互链会 404。
+const BASE = "/Hello-Mental-Omega-Launcher/";
+
+/**
+ * 把 Markdown 里的站内绝对链接补上部署 base。
+ * `//` 开头（协议相对）与站外链接不动；已带 base 的地址不重复补。
+ */
+function rehypeBaseLinks() {
+	const prefix = BASE.replace(/\/$/, "");
+	return (tree) => {
+		visit(tree, "element", (node) => {
+			if (node.tagName !== "a") return;
+			const href = node.properties?.href;
+			if (typeof href !== "string") return;
+			if (!href.startsWith("/") || href.startsWith("//")) return;
+			if (href === prefix || href.startsWith(`${prefix}/`)) return;
+			node.properties.href = `${prefix}${href}`;
+		});
+	};
+}
+
 // https://astro.build/config
 export default defineConfig({
 	site: "https://orangeartc0915.github.io",
-	base: "/Hello-Mental-Omega-Launcher/",
+	base: BASE,
 	trailingSlash: "always",
 	integrations: [
 		tailwind({
@@ -111,7 +135,16 @@ export default defineConfig({
 			},
 		}),
 		svelte(),
-		sitemap(),
+		sitemap({
+			// 已下线路由（旧程序专属页面 + 已移除的个人博客模块）已不再产出页面，
+			// 这里同步把它们从 sitemap 中排除，避免站点地图里留下 404 链接。
+			filter: (page) => {
+				const pathname = new URL(page).pathname;
+				return !/\/(dlc|projects|resources|anime|diary|albums|friends|skills|timeline|gallery)(\/|$)/.test(
+					pathname,
+				);
+			},
+		}),
 	],
 	markdown: {
 		remarkPlugins: [

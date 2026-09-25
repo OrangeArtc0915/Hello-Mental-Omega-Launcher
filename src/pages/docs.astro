@@ -1,0 +1,150 @@
+---
+/**
+ * /docs/ 文档首页
+ *
+ * 章节与页面清单都来自内容集合 `docs`（`src/content/docs/**`，schema 见 src/content/config.ts），
+ * 本页只负责按 DOC_SECTIONS 的顺序把它们排成卡片，不手写页面清单。
+ *
+ * 版式沿用主题原有页面（同 archive / projects / resources 的卡片与配色写法），
+ * 未引入新的视觉样式。
+ */
+import { DOC_SECTIONS, docSlug, docsUrl } from "../data/hmol-docs";
+import { hmol } from "../data/hmol-info";
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { getSortedDocs } from "../utils/content-utils";
+import { url } from "../utils/url-utils";
+
+const docs = await getSortedDocs();
+const grouped = DOC_SECTIONS.map((section) => ({
+	...section,
+	pages: docs
+		.filter((entry) => entry.data.section === section.id)
+		.map((entry) => ({
+			title: entry.data.title,
+			description: entry.data.description,
+			href: docsUrl(docSlug(entry.id)),
+		})),
+}));
+
+const faqHref = url("/faq/");
+const changelogHref = url("/changelog/");
+const downloadHref = url("/download/");
+---
+
+<MainGridLayout
+	title="文档"
+	description={`HMOL 文档：安装、使用、联机、排查、常见问题、错误信息与贡献，与当前版本（C# / .NET 8 版 ${hmol.versionDisplay}）对齐。`}
+>
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32"
+	>
+		<div class="card-base z-10 px-9 py-6 relative w-full">
+			<!-- 页面标题 -->
+			<div class="flex flex-col items-start justify-center mb-8">
+				<h1
+					class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+						before:w-1 before:h-8 before:rounded-md before:bg-[var(--primary)]
+						before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+				>
+					文档
+				</h1>
+				<p class="text-lg text-black/60 dark:text-white/60">
+					HMOL 的全部文档都在这一个站里，按章节组织。联机是主程序内置的功能，
+					与其他内容同属这一套文档，不再单列。
+				</p>
+			</div>
+
+			<!-- 章节与页面 -->
+			{
+				grouped.map((section) => (
+					<section class="mb-10">
+						<h2
+							class="text-2xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+								before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+								before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+						>
+							{section.title}
+							<span class="ml-2 text-sm font-normal text-black/45 dark:text-white/65">
+								{section.pages.length} 篇
+							</span>
+						</h2>
+						<p class="text-sm text-black/60 dark:text-white/60 mb-4">{section.desc}</p>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							{section.pages.map((page) => (
+								<a
+									class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+									href={page.href}
+								>
+									<h3 class="font-semibold text-black/85 dark:text-white/85 mb-1 group-hover:text-[var(--primary)] transition-colors">
+										{page.title}
+									</h3>
+									<p class="text-sm text-black/45 dark:text-white/65">
+										{page.description}
+									</p>
+								</a>
+							))}
+						</div>
+					</section>
+				))
+			}
+
+			<!-- 本站相关 -->
+			<h2
+				class="text-2xl font-bold text-black/90 dark:text-white/90 mb-4 relative
+					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
+					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+			>
+				本站相关
+			</h2>
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
+				<a
+					class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+					href={downloadHref}
+				>
+					<h3 class="font-semibold text-black/85 dark:text-white/85 mb-1 group-hover:text-[var(--primary)] transition-colors">
+						下载 {hmol.versionDisplay}
+					</h3>
+					<p class="text-sm text-black/45 dark:text-white/65">
+						发行包、系统要求、安装与校验
+					</p>
+				</a>
+				<a
+					class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+					href={faqHref}
+				>
+					<h3 class="font-semibold text-black/85 dark:text-white/85 mb-1 group-hover:text-[var(--primary)] transition-colors">
+						常见问题
+					</h3>
+					<p class="text-sm text-black/45 dark:text-white/65">
+						四份问答文档的汇总 + 错误码分类入口
+					</p>
+				</a>
+				<a
+					class="card-base group !p-5 border border-black/5 dark:border-white/5 hover:!-translate-y-0.5 transition-all duration-200"
+					href={changelogHref}
+				>
+					<h3 class="font-semibold text-black/85 dark:text-white/85 mb-1 group-hover:text-[var(--primary)] transition-colors">
+						更新日志
+					</h3>
+					<p class="text-sm text-black/45 dark:text-white/65">按时间倒序的版本记录</p>
+				</a>
+			</div>
+
+			<!-- 说明 -->
+			<div class="card-base !p-5 border border-black/5 dark:border-white/5">
+				<p class="font-bold text-black/85 dark:text-white/85 mb-2">关于文档</p>
+				<p class="text-sm text-black/60 dark:text-white/60 mb-3">
+					文档正文就是本站自己的页面（<code>src/content/docs/</code> 下的 Markdown），
+					与官网共用同一套主题、导航与页脚 —— 从任何一页都能点回<a
+						class="link text-[var(--primary)]"
+						href={docsUrl()}>文档首页</a
+					>。
+				</p>
+				<p class="text-sm text-black/60 dark:text-white/60">
+					文档内容与当前版本（C# / .NET 8 版，{hmol.versionDisplay}）对齐；界面截图与文件名
+					请以下载页发行的 <code>{hmol.zipName}</code> 为准。
+				</p>
+			</div>
+		</div>
+	</div>
+</MainGridLayout>

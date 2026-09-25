@@ -12,6 +12,7 @@ import type {
 	SidebarLayoutConfig,
 	SiteConfig,
 } from "./types/config";
+import { HMOL, HMOL_LICENSE_URL } from "./constants/hmol";
 import { LinkPreset } from "./types/config";
 
 // 移除i18n导入以避免循环依赖
@@ -20,8 +21,18 @@ import { LinkPreset } from "./types/config";
 const SITE_LANG = "zh_CN";
 
 export const siteConfig: SiteConfig = {
-	title: "HMOL",
-	subtitle: "Hello Mental Omega Launcher",
+	title: "HMOL 启动器",
+	subtitle: HMOL.name,
+
+	keywords: [
+		"HMOL",
+		"Hello Mental Omega Launcher",
+		"心灵终结",
+		"Mental Omega",
+		"MO 启动器",
+		"红色警戒2",
+		"命令与征服",
+	],
 
 	lang: SITE_LANG,
 
@@ -30,11 +41,12 @@ export const siteConfig: SiteConfig = {
 		fixed: false, // 对访问者隐藏主题色选择器
 	},
 
+	// 个人博客模块的页面已从官网移除，仅保留数据与组件源码（改回时需一并恢复页面）
 	featurePages: {
 		anime: false,
 		diary: false,
 		friends: false,
-		projects: true,
+		projects: false,
 		skills: false,
 		timeline: false,
 		albums: false,
@@ -42,7 +54,7 @@ export const siteConfig: SiteConfig = {
 
 	navbarTitle: {
 		text: "HMOL",
-		icon: "assets/home/home.png",
+		icon: "/brand/icon-128.png", // 启动器程序图标（由 AppIcon.ico 派生）
 	},
 
 	bangumi: {
@@ -66,32 +78,14 @@ export const siteConfig: SiteConfig = {
 
 		// 支持单张图片或图片数组，当数组长度 > 1 时自动启用轮播
 		src: {
-			desktop: [
-				"/assets/desktop-banner/d1.webp",
-				"/assets/desktop-banner/d2.webp",
-				"/assets/desktop-banner/d3.webp",
-				"/assets/desktop-banner/d4.webp",
-				"/assets/desktop-banner/d5.webp",
-				"/assets/desktop-banner/d6.webp",
-				"/assets/desktop-banner/d7.webp",
-				"/assets/desktop-banner/d8.webp",
-			], // 桌面横幅图片
-			mobile: [
-				"/assets/mobile-banner/m1.webp",
-				"/assets/mobile-banner/m2.webp",
-				"/assets/mobile-banner/m3.webp",
-				"/assets/mobile-banner/m4.webp",
-				"/assets/mobile-banner/m5.webp",
-				"/assets/mobile-banner/m6.webp",
-				"/assets/mobile-banner/m7.webp",
-				"/assets/mobile-banner/m8.webp",
-			], // 移动横幅图片
+			desktop: ["/brand/bg-desktop.jpg"], // 桌面横幅图片（docs/111.jpg）
+			mobile: ["/brand/bg-mobile.jpg"], // 移动横幅图片（docs/comment_*.jpg）
 		}, // 使用本地横幅图片
 
 		position: "center", // 等同于 object-position，仅支持 'top', 'center', 'bottom'。默认为 'center'
 
 		carousel: {
-			enable: true, // 为 true 时：为多张图片启用轮播。为 false 时：从数组中随机显示一张图片
+			enable: false, // 为 true 时：为多张图片启用轮播。为 false 时：从数组中随机显示一张图片
 
 			interval: 5, // 轮播间隔时间（秒）
 		},
@@ -113,12 +107,12 @@ export const siteConfig: SiteConfig = {
 
 		homeText: {
 			enable: true,
-			title: "Hello Mental Omega Launcher",
+			title: HMOL.name,
 
 			subtitle: [
-				"为心灵终结玩家打造的轻量级启动器",
-				"一键启动 · 多实例管理 · 主题切换",
-				"开源 · 安全 · 社区驱动",
+				HMOL.tagline,
+				"多实例管理 · 资源包一键安装 · 备份还原",
+				"内建联机组网 · 界面可自定义 · 扩展即 JSON",
 			],
 			typewriter: {
 				enable: true, // 启用副标题打字机效果
@@ -146,12 +140,12 @@ export const siteConfig: SiteConfig = {
 	},
 	generateOgImages: false, // 启用生成OpenGraph图片功能,注意开启后要渲染很长时间，不建议本地调试的时候开启
 	favicon: [
-		// 留空以使用默认 favicon
-		// {
-		//   src: '/favicon/icon.png',    // 图标文件路径
-		//   theme: 'light',              // 可选，指定主题 'light' | 'dark'
-		//   sizes: '32x32',              // 可选，图标大小
-		// }
+		// 站点图标 = 启动器程序图标（由 src/HMOL.App/Assets/AppIcon.ico 派生）
+		{ src: "/brand/icon-32.png", sizes: "32x32" },
+		{ src: "/brand/icon-128.png", sizes: "128x128" },
+		{ src: "/brand/icon-180.png", sizes: "180x180" },
+		{ src: "/brand/icon-192.png", sizes: "192x192" },
+		{ src: "/brand/favicon.ico", sizes: "any" },
 	],
 
 	// 字体配置
@@ -168,30 +162,12 @@ export const siteConfig: SiteConfig = {
 export const fullscreenWallpaperConfig: FullscreenWallpaperConfig = {
 	enable: true, // 启用全屏壁纸功能,非Banner模式下生效
 	src: {
-		desktop: [
-			"/assets/desktop-banner/d1.webp",
-			"/assets/desktop-banner/d2.webp",
-			"/assets/desktop-banner/d3.webp",
-			"/assets/desktop-banner/d4.webp",
-			"/assets/desktop-banner/d5.webp",
-			"/assets/desktop-banner/d6.webp",
-			"/assets/desktop-banner/d7.webp",
-			"/assets/desktop-banner/d8.webp",
-		], // 桌面横幅图片
-		mobile: [
-			"/assets/mobile-banner/m1.webp",
-			"/assets/mobile-banner/m2.webp",
-			"/assets/mobile-banner/m3.webp",
-			"/assets/mobile-banner/m4.webp",
-			"/assets/mobile-banner/m5.webp",
-			"/assets/mobile-banner/m6.webp",
-			"/assets/mobile-banner/m7.webp",
-			"/assets/mobile-banner/m8.webp",
-		], // 移动横幅图片
-	}, // 使用本地横幅图片
+		desktop: ["/brand/bg-desktop.jpg"], // 桌面壁纸
+		mobile: ["/brand/bg-mobile.jpg"], // 移动壁纸
+	}, // 使用本地壁纸图片
 	position: "center", // 壁纸位置，等同于 object-position
 	carousel: {
-		enable: true, // 启用轮播
+		enable: false, // 启用轮播
 		interval: 6, // 轮播间隔时间（秒）
 	},
 	zIndex: -1, // 层级，确保壁纸在背景层
@@ -199,70 +175,42 @@ export const fullscreenWallpaperConfig: FullscreenWallpaperConfig = {
 	blur: 1, // 背景模糊程度
 };
 
+// 导航按官网路由契约配置：首页 / 下载 / 文档 / 更新日志 / 常见问题 / 关于
 export const navBarConfig: NavBarConfig = {
 	links: [
 		LinkPreset.Home,
 		{
 			name: "下载",
-			url: "/projects/",
+			url: "/download/",
 			icon: "material-symbols:download",
 		},
 		{
-			name: "DLC",
-			url: "/dlc/",
-			icon: "material-symbols:extension",
-		},
-		{
-			name: "Wiki",
-			url: "/wiki/",
-			external: true,
+			name: "文档",
+			url: "/docs/",
 			icon: "material-symbols:menu-book",
-			children: [
-				{
-					name: "去Github查看",
-					url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki",
-					external: true,
-					icon: "fa6-brands:github",
-				},
-				{
-					name: "查看本站wiki",
-					url: "/Hello-Mental-Omega-Launcher/wiki/",
-					external: true,
-					icon: "material-symbols:menu-book",
-				},
-			],
 		},
 		{
-			name: "资源",
-			url: "/resources/",
-			icon: "material-symbols:folder-open",
+			name: "更新日志",
+			url: "/changelog/",
+			icon: "material-symbols:new-releases",
+		},
+		{
+			name: "常见问题",
+			url: "/faq/",
+			icon: "material-symbols:help",
 		},
 		{
 			name: "关于",
 			url: "/about/",
 			icon: "material-symbols:info",
 		},
-		{
-			name: "More",
-			url: "#",
-			icon: "material-symbols:more-horiz",
-			children: [
-				LinkPreset.Archive,
-				{
-					name: "GitHub",
-					url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher",
-					external: true,
-					icon: "fa6-brands:github",
-				},
-			],
-		},
 	],
 };
 
 export const profileConfig: ProfileConfig = {
-	avatar: "/docs/作者头像.jpg",
-	name: "mmm",
-	bio: "Hello Mental Omega Launcher",
+	avatar: "/brand/author-avatar.jpg", // docs/1414893933180198206.suf.jpg
+	name: HMOL.author,
+	bio: HMOL.tagline,
 	typewriter: {
 		enable: false,
 		speed: 80,
@@ -271,25 +219,25 @@ export const profileConfig: ProfileConfig = {
 		{
 			name: "GitHub",
 			icon: "fa6-brands:github",
-			url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher",
+			url: HMOL.github,
 		},
 		{
 			name: "Gitee",
 			icon: "simple-icons:gitee",
-			url: "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher",
+			url: HMOL.gitee,
 		},
 		{
-			name: "Wiki",
-			icon: "material-symbols:menu-book",
-			url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/wiki",
+			name: "QQ 群",
+			icon: "fa6-brands:qq",
+			url: HMOL.qqGroupUrl,
 		},
 	],
 };
 
 export const licenseConfig: LicenseConfig = {
 	enable: true,
-	name: "HMOL Non-Commercial, No-Modification",
-	url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE",
+	name: `HMOL · ${HMOL.license}`,
+	url: HMOL_LICENSE_URL,
 };
 
 export const expressiveCodeConfig: ExpressiveCodeConfig = {
@@ -308,30 +256,31 @@ export const commentConfig: CommentConfig = {
 
 export const announcementConfig: AnnouncementConfig = {
 	title: "HMOL",
-	content: "欢迎访问 HMOL (Hello Mental Omega Launcher) 官方网站。请仅从官方渠道下载。",
+	content: `当前版本 ${HMOL.versionDisplay}（${HMOL.name}）。本软件为专有软件，保留所有权利；请仅从官方渠道下载。`,
 	closable: false,
 	link: {
 		enable: true,
 		text: "前往下载",
-		url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases/latest",
-		external: true,
+		url: "/download/",
+		external: false,
 	},
 	link2: {
 		enable: true,
-		text: "前往论坛",
-		url: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/discussions",
-		external: true,
+		text: "查看文档",
+		url: "/docs/",
+		external: false,
 	},
 	link3: {
 		enable: true,
-		text: "QQ群",
-		url: "/about/#qq-交流群",
-		external: false,
+		text: "加入 QQ 群",
+		url: HMOL.qqGroupUrl,
+		external: true,
 	},
 };
 
+// 音乐播放器属于原个人博客模块，官网下线（保留配置项，改回 true 即可恢复）
 export const musicPlayerConfig: MusicPlayerConfig = {
-	enable: true,
+	enable: false,
 	mode: "local",
 };
 
@@ -346,13 +295,14 @@ export const footerConfig: FooterConfig = {
  * 用于控制侧边栏组件的显示、排序、动画和响应式行为
  */
 export const sidebarLayoutConfig: SidebarLayoutConfig = {
-	// 是否启用侧边栏功能
+	// 是否启用侧边栏功能（恢复主题原版的侧栏，只保留资料卡与公告）
 	enable: true,
 
 	// 侧边栏位置：左侧或右侧
 	position: "left",
 
-	// 侧边栏组件配置列表
+	// 侧边栏组件配置列表（只保留官网用得上的资料卡与公告；
+	// 分类/标签是博客向组件，已关闭，代码保留可随时改回）
 	components: [
 		{
 			// 组件类型：用户资料组件
@@ -385,8 +335,8 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		{
 			// 组件类型：分类组件
 			type: "categories",
-			// 是否启用该组件
-			enable: true,
+			// 是否启用该组件（博客向，官网关闭）
+			enable: false,
 			// 组件显示顺序
 			order: 3,
 			// 组件位置："sticky" 表示粘性定位，可滚动
@@ -404,8 +354,8 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		{
 			// 组件类型：标签组件
 			type: "tags",
-			// 是否启用该组件
-			enable: true,
+			// 是否启用该组件（博客向，官网关闭）
+			enable: false,
 			// 组件显示顺序
 			order: 5,
 			// 组件位置："sticky" 表示粘性定位
@@ -483,9 +433,9 @@ export const sakuraConfig: SakuraConfig = {
 	zIndex: 100, // 层级，确保樱花在合适的层级显示
 };
 
-// Pio 看板娘配置
+// Pio 看板娘配置（原个人博客模块，官网下线：enable 改回 true 即可恢复）
 export const pioConfig: import("./types/config").PioConfig = {
-	enable: true, // 启用看板娘
+	enable: false, // 启用看板娘
 	models: ["live2d/firefly/FileReferences_Moc_0.model3.json"], // 看板娘模型路径（相对 public 的路径）
 	position: "left", // 默认位置在右侧
 	width: 280, // 默认宽度
@@ -493,7 +443,7 @@ export const pioConfig: import("./types/config").PioConfig = {
 	mode: "draggable", // 默认为可拖拽模式
 	hiddenOnMobile: false, // 默认在移动设备上隐藏
 	dialog: {
-		welcome: "欢迎来到HMOL官方网站", // 欢迎词
+		welcome: "欢迎来到 HMOL 官方网站", // 欢迎词
 		touch: [
 			"呜……不要乱摸啦～",
 			"再碰我就要生气啦！",
@@ -501,7 +451,7 @@ export const pioConfig: import("./types/config").PioConfig = {
 			"痒痒的，快住手啦！",
 		], // 触摸提示
 		close: "QWQ 下次再见啦~", // 关闭提示
-		link: "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher", // 关于链接
+		link: HMOL.github, // 关于链接
 	},
 };
 

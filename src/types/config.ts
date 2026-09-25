@@ -22,7 +22,7 @@ export type SiteConfig = {
 		fixed: boolean;
 	};
 
-	// 特色页面开关配置
+	// 特色页面开关配置（个人博客模块的页面已从官网移除，开关仅保留类型）
 	featurePages: {
 		anime: boolean; // 番剧页面开关
 		diary: boolean; // 日记页面开关

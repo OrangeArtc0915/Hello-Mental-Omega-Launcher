@@ -1,0 +1,160 @@
+---
+/**
+ * /changelog/ 更新日志
+ *
+ * 数据来源：src/content/posts/hmol-changelog.md（posts 集合），
+ * 由 src/data/hmol-changelog.ts 在构建时解析出版本号 / 日期 / 要点。
+ * 仓库里没有的版本不会出现在本页 —— 不补、不编。
+ *
+ * 版式沿用主题原有页面（同 archive / projects / resources 的卡片与配色写法），
+ * 未引入新的视觉样式。
+ */
+import { changelogEntries } from "../data/hmol-changelog";
+import { docsUrl } from "../data/hmol-docs";
+import { hmol, releaseLinks } from "../data/hmol-info";
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { url } from "../utils/url-utils";
+
+const docsHref = url("/docs/");
+
+const releaseHref = releaseLinks.githubLatest;
+const giteeHref = releaseLinks.giteeReleases;
+---
+
+<MainGridLayout
+	title="更新日志"
+	description="Hello Mental Omega Launcher（HMOL）版本更新日志，按时间倒序汇总仓库内的版本记录。"
+>
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32"
+	>
+		<div class="card-base z-10 px-9 py-6 relative w-full">
+			<!-- 页面标题 -->
+			<div class="flex flex-col items-start justify-center mb-8">
+				<h1
+					class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+						before:w-1 before:h-8 before:rounded-md before:bg-[var(--primary)]
+						before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+				>
+					更新日志
+				</h1>
+				<p class="text-lg text-black/60 dark:text-white/60">
+					按时间倒序汇总仓库内的版本记录（共 {changelogEntries.length} 篇）。
+					每条要点直接取自原文小标题，未作改写。
+				</p>
+			</div>
+
+			{
+				changelogEntries.length === 0 ? (
+					<div class="card-base !p-5 border border-black/5 dark:border-white/5 text-sm text-black/60 dark:text-white/60">
+						仓库内暂无更新日志文件（src/content/posts/hmol-changelog.md）。
+						最新版本请见{" "}
+						<a class="link text-[var(--primary)]" href={releaseHref} target="_blank" rel="noopener">
+							GitHub Releases
+						</a>
+						。
+					</div>
+				) : (
+					<div>
+						{changelogEntries.map((entry) => (
+							<article class="py-8 border-t border-black/5 dark:border-white/5">
+								<div class="flex flex-wrap items-center gap-2 mb-3">
+									{entry.version && (
+										<span class="btn-regular h-6 text-xs px-2 rounded-lg">
+											{entry.version}
+										</span>
+									)}
+									<span class="text-sm text-black/60 dark:text-white/60">
+										{entry.dateText}
+									</span>
+									{entry.updatedText && entry.updatedText !== entry.dateText && (
+										<span class="text-sm text-black/45 dark:text-white/65">
+											（更新于 {entry.updatedText}）
+										</span>
+									)}
+								</div>
+
+								<h2 class="text-xl font-semibold text-black/90 dark:text-white/90 mb-2">
+									{entry.title}
+								</h2>
+								{entry.description && (
+									<p class="text-sm text-black/60 dark:text-white/60 mb-4">
+										{entry.description}
+									</p>
+								)}
+
+								{entry.highlights.length > 0 && (
+									<div class="card-base !p-5 border border-black/5 dark:border-white/5 mb-4">
+										<div class="text-sm font-bold text-black/85 dark:text-white/85 mb-3">
+											要点（原文小标题）
+										</div>
+										<ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm text-black/75 dark:text-white/75">
+											{entry.highlights.map((highlight) => (
+												<li class="flex gap-2">
+													<span class="text-[var(--primary)] shrink-0">·</span>
+													<span>{highlight}</span>
+												</li>
+											))}
+										</ul>
+									</div>
+								)}
+
+								{entry.tags.length > 0 && (
+									<div class="flex flex-wrap gap-2 mb-4">
+										{entry.tags.map((tag) => (
+											<span class="btn-regular h-6 text-xs px-2 rounded-lg">{tag}</span>
+										))}
+									</div>
+								)}
+
+								<div class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+									<a class="link text-[var(--primary)]" href={entry.href}>
+										查看完整更新日志 →
+									</a>
+									<a
+										class="link text-[var(--primary)]"
+										href={releaseHref}
+										target="_blank"
+										rel="noopener"
+									>
+										GitHub Releases
+									</a>
+									<a
+										class="link text-[var(--primary)]"
+										href={giteeHref}
+										target="_blank"
+										rel="noopener"
+									>
+										Gitee Releases
+									</a>
+								</div>
+							</article>
+						))}
+					</div>
+				)
+			}
+
+			<div
+				class="card-base !p-5 border border-black/5 dark:border-white/5 mt-10"
+			>
+				<p class="font-bold text-black/85 dark:text-white/85 mb-2">关于版本号</p>
+				<p class="text-sm text-black/60 dark:text-white/60 mb-3">
+					当前版本 <strong>{hmol.versionDisplay}</strong>（C# / .NET 8
+					版）是本页唯一的版本说明；当前版本没有逐条发版记录，发版信息来源以
+					<a class="link text-[var(--primary)]" href={releaseHref} target="_blank" rel="noopener">
+						Release 页面
+					</a>
+					为准。功能细节与排错见
+					<a class="link text-[var(--primary)]" href={docsHref}>文档入口</a>。
+				</p>
+				<p class="text-sm text-black/60 dark:text-white/60">
+					联机功能的更新记录另见
+					<a
+						class="link text-[var(--primary)]"
+						href={docsUrl("multiplayer/changelog")}>文档 · 联机更新日志</a
+					>。
+				</p>
+			</div>
+		</div>
+	</div>
+</MainGridLayout>

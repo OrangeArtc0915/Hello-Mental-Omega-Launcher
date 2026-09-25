@@ -36,6 +36,16 @@ export async function getSortedPosts() {
 
 	return sorted;
 }
+/**
+ * 文档集合（`src/content/docs/**`）按 frontmatter 的 `order` 升序。
+ * 文档首页的分组顺序、文档页的「上一篇 / 下一篇」都以这个顺序为准
+ * （章节顺序见 src/data/hmol-docs.ts 的 DOC_SECTIONS）。
+ */
+export async function getSortedDocs() {
+	const docs = await getCollection("docs");
+	return docs.sort((a, b) => a.data.order - b.data.order);
+}
+
 export type PostForList = {
 	slug: string;
 	data: CollectionEntry<"posts">["data"];

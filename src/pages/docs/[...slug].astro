@@ -1,0 +1,171 @@
+---
+/**
+ * /docs/<slug>/ 单篇文档页
+ *
+ * 写法与文章页（src/pages/posts/[...slug].astro）保持一致：
+ * - MainGridLayout 提供导航栏 / 侧栏 / 右侧与移动端目录（主题自带的 TOC 组件，传 headings 即可）
+ * - 正文套主题的 Markdown 渲染组件（custom-md / prose），不另做文档皮肤
+ * - 「上一篇 / 下一篇」按 frontmatter 的 order 顺序取相邻文档
+ */
+import type { CollectionEntry } from "astro:content";
+import Markdown from "@components/misc/Markdown.astro";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { Icon } from "astro-icon/components";
+import { docSection, docSlug, docsUrl } from "../../data/hmol-docs";
+import { getSortedDocs } from "../../utils/content-utils";
+
+export async function getStaticPaths() {
+	const docs = await getSortedDocs();
+	return docs
+		.filter((entry) => docSlug(entry.id) !== "")
+		.map((entry) => ({
+			params: { slug: docSlug(entry.id) },
+			props: { entry },
+		}));
+}
+
+const { entry } = Astro.props as { entry: CollectionEntry<"docs"> };
+const { Content, headings } = await entry.render();
+
+// 按 order 顺序取相邻文档，作为上一页 / 下一页
+const docs = await getSortedDocs();
+const index = docs.findIndex((item) => item.id === entry.id);
+const prev = index > 0 ? docs[index - 1] : undefined;
+const next =
+	index >= 0 && index < docs.length - 1 ? docs[index + 1] : undefined;
+
+const section = docSection(entry.data.section);
+// 同章节的页面清单，便于在同一章内跳转
+const siblings = docs
+	.filter((item) => item.data.section === entry.data.section)
+	.map((item) => ({
+		title: item.data.title,
+		href: docsUrl(docSlug(item.id)),
+		current: item.id === entry.id,
+	}));
+---
+
+<MainGridLayout
+	title={entry.data.title}
+	description={entry.data.description}
+	headings={headings}
+>
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative mb-4"
+	>
+		<div class="card-base z-10 px-6 md:px-9 pt-6 pb-4 relative w-full">
+			<!-- 面包屑：文档 / 章节 -->
+			<div
+				class="flex flex-wrap items-center gap-2 text-sm mb-3 text-black/45 dark:text-white/65"
+			>
+				<a class="link text-[var(--primary)]" href={docsUrl()}>文档</a>
+				<span aria-hidden="true">/</span>
+				<a class="link text-[var(--primary)]" href={docsUrl()}>
+					{section ? section.title : entry.data.section}
+				</a>
+			</div>
+
+			<!-- 标题 -->
+			<div class="relative onload-animation">
+				<div
+					data-pagefind-body
+					data-pagefind-weight="10"
+					data-pagefind-meta="title"
+					class="transition w-full block font-bold mb-4
+						text-3xl md:text-[2.25rem]/[2.75rem]
+						text-black/90 dark:text-white/90
+						md:before:w-1 before:h-5 before:rounded-md before:bg-[var(--primary)]
+						before:absolute before:top-[0.75rem] before:left-[-1.125rem]"
+				>
+					{entry.data.title}
+				</div>
+			</div>
+
+			<div
+				class="mt-4 border-[var(--line-divider)] border-dashed border-b-[1px] mb-5"
+			>
+			</div>
+
+			<!-- 正文 -->
+			<Markdown class="mb-6 markdown-content onload-animation">
+				<Content />
+			</Markdown>
+
+			<!-- 本章节其它页面 -->
+			<nav
+				class="border-t border-black/5 dark:border-white/5 pt-5 mb-2"
+				aria-label={`${section ? section.title : "文档"}章节页面`}
+			>
+				<div class="text-sm font-bold text-black/85 dark:text-white/85 mb-3">
+					{section ? section.title : "文档"}章节
+				</div>
+				<ul class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+					{
+						siblings.map((item) => (
+							<li>
+								{item.current ? (
+									<span class="text-[var(--primary)] font-medium">
+										{item.title}
+									</span>
+								) : (
+									<a class="link text-black/60 dark:text-white/60" href={item.href}>
+										{item.title}
+									</a>
+								)}
+							</li>
+						))
+					}
+				</ul>
+			</nav>
+		</div>
+	</div>
+
+	<!-- 上一篇 / 下一篇 -->
+	<div
+		class="flex flex-col md:flex-row justify-between mb-4 gap-4 overflow-hidden w-full"
+	>
+		<a
+			href={prev ? docsUrl(docSlug(prev.id)) : "#"}
+			class:list={[
+				"w-full font-bold overflow-hidden active:scale-95",
+				{ "pointer-events-none": !prev },
+			]}
+		>
+			{
+				prev && (
+					<div class="btn-card rounded-2xl w-full h-[3.75rem] max-w-full px-4 flex items-center !justify-start gap-4">
+						<Icon
+							name="material-symbols:chevron-left-rounded"
+							class="text-[2rem] text-[var(--primary)]"
+						/>
+						<div class="overflow-hidden transition overflow-ellipsis whitespace-nowrap max-w-[calc(100%_-_3rem)] text-black/75 dark:text-white/75">
+							上一篇 · {prev.data.title}
+						</div>
+					</div>
+				)
+			}
+		</a>
+
+		<a
+			href={next ? docsUrl(docSlug(next.id)) : "#"}
+			class:list={[
+				"w-full font-bold overflow-hidden active:scale-95",
+				{ "pointer-events-none": !next },
+			]}
+		>
+			{
+				next && (
+					<div class="btn-card rounded-2xl w-full h-[3.75rem] max-w-full px-4 flex items-center !justify-end gap-4">
+						<div class="overflow-hidden transition overflow-ellipsis whitespace-nowrap max-w-[calc(100%_-_3rem)] text-black/75 dark:text-white/75">
+							下一篇 · {next.data.title}
+						</div>
+						<Icon
+							name="material-symbols:chevron-right-rounded"
+							class="text-[2rem] text-[var(--primary)]"
+						/>
+					</div>
+				)
+			}
+		</a>
+	</div>
+</MainGridLayout>
