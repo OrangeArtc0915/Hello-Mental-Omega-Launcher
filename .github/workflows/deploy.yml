@@ -1,14 +1,12 @@
 name: Deploy to GitHub Pages
 
-# 站点源码在 Web 分支，构建产物发布到 gh-pages 分支（Pages 的源头设为该分支）。
+# 站点源码在 Web 分支，构建产物由 Actions 直接发布到 Pages，**不落在任何分支上**。
 #
-# 说明：不再走 actions/deploy-pages + github-pages 环境。那条路要求工作流引用
-# `github-pages` 环境，会被该环境的「部署分支保护规则」拦住（Web 不在允许名单里，
-# 报 “Branch "Web" is not allowed to deploy to github-pages”）。改为发布到分支，
-# 完全绕开环境保护规则。
-#
-# 首次使用后需要在仓库设置里：Settings → Pages → Source 选
-# 「Deploy from a branch」→ 分支 gh-pages → 目录 / (root)。
+# 前置设置（只需在仓库 Settings 里做一次）：
+#   1) Settings → Pages → Source 选「GitHub Actions」
+#   2) Settings → Environments → `github-pages` → Deployment branches and tags
+#      把 `Web` 加进允许名单（或选 No restriction）。
+#      否则会出现：Branch "Web" is not allowed to deploy to github-pages.
 
 on:
   push:
@@ -16,7 +14,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 # 连续推送时取消上一次未完成的部署，避免互相覆盖
 concurrency:
@@ -24,37 +24,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 版本取自 package.json 的 packageManager 字段，无需在这里再写 version
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      # withastro/action 会自动识别 pnpm-lock.yaml、装依赖、执行 `pnpm build`
+      # （构建脚本 = astro build + pagefind），并上传 Pages 产物
+      - name: Install, build, and upload your site
+        uses: withastro/action@v3
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build site
-        run: pnpm build
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
-          # 关闭 Jekyll：否则 GitHub Pages 会忽略 _astro/ 这类下划线开头的目录，
-          # 同时该选项会顺带写入 .nojekyll
-          enable_jekyll: false
-          # 每次只保留一个提交，避免站点构建历史把分支撑大
-          force_orphan: true
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
