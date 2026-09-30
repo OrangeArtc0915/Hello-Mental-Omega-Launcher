@@ -1,0 +1,311 @@
+<Window x:Class="HMOL.App.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:HMOL.App.Controls"
+        xmlns:views="clr-namespace:HMOL.App.Views"
+        xmlns:core="clr-namespace:HMOL.Core.App;assembly=HMOL.Core"
+        Style="{x:Null}"
+        Title="{x:Static core:AppInfo.Name}"
+        Width="1080"
+        Height="680"
+        MinWidth="940"
+        MinHeight="620"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        Background="{x:Null}"
+        FontFamily="{StaticResource AppFont}"
+        Foreground="{DynamicResource Text.Primary}"
+        Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0"
+                      ResizeBorderThickness="6"
+                      CornerRadius="0"
+                      GlassFrameThickness="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Grid x:Name="RootGrid" UseLayoutRounding="True" SnapsToDevicePixels="True">
+
+        <!-- 窗口外的留白用来显示自绘投影，玻璃化不可用时会退化为贴边窗口 -->
+        <Border x:Name="PanBack" Margin="8" SnapsToDevicePixels="False" UseLayoutRounding="False">
+            <Border.Clip>
+                <RectangleGeometry x:Name="RectForm" RadiusX="12" RadiusY="12" />
+            </Border.Clip>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="22"
+                                  Direction="270"
+                                  Opacity="0.22"
+                                  ShadowDepth="0"
+                                  Color="{DynamicResource Shadow.Tint}" />
+            </Border.Effect>
+
+            <Grid x:Name="PanForm" Background="{DynamicResource Brush.WindowBackground}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!--
+                    个性化背景层：铺满整个窗口（含标题栏与侧栏）。
+                    放在 PanForm 的第一个子元素位置，所以它在所有界面之下；
+                    PanBack 的 12px 圆角裁切会连带把它裁圆，不会露出方角。
+                    没设背景时这一层完全透明，露出主题渐变。
+                -->
+                <views:BackgroundLayer x:Name="BackgroundView" Grid.RowSpan="2" />
+
+                <!-- 标题栏：面板底 + 底部分隔线 -->
+                <Grid Grid.Row="0"
+                      Background="{DynamicResource Surface.PanelGlass}"
+                      MouseLeftButtonDown="OnTitleBarMouseDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.ColumnSpan="2"
+                            Height="1"
+                            VerticalAlignment="Bottom"
+                            Background="{DynamicResource Border.Default}"
+                            IsHitTestVisible="False" />
+
+                    <StackPanel Grid.Column="0"
+                                Margin="16,0,12,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                        <Border Width="24"
+                                Height="24"
+                                ClipToBounds="True"
+                                CornerRadius="{StaticResource Radius.Small}">
+                            <Image Width="20"
+                                   Height="20"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Source="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+                                   Stretch="Uniform" />
+                        </Border>
+                        <TextBlock Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Text="{x:Static core:AppInfo.Name}" />
+                        <TextBlock Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   Text="{x:Static core:AppInfo.VersionDisplay}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Margin="0,0,12,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                        <c:RoundIconButton Width="32"
+                                           Height="32"
+                                           Icon="lucide/minus"
+                                           Tone="Plain"
+                                           ToolTip="最小化"
+                                           Click="OnMinimizeClick" />
+                        <c:RoundIconButton Width="32"
+                                           Height="32"
+                                           Margin="4,0,0,0"
+                                           Icon="lucide/square"
+                                           Tone="Plain"
+                                           ToolTip="最大化 / 还原"
+                                           Click="OnMaximizeClick" />
+                        <c:RoundIconButton Width="32"
+                                           Height="32"
+                                           Margin="4,0,0,0"
+                                           Icon="lucide/x"
+                                           Tone="Plain"
+                                           ToolTip="关闭"
+                                           Click="OnCloseClick" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- 内容区：左侧全局导航 + 内容区（页面实例缓存在字典里，切换时只切可见性） -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Background="{DynamicResource Surface.PanelGlass}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="0,0,1,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!--
+                                页面导航区：窗口变矮或导航项变多时可纵向滚动，不再被裁切。
+                                底部「关于」放在下一行、不放进这里，因此始终固定在底部不跟着滚走。
+                                滚动条按需出现（Auto），横向禁用；侧栏宽度固定，不会出现横向滚动条。
+                                两组面板（全局导航 / 设置分类）并排在同一格里，靠显隐互斥，
+                                切页只翻 Visibility，不新建第二个侧栏、也不动布局列宽。
+                            -->
+                            <ScrollViewer x:Name="ScrollSidebarNav"
+                                          Grid.Row="0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <Grid>
+                                    <StackPanel x:Name="PanSidebarNav" Margin="0,12,0,0" VerticalAlignment="Top">
+                                        <c:NavItem x:Name="NavHome"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/layout-dashboard"
+                                                   Tag="0"
+                                                   Text="主页"
+                                                   Checked="OnNavChecked" />
+                                        <c:NavItem x:Name="NavInstances"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/layers"
+                                                   Tag="1"
+                                                   Text="游戏实例"
+                                                   Checked="OnNavChecked" />
+                                        <c:NavItem x:Name="NavPackages"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/package"
+                                                   Tag="2"
+                                                   Text="包管理"
+                                                   Checked="OnNavChecked" />
+                                        <c:NavItem x:Name="NavMultiplayer"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/network"
+                                                   Tag="3"
+                                                   Text="联机"
+                                                   Checked="OnNavChecked" />
+                                        <c:NavItem x:Name="NavLog"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/scroll-text"
+                                                   Tag="4"
+                                                   Text="运行日志"
+                                                   Checked="OnNavChecked" />
+                                        <c:NavItem x:Name="NavSettings"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/settings"
+                                                   Tag="5"
+                                                   Text="设置"
+                                                   Checked="OnNavChecked" />
+                                    </StackPanel>
+
+                                    <!--
+                                        设置分类栏：进设置页时顶替上面的主导航，离开后还原。
+                                        GroupName 必须与主导航不同——同名 RadioButton 会互相抢选中，
+                                        而这两组本来就该各自记住自己的选中项。
+                                        每项的 Tag 就是分类序号，事件里靠它把「谁被点了」翻译成索引。
+                                    -->
+                                    <StackPanel x:Name="PanSetupNav"
+                                                Margin="0,12,0,0"
+                                                VerticalAlignment="Top"
+                                                Visibility="Collapsed">
+                                        <!-- 返回：不参与分类选中，单独分组，点完自己取消高亮 -->
+                                        <c:NavItem x:Name="SetupNavBack"
+                                                   GroupName="SetupBackNav"
+                                                   Icon="lucide/arrow-left"
+                                                   Text="返回"
+                                                   Click="OnSetupBackClick" />
+                                        <c:NavItem x:Name="SetupCatAppearance"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/palette"
+                                                   Tag="0"
+                                                   Text="外观"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatNickname"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/user"
+                                                   Tag="1"
+                                                   Text="联机昵称"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatWeatherCity"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/globe"
+                                                   Tag="2"
+                                                   Text="天气城市"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatSites"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/link-2"
+                                                   Tag="3"
+                                                   Text="常用网站"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatBackground"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/image"
+                                                   Tag="4"
+                                                   Text="主页背景"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatMusic"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/music"
+                                                   Tag="5"
+                                                   Text="背景音乐"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatLayout"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/grid-2x2"
+                                                   Tag="6"
+                                                   Text="界面布局"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatExtensions"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/puzzle"
+                                                   Tag="7"
+                                                   Text="扩展模块"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatAutoStart"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/power"
+                                                   Tag="8"
+                                                   Text="开机自启"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatGamePath"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/folder-open"
+                                                   Tag="9"
+                                                   Text="游戏路径"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatUpdate"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/download"
+                                                   Tag="10"
+                                                   Text="程序更新"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatAbout"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/info"
+                                                   Tag="11"
+                                                   Text="关于与存储"
+                                                   Checked="OnSetupCategoryChecked" />
+                                    </StackPanel>
+                                </Grid>
+                            </ScrollViewer>
+
+                            <StackPanel x:Name="PanSidebarFooter"
+                                        Grid.Row="1"
+                                        Margin="0,0,0,12"
+                                        VerticalAlignment="Bottom">
+                                <!-- 单独分组，避免与主页面导航互斥；点击后弹独立窗口，不参与页面切换 -->
+                                <c:NavItem x:Name="NavAbout"
+                                           GroupName="AboutNav"
+                                           Icon="lucide/info"
+                                           Text="关于"
+                                           Click="OnAboutNavClick" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid x:Name="PanContent" Grid.Column="1" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

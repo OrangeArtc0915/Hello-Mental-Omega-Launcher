@@ -1,0 +1,15 @@
+# 批处理必须是 CRLF：cmd.exe 解析 LF 行尾的 .bat 会因字节偏移错位，
+# 含中文时表现为把一行拆成几段乱码命令。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.cs   text eol=crlf
+*.xaml text eol=crlf
+*.csproj text eol=crlf
+*.sln  text eol=crlf
+*.json text eol=crlf
+*.manifest text eol=crlf
+
+*.ico binary
+*.png binary

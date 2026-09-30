@@ -1,0 +1,31 @@
+# ---- 构建产物 ----
+bin/
+obj/
+publish/
+_pkg/
+*.user
+*.suo
+.vs/
+
+# ---- 运行时数据（绿色便携：exe 同目录 Data\） ----
+Data/
+
+# ---- 旧版 Python 实现：原地保留，不入新仓库 ----
+/HMOL_QT/
+/HMOL联机模块/
+/Tool/
+/Web/
+
+# ---- 签名工具与证书 ----
+# 目录里是 makecert / signtool 这些工具，没必要入库；生成的证书与私钥更绝对不能入库
+/签名/
+*.pfx
+*.pvk
+*.spc
+*.cer
+
+# ---- 临时文件 ----
+_version.tmp
+*.failed
+/probe-ghfast/
+/Web.git.corrupt.bak/

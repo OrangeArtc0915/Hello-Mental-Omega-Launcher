@@ -1,0 +1,732 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="clr-namespace:HMOL.App.Controls"
+                    xmlns:svg="clr-namespace:HMOL.App.Controls.Svg">
+
+    <!-- ===================== 窗口（对话框统一外观） ===================== -->
+
+    <!--
+        会话窗一律走这套：去掉系统原生标题栏（WindowChrome 把非客户区交给 WPF 画），
+        顶上留一条透明拖动区，右上角放自绘关闭按钮；标题文字仍由窗内的 SurfaceCard 显示。
+
+        必须带 x:Key：WPF 的隐式样式只认精确类型，放在 Application.Resources 里的
+        无 key「Style TargetType="Window"」不会作用到 Window 的派生类（全部对话框都是派生类），
+        实测派生窗口拿到的是 Style=<null>。所以改由 App 在窗口 Initialized 时按 key 取用，
+        见 App.OnWindowInitialized。主窗口与联机 HUD 自带外壳，用 Style="{x:Null}" 排除。
+    -->
+    <Style x:Key="DialogWindow" TargetType="Window">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="UseLayoutRounding" Value="True" />
+        <!--
+            WindowStyle=None 必须显式设置：只靠 WindowChrome 的 CaptionHeight=0 时，
+            系统在不少 Windows 配置下仍会照着 WS_CAPTION 画出原生标题栏。
+            它与 AllowsTransparency=False（默认）+ WindowChrome 是微软推荐组合；
+            AllowsTransparency=True 的窗口（联机 HUD）已在自身元素上用 Style="{x:Null}" 排除。
+        -->
+        <Setter Property="WindowStyle" Value="None" />
+        <Setter Property="WindowChrome.WindowChrome">
+            <Setter.Value>
+                <WindowChrome CaptionHeight="0"
+                              CornerRadius="0"
+                              GlassFrameThickness="0"
+                              ResizeBorderThickness="6"
+                              UseAeroCaptionButtons="False" />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Window">
+                    <Grid>
+                        <Border Background="{DynamicResource Surface.Window}" />
+
+                        <ContentPresenter />
+
+                        <!-- 顶部拖动区：只盖住标题那一带，不挡下面的输入控件 -->
+                        <c:DialogTitleBar Height="44"
+                                          VerticalAlignment="Top"
+                                          Background="{DynamicResource Common.Transparent}" />
+
+                        <Button x:Name="DialogCloseButton"
+                                Width="28"
+                                Height="28"
+                                Margin="0,10,14,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Command="{x:Static c:AppCommands.CloseWindow}"
+                                CommandTarget="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                                Cursor="Hand"
+                                Focusable="False"
+                                ToolTip="关闭">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="CloseFace"
+                                            Background="{DynamicResource Common.Transparent}"
+                                            CornerRadius="{StaticResource Radius.Pill}">
+                                        <svg:SvgIcon x:Name="CloseIcon"
+                                                     Width="15"
+                                                     Height="15"
+                                                     HorizontalAlignment="Center"
+                                                     VerticalAlignment="Center"
+                                                     Icon="lucide/x"
+                                                     IconBrush="{DynamicResource Text.Secondary}" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="CloseFace" Property="Background" Value="{DynamicResource Status.DangerSoft}" />
+                                            <Setter TargetName="CloseIcon" Property="IconBrush" Value="{DynamicResource Status.Danger}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 悬停提示 ===================== -->
+
+    <Style TargetType="ToolTip">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{DynamicResource Surface.Card}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Item}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="14"
+                                              Direction="270"
+                                              Opacity="0.16"
+                                              ShadowDepth="2"
+                                              Color="{DynamicResource Shadow.Tint}" />
+                        </Border.Effect>
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 右键菜单 ===================== -->
+
+    <Style TargetType="Separator">
+        <Setter Property="Margin" Value="6,4" />
+        <Setter Property="Background" Value="{DynamicResource Border.Default}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1" Background="{TemplateBinding Background}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="MenuItem">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="ItemFace"
+                            Margin="0,1"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{DynamicResource Common.Transparent}"
+                            CornerRadius="{StaticResource Radius.Small}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ContentPresenter Grid.Column="0"
+                                              VerticalAlignment="Center"
+                                              ContentSource="Icon" />
+
+                            <ContentPresenter Grid.Column="1"
+                                              Margin="0"
+                                              VerticalAlignment="Center"
+                                              ContentSource="Header"
+                                              RecognizesAccessKey="True" />
+
+                            <TextBlock Grid.Column="2"
+                                       Margin="20,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Tertiary}"
+                                       Text="{TemplateBinding InputGestureText}" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="ItemFace" Property="Background" Value="{DynamicResource Accent.Faint}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ContextMenu">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="Padding" Value="5" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{DynamicResource Surface.Card}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Item}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18"
+                                              Direction="270"
+                                              Opacity="0.18"
+                                              ShadowDepth="2"
+                                              Color="{DynamicResource Shadow.Tint}" />
+                        </Border.Effect>
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 下拉框 ===================== -->
+
+    <Style TargetType="ComboBoxItem">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="ItemFace"
+                            Margin="0,1"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{DynamicResource Common.Transparent}"
+                            CornerRadius="{StaticResource Radius.Small}">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="ItemFace" Property="Background" Value="{DynamicResource Surface.CardHover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="ItemFace" Property="Background" Value="{DynamicResource Accent.Faint}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        说明：控件模板里写死了与 MpCombo 一致的取值（Surface.Sunken / Border.Default / 半径 8），
+        因此 MpCombo 这个只改颜色的旧样式已无意义，联机页已改为直接用全局样式。
+    -->
+    <Style TargetType="ComboBox">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton x:Name="DropToggle"
+                                      ClickMode="Press"
+                                      Focusable="False"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="Face"
+                                            Background="{DynamicResource Surface.Sunken}"
+                                            BorderBrush="{DynamicResource Border.Default}"
+                                            BorderThickness="1"
+                                            CornerRadius="{StaticResource Radius.Button}">
+                                        <svg:SvgIcon x:Name="Arrow"
+                                                     Width="14"
+                                                     Height="14"
+                                                     Margin="0,0,10,0"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     Icon="lucide/arrow-up-down"
+                                                     IconBrush="{DynamicResource Text.Secondary}" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource Border.Strong}" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Face" Property="BorderBrush" Value="{DynamicResource Accent.Base}" />
+                                            <Setter TargetName="Arrow" Property="IconBrush" Value="{DynamicResource Accent.Base}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+
+                        <!-- IsEditable=False 时展示选中项；右边留出箭头的位置 -->
+                        <ContentPresenter Margin="10,0,30,0"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          IsHitTestVisible="False" />
+
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
+                               Placement="Bottom"
+                               PopupAnimation="Fade"
+                               SnapsToDevicePixels="True">
+                            <Border MinWidth="{TemplateBinding ActualWidth}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                    Margin="0,4,0,0"
+                                    Background="{DynamicResource Surface.Card}"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource Radius.Item}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="18"
+                                                      Direction="270"
+                                                      Opacity="0.18"
+                                                      ShadowDepth="2"
+                                                      Color="{DynamicResource Shadow.Tint}" />
+                                </Border.Effect>
+                                <ScrollViewer Margin="5" VerticalScrollBarVisibility="Auto">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 基础排版 ===================== -->
+
+    <!-- 不设置 Foreground：让文字颜色从父级继承，避免覆盖按钮内的浅色文字 -->
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!--
+        字号梯度（主页确立、各内容页统一遵循，需要时按同一档取值，不再各页自创）：
+          页面标题 / 主页英雄文字 ······ 18   粗体，Text.Primary
+          卡片标题 ····················· 13.5 粗体（SurfaceCard 模板里定义）
+          列表行 / 卡片条目主标题 ······· 12.5 SemiBold，Text.Primary
+          正文与次级说明 ··············· 12   Text.Secondary
+          弱提示 ······················· 11.5 Text.Tertiary
+          元信息（路径 / 主机 / 计数）···· 11   Text.Tertiary
+        图标：卡片 / 页头图标块 38 配 19，列表行图标块 24 配 13，行内联图标 13。
+    -->
+
+    <!-- ===================== 滚动条 ===================== -->
+
+    <Style TargetType="Thumb">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="Bd"
+                            Margin="3,0"
+                            Background="{DynamicResource Text.Tertiary}"
+                            CornerRadius="3" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Text.Secondary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScrollBarThumbHorizontal" TargetType="Thumb">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="Bd"
+                            Margin="0,3"
+                            Background="{DynamicResource Text.Tertiary}"
+                            CornerRadius="3" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Text.Secondary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ScrollBarPageButton" TargetType="RepeatButton">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border Background="Transparent" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+        <Setter Property="Width" Value="12" />
+        <Setter Property="MinWidth" Value="12" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid Background="Transparent">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource ScrollBarPageButton}"
+                                              Command="ScrollBar.PageUpCommand" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb MinHeight="24" />
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource ScrollBarPageButton}"
+                                              Command="ScrollBar.PageDownCommand" />
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Height" Value="12" />
+                <Setter Property="MinHeight" Value="12" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Grid Background="Transparent">
+                                <Track x:Name="PART_Track">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource ScrollBarPageButton}"
+                                                      Command="ScrollBar.PageLeftCommand" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb MinWidth="24" Style="{StaticResource ScrollBarThumbHorizontal}" />
+                                    </Track.Thumb>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource ScrollBarPageButton}"
+                                                      Command="ScrollBar.PageRightCommand" />
+                                    </Track.IncreaseRepeatButton>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===================== 进度条 ===================== -->
+
+    <!-- 只做确定进度（PART_Track / PART_Indicator 是 ProgressBar 约定的模板部件名）。
+         不确定进度（IsIndeterminate）不在这里做动画，界面改为隐藏进度条、只留文字与取消。 -->
+    <Style TargetType="ProgressBar">
+        <Setter Property="Height" Value="6" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+        <Setter Property="Foreground" Value="{DynamicResource Accent.Bright}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border Background="{TemplateBinding Background}"
+                            ClipToBounds="True"
+                            CornerRadius="3">
+                        <Grid>
+                            <Rectangle x:Name="PART_Track" />
+                            <Rectangle x:Name="PART_Indicator"
+                                       HorizontalAlignment="Left"
+                                       Fill="{TemplateBinding Foreground}"
+                                       RadiusX="3"
+                                       RadiusY="3" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 卡片 ===================== -->
+
+    <Style TargetType="{x:Type c:SurfaceCard}">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:SurfaceCard}">
+                    <Border x:Name="CardBorder"
+                            Background="{DynamicResource Surface.CardGlass}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            ClipToBounds="True"
+                            CornerRadius="{StaticResource Radius.Card}"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="16"
+                                              Direction="270"
+                                              Opacity="0.1"
+                                              ShadowDepth="2"
+                                              Color="{DynamicResource Shadow.Tint}" />
+                        </Border.Effect>
+
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock x:Name="TitleElement"
+                                       Grid.Row="0"
+                                       Margin="16,14,16,0"
+                                       FontSize="13.5"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Visibility="Collapsed" />
+
+                            <ContentPresenter Grid.Row="1"
+                                              Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 页面页头 ===================== -->
+
+    <!-- 内容页页头：左侧图标底色块 + 标题 18 粗 + 副标题 12 次要色，右侧 Content 里放本页操作按钮。
+         尺寸与字号取自主页横幅那一套语言，五个内容页共用。 -->
+    <Style TargetType="{x:Type c:PageHeader}">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        <Setter Property="HorizontalContentAlignment" Value="Right" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:PageHeader}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="IconBlock"
+                                Grid.Column="0"
+                                Width="38"
+                                Height="38"
+                                Margin="0,0,12,0"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource Accent.Faint}"
+                                CornerRadius="{StaticResource Radius.Item}">
+                            <svg:SvgIcon x:Name="IconElement"
+                                         Width="19"
+                                         Height="19"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Icon="{TemplateBinding Icon}"
+                                         IconBrush="{DynamicResource Accent.Base}" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,12,0"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="TitleElement"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="SubtitleElement"
+                                       Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <ContentPresenter Grid.Column="2"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 文字按钮 ===================== -->
+
+    <Style TargetType="{x:Type c:OutlineButton}">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:OutlineButton}">
+                    <Border x:Name="Face"
+                            Background="{DynamicResource Surface.Card}"
+                            BorderBrush="{DynamicResource Border.Strong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Button}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 圆形图标按钮 ===================== -->
+
+    <Style TargetType="{x:Type c:RoundIconButton}">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:RoundIconButton}">
+                    <Border x:Name="Hit"
+                            Background="{DynamicResource Common.Transparent}"
+                            CornerRadius="{StaticResource Radius.Pill}">
+                        <svg:SvgIcon x:Name="IconElement"
+                                     Width="{TemplateBinding IconSize}"
+                                     Height="{TemplateBinding IconSize}"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================== 侧栏导航项 ===================== -->
+
+    <Style TargetType="{x:Type c:NavItem}">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Margin" Value="8,2" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:NavItem}">
+                    <Border x:Name="Back"
+                            Height="42"
+                            Background="{DynamicResource Common.Transparent}"
+                            CornerRadius="{StaticResource Radius.Item}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="3" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border x:Name="Indicator"
+                                    Grid.Column="0"
+                                    Width="3"
+                                    Height="18"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource Nav.Indicator}"
+                                    CornerRadius="2" />
+
+                            <svg:SvgIcon x:Name="IconElement"
+                                         Grid.Column="1"
+                                         Width="{TemplateBinding IconSize}"
+                                         Height="{TemplateBinding IconSize}"
+                                         Margin="12,0,0,0"
+                                         VerticalAlignment="Center"
+                                         IconBrush="{DynamicResource Nav.Text}" />
+
+                            <TextBlock x:Name="TextElement"
+                                       Grid.Column="2"
+                                       Margin="10,0,12,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="13.5"
+                                       Foreground="{DynamicResource Nav.Text}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

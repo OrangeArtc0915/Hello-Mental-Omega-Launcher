@@ -1,0 +1,443 @@
+<c:LauncherPage x:Class="HMOL.App.Pages.PageInstances"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:c="clr-namespace:HMOL.App.Controls"
+                xmlns:svg="clr-namespace:HMOL.App.Controls.Svg">
+
+    <c:LauncherPage.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </c:LauncherPage.Resources>
+
+    <Grid Margin="24,20,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头：与其余页面同一形态，本页操作按钮组放在右侧 -->
+        <c:PageHeader x:Name="HeaderInstances"
+                      Grid.Row="0"
+                      Title="游戏实例"
+                      Subtitle="每个实例记录一份游戏目录与它的插件包组合"
+                      Icon="lucide/layers">
+            <StackPanel Orientation="Horizontal">
+                <c:OutlineButton Content="新建实例"
+                                 Tone="Solid"
+                                 Click="OnNewInstanceClick" />
+                <c:OutlineButton Margin="8,0,0,0"
+                                 Content="导入实例"
+                                 Click="OnImportInstanceClick" />
+                <c:OutlineButton Margin="8,0,0,0"
+                                 Content="刷新"
+                                 Click="OnRefreshClick" />
+            </StackPanel>
+        </c:PageHeader>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,14,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- 结果提示条 -->
+                <Border x:Name="BarNotice"
+                        Margin="0,0,0,10"
+                        Padding="12,10"
+                        Background="{DynamicResource Accent.Faint}"
+                        CornerRadius="{StaticResource Radius.Item}"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <svg:SvgIcon x:Name="IconNotice"
+                                     Grid.Column="0"
+                                     Width="16"
+                                     Height="16"
+                                     Margin="0,1,0,0"
+                                     VerticalAlignment="Top"
+                                     Icon="lucide/info"
+                                     IconBrush="{DynamicResource Accent.Base}" />
+
+                        <TextBlock x:Name="LabNotice"
+                                   Grid.Column="1"
+                                   Margin="10,0,8,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   TextWrapping="Wrap" />
+
+                        <c:RoundIconButton Grid.Column="2"
+                                           VerticalAlignment="Center"
+                                           Icon="lucide/x"
+                                           IconSize="13"
+                                           Tone="Plain"
+                                           Click="OnDismissNoticeClick" />
+                    </Grid>
+                </Border>
+
+                <!-- 实例卡片 -->
+                <ItemsControl x:Name="PanInstances">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <c:SurfaceCard Width="356"
+                                           Margin="0,0,14,14"
+                                           Padding="0"
+                                           HasHoverEffect="False"
+                                           UseShadow="False">
+                                <Grid Margin="16,14,16,14">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- 标题 -->
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0"
+                                                Width="38"
+                                                Height="38"
+                                                Background="{DynamicResource Accent.Faint}"
+                                                CornerRadius="{StaticResource Radius.Item}">
+                                            <Grid>
+                                                <!-- 游戏自带图标：有就显示图片 -->
+                                                <Image Width="26"
+                                                       Height="26"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"
+                                                       Source="{Binding IconImage}"
+                                                       Visibility="{Binding HasIconImage, Converter={StaticResource BoolToVis}}" />
+
+                                                <!-- 没有游戏图标时退回矢量图标（目录失效则显示警告） -->
+                                                <svg:SvgIcon Width="19"
+                                                             Height="19"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             Visibility="{Binding HasFallbackIcon, Converter={StaticResource BoolToVis}}">
+                                                    <svg:SvgIcon.Style>
+                                                        <Style TargetType="svg:SvgIcon">
+                                                            <Setter Property="Icon" Value="lucide/layers" />
+                                                            <Setter Property="IconBrush" Value="{DynamicResource Accent.Base}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsValid}" Value="False">
+                                                                    <Setter Property="Icon" Value="lucide/triangle-alert" />
+                                                                    <Setter Property="IconBrush" Value="{DynamicResource Status.Danger}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </svg:SvgIcon.Style>
+                                                </svg:SvgIcon>
+                                            </Grid>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="12,0,8,0"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock FontSize="13.5"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource Text.Primary}"
+                                                       Text="{Binding Name}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,3,0,0"
+                                                       FontSize="11.5"
+                                                       Foreground="{DynamicResource Text.Tertiary}"
+                                                       Text="{Binding Summary}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <Border Grid.Column="2"
+                                                Padding="8,2"
+                                                VerticalAlignment="Top"
+                                                Background="{DynamicResource Accent.Faint}"
+                                                CornerRadius="{StaticResource Radius.Pill}"
+                                                Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock FontSize="10.5"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Accent.Base}"
+                                                       Text="当前实例" />
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- 游戏目录 -->
+                                    <StackPanel Grid.Row="1" Margin="0,12,0,0">
+                                        <TextBlock FontSize="11"
+                                                   Foreground="{DynamicResource Text.Tertiary}"
+                                                   Text="游戏目录" />
+                                        <TextBlock Margin="0,2,0,0"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding GameDir}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding GameDir}" />
+                                    </StackPanel>
+
+                                    <!-- 备注 -->
+                                    <TextBlock Grid.Row="2"
+                                               Margin="0,8,0,0"
+                                               FontSize="11.5"
+                                               Foreground="{DynamicResource Text.Secondary}"
+                                               Text="{Binding Note}"
+                                               TextWrapping="Wrap"
+                                               Visibility="{Binding HasNote, Converter={StaticResource BoolToVis}}" />
+
+                                    <!-- 体积 -->
+                                    <TextBlock Grid.Row="3"
+                                               Margin="0,8,0,0"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource Text.Tertiary}"
+                                               Text="{Binding SizeText}" />
+
+                                    <!-- 操作 -->
+                                    <WrapPanel Grid.Row="4" Margin="0,12,0,0">
+                                        <c:OutlineButton Padding="14,5"
+                                                         Content="启动游戏"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Tone="Solid"
+                                                         Click="OnLaunchClick" />
+                                        <!-- 文案与配色按「是否当前实例」在 Loaded 时决定，避免用显式 Style 顶掉隐式模板 -->
+                                        <c:OutlineButton Margin="6,6,0,0"
+                                                         Padding="12,5"
+                                                         Content="设为当前"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Click="OnUseClick"
+                                                         Loaded="OnUseButtonLoaded" />
+                                        <c:OutlineButton Margin="6,6,0,0"
+                                                         Padding="10,5"
+                                                         Content="打开目录"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Tone="Plain"
+                                                         Click="OnOpenDirClick" />
+                                        <c:OutlineButton Margin="6,6,0,0"
+                                                         Padding="10,5"
+                                                         Content="编辑"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Tone="Plain"
+                                                         Click="OnEditClick" />
+                                        <c:OutlineButton Margin="6,6,0,0"
+                                                         Padding="10,5"
+                                                         Content="重命名"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Tone="Plain"
+                                                         Click="OnRenameClick" />
+                                        <c:OutlineButton Margin="6,6,0,0"
+                                                         Padding="10,5"
+                                                         Content="导出"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Tone="Plain"
+                                                         Click="OnExportClick" />
+                                        <c:OutlineButton Margin="6,6,0,0"
+                                                         Padding="10,5"
+                                                         Content="删除"
+                                                         FontSize="12.5"
+                                                         Tag="{Binding Instance}"
+                                                         Tone="Danger"
+                                                         Click="OnDeleteClick" />
+                                    </WrapPanel>
+                                </Grid>
+                            </c:SurfaceCard>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- 空状态：图标底色块 + 说明 + 引导按钮（与主页空态同构） -->
+                <c:SurfaceCard x:Name="CardEmpty"
+                               Margin="0,0,0,10"
+                               HasHoverEffect="False"
+                               UseShadow="False"
+                               Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border Width="54"
+                                Height="54"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource Accent.Faint}"
+                                CornerRadius="{StaticResource Radius.Card}">
+                            <svg:SvgIcon Width="26"
+                                         Height="26"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Icon="lucide/package-plus"
+                                         IconBrush="{DynamicResource Accent.Base}" />
+                        </Border>
+
+                        <TextBlock Margin="0,14,0,0"
+                                   HorizontalAlignment="Center"
+                                   FontSize="14.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   Text="还没有游戏实例" />
+                        <TextBlock Margin="0,6,0,0"
+                                   HorizontalAlignment="Center"
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="实例只记录「游戏装在哪」，不会复制游戏本体；也可以直接导入别人导出的实例包。"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap" />
+
+                        <c:OutlineButton Margin="0,16,0,0"
+                                         HorizontalAlignment="Center"
+                                         Tone="Solid"
+                                         Click="OnNewInstanceClick">
+                            <StackPanel Orientation="Horizontal">
+                                <svg:SvgIcon Width="15"
+                                             Height="15"
+                                             VerticalAlignment="Center"
+                                             Icon="lucide/circle-plus"
+                                             IconBrush="{DynamicResource Text.OnAccent}" />
+                                <TextBlock Margin="7,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="新建实例" />
+                            </StackPanel>
+                        </c:OutlineButton>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <!-- 备份与还原 -->
+                <c:SurfaceCard x:Name="CardBackup"
+                               Margin="0,10,0,0"
+                               HasHoverEffect="False"
+                               Title="备份与还原"
+                               UseShadow="False">
+                    <StackPanel>
+                        <TextBlock x:Name="LabBackupTarget"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextWrapping="Wrap" />
+
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton x:Name="BtnBackup"
+                                             Padding="14,6"
+                                             Content="创建备份"
+                                             FontSize="12.5"
+                                             Tone="Solid"
+                                             Click="OnBackupClick" />
+                            <c:OutlineButton x:Name="BtnBackupOriginal"
+                                             Margin="8,0,0,0"
+                                             Padding="14,6"
+                                             Content="备份原版游戏"
+                                             FontSize="12.5"
+                                             Click="OnBackupOriginalClick" />
+                            <c:OutlineButton x:Name="BtnRestore"
+                                             Margin="8,0,0,0"
+                                             Padding="14,6"
+                                             Content="还原到当前实例"
+                                             FontSize="12.5"
+                                             Click="OnRestoreClick" />
+                            <c:OutlineButton x:Name="BtnDeleteBackup"
+                                             Margin="8,0,0,0"
+                                             Padding="14,6"
+                                             Content="删除备份"
+                                             FontSize="12.5"
+                                             Tone="Danger"
+                                             Click="OnDeleteBackupClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Padding="14,6"
+                                             Content="刷新列表"
+                                             FontSize="12.5"
+                                             Tone="Plain"
+                                             Click="OnRefreshBackupsClick" />
+                        </WrapPanel>
+
+                        <ItemsControl x:Name="PanBackups" Margin="0,12,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,6"
+                                            Padding="10,8"
+                                            CornerRadius="{StaticResource Radius.Item}"
+                                            Cursor="Hand"
+                                            Tag="{Binding}"
+                                            MouseEnter="OnBackupRowEnter"
+                                            MouseLeave="OnBackupRowLeave"
+                                            MouseLeftButtonUp="OnBackupRowClick">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource Accent.Faint}" />
+                                                    </DataTrigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource Surface.CardHover}" />
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.Column="0"
+                                                    Width="24"
+                                                    Height="24"
+                                                    VerticalAlignment="Center"
+                                                    Background="{DynamicResource Surface.Card}"
+                                                    CornerRadius="{StaticResource Radius.Small}">
+                                                <svg:SvgIcon Width="13"
+                                                             Height="13"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             Icon="{Binding Icon}"
+                                                             IconBrush="{DynamicResource Text.Secondary}" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="10,0,10,0">
+                                                <TextBlock FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Text.Primary}"
+                                                           Text="{Binding Title}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Margin="0,2,0,0"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource Text.Tertiary}"
+                                                           Text="{Binding Detail}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource Text.Tertiary}"
+                                                       Text="{Binding KindText}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock x:Name="LabBackupEmpty"
+                                   Margin="0,12,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   Text="还没有任何备份。" />
+                    </StackPanel>
+                </c:SurfaceCard>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</c:LauncherPage>

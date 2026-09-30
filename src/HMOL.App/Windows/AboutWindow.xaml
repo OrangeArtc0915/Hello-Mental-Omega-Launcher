@@ -1,0 +1,223 @@
+<Window x:Class="HMOL.App.Windows.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:HMOL.App.Controls"
+        xmlns:core="clr-namespace:HMOL.Core.App;assembly=HMOL.Core"
+        Title="关于"
+        Width="560"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Surface.Window}"
+        Foreground="{DynamicResource Text.Primary}"
+        FontFamily="{StaticResource AppFont}"
+        Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <c:SurfaceCard Grid.Row="0" Title="关于">
+            <StackPanel>
+                <!-- 软件名与版本：全部取自 AppInfo，界面里不写死 -->
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="48"
+                            Height="48"
+                            ClipToBounds="True"
+                            CornerRadius="{StaticResource Radius.Item}">
+                        <Image Width="48"
+                               Height="48"
+                               Source="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+                               Stretch="Uniform" />
+                    </Border>
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Text="{x:Static core:AppInfo.Name}" />
+                        <TextBlock Margin="0,3,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{x:Static core:AppInfo.VersionDisplay}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- 作者 -->
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="作者" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Text="{x:Static core:AppInfo.Author}" />
+                </Grid>
+
+                <!-- 许可声明：本项目为专有软件，许可证正文见仓库根 LICENSE -->
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="许可" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Text="{x:Static core:AppInfo.License}" />
+                </Grid>
+
+                <!-- 官网（GitHub Pages） -->
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="官网" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Accent.Base}"
+                               Cursor="Hand"
+                               Text="{x:Static core:AppInfo.WebsiteUrl}"
+                               ToolTip="在默认浏览器中打开项目官网"
+                               MouseLeftButtonUp="OnOpenWebsiteClick" />
+                </Grid>
+
+                <!-- GitHub 仓库 -->
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="GitHub 仓库" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Accent.Base}"
+                               Cursor="Hand"
+                               Text="{x:Static core:AppInfo.GitHubUrl}"
+                               ToolTip="{x:Static core:AppInfo.GitHubUrl}"
+                               MouseLeftButtonUp="OnOpenGitHubClick" />
+                </Grid>
+
+                <!-- Gitee 仓库（国内备源） -->
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="Gitee 仓库" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Accent.Base}"
+                               Cursor="Hand"
+                               Text="{x:Static core:AppInfo.GiteeUrl}"
+                               ToolTip="{x:Static core:AppInfo.GiteeUrl}"
+                               MouseLeftButtonUp="OnOpenGiteeClick" />
+                </Grid>
+
+                <!-- 问题反馈 -->
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="问题反馈" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Accent.Base}"
+                               Cursor="Hand"
+                               Text="{x:Static core:AppInfo.GitHubIssuesUrl}"
+                               ToolTip="在默认浏览器中打开 GitHub Issues"
+                               MouseLeftButtonUp="OnOpenIssuesClick" />
+                </Grid>
+
+                <!-- 官方 QQ 群 -->
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" MinWidth="88" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="官方 QQ 群" />
+                    <TextBlock Grid.Column="1"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource Text.Primary}"
+                               Text="{x:Static core:AppInfo.QqGroup}" />
+                    <c:OutlineButton Grid.Column="2"
+                                     Padding="12,6"
+                                     FontSize="12"
+                                     Content="复制群号"
+                                     Click="OnCopyGroupClick" />
+                    <c:OutlineButton Grid.Column="3"
+                                     Margin="8,0,0,0"
+                                     Padding="12,6"
+                                     FontSize="12"
+                                     Content="一键加群"
+                                     Tone="Solid"
+                                     Click="OnJoinGroupClick" />
+                </Grid>
+
+                <TextBlock x:Name="LabHint"
+                           Margin="0,12,0,0"
+                           FontSize="11"
+                           Foreground="{DynamicResource Text.Tertiary}"
+                           TextWrapping="Wrap"
+                           Text="复制后可直接在 QQ 里搜索群号。" />
+            </StackPanel>
+        </c:SurfaceCard>
+
+        <StackPanel Grid.Row="1"
+                    Margin="0,12,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <c:OutlineButton Width="88"
+                             Height="36"
+                             Content="关闭"
+                             Tone="Solid"
+                             Click="OnCloseClick" />
+        </StackPanel>
+    </Grid>
+</Window>
