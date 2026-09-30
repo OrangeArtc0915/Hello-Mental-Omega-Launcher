@@ -33,6 +33,10 @@ yarn.lock
 cache/
 fuwari/
 
+# local temp dirs
+.tmp-install/
+.tmp-neko/
+
 # resource tool exe
 Resource/#TOOLS/*.exe
 Resource/#TOOLS/__pycache__/

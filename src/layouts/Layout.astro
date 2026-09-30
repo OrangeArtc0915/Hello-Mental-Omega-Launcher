@@ -110,6 +110,13 @@ if (siteConfig.generateOgImages && postSlug) {
 	ogImageUrl = new URL(`/og/${postSlug}.png`, Astro.site).toString();
 }
 
+// 社交分享图：没有按文章生成的 OG 图时，回退到固定的品牌分享图（public/brand/og.png）。
+// 站点部署在子路径下，所以带上 BASE_URL 再拼成绝对地址，供 QQ/微信等抓取。
+const socialImageUrl = new URL(
+	`${import.meta.env.BASE_URL}brand/og.png`,
+	Astro.site,
+).toString();
+
 const favicons: Favicon[] =
 	siteConfig.favicon.length > 0 ? siteConfig.favicon : defaultFavicons;
 
@@ -149,7 +156,11 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		<meta property="og:url" content={Astro.url}>
 		<meta property="og:title" content={pageTitle}>
 		<meta property="og:description" content={description || pageTitle}>
-		{ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+		{ogImageUrl ? (
+			<meta property="og:image" content={ogImageUrl} />
+		) : (
+			<meta property="og:image" content={socialImageUrl} />
+		)}
 		{
 			setOGTypeArticle ? (
 				<meta property="og:type" content="article" />
@@ -162,6 +173,7 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		<meta property="twitter:url" content={Astro.url}>
 		<meta name="twitter:title" content={pageTitle}>
 		<meta name="twitter:description" content={description || pageTitle}>
+		<meta name="twitter:image" content={socialImageUrl}>
 
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
