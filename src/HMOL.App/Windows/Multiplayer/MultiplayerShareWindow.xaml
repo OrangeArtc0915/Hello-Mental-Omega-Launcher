@@ -1,0 +1,54 @@
+<Window x:Class="HMOL.App.Windows.Multiplayer.MultiplayerShareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:HMOL.App.Controls"
+        Width="560"
+        Height="520"
+        Background="{DynamicResource Surface.Window}"
+        FontFamily="{StaticResource AppFont}"
+        Foreground="{DynamicResource Text.Primary}"
+        Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        WindowStartupLocation="CenterOwner"
+        SnapsToDevicePixels="True">
+
+    <c:SurfaceCard x:Name="Card" Margin="12" Padding="0" Title="分享给队友" UseShadow="False">
+        <StackPanel Margin="16,12,16,16">
+            <TextBlock FontSize="12"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       TextWrapping="Wrap"
+                       Text="把下面的文本发给队友；队友在「联机 → 组网」页点「粘贴分享文本一键加入」即可自动填好并连接。" />
+
+            <TextBox x:Name="TxtShare"
+                     Height="300"
+                     Margin="0,10,0,0"
+                     Padding="10,8"
+                     AcceptsReturn="True"
+                     Background="{DynamicResource Surface.Sunken}"
+                     BorderBrush="{DynamicResource Border.Default}"
+                     BorderThickness="1"
+                     CaretBrush="{DynamicResource Text.Primary}"
+                     FontFamily="Consolas, Microsoft YaHei UI"
+                     FontSize="11.5"
+                     Foreground="{DynamicResource Text.Primary}"
+                     IsReadOnly="True"
+                     VerticalScrollBarVisibility="Auto" />
+
+            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                <c:OutlineButton Content="复制文本" Tone="Solid" Click="OnCopyClick" />
+                <TextBlock x:Name="LabCopied"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource Status.Success}" />
+            </StackPanel>
+
+            <TextBlock Margin="0,10,0,0"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource Text.Tertiary}"
+                       TextWrapping="Wrap"
+                       Text="本轮不含二维码图像，只提供文本分享。" />
+        </StackPanel>
+    </c:SurfaceCard>
+</Window>

@@ -1,0 +1,80 @@
+<Window x:Class="HMOL.App.Windows.Multiplayer.MultiplayerNodeSpeedWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:HMOL.App.Controls"
+        Width="560"
+        Height="470"
+        Background="{DynamicResource Surface.Window}"
+        FontFamily="{StaticResource AppFont}"
+        Foreground="{DynamicResource Text.Primary}"
+        Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        WindowStartupLocation="CenterOwner"
+        SnapsToDevicePixels="True">
+
+    <c:SurfaceCard x:Name="Card" Margin="12" Padding="0" Title="节点测速" UseShadow="False">
+        <Grid Margin="16,12,16,16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="LabHint"
+                       Grid.Row="0"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource Text.Tertiary}"
+                       TextWrapping="Wrap"
+                       Text="双击某一行即可把它设为当前节点；EasyTier 节点优先按 TCP 建连耗时，失败时改用 PING。" />
+
+            <ListBox x:Name="ListNodes"
+                     Grid.Row="1"
+                     Margin="0,10,0,0"
+                     Padding="2"
+                     Background="{DynamicResource Surface.Sunken}"
+                     BorderBrush="{DynamicResource Border.Default}"
+                     BorderThickness="1"
+                     Foreground="{DynamicResource Text.Primary}"
+                     MouseDoubleClick="OnListDoubleClick"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="110" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       Text="{Binding Node}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1"
+                                       FontFamily="Consolas, Microsoft YaHei UI"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{Binding Latency}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel Grid.Row="2" Margin="0,12,0,0" Orientation="Horizontal">
+                <c:OutlineButton x:Name="BtnRetest"
+                                 Content="全部重测"
+                                 Click="OnRetestClick" />
+                <c:OutlineButton x:Name="BtnApply"
+                                 Margin="8,0,0,0"
+                                 Content="应用选中"
+                                 Tone="Solid"
+                                 Click="OnApplyClick" />
+                <TextBlock x:Name="LabStatus"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource Text.Tertiary}" />
+            </StackPanel>
+        </Grid>
+    </c:SurfaceCard>
+</Window>

@@ -1,0 +1,665 @@
+<c:LauncherPage x:Class="HMOL.App.Pages.PageMultiplayer"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:c="clr-namespace:HMOL.App.Controls"
+                xmlns:svg="clr-namespace:HMOL.App.Controls.Svg">
+
+    <c:LauncherPage.Resources>
+        <!-- 列表：底色、选中态与文字颜色都走语义资源键，深色主题下不会出现白底白字 -->
+        <Style x:Key="MpList" TargetType="ListBox">
+            <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                        <Setter Property="Padding" Value="8,5" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="Bd"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="{DynamicResource Common.Transparent}"
+                                            CornerRadius="{StaticResource Radius.Small}">
+                                        <ContentPresenter HorizontalAlignment="Stretch" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface.CardHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent.Faint}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 输入框外壳：与设置页一致，把 TextBox 塞进带底色的 Border 里 -->
+        <Style x:Key="MpField" TargetType="Border">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+            <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Button}" />
+        </Style>
+
+        <Style x:Key="MpInput" TargetType="TextBox">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+        </Style>
+
+        <Style x:Key="MpLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="MpHint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="MpMono" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas, Microsoft YaHei UI" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="MpSection" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+        </Style>
+    </c:LauncherPage.Resources>
+
+    <Grid Margin="24,20,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头：与其余页面同一形态（本页没有页级操作按钮，下面的页签是视图切换） -->
+        <c:PageHeader x:Name="HeaderMultiplayer"
+                      Grid.Row="0"
+                      Title="联机"
+                      Subtitle="选方案与节点建房，队友按同样的房间名加入；大厅里可以互相发现、邀请与聊天"
+                      Icon="lucide/network" />
+
+        <!-- 提示条 -->
+        <Border x:Name="BarNotice"
+                Grid.Row="1"
+                Margin="0,12,0,0"
+                Padding="12,10"
+                Background="{DynamicResource Accent.Faint}"
+                CornerRadius="{StaticResource Radius.Item}"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <svg:SvgIcon x:Name="IconNotice"
+                             Grid.Column="0"
+                             Width="16"
+                             Height="16"
+                             Margin="0,1,0,0"
+                             VerticalAlignment="Top"
+                             Icon="lucide/info"
+                             IconBrush="{DynamicResource Accent.Base}" />
+                <TextBlock x:Name="LabNotice"
+                           Grid.Column="1"
+                           Margin="10,0,8,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource Text.Primary}"
+                           TextWrapping="Wrap" />
+                <c:RoundIconButton Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Icon="lucide/x"
+                                   IconSize="13"
+                                   Tone="Plain"
+                                   Click="OnDismissNoticeClick" />
+            </Grid>
+        </Border>
+
+        <!-- 子页签：视图切换单独成行，不与页头操作混在一起 -->
+        <StackPanel x:Name="PanMpTabs" Grid.Row="2" Margin="0,14,0,0" Orientation="Horizontal">
+            <c:OutlineButton x:Name="BtnTabNetwork"
+                             Content="组网"
+                             Tag="0"
+                             Tone="Solid"
+                             Click="OnTabClick" />
+            <c:OutlineButton x:Name="BtnTabHall"
+                             Margin="8,0,0,0"
+                             Content="大厅"
+                             Tag="1"
+                             Click="OnTabClick" />
+            <c:OutlineButton x:Name="BtnTabPeers"
+                             Margin="8,0,0,0"
+                             Content="对端"
+                             Tag="2"
+                             Click="OnTabClick" />
+        </StackPanel>
+
+        <!-- ═══════════════ 组网 ═══════════════ -->
+        <ScrollViewer x:Name="PanNetwork"
+                      Grid.Row="3"
+                      Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <c:SurfaceCard Title="组网方案" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <c:OutlineButton x:Name="BtnPlanEasyTier"
+                                             Tag="EasyTier"
+                                             Content="EasyTier（三层，推荐）"
+                                             Click="OnPlanClick" />
+                            <c:OutlineButton x:Name="BtnPlanN2n"
+                                             Margin="8,0,0,0"
+                                             Tag="N2n"
+                                             Content="n2n（二层，需 TAP 驱动）"
+                                             Click="OnPlanClick" />
+                        </StackPanel>
+                        <TextBlock x:Name="LabPlanHint" Style="{StaticResource MpHint}" Margin="0,8,0,0" />
+
+                        <TextBlock Style="{StaticResource MpSection}" Text="节点服务器" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="CmbNode"
+                                      Grid.Column="0"
+                                      Margin="0,6,0,0"
+                                      SelectionChanged="OnNodeChanged" />
+                            <c:OutlineButton x:Name="BtnNodeSpeed"
+                                             Grid.Column="1"
+                                             Margin="8,6,0,0"
+                                             Content="节点测速"
+                                             Click="OnNodeSpeedClick" />
+                        </Grid>
+                        <c:OutlineButton x:Name="BtnCustomNodes"
+                                         Margin="0,8,0,0"
+                                         HorizontalAlignment="Left"
+                                         Content="自定义节点"
+                                         Click="OnCustomNodesClick" />
+
+                        <TextBlock Style="{StaticResource MpSection}" Text="房间名称（小组名，最多 6 个字符）" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource MpField}">
+                                <TextBox x:Name="TxtRoomName"
+                                         Style="{StaticResource MpInput}"
+                                         MaxLength="6"
+                                         TextChanged="OnRoomNameChanged" />
+                            </Border>
+                            <c:OutlineButton x:Name="BtnRandomRoom"
+                                             Grid.Column="1"
+                                             Margin="8,6,0,0"
+                                             Content="随机生成"
+                                             Click="OnRandomRoomClick" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource MpSection}" Text="加密密钥（可选，留空不加密）" />
+                        <Border Style="{StaticResource MpField}">
+                            <TextBox x:Name="TxtRoomKey" Style="{StaticResource MpInput}" />
+                        </Border>
+
+                        <TextBlock Style="{StaticResource MpSection}" Text="虚拟 IP 模式" />
+                        <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                            <c:OutlineButton x:Name="BtnIpAuto"
+                                             Tag="Auto"
+                                             Content="自动"
+                                             Click="OnIpModeClick" />
+                            <c:OutlineButton x:Name="BtnIpManual"
+                                             Margin="8,0,0,0"
+                                             Tag="Manual"
+                                             Content="手动"
+                                             Click="OnIpModeClick" />
+                        </StackPanel>
+                        <Border x:Name="PanManualIp" Style="{StaticResource MpField}">
+                            <TextBox x:Name="TxtManualIp" Style="{StaticResource MpInput}" />
+                        </Border>
+                        <TextBlock x:Name="LabIpHint" Style="{StaticResource MpHint}" Margin="0,6,0,0" />
+
+                        <!-- n2n 专属工具 -->
+                        <StackPanel x:Name="PanN2nTools" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource MpSection}" Text="n2n 专属工具" />
+                            <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                                <c:OutlineButton x:Name="BtnTapInstall"
+                                                 Content="安装 TAP 驱动"
+                                                 Click="OnTapInstallClick" />
+                                <c:OutlineButton x:Name="BtnSupernode"
+                                                 Margin="8,0,0,0"
+                                                 Content="服务端模式"
+                                                 Click="OnSupernodeClick" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource MpHint}"
+                                       Margin="0,6,0,0"
+                                       Text="首次使用 n2n 需先装 TAP 虚拟网卡驱动；公共节点都不通时可自建节点" />
+                        </StackPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="连接" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="76" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource MpLabel}"
+                                       Text="连接状态" />
+                            <TextBlock x:Name="LabStatus"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       Text="未连接"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="76" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource MpLabel}"
+                                       Text="虚拟 IP" />
+                            <TextBlock x:Name="LabLocalIp"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Consolas, Microsoft YaHei UI"
+                                       FontSize="12.5"
+                                       Foreground="{DynamicResource Accent.Base}"
+                                       Text="-" />
+                        </Grid>
+                        <TextBlock x:Name="LabNodeInfo" Style="{StaticResource MpMono}" Margin="0,8,0,0" />
+
+                        <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                            <TextBlock VerticalAlignment="Center"
+                                       Style="{StaticResource MpLabel}"
+                                       Text="公开我的房间到大厅" />
+                            <c:OutlineButton x:Name="BtnPublish"
+                                             Margin="10,0,0,0"
+                                             Tag="Publish"
+                                             Content="未公开"
+                                             Click="OnPublishClick" />
+                        </StackPanel>
+                        <TextBlock x:Name="LabPublishHint" Style="{StaticResource MpHint}" Margin="0,6,0,0" />
+
+                        <c:OutlineButton x:Name="BtnConnect"
+                                         Margin="0,16,0,0"
+                                         Height="40"
+                                         Content="连 接"
+                                         Tone="Solid"
+                                         Click="OnConnectClick" />
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="分享给队友" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource MpHint}"
+                                   Text="复制下面的说明给队友（队友粘贴后即可一键加入），也可以直接粘贴队友发来的分享文本加入。" />
+                        <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                            <c:OutlineButton x:Name="BtnCopyShare"
+                                             Content="复制分享文本"
+                                             Tone="Solid"
+                                             Click="OnCopyShareClick" />
+                            <c:OutlineButton x:Name="BtnShareWindow"
+                                             Margin="8,0,0,0"
+                                             Content="分享文本窗口"
+                                             Click="OnShareWindowClick" />
+                            <c:OutlineButton x:Name="BtnJoinShare"
+                                             Margin="8,0,0,0"
+                                             Content="粘贴分享文本一键加入"
+                                             Click="OnJoinShareClick" />
+                        </StackPanel>
+                        <Border Style="{StaticResource MpField}" Height="Auto" Padding="10,8">
+                            <TextBox x:Name="TxtSharePreview"
+                                     Style="{StaticResource MpInput}"
+                                     FontFamily="Consolas, Microsoft YaHei UI"
+                                     FontSize="11"
+                                     Height="120"
+                                     IsReadOnly="True"
+                                     TextWrapping="NoWrap"
+                                     VerticalContentAlignment="Top"
+                                     VerticalScrollBarVisibility="Auto"
+                                     AcceptsReturn="True" />
+                        </Border>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="引擎输出" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <ScrollViewer x:Name="ScrollEngineOutput"
+                                      Height="150"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="PanEngineOutput" />
+                        </ScrollViewer>
+                        <TextBlock x:Name="LabEngineEmpty"
+                                   Style="{StaticResource MpHint}"
+                                   Text="连接后这里会显示组网引擎的运行输出。" />
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="网络工具箱" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource MpHint}"
+                                   Text="涉及系统改动的操作都会先说明再执行；装驱动、开关防火墙、改网卡跃点等需要管理员权限时会弹出系统提权确认。" />
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton Content="连通性检测" Click="OnNetCheckClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="防火墙控制"
+                                             Click="OnFirewallClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="网卡优先级"
+                                             Click="OnMetricClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="文件传输"
+                                             Click="OnFileTransferClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="更多设置"
+                                             Click="OnMoreSettingsClick" />
+                            <c:OutlineButton x:Name="BtnHud"
+                                             Margin="8,0,0,0"
+                                             Content="游戏 HUD"
+                                             Click="OnHudClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="大厅延迟代码"
+                                             Click="OnLagCodeClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="广播转发服务"
+                                             Click="OnWinIpBroadcastClick" />
+                        </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ═══════════════ 大厅 ═══════════════ -->
+        <ScrollViewer x:Name="PanHall"
+                      Grid.Row="3"
+                      Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Visibility="Collapsed">
+            <StackPanel>
+                <c:SurfaceCard Title="联机大厅" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <c:OutlineButton x:Name="BtnHall"
+                                             Content="进入大厅"
+                                             Tone="Solid"
+                                             Click="OnHallClick" />
+                            <TextBlock x:Name="LabHallStatus"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource MpLabel}"
+                                       Text="未进入大厅" />
+                        </StackPanel>
+                        <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                            <TextBlock VerticalAlignment="Center" Style="{StaticResource MpLabel}" Text="昵称：" />
+                            <TextBlock x:Name="LabNickname"
+                                       VerticalAlignment="Center"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       Text="-" />
+                        </StackPanel>
+                        <TextBlock x:Name="LabNicknameHint" Style="{StaticResource MpHint}" Margin="0,6,0,0" />
+                        <TextBlock Style="{StaticResource MpHint}"
+                                   Margin="0,6,0,0"
+                                   Text="大厅是公共信标广场，聊天内容对第三方可见，请勿发送敏感信息。" />
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="在线玩家" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <ListBox x:Name="ListHallPeers" Height="160" Style="{StaticResource MpList}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Ip}" />
+                                        <TextBlock Grid.Column="2"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Tertiary}"
+                                                   Text="{Binding Latency}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton Content="收藏选中玩家" Click="OnFavoriteClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="邀请入房（房主）"
+                                             Click="OnInviteClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="大厅聊天"
+                                             Click="OnHallChatClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="刷新"
+                                             Click="OnHallRefreshClick" />
+                        </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="公开房间" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <ListBox x:Name="ListPublicRooms" Height="120" Style="{StaticResource MpList}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Community}" />
+                                        <TextBlock Grid.Column="2"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Tertiary}"
+                                                   Text="{Binding Latency}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton Content="一键加入公开房间"
+                                             Tone="Solid"
+                                             Click="OnJoinPublicClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="刷新"
+                                             Click="OnPublicRefreshClick" />
+                        </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <c:SurfaceCard Margin="0,14,0,0" Title="收藏队友" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <ListBox x:Name="ListFriends" Height="130" Style="{StaticResource MpList}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Ip}" />
+                                        <TextBlock Grid.Column="2"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Community}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Tertiary}"
+                                                   Text="{Binding Times}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton Content="一键加入"
+                                             Tone="Solid"
+                                             Click="OnFriendJoinClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="取消收藏"
+                                             Tone="Danger"
+                                             Click="OnFriendRemoveClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="刷新"
+                                             Click="OnFriendRefreshClick" />
+                        </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ═══════════════ 对端 ═══════════════ -->
+        <ScrollViewer x:Name="PanPeers"
+                      Grid.Row="3"
+                      Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Visibility="Collapsed">
+            <StackPanel>
+                <c:SurfaceCard Title="在线对端" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <Grid Margin="2,2,2,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" FontSize="11" Foreground="{DynamicResource Text.Tertiary}" Text="名称" />
+                            <TextBlock Grid.Column="1" FontSize="11" Foreground="{DynamicResource Text.Tertiary}" Text="IP" />
+                            <TextBlock Grid.Column="2" FontSize="11" Foreground="{DynamicResource Text.Tertiary}" Text="延迟" />
+                            <TextBlock Grid.Column="3" FontSize="11" Foreground="{DynamicResource Text.Tertiary}" Text="状态" />
+                        </Grid>
+                        <ListBox x:Name="ListPeers" Height="180" Style="{StaticResource MpList}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="{Binding Name}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1"
+                                                   FontFamily="Consolas, Microsoft YaHei UI"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Ip}" />
+                                        <TextBlock Grid.Column="2"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{Binding Latency}" />
+                                        <TextBlock Grid.Column="3"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Tertiary}"
+                                                   Text="{Binding Status}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock x:Name="LabPeerHint" Style="{StaticResource MpHint}" Margin="0,8,0,0"
+                                   Text="连接后每 3 秒自动刷新；被移出房间的玩家不会出现在这里。" />
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton Content="房间聊天" Tone="Solid" Click="OnRoomChatClick" />
+                            <c:OutlineButton x:Name="BtnKick"
+                                             Margin="8,0,0,0"
+                                             Content="踢出选中"
+                                             Tone="Danger"
+                                             Click="OnKickClick" />
+                            <c:OutlineButton x:Name="BtnUnkick"
+                                             Margin="8,0,0,0"
+                                             Content="拉回被踢玩家"
+                                             Click="OnUnkickClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="刷新"
+                                             Click="OnPeerRefreshClick" />
+                            <TextBlock x:Name="LabOwnerHint"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource MpHint}"
+                                       Text="踢人与拉回仅房主可用" />
+                        </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</c:LauncherPage>

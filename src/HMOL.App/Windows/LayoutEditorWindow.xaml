@@ -1,0 +1,427 @@
+<Window x:Class="HMOL.App.Windows.LayoutEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:HMOL.App.Controls"
+        xmlns:l="clr-namespace:HMOL.App.Layout"
+        xmlns:svg="clr-namespace:HMOL.App.Controls.Svg"
+        Title="界面布局"
+        Width="1060"
+        Height="700"
+        MinWidth="940"
+        MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Surface.Window}"
+        Foreground="{DynamicResource Text.Primary}"
+        FontFamily="{StaticResource AppFont}"
+        Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Window.Resources>
+        <!-- 列表行样式：悬停 / 选中都用语义资源键，跟随主题与强调色 -->
+        <Style x:Key="LayoutListStyle" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="AllowDrop" Value="True" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="8,6" />
+                        <Setter Property="Focusable" Value="False" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="Bd"
+                                            Margin="1"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="{DynamicResource Common.Transparent}"
+                                            CornerRadius="{StaticResource Radius.Small}">
+                                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Nav.ItemHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Nav.ItemActive}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 元素列表可以拖拽，鼠标样式给个提示 -->
+        <Style x:Key="ElementListStyle" TargetType="ListBox" BasedOn="{StaticResource LayoutListStyle}">
+            <Setter Property="Cursor" Value="SizeAll" />
+        </Style>
+
+        <!-- 编辑区两块内容（侧栏导航 / 主页控件）用分页切换 -->
+        <Style x:Key="EditorTabItemStyle" TargetType="TabItem">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd"
+                                Margin="0,0,6,0"
+                                Padding="14,7"
+                                Background="{DynamicResource Common.Transparent}"
+                                CornerRadius="{StaticResource Radius.Small}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Nav.ItemHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent.Faint}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Accent.Base}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EditorTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="{DynamicResource Common.Transparent}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource EditorTabItemStyle}" />
+        </Style>
+
+        <DataTemplate x:Key="ElementRowTemplate">
+            <Grid Height="28">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <svg:SvgIcon Grid.Column="0"
+                             Width="15"
+                             Height="15"
+                             VerticalAlignment="Center"
+                             Icon="{Binding Icon}"
+                             IconBrush="{DynamicResource Text.Secondary}" />
+                <TextBlock Grid.Column="1"
+                           Margin="8,0,8,0"
+                           VerticalAlignment="Center"
+                           FontSize="12.5"
+                           Foreground="{DynamicResource Text.Primary}"
+                           Text="{Binding Name}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{DynamicResource Text.Tertiary}"
+                           Text="{Binding Hint}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SchemeRowTemplate">
+            <TextBlock Height="28"
+                       VerticalAlignment="Center"
+                       FontSize="12.5"
+                       Foreground="{DynamicResource Text.Primary}"
+                       Text="{Binding NameText}"
+                       TextTrimming="CharacterEllipsis" />
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Margin="16,14,16,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock FontSize="16" FontWeight="Bold" Text="自定义界面布局" />
+            <TextBlock Margin="0,4,0,0"
+                       FontSize="12"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       TextWrapping="Wrap"
+                       Text="调整左侧导航的顺序、显隐与名称，以及主页控件的位置与大小。编辑过程不影响主界面，点「保存并应用」后才生效。" />
+        </StackPanel>
+
+        <TabControl Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource EditorTabControlStyle}">
+
+            <!-- 侧栏导航：固定布局，只能改顺序 / 显隐 / 名称 -->
+            <TabItem Header="侧栏导航">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 方案列表 -->
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Margin="2,0,0,6"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="布局方案" />
+
+                            <Border Grid.Row="1"
+                                    MinHeight="120"
+                                    Background="{DynamicResource Surface.Sunken}"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource Radius.Item}">
+                                <ListBox x:Name="ListSchemes"
+                                         ItemTemplate="{StaticResource SchemeRowTemplate}"
+                                         SelectionChanged="OnSchemeSelectionChanged"
+                                         Style="{StaticResource LayoutListStyle}" />
+                            </Border>
+
+                            <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                                <c:OutlineButton x:Name="BtnSchemeNew"
+                                                 Content="新建空白"
+                                                 ToolTip="新建一套只含默认顺序的方案"
+                                                 Click="OnSchemeNewClick" />
+                                <c:OutlineButton x:Name="BtnSchemeRename"
+                                                 Margin="0,6,0,0"
+                                                 Content="重命名方案"
+                                                 Click="OnSchemeRenameClick" />
+                                <c:OutlineButton x:Name="BtnSchemeDelete"
+                                                 Margin="0,6,0,0"
+                                                 Content="删除方案"
+                                                 Tone="Danger"
+                                                 Click="OnSchemeDeleteClick" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 可选元素：当前隐藏的 -->
+                        <Grid Grid.Column="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Margin="2,0,0,6">
+                                <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="可选元素（当前隐藏）" />
+                                <TextBlock FontSize="11"
+                                           Foreground="{DynamicResource Text.Tertiary}"
+                                           Text="拖到右边即显示" />
+                            </StackPanel>
+
+                            <Border Grid.Row="1"
+                                    Background="{DynamicResource Surface.Sunken}"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource Radius.Item}">
+                                <Grid>
+                                    <ListBox x:Name="ListHidden"
+                                             ItemTemplate="{StaticResource ElementRowTemplate}"
+                                             SelectionChanged="OnElementSelectionChanged"
+                                             PreviewMouseLeftButtonDown="OnElementListMouseDown"
+                                             PreviewMouseMove="OnElementListMouseMove"
+                                             DragOver="OnElementListDragOver"
+                                             DragLeave="OnElementListDragLeave"
+                                             Drop="OnElementListDrop"
+                                             Style="{StaticResource ElementListStyle}" />
+                                    <Canvas ClipToBounds="True" IsHitTestVisible="False">
+                                        <Border x:Name="MarkHidden"
+                                                Height="2"
+                                                Background="{DynamicResource Accent.Bright}"
+                                                Visibility="Collapsed" />
+                                    </Canvas>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- 当前布局：显示中的 -->
+                        <Grid Grid.Column="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Margin="2,0,0,6">
+                                <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource Text.Secondary}"
+                                           Text="当前布局（显示中）" />
+                                <TextBlock FontSize="11"
+                                           Foreground="{DynamicResource Text.Tertiary}"
+                                           Text="上下拖动可排序，拖回左边即隐藏" />
+                            </StackPanel>
+
+                            <Border Grid.Row="1"
+                                    Background="{DynamicResource Surface.Sunken}"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="1"
+                                    CornerRadius="{StaticResource Radius.Item}">
+                                <Grid>
+                                    <ListBox x:Name="ListShown"
+                                             ItemTemplate="{StaticResource ElementRowTemplate}"
+                                             SelectionChanged="OnElementSelectionChanged"
+                                             PreviewMouseLeftButtonDown="OnElementListMouseDown"
+                                             PreviewMouseMove="OnElementListMouseMove"
+                                             DragOver="OnElementListDragOver"
+                                             DragLeave="OnElementListDragLeave"
+                                             Drop="OnElementListDrop"
+                                             Style="{StaticResource ElementListStyle}" />
+                                    <Canvas ClipToBounds="True" IsHitTestVisible="False">
+                                        <Border x:Name="MarkShown"
+                                                Height="2"
+                                                Background="{DynamicResource Accent.Bright}"
+                                                Visibility="Collapsed" />
+                                    </Canvas>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <!-- 对选中元素的快捷操作 -->
+                    <StackPanel Grid.Row="1"
+                                Margin="0,10,0,0"
+                                HorizontalAlignment="Left"
+                                Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnMoveUp"
+                                         Content="上移"
+                                         Click="OnMoveUpClick" />
+                        <c:OutlineButton x:Name="BtnMoveDown"
+                                         Margin="6,0,0,0"
+                                         Content="下移"
+                                         Click="OnMoveDownClick" />
+                        <c:OutlineButton x:Name="BtnHide"
+                                         Margin="6,0,0,0"
+                                         Content="隐藏"
+                                         ToolTip="选择「设置」时不可用：它是布局编辑器的入口，隐藏后不好找回"
+                                         Click="OnHideClick" />
+                        <c:OutlineButton x:Name="BtnShow"
+                                         Margin="6,0,0,0"
+                                         Content="显示"
+                                         Click="OnShowClick" />
+                        <c:OutlineButton x:Name="BtnRenameElement"
+                                         Margin="6,0,0,0"
+                                         Content="重命名元素"
+                                         Click="OnRenameElementClick" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- 主页控件：自由定位 -->
+            <TabItem Header="主页控件">
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="270" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            MinHeight="260"
+                            Padding="10"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Item}">
+                        <l:HomeLayoutPreview x:Name="PanHomePreview" MinHeight="240" />
+                    </Border>
+
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="2,0,0,6">
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="主页控件" />
+                            <TextBlock FontSize="11"
+                                       Foreground="{DynamicResource Text.Tertiary}"
+                                       TextWrapping="Wrap"
+                                       Text="拖动方块移动、拉手柄缩放、双击居中。虚线框表示该控件仍跟随流式布局；侧栏是固定布局，不参与自由定位。" />
+                        </StackPanel>
+
+                        <Border Grid.Row="1"
+                                MinHeight="120"
+                                Background="{DynamicResource Surface.Sunken}"
+                                BorderBrush="{DynamicResource Border.Default}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource Radius.Item}">
+                            <ListBox x:Name="ListHome"
+                                     ItemTemplate="{StaticResource ElementRowTemplate}"
+                                     SelectionChanged="OnHomeSelectionChanged"
+                                     Style="{StaticResource LayoutListStyle}" />
+                        </Border>
+
+                        <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                            <c:OutlineButton x:Name="BtnHomeCenter"
+                                             Content="居中"
+                                             ToolTip="按当前大小在主页内容区里居中"
+                                             Click="OnHomeCenterClick" />
+                            <c:OutlineButton x:Name="BtnHomeReset"
+                                             Margin="0,6,0,0"
+                                             Content="恢复默认位置与大小"
+                                             ToolTip="清掉坐标，让这个控件回到流式布局"
+                                             Click="OnHomeResetClick" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="2"
+                    Margin="0,12,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <c:OutlineButton x:Name="BtnReset"
+                             Content="恢复默认"
+                             ToolTip="恢复默认顺序、显示状态、名称与主页位置（点保存并应用后生效）"
+                             Click="OnResetClick" />
+            <c:OutlineButton x:Name="BtnSaveAs"
+                             Margin="6,0,0,0"
+                             Content="另存为新方案"
+                             Click="OnSaveAsClick" />
+            <c:OutlineButton x:Name="BtnApply"
+                             Margin="6,0,0,0"
+                             Content="保存并应用"
+                             Tone="Solid"
+                             Click="OnApplyClick" />
+            <c:OutlineButton x:Name="BtnClose"
+                             Margin="6,0,0,0"
+                             Content="关闭"
+                             Click="OnCloseClick" />
+        </StackPanel>
+
+        <TextBlock x:Name="LabStatus"
+                   Grid.Row="3"
+                   Margin="0,10,0,0"
+                   FontSize="11.5"
+                   Foreground="{DynamicResource Text.Tertiary}"
+                   TextWrapping="Wrap" />
+    </Grid>
+</Window>
