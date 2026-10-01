@@ -1190,22 +1190,6 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="设置、实例、插件包与日志都放在这里；可用环境变量 HMOL_DATA 重定向。" />
-
-                    <TextBlock Margin="0,14,0,0"
-                               FontSize="12"
-                               Foreground="{DynamicResource Text.Secondary}"
-                               Text="数字签名" />
-                    <TextBlock Margin="0,4,0,0"
-                               FontSize="11.5"
-                               Foreground="{DynamicResource Text.Tertiary}"
-                               TextWrapping="Wrap"
-                               Text="启动器用自签证书（CN=mmm）签名，证书已内置于程序内，不需要额外的 cer 文件。把它装进本机的「受信任的根证书颁发机构」与「受信任的发布者」后，运行本程序就不再出现「未知发布者」提示。" />
-                    <c:OutlineButton x:Name="BtnTrustCertificate"
-                                     Margin="0,10,0,0"
-                                     HorizontalAlignment="Left"
-                                     Content="安装信任证书"
-                                     Tone="Solid"
-                                     Click="OnTrustCertificateClick" />
                 </StackPanel>
             </c:SurfaceCard>
             </Grid>

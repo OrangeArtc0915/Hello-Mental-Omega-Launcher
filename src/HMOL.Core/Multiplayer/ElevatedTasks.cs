@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.Unicode;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
-using HMOL.Core.Security;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -53,9 +52,6 @@ public static class ElevatedTasks
     /// <summary>安装并启动 WinIPBroadcast 广播转发服务。</summary>
     public const string WinIpBroadcastInstall = "winipbroadcast-install";
 
-    /// <summary>把内嵌的自签公钥证书装进本机受信任存储。</summary>
-    public const string TrustCertificate = "trust-certificate";
-
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -95,7 +91,6 @@ public static class ElevatedTasks
             FirewallOn => NetworkToolkit.SetFirewallAsync(true, cancellationToken),
             FirewallOff => NetworkToolkit.SetFirewallAsync(false, cancellationToken),
             WinIpBroadcastInstall => NetworkToolkit.EnsureWinIpBroadcastAsync(cancellationToken),
-            TrustCertificate => Task.FromResult(TrustedCertificateInstaller.Install()),
             _ => Task.FromResult(new ToolkitStatus(false, $"未知的提权任务：{task}"))
         };
 

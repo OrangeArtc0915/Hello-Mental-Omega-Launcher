@@ -21,11 +21,6 @@
     <!-- 壁纸包解包工具 RePKG.exe（第三方，运行时释放到 Data\Cache）。
          用二进制内嵌资源而不是 Base64：省约 1/3 体积，也不用再维护生成脚本。 -->
     <EmbeddedResource Include="Resources\RePKG.exe" />
-
-    <!-- 启动器自签证书的公钥部分（CN=mmm，不含私钥）。内嵌进 exe 由「设置 → 关于与存储 →
-         安装信任证书」写进本机的受信任存储，发行包里不再单独放 .cer 文件。
-         私钥只在仓库根的 签名\HMOL-mmm.pfx，绝不入库、绝不随包分发。 -->
-    <EmbeddedResource Include="Resources\HMOL-mmm.cer" />
   </ItemGroup>
 
 </Project>
