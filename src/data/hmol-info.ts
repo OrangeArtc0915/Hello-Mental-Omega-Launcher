@@ -3,9 +3,9 @@
  *
  * 这里是「取真实值」的唯一入口，避免版本号/链接在页面里被手写多份：
  * - 版本号、作者、仓库、QQ 群：构建时读取 `src/HMOL.Core/App/AppInfo.cs`（唯一来源）
- * - 产物名与目标平台：`build.bat` 第 6 步组装发行包时的 `HMOL-v%VERSION%-win-x64.zip`、
+ * - 产物名与目标平台：`build.bat` 第 7 步组装发行包时的 `HMOL-v%VERSION%-win-x64.zip`、
  *   以及 `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`
- * - 发行包内容：`build.bat` 第 6 步（HMOL.exe、存在的 README.md/NOTICE/LICENSE、runtime\）
+ * - 发行包内容：`build.bat` 第 7 步（HMOL.exe、存在的 README.md/NOTICE/LICENSE、runtime\）
  * - 运行时组件：仓库根 `runtime\` 目录清单（7zip / easytier / n2n / tap / winipbroadcast）
  *
  * 读不到 AppInfo.cs 时会回退到 FALLBACK 常量并在构建日志里打印警告，
