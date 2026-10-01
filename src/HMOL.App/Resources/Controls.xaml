@@ -39,7 +39,13 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Window">
                     <Grid>
-                        <Border Background="{DynamicResource Surface.Window}" />
+                        <!--
+                            窗口底用 Surface.Card 而不是 Surface.Window：
+                            二级窗口的内容是一张半透明的 SurfaceCard（Surface.CardGlass），
+                            若底下铺 Surface.Window，深色主题下卡片外的一圈窗口底色会形成一圈近黑方框；
+                            铺不透明的 Surface.Card 后，卡片与其外圈同色，黑框消失、卡片四角也自然衔接。
+                        -->
+                        <Border Background="{DynamicResource Surface.Card}" />
 
                         <ContentPresenter />
 

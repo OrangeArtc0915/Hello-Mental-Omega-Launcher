@@ -15,7 +15,7 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Margin="12" Padding="0" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" UseShadow="False">
         <StackPanel Margin="16,12,16,16">
             <Grid>
                 <Grid.ColumnDefinitions>
