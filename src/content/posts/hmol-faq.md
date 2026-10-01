@@ -2,7 +2,7 @@
 title: HMOL 常见问题解答
 published: 2026-07-30
 updated: 2026-10-01
-description: 整理 HMOL（当前版本 v1.0.0，C# / .NET 8 版）使用中的常见问题与解决方案，涵盖解压与启动、单实例、包管理、备份还原、联机、日志排查等高频问题。
+description: 整理 HMOL（当前版本 v1.1.0，C# / .NET 8 版）使用中的常见问题与解决方案，涵盖解压与启动、单实例、包管理、备份还原、联机、日志排查等高频问题。
 tags: [FAQ, 常见问题, 故障排除, 帮助]
 category: 帮助文档
 draft: false
@@ -11,7 +11,7 @@ draft: false
 # HMOL 常见问题解答
 
 > [!NOTE]
-> 本页对应**当前版本**：C# / .NET 8 版 `v1.0.0`。
+> 本页对应**当前版本**：C# / .NET 8 版 `v1.1.0`。
 > 更多问答见文档的 [常见问题 FAQ](/docs/faq/) 与 [联机 · 常见问题](/docs/multiplayer/faq/)。
 
 ## 安装与解压
