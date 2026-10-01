@@ -39,8 +39,8 @@ export interface HmolInfo {
 /** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（2026-09 快照） */
 const FALLBACK: HmolInfo = {
 	name: "Hello Mental Omega Launcher",
-	version: "1.1.0",
-	versionDisplay: "v1.1.0",
+	version: "1.2.0",
+	versionDisplay: "v1.2.0",
 	author: "mmm",
 	license: "保留所有权利",
 	githubUrl:
@@ -54,7 +54,7 @@ const FALLBACK: HmolInfo = {
 		"https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases",
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
-	zipName: "HMOL-v1.1.0-win-x64.zip",
+	zipName: "HMOL-v1.2.0-win-x64.zip",
 };
 
 const APPINFO_REL = path.join("src", "HMOL.Core", "App", "AppInfo.cs");
