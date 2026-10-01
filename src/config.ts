@@ -77,17 +77,26 @@ export const siteConfig: SiteConfig = {
 		enable: true, // 是否启动Banner壁纸模式
 
 		// 支持单张图片或图片数组，当数组长度 > 1 时自动启用轮播
+		// 3 张背景图，按数组顺序轮播（原图见 public/brand/wallpapers/）
 		src: {
-			desktop: ["/brand/bg-desktop.jpg"], // 桌面横幅图片（docs/111.jpg）
-			mobile: ["/brand/bg-mobile.jpg"], // 移动横幅图片（docs/comment_*.jpg）
+			desktop: [
+				"/brand/wallpapers/1.jpg",
+				"/brand/wallpapers/2.jpg",
+				"/brand/wallpapers/3.jpg",
+			],
+			mobile: [
+				"/brand/wallpapers/1.jpg",
+				"/brand/wallpapers/2.jpg",
+				"/brand/wallpapers/3.jpg",
+			],
 		}, // 使用本地横幅图片
 
 		position: "center", // 等同于 object-position，仅支持 'top', 'center', 'bottom'。默认为 'center'
 
 		carousel: {
-			enable: false, // 为 true 时：为多张图片启用轮播。为 false 时：从数组中随机显示一张图片
+			enable: true, // 为 true 时：为多张图片启用轮播。为 false 时：从数组中随机显示一张图片
 
-			interval: 5, // 轮播间隔时间（秒）
+			interval: 3, // 轮播间隔时间（秒）
 		},
 
 		waves: {
@@ -161,14 +170,23 @@ export const siteConfig: SiteConfig = {
 };
 export const fullscreenWallpaperConfig: FullscreenWallpaperConfig = {
 	enable: true, // 启用全屏壁纸功能,非Banner模式下生效
+	// 与横幅共用同一组背景图（public/brand/wallpapers/）
 	src: {
-		desktop: ["/brand/bg-desktop.jpg"], // 桌面壁纸
-		mobile: ["/brand/bg-mobile.jpg"], // 移动壁纸
+		desktop: [
+			"/brand/wallpapers/1.jpg",
+			"/brand/wallpapers/2.jpg",
+			"/brand/wallpapers/3.jpg",
+		],
+		mobile: [
+			"/brand/wallpapers/1.jpg",
+			"/brand/wallpapers/2.jpg",
+			"/brand/wallpapers/3.jpg",
+		],
 	}, // 使用本地壁纸图片
 	position: "center", // 壁纸位置，等同于 object-position
 	carousel: {
-		enable: false, // 启用轮播
-		interval: 6, // 轮播间隔时间（秒）
+		enable: true, // 启用轮播
+		interval: 3, // 轮播间隔时间（秒）
 	},
 	zIndex: -1, // 层级，确保壁纸在背景层
 	opacity: 0.8, // 壁纸透明度
@@ -433,7 +451,7 @@ export const sakuraConfig: SakuraConfig = {
 	zIndex: 100, // 层级，确保樱花在合适的层级显示
 };
 
-// Pio 看板娘配置（原个人博客模块，官网下线：enable 改回 true 即可恢复）
+// Pio 看板娘配置（官网已改用 public/firefly/ 的上游 Live2D 加载器，这里保持关闭）
 export const pioConfig: import("./types/config").PioConfig = {
 	enable: false, // 启用看板娘
 	models: ["live2d/firefly/FileReferences_Moc_0.model3.json"], // 看板娘模型路径（相对 public 的路径）

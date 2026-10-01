@@ -5,7 +5,6 @@ import "@fontsource/roboto/latin-700.css";
 
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import MusicPlayer from "@components/widget/MusicPlayer.svelte";
-import FireflyLive2D from "@components/widget/FireflyLive2D.svelte";
 import { profileConfig, siteConfig } from "@/config";
 import { widgetConfigs } from "../config";
 import { umamiConfig } from "../config.ts";
@@ -19,6 +18,7 @@ import {
 	PAGE_WIDTH,
 } from "../constants/constants";
 import { defaultFavicons } from "../constants/icon";
+import { HMOL } from "../constants/hmol";
 import type { Favicon, SakuraConfig } from "../types/config";
 import { pathsEqual, url } from "../utils/url-utils";
 
@@ -253,8 +253,40 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		<!-- Music Player -->
 		<MusicPlayer client:idle />
 		
-		<!-- 流萤 Live2D 看板娘组件 -->
-		<FireflyLive2D client:idle />
+		<!-- 流萤 Live2D 看板娘：上游加载器（模型、动作、表情、配件、按钮均自带），
+		     资源在 public/firefly/，配置项见 https://github.com/Iskongkongyo/Firefly-live2d
+		     尺寸/缩放/偏移用加载器默认值（420×620，scale 0.94，偏移 -20/12），
+		     如需调整在这里补 width / height / scale / offsetX / offsetY 即可。 -->
+		<script
+			is:inline
+			set:html={`window.FireflyLive2DConfig = ${JSON.stringify({
+				side: "left",
+				homeUrl: import.meta.env.BASE_URL,
+				profileUrl: HMOL.github,
+				profileHint: "想去 GitHub 看看这个项目吗？",
+			})};`}
+		></script>
+		<script
+			is:inline
+			defer
+			src={`${import.meta.env.BASE_URL}firefly/firefly-loader.js`}></script>
+
+		<!-- 看板娘整体压暗一点减少遮挡感；鼠标靠近或键盘聚焦时恢复不透明。
+		     注意 .ff-live2d-root 是 pointer-events:none，:hover 命中不到它，
+		     要用 :has() 从里面的 canvas / 按钮反查父级。
+		     用 body + :not(.ff-hidden) 抬高优先级，避免被加载器运行时注入的 firefly.css 覆盖；
+		     不重写 transition，保留加载器自带的隐藏/恢复过渡。 -->
+		<style is:global>
+			body .ff-live2d-root:not(.ff-hidden) {
+				opacity: 0.78;
+			}
+
+			body .ff-live2d-root:not(.ff-hidden):has(.ff-live2d-canvas:hover),
+			body .ff-live2d-root:not(.ff-hidden):has(.ff-live2d-controls:hover),
+			body .ff-live2d-root:not(.ff-hidden):focus-within {
+				opacity: 1;
+			}
+		</style>
 		
 		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
 		<div id="page-height-extend" class="hidden h-[300vh]"></div>
