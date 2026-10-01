@@ -33,7 +33,6 @@ rem 代码签名：证书、私钥与 signtool 都在仓库根的 签名\ 目录
 rem PFX 口令不写进本脚本：优先读环境变量 HMOL_PFX_PASSWORD，没有就停下来交互输入。
 set "SIGNDIR=%~dp0签名"
 set "SIGNPFX=%SIGNDIR%\HMOL-mmm.pfx"
-set "SIGNCER=%SIGNDIR%\HMOL-mmm.cer"
 set "SIGNTOOL=%SIGNDIR%\signtool.exe"
 
 :parseArgs
@@ -136,8 +135,8 @@ if not exist "%DISTDIR%\HMOL.exe" (
 
 rem ---------- 5/7 代码签名 ----------
 rem 必须赶在组装发行包之前签：zip 里装的就是这个 exe，签完再打包才不用重做一遍。
-rem 证书是自签的（CN=mmm），别的机器上仍会提示未知发布者；要消掉提示得把包里的
-rem HMOL-mmm.cer 装进「受信任的根证书颁发机构」与「受信任的发布者」（需管理员）。
+rem 证书是自签的（CN=mmm），别的机器上仍会提示未知发布者；要消掉提示，得把 签名\HMOL-mmm.cer
+rem 装进那台机器的「受信任的根证书颁发机构」与「受信任的发布者」（需管理员）。
 echo.
 if "%SIGN%"=="0" (
     echo [5/7] 已按 --skip-sign 跳过代码签名
@@ -194,9 +193,8 @@ if exist "README.md" copy /y "README.md" "%PKG%\README.md" >nul
 if exist "NOTICE"    copy /y "NOTICE"    "%PKG%\NOTICE"    >nul
 if exist "LICENSE"   copy /y "LICENSE"   "%PKG%\LICENSE"   >nul
 
-rem 公钥证书随包分发：用户双击装进「受信任的根证书颁发机构」与「受信任的发布者」后，
-rem 本机就不再对本程序提示未知发布者。私钥只在 %SIGNPFX%，绝不随包分发。
-if "%SIGN%"=="1" if exist "%SIGNCER%" copy /y "%SIGNCER%" "%PKG%\HMOL-mmm.cer" >nul
+rem 公钥证书不随包分发：签名后的 exe 里已经带着证书，发行包里不再放 .cer 散文件。
+rem 私钥只在 %SIGNPFX%，绝不随包分发。
 
 rem 组网组件（EasyTier / n2n / TAP 驱动）不内嵌进 exe：35 MB 的第三方二进制
 rem 进 exe 会让混淆器去加密它们，也会让单文件变得笨重。改为随包放在 runtime\ 下，
