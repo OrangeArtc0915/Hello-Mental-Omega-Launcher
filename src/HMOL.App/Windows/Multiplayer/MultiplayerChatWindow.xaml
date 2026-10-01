@@ -15,7 +15,7 @@
         WindowStartupLocation="CenterOwner"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Margin="12" Padding="0" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" UseShadow="False">
         <Grid Margin="14,12,14,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />

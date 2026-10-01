@@ -13,7 +13,7 @@
         WindowStartupLocation="CenterOwner"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Margin="12" Padding="0" Title="PING 测试" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" Title="PING 测试" UseShadow="False">
         <StackPanel Margin="16,12,16,16">
             <TextBlock FontSize="12"
                        Foreground="{DynamicResource Text.Secondary}"

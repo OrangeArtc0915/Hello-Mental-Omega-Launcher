@@ -13,7 +13,7 @@
         WindowStartupLocation="CenterOwner"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Margin="12" Padding="0" Title="心灵终结 CNC 大厅延迟代码" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" Title="心灵终结 CNC 大厅延迟代码" UseShadow="False">
         <StackPanel Margin="16,12,16,16">
             <TextBlock FontSize="12"
                        Foreground="{DynamicResource Text.Secondary}"
