@@ -163,9 +163,9 @@ public sealed class Settings
     private double _uiScale = 1.0;
 
     /// <summary>
-    /// 启动时是否自动检测游戏路径（对应旧版配置键 auto_detect_path）。
-    /// 旧版只有开关、没有实现；新版在后台按「常见盘符 + 常见目录名」扫描，
-    /// 结果只作建议、绝不静默改写实例配置。默认开启。
+    /// 是否已经历过「首次运行配置向导」。
+    /// 老用户升级上来时该字段是新增的、值为 false，主窗口在启动判定里会顺手补写成 true，
+    /// 避免他们之后把实例删空又被向导打扰。见 <c>MainWindow.QueueFirstRunWizard</c>。
     /// </summary>
-    public bool AutoDetectGamePath { get; set; } = true;
+    public bool FirstRunCompleted { get; set; }
 }

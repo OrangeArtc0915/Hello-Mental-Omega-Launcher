@@ -13,8 +13,6 @@ using HMOL.App.Windows;
 using HMOL.Core.App;
 using HMOL.Core.Appearance;
 using HMOL.Core.Extensions;
-using HMOL.Core.Games;
-using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Layout;
 using HMOL.Core.Logging;
@@ -138,25 +136,9 @@ public sealed class ExtensionRow
     public string DeleteA11yName { get; }
 }
 
-/// <summary>设置页「游戏路径」自动检测结果里的一行。列表每次刷新时整份重建，因此不需要变更通知。</summary>
-public sealed class GamePathCandidateRow
-{
-    public GamePathCandidateRow(string path, bool hasExecutable)
-    {
-        Path = path;
-        HasExecutable = hasExecutable;
-    }
-
-    /// <summary>候选的游戏目录绝对路径。</summary>
-    public string Path { get; }
-
-    /// <summary>该目录下是否已能找到游戏主程序。</summary>
-    public bool HasExecutable { get; }
-}
-
 /// <summary>
 /// 设置页。只做 <see cref="Settings"/> 里已有的字段：主题模式、强调色、窗口透明度、界面缩放、
-/// 联机昵称、天气城市、常用网站、游戏路径自动检测、主页背景、背景音乐。
+/// 联机昵称、天气城市、常用网站、主页背景、背景音乐。
 /// 改动立即生效并自动保存。
 /// </summary>
 public partial class PageSettings : LauncherPage
@@ -179,9 +161,6 @@ public partial class PageSettings : LauncherPage
     private bool _suppressNicknameChanged;
 
     private bool _suppressWeatherCityChanged;
-
-    /// <summary>「立即检测」正在进行时不允许重入。</summary>
-    private bool _detectingGamePath;
 
     /// <summary>「检查启动器更新」正在进行时不允许重入。</summary>
     private bool _checkingUpdate;
@@ -221,7 +200,6 @@ public partial class PageSettings : LauncherPage
         RefreshMusic();
         RefreshLayout();
         RefreshAutoStart();
-        RefreshAutoDetect();
         RefreshExtensions();
         RefreshUpdate();
 
@@ -243,7 +221,6 @@ public partial class PageSettings : LauncherPage
         RefreshMusic();
         RefreshLayout();
         RefreshAutoStart();
-        RefreshAutoDetect();
 
         // 扩展列表：只读一遍扩展目录（不执行任何扩展内容、不写盘）
         RefreshExtensions();
@@ -311,6 +288,14 @@ public partial class PageSettings : LauncherPage
         // 换分类后回到顶部，否则会停在上一个分类的滚动位置
         ScrollCategory.ScrollToTop();
     }
+
+    // ————— 首次运行向导 —————
+
+    /// <summary>
+    /// 老用户的手动入口：无条件开窗，既不做首次运行判定、也不动那个标记。
+    /// </summary>
+    private void OnRunWizardClick(object sender, RoutedEventArgs e)
+        => new ConfigWizardWindow { Owner = Window.GetWindow(this) }.ShowDialog();
 
     // ————— 主题与强调色 —————
 
@@ -404,155 +389,6 @@ public partial class PageSettings : LauncherPage
     /// <summary>让主窗口按最新设置重设透明度与缩放。</summary>
     private void ApplyAppearanceToWindow()
         => (Window.GetWindow(this) as MainWindow)?.ApplyAppearance();
-
-    // ————— 游戏路径自动检测 —————
-
-    /// <summary>刷新自动检测开关按钮的文案与色调（状态以设置为准）。</summary>
-    private void RefreshAutoDetect()
-    {
-        if (BtnAutoDetect is null) return;
-
-        var enabled = SettingsStore.Current.AutoDetectGamePath;
-
-        BtnAutoDetect.Content = enabled ? "已开启" : "已关闭";
-        BtnAutoDetect.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
-    }
-
-    private void OnAutoDetectToggleClick(object sender, RoutedEventArgs e)
-    {
-        var enabled = !SettingsStore.Current.AutoDetectGamePath;
-
-        SettingsStore.Current.AutoDetectGamePath = enabled;
-        SettingsStore.Save();
-
-        RefreshAutoDetect();
-        SetGamePathStatus(enabled
-            ? "已开启：下次启动会在后台自动检测疑似游戏目录。"
-            : "已关闭：启动时不再自动检测，仍可点「立即检测」。", warn: false);
-
-        Log.Info($"自动检测游戏路径已{(enabled ? "开启" : "关闭")}");
-    }
-
-    /// <summary>
-    /// 立即检测：在后台线程扫描固定磁盘。结果只作建议（列在下面），
-    /// 只有用户点「添加为实例」并确认后才写配置，绝不静默改动。
-    /// </summary>
-    private async void OnDetectNowClick(object sender, RoutedEventArgs e)
-    {
-        if (_detectingGamePath) return;
-
-        _detectingGamePath = true;
-        BtnDetectNow.IsEnabled = false;
-        ListGameCandidates.ItemsSource = null;
-        SetGamePathStatus("正在扫描本机固定磁盘（限制深度与耗时，可能需要几秒）…", warn: false);
-
-        try
-        {
-            // 手动检测给更宽松的时间预算，尽量扫全；仍在后台线程执行，不卡界面
-            var candidates = await Task.Run(() => GameLocator.FindCandidates(TimeSpan.FromSeconds(20)));
-            ShowGameCandidates(candidates);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("自动检测游戏路径失败", ex);
-            SetGamePathStatus($"检测失败：{ex.Message}", warn: true);
-        }
-        finally
-        {
-            BtnDetectNow.IsEnabled = true;
-            _detectingGamePath = false;
-        }
-    }
-
-    /// <summary>把候选目录列出来（过滤掉已经是现有实例的），并给出一句结果说明。</summary>
-    private void ShowGameCandidates(IReadOnlyList<GameDirectoryCandidate> candidates)
-    {
-        var existing = InstanceManager.All.Select(item => item.GameDir).ToList();
-
-        var fresh = candidates
-            .Where(candidate => !existing.Any(dir => GameLocator.IsSamePath(dir, candidate.Directory)))
-            .ToList();
-
-        ListGameCandidates.ItemsSource = fresh.Count > 0
-            ? fresh.Select(candidate => new GamePathCandidateRow(candidate.Directory, candidate.HasExecutable)).ToList()
-            : null;
-
-        if (candidates.Count == 0)
-        {
-            SetGamePathStatus("没有发现疑似心灵终结目录。可以到「游戏实例」页手动添加。", warn: true);
-            return;
-        }
-
-        if (fresh.Count == 0)
-        {
-            SetGamePathStatus($"发现 {candidates.Count} 个疑似目录，但都已经是现有实例了。", warn: false);
-            return;
-        }
-
-        SetGamePathStatus(
-            $"发现 {fresh.Count} 个疑似游戏目录（仅建议；点「添加为实例」并确认后才会写入配置）。", warn: false);
-    }
-
-    /// <summary>用户明确点击后才把候选目录添加成实例。</summary>
-    private void OnUseGameCandidateClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not FrameworkElement { Tag: GamePathCandidateRow row }) return;
-
-        var choice = ChoiceWindow.Ask(Window.GetWindow(this), "添加游戏实例",
-            $"把「{row.Path}」添加为一个游戏实例？",
-            "会用该目录创建一个新实例（名称默认取目录名，重名会自动加序号）。只有你点了「添加」才会写配置。",
-            new ChoiceOption("添加", "add", ButtonTone.Solid),
-            new ChoiceOption("取消", "cancel"));
-
-        if (choice != "add") return;
-
-        var baseName = Path.GetFileName(row.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        if (string.IsNullOrWhiteSpace(baseName)) baseName = "心灵终结";
-
-        var result = InstanceManager.Add(UniqueInstanceName(baseName), row.Path);
-
-        SetGamePathStatus(result.Message, warn: !result.Success);
-
-        if (result.Success)
-        {
-            Log.Info($"自动检测：已按建议创建实例「{baseName}」：{row.Path}");
-            _ = RefreshCandidateListAfterUseAsync();
-        }
-    }
-
-    /// <summary>添加成功后重新列一遍候选，去掉刚用掉的那条。</summary>
-    private async Task RefreshCandidateListAfterUseAsync()
-    {
-        try
-        {
-            var candidates = await Task.Run(() => GameLocator.FindCandidates(TimeSpan.FromSeconds(20)));
-            ShowGameCandidates(candidates);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"刷新候选列表失败：{ex.Message}");
-        }
-    }
-
-    private static string UniqueInstanceName(string baseName)
-    {
-        var name = baseName;
-        var index = 2;
-
-        while (InstanceManager.All.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
-        {
-            name = $"{baseName} ({index})";
-            index++;
-        }
-
-        return name;
-    }
-
-    private void SetGamePathStatus(string message, bool warn)
-    {
-        LabGamePathStatus.Text = message;
-        LabGamePathStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "Status.Warn" : "Text.Tertiary");
-    }
 
     // ————— 程序更新 —————
 
