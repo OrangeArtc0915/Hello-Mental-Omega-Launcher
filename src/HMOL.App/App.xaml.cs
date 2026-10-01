@@ -1,4 +1,3 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -14,7 +13,6 @@ using HMOL.App.Theme;
 using HMOL.App.Windows;
 using HMOL.Core.App;
 using HMOL.Core.Extensions;
-using HMOL.Core.Games;
 using HMOL.Core.Instances;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
@@ -159,13 +157,11 @@ public partial class App : Application
             BgmPlayer.Initialize();
             window.Show();
 
-            // 启动时自动检测游戏路径（设置里开启时）：后台扫描，发现疑似目录且还没有任何实例时提示一次；
-            // 结果只作建议、绝不自动写配置。截图自检模式跳过，免得弹窗打断截图。
+            // 截图自检模式下安静处理，不弹任何窗口，免得打断截图。
             var quiet = false;
 #if DEBUG
             quiet = DebugCapture.TryReadPath(e.Args, out _);
 #endif
-            if (!quiet) _ = SuggestGamePathAsync(window);
 
             // 自动检查启动器更新：让出一轮消息循环再弹窗，那时弹窗才有 owner，位置和焦点才正常。
             // 自启驻留托盘时不检查（上面那个分支），截图自检模式也不打扰。
@@ -177,71 +173,6 @@ public partial class App : Application
             if (DebugCapture.TryReadPath(e.Args, out var capturePath))
                 DebugCapture.Attach(window, capturePath!, e.Args);
 #endif
-        }
-    }
-
-    // ————— 启动时自动检测游戏路径 —————
-
-    /// <summary>
-    /// 设置里开启「启动时自动检测游戏路径」时，在后台扫描固定磁盘。
-    /// 只在当前一个实例都没有时提示一次（老用户可以到设置页用「立即检测」），
-    /// 结果只作建议：用户点「添加为实例」才创建，绝不静默改写配置。
-    /// </summary>
-    private static async Task SuggestGamePathAsync(MainWindow window)
-    {
-        if (!SettingsStore.Current.AutoDetectGamePath) return;
-        if (InstanceManager.All.Count > 0) return;
-
-        // 等界面稳定下来再跑，别和启动动画、门锁提示抢
-        try { await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(true); }
-        catch { return; }
-
-        IReadOnlyList<GameDirectoryCandidate> candidates;
-
-        try
-        {
-            candidates = await Task.Run(() => GameLocator.FindCandidates()).ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"启动时自动检测游戏路径失败：{ex.Message}");
-            return;
-        }
-
-        if (candidates.Count == 0)
-        {
-            Log.Info("启动时自动检测游戏路径：未发现候选目录");
-            return;
-        }
-
-        Log.Info($"启动时自动检测游戏路径：发现 {candidates.Count} 个候选，首个为 {candidates[0].Directory}");
-
-        var candidate = candidates[0];
-
-        try
-        {
-            var choice = ChoiceWindow.Ask(window, "发现可能的游戏目录",
-                $"在「{candidate.Directory}」发现疑似心灵终结目录。",
-                "要把它添加为一个游戏实例吗？\n" +
-                "检测结果只作建议，不会自动改动你的配置；也可以到「设置 → 游戏路径」查看全部候选。",
-                new ChoiceOption("添加为实例", "add", ButtonTone.Solid),
-                new ChoiceOption("忽略", "skip"));
-
-            Log.Info($"启动时自动检测游戏路径：建议窗返回 {choice ?? "<关闭>"}");
-
-            if (choice != "add") return;
-
-            var baseName = Path.GetFileName(
-                candidate.Directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            if (string.IsNullOrWhiteSpace(baseName)) baseName = "心灵终结";
-
-            var result = InstanceManager.Add(baseName, candidate.Directory);
-
-            Log.Info($"启动时自动检测：{(result.Success ? "已按建议创建实例" : "未创建实例")}「{baseName}」：{result.Message}");
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"启动时自动检测的提示处理失败：{ex.Message}");
         }
     }
 

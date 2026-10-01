@@ -172,7 +172,7 @@ dotnet build f:\ra2\HMOL\HMOL\HMOL.sln -c Debug
 | M053 | 依赖库检查与提示 | `HMOL_qt.py:18642` `check_dependencies`、`5979` `class DependencyWarningDialog`、`40-62` PIL/py7zr/rarfile 探测 | 无（新版自包含单文件，无外部运行时依赖） | 已删除 |
 | M054 | 未处理异常 / 启动错误提示 | `HMOL_qt.py:18800` `_show_startup_error`、`18824` `_install_fatal_error_hook`、`18829` `_fatal_handler` | `src/HMOL.App/App.xaml.cs` `OnUnhandledException` | 已迁移 |
 | M055 | EULA 启动门 | `HMOL_qt.py:18660` `_show_eula_full`、`18754` `_check_eula_accepted`、`18795` `show_eula_viewer`；配置键 `eula_accepted`/`eula_accepted_version`（`9655`） | 无 | 未迁移 |
-| M056 | 设置项「启动时自动检测游戏路径」 | `HMOL_qt.py:9613`/`9649` `auto_detect_path`（只有开关，无实现） | `Core/Games/GameLocator.cs` `FindCandidates`（限深度 / 限耗时 / 跳过系统目录）＋`Core/App/Settings.cs` `AutoDetectGamePath`＋`Pages/PageSettings.xaml` 「游戏路径」卡（开关 + 立即检测 + 添加为实例）＋`App.xaml.cs` `SuggestGamePathAsync`（启动后台建议，仅提示不改配置） | 已迁移 |
+| M056 | 设置项「启动时自动检测游戏路径」 | `HMOL_qt.py:9613`/`9649` `auto_detect_path`（只有开关，无实现） | 无（自动探测扫描功能已移除；`Pages/PageSettings.xaml` 「游戏路径」卡保留作占位，游戏目录改为在「游戏实例」页手动管理） | 已删除 |
 
 ### 2.7 日志
 

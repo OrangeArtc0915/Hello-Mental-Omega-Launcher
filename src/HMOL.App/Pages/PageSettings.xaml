@@ -1027,66 +1027,25 @@
                 </StackPanel>
             </c:SurfaceCard>
 
-            <!-- 游戏路径：启动时自动检测 + 手动立即检测，结果只作建议 -->
+            <!-- 游戏路径：目录属于每个实例，在「游戏实例」页管理；向导可随时重跑 -->
             <c:SurfaceCard x:Name="CardGamePath" Margin="0,14,0,0" Title="游戏路径">
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock VerticalAlignment="Center"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource Text.Secondary}"
-                                   Text="启动时自动检测游戏路径" />
-                        <c:OutlineButton x:Name="BtnAutoDetect"
-                                         Margin="10,0,0,0"
-                                         Click="OnAutoDetectToggleClick" />
-                    </StackPanel>
-                    <TextBlock Margin="0,6,0,0"
+                    <TextBlock FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="游戏目录属于每个游戏实例，请在「游戏实例」页新建或编辑实例时指定。" />
+                    <TextBlock Margin="0,8,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="开启后每次启动都在后台扫描本机固定磁盘（限制扫描深度与目录数、跳过系统与分页目录），发现疑似心灵终结目录时只提示你，绝不自动改写实例配置。" />
-
-                    <c:OutlineButton x:Name="BtnDetectNow"
-                                     Margin="0,10,0,0"
+                               Text="首次运行会出现一次配置向导，带你完成「选目录 → 检查环境 → 创建实例」。" />
+                    <c:OutlineButton x:Name="BtnRunWizard"
+                                     Height="34"
+                                     Margin="0,12,0,0"
                                      HorizontalAlignment="Left"
-                                     Content="立即检测"
+                                     Content="重新运行配置向导"
                                      Tone="Solid"
-                                     Click="OnDetectNowClick" />
-                    <TextBlock x:Name="LabGamePathStatus"
-                               Margin="0,8,0,0"
-                               FontSize="11.5"
-                               Foreground="{DynamicResource Text.Tertiary}"
-                               TextWrapping="Wrap" />
-
-                    <ItemsControl x:Name="ListGameCandidates" Margin="0,6,0,0">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,4,0,0"
-                                        Padding="10,8"
-                                        Background="{DynamicResource Surface.Sunken}"
-                                        BorderBrush="{DynamicResource Border.Default}"
-                                        BorderThickness="1"
-                                        CornerRadius="{StaticResource Radius.Item}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="12"
-                                                   Text="{Binding Path}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding Path}" />
-                                        <c:OutlineButton Grid.Column="1"
-                                                         Margin="8,0,0,0"
-                                                         Content="添加为实例"
-                                                         Tag="{Binding}"
-                                                         Click="OnUseGameCandidateClick" />
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                                     Click="OnRunWizardClick" />
                 </StackPanel>
             </c:SurfaceCard>
 

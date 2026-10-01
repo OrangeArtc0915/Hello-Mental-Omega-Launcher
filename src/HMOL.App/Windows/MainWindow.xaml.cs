@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using HMOL.App.Animation;
 using HMOL.App.Controls;
 using HMOL.App.Interop;
@@ -13,6 +14,7 @@ using HMOL.App.Layout;
 using HMOL.App.Pages;
 using HMOL.App.Theme;
 using HMOL.Core.App;
+using HMOL.Core.Instances;
 using HMOL.Core.Layout;
 using HMOL.Core.Logging;
 
@@ -95,6 +97,9 @@ public partial class MainWindow : Window
 
             // 主题变了要重铺一次：压暗层取的是主题里的窗口底色，得跟着主题走
             ThemeService.ThemeChanged += ApplyBackground;
+
+            // 首次运行：等界面稳定后再判定并弹向导
+            QueueFirstRunWizard();
         };
 
         Closed += (_, _) => ThemeService.ThemeChanged -= ApplyBackground;
@@ -105,6 +110,41 @@ public partial class MainWindow : Window
         // 最小化时停掉背景里的动图与视频，别白烧 CPU
         StateChanged += (_, _) => BackgroundView.SetPaused(WindowState == WindowState.Minimized);
     }
+
+    /// <summary>
+    /// 首次运行向导：必须等主窗口完全显示之后再弹，让出一轮消息循环。
+    /// 在构造函数或 Loaded 里直接 ShowDialog，向导没有 Owner，会跑到屏幕正中抢焦点，像野弹窗。
+    ///
+    /// <para>
+    /// 判定：没跑过向导 且 一个实例都没有。原设计里的第三条「设置里没记过游戏目录」在 HMOL 不适用——
+    /// 游戏目录只存在于实例上（<see cref="GameInstance.GameDir"/>），设置里没有对应字段。
+    /// </para>
+    ///
+    /// <para>
+    /// 任一条不成立时顺手把标记补上：老用户升级上来时该字段是新增的、值为 false，
+    /// 不补的话他哪天把实例全删了，判定会突然成立，向导就会在一个用了半年的老用户面前弹出来。
+    /// </para>
+    /// </summary>
+    private void QueueFirstRunWizard()
+        => Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        {
+            var settings = SettingsStore.Current;
+
+            var isFirstRun = !settings.FirstRunCompleted && InstanceStore.All.Count == 0;
+
+            if (!isFirstRun)
+            {
+                if (!settings.FirstRunCompleted)
+                {
+                    settings.FirstRunCompleted = true;
+                    SettingsStore.Save();
+                }
+
+                return;
+            }
+
+            new ConfigWizardWindow { Owner = this }.ShowDialog();
+        }));
 
     // ————— 关闭与托盘 —————
 
