@@ -34,5 +34,6 @@ Data/
 # ---- 临时文件 ----
 _version.tmp
 *.failed
+debug.log
 /probe-ghfast/
 /Web.git.corrupt.bak/
