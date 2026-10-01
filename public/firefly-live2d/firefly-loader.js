@@ -249,8 +249,12 @@
   async function boot() {
     loadStyle(asset(cfg.css));
 
-    await loadScript(asset(cfg.core), () => !!window.Live2DCubismCore);
-    await loadScript(asset(cfg.pixi), () => !!window.PIXI);
+    // Cubism Core 与 PixiJS 互不依赖，并行下载，省掉一轮串行等待；
+    // cubism4 构建要挂在 PIXI 上，必须等 PixiJS 就绪后再加载。
+    await Promise.all([
+      loadScript(asset(cfg.core), () => !!window.Live2DCubismCore),
+      loadScript(asset(cfg.pixi), () => !!window.PIXI),
+    ]);
     await loadScript(asset(cfg.live2d), () => !!window.PIXI?.live2d?.Live2DModel);
 
     const {

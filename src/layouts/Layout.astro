@@ -136,6 +136,11 @@ const bannerOffset =
 
 const umamiEnabled = umamiConfig.enabled || false;
 const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
+
+// 看板娘：资源目录与站点根。baseUrl 显式给出，不依赖 document.currentScript，
+// 这样才能把 loader 推迟到首屏之后再动态注入（见下方脚本）。
+const fireflyBase = `${import.meta.env.BASE_URL}firefly-live2d/`;
+const siteHome = import.meta.env.BASE_URL;
 ---
 
 <!DOCTYPE html>
@@ -253,40 +258,50 @@ const umamiScripts = umamiConfig.scripts || ""; // 获取Umami scripts配置
 		<!-- Music Player -->
 		<MusicPlayer client:idle />
 		
-		<!-- 流萤 Live2D 看板娘：上游加载器（模型、动作、表情、配件、按钮均自带），
-		     资源在 public/firefly/，配置项见 https://github.com/Iskongkongyo/Firefly-live2d
-		     尺寸/缩放/偏移用加载器默认值（420×620，scale 0.94，偏移 -20/12），
-		     如需调整在这里补 width / height / scale / offsetX / offsetY 即可。 -->
-		<script
-			is:inline
-			set:html={`window.FireflyLive2DConfig = ${JSON.stringify({
-				side: "left",
-				homeUrl: import.meta.env.BASE_URL,
-				profileUrl: HMOL.github,
-				profileHint: "想去 GitHub 看看这个项目吗？",
-			})};`}
-		></script>
-		<script
-			is:inline
-			defer
-			src={`${import.meta.env.BASE_URL}firefly/firefly-loader.js`}></script>
+		<!-- 看板娘：流萤 Live2D（PixiJS + Cubism 4，资源在 public/firefly-live2d/）
+		     baseUrl 显式写死，不再依赖 document.currentScript，
+		     这样就能把 loader 推迟到首屏之后再动态注入 -->
+		<script is:inline define:vars={{ fireflyBase, siteHome, profileUrl: HMOL.github }}>
+			window.FireflyLive2DConfig = {
+				baseUrl: fireflyBase,
+				side: "left", // 停靠左下角
+				width: 420,
+				height: 620,
+				scale: 0.94,
+				offsetX: -20,
+				offsetY: 12,
+				zIndex: 45, // 低于导航栏，高于正文
+				minWidth: 1025, // 窄屏不加载，省流量
+				allowTouch: false, // 移动端不加载（模型资源约 7 MB）
+				welcome: "欢迎来到 HMOL 官方网站",
+				homeUrl: siteHome,
+				profileUrl: profileUrl,
+				profileHint: "想去 GitHub 看看这个项目吗？点这里就能跳过去~",
+				storageKey: "hmol-firefly-live2d-hidden",
+			};
 
-		<!-- 看板娘整体压暗一点减少遮挡感；鼠标靠近或键盘聚焦时恢复不透明。
-		     注意 .ff-live2d-root 是 pointer-events:none，:hover 命中不到它，
-		     要用 :has() 从里面的 canvas / 按钮反查父级。
-		     用 body + :not(.ff-hidden) 抬高优先级，避免被加载器运行时注入的 firefly.css 覆盖；
-		     不重写 transition，保留加载器自带的隐藏/恢复过渡。 -->
-		<style is:global>
-			body .ff-live2d-root:not(.ff-hidden) {
-				opacity: 0.78;
-			}
-
-			body .ff-live2d-root:not(.ff-hidden):has(.ff-live2d-canvas:hover),
-			body .ff-live2d-root:not(.ff-hidden):has(.ff-live2d-controls:hover),
-			body .ff-live2d-root:not(.ff-hidden):focus-within {
-				opacity: 1;
-			}
-		</style>
+			// 运行时 + 模型约 7 MB，等首屏加载完再拉，避免和横幅图抢带宽
+			(function () {
+				function start() {
+					var s = document.createElement("script");
+					s.src = fireflyBase + "firefly-loader.js";
+					s.async = true;
+					document.head.appendChild(s);
+				}
+				function schedule() {
+					if ("requestIdleCallback" in window) {
+						requestIdleCallback(start, { timeout: 2000 });
+					} else {
+						setTimeout(start, 200);
+					}
+				}
+				if (document.readyState === "complete") {
+					schedule();
+				} else {
+					window.addEventListener("load", schedule, { once: true });
+				}
+			})();
+		</script>
 		
 		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
 		<div id="page-height-extend" class="hidden h-[300vh]"></div>
