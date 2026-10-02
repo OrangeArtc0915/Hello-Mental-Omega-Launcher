@@ -237,6 +237,10 @@ const siteHome = import.meta.env.BASE_URL;
 
 		<slot name="head"></slot>
 
+		<!-- 看板娘样式：写进 head 而不是让 loader 运行时注入，
+		     否则 Swup 切换页面替换 head 时会把它清掉，模型会丢失 position:fixed -->
+		<link rel="stylesheet" href={`${fireflyBase}firefly.css`} />
+
 		<link rel="alternate" type="application/rss+xml" title={profileConfig.name} href={`${Astro.site}rss.xml`}/>
 
 		<!-- Umami Analytics -->
@@ -280,25 +284,28 @@ const siteHome = import.meta.env.BASE_URL;
 				storageKey: "hmol-firefly-live2d-hidden",
 			};
 
-			// 运行时 + 模型约 7 MB，等首屏加载完再拉，避免和横幅图抢带宽
+			// 运行时 + 模型约 7 MB。DOM 一解析完就开始拉，不再等 window.load
+			// （window.load 要等图片全部下完，实测白等 2 秒多）。
+			// 用 fetchPriority=low 让横幅等首屏资源仍然排在前面。
 			(function () {
 				function start() {
 					var s = document.createElement("script");
 					s.src = fireflyBase + "firefly-loader.js";
 					s.async = true;
+					if ("fetchPriority" in s) s.fetchPriority = "low";
 					document.head.appendChild(s);
 				}
 				function schedule() {
 					if ("requestIdleCallback" in window) {
-						requestIdleCallback(start, { timeout: 2000 });
+						requestIdleCallback(start, { timeout: 600 });
 					} else {
-						setTimeout(start, 200);
+						setTimeout(start, 100);
 					}
 				}
-				if (document.readyState === "complete") {
-					schedule();
+				if (document.readyState === "loading") {
+					document.addEventListener("DOMContentLoaded", schedule, { once: true });
 				} else {
-					window.addEventListener("load", schedule, { once: true });
+					schedule();
 				}
 			})();
 		</script>
