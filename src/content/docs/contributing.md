@@ -72,7 +72,7 @@ order: 230
 
 ```markdown
 ## 环境
-- HMOL 版本：v1.2.0
+- HMOL 版本：v1.2.1
 - Windows 版本：Windows 11 22H2 (Build 22621)
 - 运行方式：直接运行 HMOL.exe / 管理员运行
 
