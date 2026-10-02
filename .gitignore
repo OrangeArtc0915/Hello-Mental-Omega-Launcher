@@ -37,3 +37,6 @@ _version.tmp
 debug.log
 /probe-ghfast/
 /Web.git.corrupt.bak/
+
+# ---- 宣传片工具：本地制作目录，整目录不入库 ----
+/宣传片工具/
