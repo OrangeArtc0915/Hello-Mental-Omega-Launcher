@@ -26,7 +26,7 @@
 
 ## 下载与运行
 
-1. 到 [Releases](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases) 下载 `HMOL-v1.2.0-win-x64.zip`。
+1. 到 [Releases](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases) 下载 `HMOL-v1.2.1-win-x64.zip`。
 2. **完整解压**到任意目录（绿色便携，不要只把 exe 拖出来，旁边需要 `runtime\`）。
 3. 双击目录内的 `HMOL.exe` 启动。
 
@@ -83,7 +83,7 @@ build.bat --skip-sign    :: 跳过签名（没有证书时用）
 
 ```
 HMOL联机模块 组网分享
-版本: 1.2.0
+版本: 1.2.1
 方案: EasyTier
 节点: udp://39.108.52.138:11010
 房间名: ABC123
