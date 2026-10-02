@@ -15,8 +15,8 @@ export const HMOL = {
 	/** 简称，用于导航标题与徽标 */
 	shortName: "HMOL",
 	/** 当前版本号，对应 AppInfo.Version / VersionDisplay */
-	version: "1.2.1",
-	versionDisplay: "v1.2.1",
+	version: "1.2.2",
+	versionDisplay: "v1.2.2",
 	/** 作者，对应 AppInfo.Author */
 	author: "mmm",
 	/** 许可摘要，对应 AppInfo.License 与仓库根 LICENSE */
