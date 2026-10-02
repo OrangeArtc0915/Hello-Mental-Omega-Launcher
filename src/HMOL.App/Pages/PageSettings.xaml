@@ -249,11 +249,40 @@
                                    Foreground="{DynamicResource Text.Secondary}"
                                    TextAlignment="Right" />
                     </Grid>
+                    <!-- 卡片 / 组件透明度：只改承载面底色的 alpha，文字与图标保持清晰 -->
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="卡片透明度" />
+                        <Slider x:Name="SldSurfaceOpacity"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="0.3"
+                                Maximum="1"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnSurfaceOpacityChanged" />
+                        <TextBlock x:Name="LabSurfaceOpacity"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="透明度越小窗口越透（最低 50%）；缩放会等比放大 / 缩小整个界面，立即生效并自动保存。" />
+                               Text="窗口透明度越低整个窗口越透（含文字，最低 50%）；卡片透明度只让卡片、侧栏与标题栏等承载面变透，文字图标保持清晰（最低 30%）；缩放会等比放大 / 缩小整个界面。均立即生效并自动保存。" />
                 </StackPanel>
             </c:SurfaceCard>
 
@@ -773,6 +802,30 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap" />
+
+                    <!-- 主页小组件显隐：日历 / 天气 / 常用网站，关掉就不在主页出现 -->
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="主页小组件" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnWidgetCalendar"
+                                         Tag="Calendar"
+                                         Click="OnWidgetToggleClick" />
+                        <c:OutlineButton x:Name="BtnWidgetWeather"
+                                         Margin="8,0,0,0"
+                                         Tag="Weather"
+                                         Click="OnWidgetToggleClick" />
+                        <c:OutlineButton x:Name="BtnWidgetSites"
+                                         Margin="8,0,0,0"
+                                         Tag="Sites"
+                                         Click="OnWidgetToggleClick" />
+                    </StackPanel>
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="关掉的组件会从主页拿掉，空出来的位置也会一并收掉；组件自己的内容（如网站清单）仍保留在设置里，随时可以再打开。" />
                 </StackPanel>
             </c:SurfaceCard>
 

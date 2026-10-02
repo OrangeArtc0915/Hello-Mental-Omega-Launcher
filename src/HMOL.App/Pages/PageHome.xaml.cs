@@ -259,8 +259,9 @@ public partial class PageHome : LauncherPage
         RefreshCalendar();
         RefreshSites();
 
-        // 日期与站点都用不着动画，只有天气要联网；命中 30 分钟缓存时这一步不发请求
-        _ = RefreshWeatherAsync();
+        // 日期与站点都用不着动画，只有天气要联网；命中 30 分钟缓存时这一步不发请求。
+        // 天气块被隐藏时整段跳过，省一次没必要的请求（下次进主页时若已重新显示再补上）。
+        if (SettingsStore.Current.HomeWidgets.Weather) _ = RefreshWeatherAsync();
 
         // 扩展：先取数据再出卡。整个过程不阻塞界面，失败只落在各自的卡上
         _ = RefreshExtensionWidgetsAsync();
@@ -623,6 +624,8 @@ public partial class PageHome : LauncherPage
     // ————— 刷新 —————
     private void Refresh()
     {
+        ApplyWidgetVisibility();
+
         if (CardCurrent is null) return;
 
         var instances = InstanceManager.All;
@@ -642,6 +645,34 @@ public partial class PageHome : LauncherPage
         LabSwitchEmpty.Visibility = instances.Count <= 1 ? Visibility.Visible : Visibility.Collapsed;
 
         RefreshCurrentInstance();
+    }
+
+    /// <summary>
+    /// 按设置显示 / 隐藏三块小组件。不能只把卡片 Collapsed——它占的等宽列也得一起收，
+    /// 否则那一条会留下等宽的空白，看起来像排版坏了。列间的 12px 间距同理，只在相邻两块都显示时才留。
+    /// </summary>
+    private void ApplyWidgetVisibility()
+    {
+        var widgets = SettingsStore.Current.HomeWidgets;
+        var showCalendar = widgets.Calendar;
+        var showWeather = widgets.Weather;
+        var showSites = widgets.Sites;
+
+        CardCalendar.Visibility = Vis(showCalendar);
+        CardWeather.Visibility = Vis(showWeather);
+        CardSites.Visibility = Vis(showSites);
+
+        ColWidgetCalendar.Width = Star(showCalendar, 1.1);
+        ColWidgetWeather.Width = Star(showWeather, 1.05);
+        ColWidgetSites.Width = Star(showSites, 0.95);
+
+        ColWidgetGap1.Width = new GridLength(showCalendar && showWeather ? 12 : 0);
+        ColWidgetGap2.Width = new GridLength(showWeather && showSites ? 12 : 0);
+
+        static Visibility Vis(bool show) => show ? Visibility.Visible : Visibility.Collapsed;
+
+        static GridLength Star(bool show, double ratio)
+            => show ? new GridLength(ratio, GridUnitType.Star) : new GridLength(0);
     }
 
     /// <summary>横幅：按时段的问候语 + 一句话状态摘要（有实例说实例名与路径可用性，没实例引导去创建）。</summary>

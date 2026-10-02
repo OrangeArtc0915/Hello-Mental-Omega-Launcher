@@ -98,6 +98,21 @@ public static class ThemeService
         _systemWatcher = null;
     }
 
+    /// <summary>
+    /// 只按当前设置重算「卡片 / 组件」两个半透明承载面的画刷。
+    /// 拖动设置页的透明度滑块时用这个，不走整个 <see cref="Apply"/>——
+    /// 后者还会重建窗口渐变并触发 <c>ThemeChanged</c>，让主页背景白重铺一遍。
+    /// </summary>
+    public static void ApplySurfaceOpacity()
+    {
+        var resources = Application.Current?.Resources;
+        if (resources is null) return;
+
+        resources["Surface.CardGlass"] = FrozenBrush(ScaleAlpha(CardGlassBase(IsDark), CardGlassAlpha));
+        resources["Surface.PanelGlass"] = FrozenBrush(ScaleAlpha(PanelGlassBase(IsDark), PanelGlassAlpha));
+        resources["Surface.Sunken"] = FrozenBrush(ScaleAlpha(SunkenBase(IsDark)));
+    }
+
     public static bool IsSystemInDarkMode()
     {
         try
@@ -154,15 +169,18 @@ public static class ThemeService
         brushes["Surface.Panel"] = dark ? ColorOf("#1D222C") : ColorOf("#EFF1F6");
 
         // 侧栏与标题栏用半透明版本：后续的个性化背景要能透到整个窗口，不能只铺内容区。
-        brushes["Surface.PanelGlass"] = dark ? ColorOf("#C71D222C") : ColorOf("#C7EFF1F6");
+        brushes["Surface.PanelGlass"] = ScaleAlpha(PanelGlassBase(dark), PanelGlassAlpha);
 
         // 卡片也半透明，但比侧栏稍实一点，保证卡片里文字密集处对比度够。
         // 只给 SurfaceCard 模板用；Surface.Card 保持不透明，否则嵌在卡片里的面板和弹窗
         // 会变成「半透明套半透明」，叠出来的通透度不可控。
-        brushes["Surface.CardGlass"] = dark ? ColorOf("#D1212833") : ColorOf("#D1FFFFFF");
+        brushes["Surface.CardGlass"] = ScaleAlpha(CardGlassBase(dark), CardGlassAlpha);
         brushes["Surface.Card"] = dark ? ColorOf("#212833") : Colors.White;
         brushes["Surface.CardHover"] = dark ? ColorOf("#283040") : ColorOf("#F7F9FC");
-        brushes["Surface.Sunken"] = dark ? ColorOf("#1A1F28") : ColorOf("#F1F3F8");
+
+        // 内凹面（列表行、输入框这类压在承载面上的小块）默认不透明，但也要跟着「卡片透明度」走：
+        // 否则卡片透了、里面的列表行还是实心的，整块看起来像没变（常用网站的列表就是这种）。
+        brushes["Surface.Sunken"] = ScaleAlpha(SunkenBase(dark));
         brushes["Surface.Overlay"] = dark ? ColorOf("#B3000000") : ColorOf("#59000000");
 
         // 描边
@@ -228,6 +246,36 @@ public static class ThemeService
 
     /// <summary>深色主题下把强调色压向这个墨色，避免浅色底把界面顶得发白。</summary>
     private static Color DarkInk => ColorOf("#20262F");
+
+    /// <summary>卡片承载面底色（不含 alpha）。alpha 由 <see cref="ScaleAlpha"/> 按设置叠上。</summary>
+    private static Color CardGlassBase(bool dark) => dark ? ColorOf("#212833") : Colors.White;
+
+    /// <summary>侧栏 / 标题栏等组件承载面底色（不含 alpha）。</summary>
+    private static Color PanelGlassBase(bool dark) => dark ? ColorOf("#1D222C") : ColorOf("#EFF1F6");
+
+    /// <summary>内凹面底色（不含 alpha）。它默认就是实心的，所以基准 alpha 为 1。</summary>
+    private static Color SunkenBase(bool dark) => dark ? ColorOf("#1A1F28") : ColorOf("#F1F3F8");
+
+    /// <summary>卡片承载面的基准不透明度（0xD1 ≈ 82%），再乘用户设置里的透明度。</summary>
+    private const double CardGlassAlpha = 0xD1 / 255d;
+
+    /// <summary>组件承载面的基准不透明度（0xC7 ≈ 78%）。</summary>
+    private const double PanelGlassAlpha = 0xC7 / 255d;
+
+    /// <summary>把用户设置里的承载面透明度乘到基准 alpha 上，得到最终带 alpha 的底色。</summary>
+    private static Color ScaleAlpha(Color baseColor, double baseAlpha = 1.0)
+    {
+        var opacity = SettingsStore.Current.SurfaceOpacity;
+        var alpha = (byte)Math.Round(Math.Clamp(baseAlpha * opacity, 0, 1) * 255);
+        return Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B);
+    }
+
+    private static SolidColorBrush FrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
 
     private static Color Mix(Color from, Color to, double t) => Color.FromArgb(
         (byte)(from.A + (to.A - from.A) * t),
