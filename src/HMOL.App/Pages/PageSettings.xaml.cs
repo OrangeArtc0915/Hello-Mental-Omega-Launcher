@@ -368,13 +368,32 @@ public partial class PageSettings : LauncherPage
         ApplyAppearanceToWindow();
     }
 
+    /// <summary>
+    /// 卡片 / 组件透明度：只重算承载面画刷，不走整窗口的 <see cref="ApplyAppearanceToWindow"/>，
+    /// 也不触发 <c>ThemeChanged</c>，省得主页背景跟着白重铺一遍。
+    /// </summary>
+    private void OnSurfaceOpacityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_appearanceReady || _suppressAppearanceChanged) return;
+
+        var value = Math.Round(e.NewValue, 2);
+        if (Math.Abs(value - SettingsStore.Current.SurfaceOpacity) < 0.001) return;
+
+        SettingsStore.Current.SurfaceOpacity = value;
+        SettingsStore.Save();
+
+        RefreshAppearanceLabels();
+        ThemeService.ApplySurfaceOpacity();
+    }
+
     private void RefreshAppearance()
     {
-        if (SldOpacity is null || SldScale is null) return;
+        if (SldOpacity is null || SldScale is null || SldSurfaceOpacity is null) return;
 
         _suppressAppearanceChanged = true;
         SldOpacity.Value = Math.Clamp(SettingsStore.Current.WindowOpacity, Settings.MinWindowOpacity, Settings.MaxWindowOpacity);
         SldScale.Value = Math.Clamp(SettingsStore.Current.UiScale, Settings.MinUiScale, Settings.MaxUiScale);
+        SldSurfaceOpacity.Value = Math.Clamp(SettingsStore.Current.SurfaceOpacity, Settings.MinSurfaceOpacity, Settings.MaxSurfaceOpacity);
         _suppressAppearanceChanged = false;
 
         RefreshAppearanceLabels();
@@ -384,6 +403,7 @@ public partial class PageSettings : LauncherPage
     {
         if (LabOpacity is not null) LabOpacity.Text = $"{SettingsStore.Current.WindowOpacity * 100:0}%";
         if (LabScale is not null) LabScale.Text = $"{SettingsStore.Current.UiScale:0.00}×";
+        if (LabSurfaceOpacity is not null) LabSurfaceOpacity.Text = $"{SettingsStore.Current.SurfaceOpacity * 100:0}%";
     }
 
     /// <summary>让主窗口按最新设置重设透明度与缩放。</summary>
@@ -1126,6 +1146,47 @@ public partial class PageSettings : LauncherPage
 
         LabLayoutScheme.Text = $"当前方案：{active.Name}（共 {LayoutStore.All.Count} 套）" +
                                (overridden == 0 ? "，未做任何调整。" : $"，已调整 {overridden} 项。");
+
+        RefreshWidgetToggles();
+    }
+
+    /// <summary>主页三块小组件的开关：显示时用强调色实心，隐藏时描边，文案里直接写清当前状态。</summary>
+    private void RefreshWidgetToggles()
+    {
+        if (BtnWidgetCalendar is null) return;
+
+        var widgets = SettingsStore.Current.HomeWidgets;
+
+        Sync(BtnWidgetCalendar, "日历", widgets.Calendar);
+        Sync(BtnWidgetWeather, "天气", widgets.Weather);
+        Sync(BtnWidgetSites, "常用网站", widgets.Sites);
+
+        static void Sync(OutlineButton button, string name, bool shown)
+        {
+            button.Content = $"{name}：{(shown ? "显示" : "隐藏")}";
+            button.Tone = shown ? ButtonTone.Solid : ButtonTone.Outline;
+        }
+    }
+
+    /// <summary>切换某块主页小组件的显隐。改动立即落盘，回主页时按新设置重排。</summary>
+    private void OnWidgetToggleClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+
+        var widgets = SettingsStore.Current.HomeWidgets;
+        var shown = tag switch
+        {
+            "Calendar" => widgets.Calendar = !widgets.Calendar,
+            "Weather" => widgets.Weather = !widgets.Weather,
+            "Sites" => widgets.Sites = !widgets.Sites,
+            _ => (bool?)null
+        };
+        if (shown is null) return;
+
+        SettingsStore.Save();
+        RefreshWidgetToggles();
+
+        Log.Info($"主页小组件「{tag}」已改为{(shown.Value ? "显示" : "隐藏")}");
     }
 
     /// <summary>让主窗口按启用方案重排侧栏。</summary>

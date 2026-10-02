@@ -161,13 +161,13 @@
                 三块永远排在一行且不会被裁切。扩展卡用等分栅格（每行 3 张）跟着同一套宽度走，
                 窄窗口下与上面三块一起等比收缩、自动换到下一行。
             -->
-            <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid x:Name="GrdWidgets" Grid.Row="2" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.1*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="1.05*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="0.95*" />
+                    <ColumnDefinition x:Name="ColWidgetCalendar" Width="1.1*" />
+                    <ColumnDefinition x:Name="ColWidgetGap1" Width="12" />
+                    <ColumnDefinition x:Name="ColWidgetWeather" Width="1.05*" />
+                    <ColumnDefinition x:Name="ColWidgetGap2" Width="12" />
+                    <ColumnDefinition x:Name="ColWidgetSites" Width="0.95*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

@@ -37,6 +37,19 @@ public sealed class BackgroundSettings
     public bool FromWallpaperPackage { get; set; }
 }
 
+/// <summary>主页小组件的显隐。默认三块都显示；旧配置文件里没有这个字段时按默认（全显示）处理。</summary>
+public sealed class HomeWidgetSettings
+{
+    /// <summary>现实月历。</summary>
+    public bool Calendar { get; set; } = true;
+
+    /// <summary>现实天气。</summary>
+    public bool Weather { get; set; } = true;
+
+    /// <summary>常用网站。</summary>
+    public bool Sites { get; set; } = true;
+}
+
 /// <summary>背景音乐设置。</summary>
 public sealed class BgmSettings
 {
@@ -71,6 +84,11 @@ public sealed class Settings
 
     public const double MaxUiScale = 1.5;
 
+    /// <summary>卡片与组件（半透明承载面）透明度允许范围：0.3（很透）~ 1.0（不透明）。</summary>
+    public const double MinSurfaceOpacity = 0.3;
+
+    public const double MaxSurfaceOpacity = 1.0;
+
     /// <summary>主题：浅色 / 深色 / 跟随系统。</summary>
     public ThemeMode ThemeMode { get; set; } = ThemeMode.System;
 
@@ -100,6 +118,9 @@ public sealed class Settings
 
     /// <summary>背景音乐。</summary>
     public BgmSettings Bgm { get; set; } = new();
+
+    /// <summary>主页小组件（日历 / 天气 / 常用网站）的显隐。</summary>
+    public HomeWidgetSettings HomeWidgets { get; set; } = new();
 
     /// <summary>当前启用的自定义布局方案 Id；为空表示使用默认布局。</summary>
     public string? ActiveLayoutSchemeId { get; set; }
@@ -161,6 +182,21 @@ public sealed class Settings
     }
 
     private double _uiScale = 1.0;
+
+    /// <summary>
+    /// 卡片与组件（半透明承载面）透明度：1.0 = 不透明（默认观感），越小透出的主页背景越多，
+    /// 但只作用在承载面底色的 alpha 上，文字与图标仍保持清晰（区别于整体「窗口透明度」）。
+    /// 旧配置文件里没有这个字段时按 1.0 处理；越界或非法值在写入时夹回范围。
+    /// </summary>
+    public double SurfaceOpacity
+    {
+        get => _surfaceOpacity;
+        set => _surfaceOpacity = double.IsFinite(value)
+            ? Math.Clamp(value, MinSurfaceOpacity, MaxSurfaceOpacity)
+            : MaxSurfaceOpacity;
+    }
+
+    private double _surfaceOpacity = MaxSurfaceOpacity;
 
     /// <summary>
     /// 是否已经历过「首次运行配置向导」。
