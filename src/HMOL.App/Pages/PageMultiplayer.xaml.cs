@@ -802,7 +802,19 @@ public partial class PageMultiplayer : LauncherPage
             BtnHall.IsEnabled = false;
             LabHallStatus.Text = "正在离开大厅…";
 
-            await hall.LeaveAsync();
+            try
+            {
+                await hall.LeaveAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("离开大厅失败", ex);
+            }
+            finally
+            {
+                // 与进入分支对称：不恢复的话退出一次后按钮会永久灰掉
+                BtnHall.IsEnabled = true;
+            }
 
             StopHallLoop();
             _hallChat = null;
