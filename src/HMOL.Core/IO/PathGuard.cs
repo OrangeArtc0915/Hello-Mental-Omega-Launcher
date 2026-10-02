@@ -102,6 +102,21 @@ public static class PathGuard
         }
     }
 
+    /// <summary>两个路径是否落在同一个分区。同分区时移动文件/目录只是改名，瞬间完成、不搬字节。</summary>
+    public static bool SameVolume(string left, string right)
+    {
+        try
+        {
+            var a = Path.GetPathRoot(Path.GetFullPath(left));
+            var b = Path.GetPathRoot(Path.GetFullPath(right));
+            return !string.IsNullOrEmpty(a) && string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>把名称里 Windows 不允许的字符替换为 "_"（用于实例名、备份名、包名做目录/文件名）。</summary>
     public static string SanitizeFileName(string? name)
     {

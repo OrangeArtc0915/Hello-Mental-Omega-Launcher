@@ -1,4 +1,5 @@
 using System.IO;
+using HMOL.Core.App;
 using HMOL.Core.Logging;
 
 namespace HMOL.Core.IO;
@@ -45,7 +46,9 @@ public sealed class OperationJournal
         => _entries.Add(new Entry(Kind.Moved, originalPath, quarantinePath));
 
     /// <summary>
-    /// 覆盖前备份。同一文件在一次操作里只备份一次；文件不存在则什么都不做。
+    /// 覆盖前把原文件改名留底：同目录改名是瞬间完成的，不复制内容。
+    /// 新文件随后写到原位置，回滚时再改名回来；提交后这份 .bak 保留，方便用户自己找回原文件。
+    /// 同一文件在一次操作里只备份一次；文件不存在则什么都不做。
     /// 返回备份文件路径（未备份时为 null）。
     /// </summary>
     public string? BackupExisting(string file)
@@ -62,7 +65,8 @@ public sealed class OperationJournal
             var suffix = 1;
             while (File.Exists(backup)) backup = $"{file}.bak-{stamp}-{suffix++}";
 
-            File.Copy(file, backup, overwrite: false);
+            // 改名而不是复制：重装 / 还原时省掉被覆盖文件的整整一遍读写（GB 级很可观）
+            File.Move(file, backup);
             TrackOverwritten(file, backup);
             return backup;
         }
@@ -130,8 +134,10 @@ public sealed class OperationJournal
                         if (!File.Exists(entry.Extra)) break;
 
                         Directory.CreateDirectory(Path.GetDirectoryName(entry.Path) ?? ".");
-                        File.Copy(entry.Extra, entry.Path, overwrite: true);
-                        File.Delete(entry.Extra);
+
+                        // 备份当初是「改名」出去的，回滚也改名回来：先丢掉这次写进去的新内容
+                        if (File.Exists(entry.Path)) File.Delete(entry.Path);
+                        File.Move(entry.Extra, entry.Path);
                         break;
 
                     case Kind.Moved:
@@ -177,6 +183,10 @@ public sealed class OperationJournal
         {
             Log.Warn($"清理隔离目录失败：{_quarantineRoot}（{ex.Message}）");
         }
+        finally
+        {
+            Paths.CleanupScratch(Path.GetDirectoryName(_quarantineRoot));
+        }
     }
 
     private void DeleteQuarantine()
@@ -188,6 +198,10 @@ public sealed class OperationJournal
         catch (Exception ex)
         {
             Log.Warn($"清理隔离目录失败：{_quarantineRoot}（{ex.Message}）");
+        }
+        finally
+        {
+            Paths.CleanupScratch(Path.GetDirectoryName(_quarantineRoot));
         }
     }
 }

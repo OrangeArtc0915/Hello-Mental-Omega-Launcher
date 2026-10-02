@@ -189,7 +189,7 @@ public static class InstanceManager
     /// <summary>导出实例到压缩包（对应旧版 export_instance）。</summary>
     public static InstanceResult Export(string instanceId, string exportPath,
         System.IO.Compression.CompressionLevel level = System.IO.Compression.CompressionLevel.Optimal,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         var instance = InstanceStore.FindById(instanceId);
         if (instance is null) return new InstanceResult(false, "实例不存在");
@@ -199,7 +199,7 @@ public static class InstanceManager
 
     /// <summary>从压缩包导入实例（对应旧版 import_instance），返回新实例的 Id。</summary>
     public static (InstanceResult Result, string? InstanceId) Import(string archivePath,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
         => InstanceArchive.Import(archivePath, progress, token);
 
     /// <summary>

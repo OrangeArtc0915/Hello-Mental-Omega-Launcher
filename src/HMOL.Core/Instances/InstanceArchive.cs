@@ -59,6 +59,9 @@ public static class InstanceArchive
 
     public const string GameFilesDirectoryName = "game_files";
 
+    /// <summary>读写缓冲（导出打包与导入搬移共用）。</summary>
+    private const int CopyBufferSize = 1024 * 1024;
+
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
@@ -77,7 +80,7 @@ public static class InstanceArchive
     /// .rar **不支持导出**：RAR 是专有格式，没有可用的写入实现。
     /// </summary>
     public static InstanceResult Export(GameInstance instance, string exportPath,
-        CompressionLevel level = CompressionLevel.Optimal, IProgress<double>? progress = null,
+        CompressionLevel level = CompressionLevel.Optimal, IProgress<ProgressSample>? progress = null,
         CancellationToken token = default)
     {
         if (instance is null) return new InstanceResult(false, "实例不存在");
@@ -147,6 +150,24 @@ public static class InstanceArchive
                 }
 
                 var finished = 0;
+                var doneBytes = 0L;
+                var lastReported = -1.0;
+                var buffer = new byte[CopyBufferSize];
+
+                // 按字节报进度：几个 GB 的实例里单个大文件很多，按文件报会让进度条长时间不动
+                void Report()
+                {
+                    if (progress is null) return;
+
+                    var value = totalSize > 0
+                        ? Math.Min(1, (double)doneBytes / totalSize)
+                        : (double)finished / files.Count;
+
+                    if (value - lastReported < 0.005) return;
+
+                    lastReported = value;
+                    progress.Report(new ProgressSample(value, doneBytes, totalSize));
+                }
 
                 foreach (var file in files)
                 {
@@ -156,9 +177,19 @@ public static class InstanceArchive
 
                     try
                     {
-                        using var source = new FileStream(file.Full, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        using var source = new FileStream(file.Full, FileMode.Open, FileAccess.Read, FileShare.Read,
+                            CopyBufferSize, FileOptions.SequentialScan);
                         using var destination = entry.Open();
-                        source.CopyTo(destination);
+
+                        int read;
+                        while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            token.ThrowIfCancellationRequested();
+
+                            destination.Write(buffer, 0, read);
+                            doneBytes += read;
+                            Report();
+                        }
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
@@ -168,12 +199,12 @@ public static class InstanceArchive
                     }
 
                     finished++;
-                    progress?.Report((double)finished / files.Count);
+                    Report();
                 }
             }
 
             File.Move(partial, target, overwrite: false);
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var sizeText = BackupService.FormatSize(new FileInfo(target).Length);
 
@@ -204,7 +235,7 @@ public static class InstanceArchive
     /// 返回 null 表示成功，否则返回可直接展示给用户的中文原因。
     /// </summary>
     private static string? WriteSevenZip(GameInstance instance, string archivePath, InstanceArchiveInfo info,
-        CompressionLevel level, IProgress<double>? progress, CancellationToken token)
+        CompressionLevel level, IProgress<ProgressSample>? progress, CancellationToken token)
     {
         var staging = Path.Combine(Paths.Temp, $"export7z_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
         var content = Path.Combine(staging, "content");
@@ -223,7 +254,7 @@ public static class InstanceArchive
             }
 
             var (ok, error) = SevenZipTool.Create(content, archivePath, ToSevenZipLevel(level),
-                progress is null ? null : new ProgressSpan(progress, 0.03, 0.98), token);
+                progress is null ? null : new PercentProgress(new ProgressSpan(progress, 0.03, 0.98)), token);
 
             if (ok) return null;
 
@@ -253,7 +284,7 @@ public static class InstanceArchive
     /// 返回新建实例的 Id（失败时为 null）。只接受 <see cref="ArchiveFormats.Extensions"/> 里列出的格式。
     /// </summary>
     public static (InstanceResult Result, string? InstanceId) Import(string archivePath,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(archivePath) || !File.Exists(archivePath))
             return (new InstanceResult(false, "文件不存在"), null);
@@ -262,7 +293,12 @@ public static class InstanceArchive
             return (new InstanceResult(false,
                 $"只支持 {ArchiveFormats.Display} 格式的实例包，当前文件是 {Path.GetFileName(archivePath)}"), null);
 
-        var tempDirectory = Path.Combine(Paths.Temp, $"import_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
+        // id 先定下来：暂存目录要落在「实例目录所在分区」上。同盘才有机会直接改名搬过去，
+        // 否则 GB 级内容得先写到系统盘再复制过来，既慢又容易把系统盘写满。
+        var id = GameInstance.NewId();
+        var instanceDirectory = Paths.InstanceDir(id);
+        var scratch = Paths.ScratchFor(instanceDirectory);
+        var tempDirectory = Path.Combine(scratch, $"import_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
 
         try
         {
@@ -289,13 +325,8 @@ public static class InstanceArchive
                 return (new InstanceResult(false, "解压出来的文件不是有效的游戏目录"), null);
 
             var name = ResolveName(string.IsNullOrWhiteSpace(info.Name) ? "导入的实例" : info.Name);
-            var id = GameInstance.NewId();
-            var instanceDirectory = Paths.InstanceDir(id);
 
-            Directory.CreateDirectory(instanceDirectory);
-
-            var summary = DirectoryCopier.Copy(gameFiles, instanceDirectory, CopyConflictPolicy.Overwrite,
-                null, progress is null ? null : new ProgressSpan(progress, 0.3, 0.9), token);
+            var summary = MoveIntoPlace(gameFiles, instanceDirectory, progress, token);
 
             if (summary.Total == 0 || summary.AllFailed)
             {
@@ -327,7 +358,7 @@ public static class InstanceArchive
 
             InstanceManager.EnsureDirectories(instance);
             InstanceStore.Upsert(instance);
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             Log.Info($"实例「{name}」导入成功，共 {summary.Total} 个文件 → {instanceDirectory}");
 
@@ -351,7 +382,38 @@ public static class InstanceArchive
         finally
         {
             TryDeleteDirectory(tempDirectory);
+            Paths.CleanupScratch(scratch);
         }
+    }
+
+    /// <summary>
+    /// 把解压出来的游戏文件搬进实例目录。暂存目录与实例目录同分区时直接
+    /// <see cref="Directory.Move"/>（改名，瞬间完成）；跨分区才退化为带进度的复制。
+    /// </summary>
+    private static CopySummary MoveIntoPlace(string source, string target, IProgress<ProgressSample>? progress,
+        CancellationToken token)
+    {
+        if (PathGuard.SameVolume(source, target) && !Directory.Exists(target))
+        {
+            try
+            {
+                Directory.Move(source, target);
+                progress?.Report(new ProgressSample(1));
+
+                return new CopySummary(DirectoryCopier.CountFiles(target), 0, 0,
+                    DirectoryCopier.GetSize(target), []);
+            }
+            catch (IOException ex)
+            {
+                // 目标卷不支持目录改名等情况：退回逐文件复制
+                Log.Warn($"同分区搬移失败，退回复制：{source} → {target}（{ex.Message}）");
+            }
+        }
+
+        Directory.CreateDirectory(target);
+
+        return DirectoryCopier.Copy(source, target, CopyConflictPolicy.Overwrite, null,
+            progress is null ? null : new ProgressSpan(progress, 0.3, 0.9), token, consumeSource: true);
     }
 
     /// <summary>枚举游戏目录下的文件（缓存大小，避免后续多次 stat）。</summary>
