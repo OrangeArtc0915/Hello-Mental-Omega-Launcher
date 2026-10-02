@@ -29,13 +29,18 @@ public sealed record CopySummary(
 }
 
 /// <summary>
-/// 目录复制。对应旧版 <c>copy_files</c>：流式逐文件复制（1MB 缓冲，不整文件读进内存）、
+/// 目录复制。对应旧版 <c>copy_files</c>：流式逐文件复制（不整文件读进内存）、
 /// 单个文件失败只计数不中断、支持进度与取消。
-/// 覆盖已有文件前调用方可用 <see cref="OperationJournal"/> 留下 .bak 备份并登记痕迹。
+/// 进度按**字节**上报（累计已复制字节 / 总字节），单个大文件也能看到条在动；
+/// 覆盖已有文件前调用方可用 <see cref="OperationJournal"/> 留下备份并登记痕迹。
 /// </summary>
 public static class DirectoryCopier
 {
-    private const int BufferSize = 1024 * 1024;
+    /// <summary>读写缓冲。4MB 能把顺序写的系统调用次数压下来，大文件复制更快。</summary>
+    private const int BufferSize = 4 * 1024 * 1024;
+
+    /// <summary>进度回调的最小步进（0.5%），太密只会拖慢 UI 线程。</summary>
+    private const double ProgressStep = 0.005;
 
     /// <summary>备份元数据文件名。统计体积/文件数时一律排除它（对应旧版 backup_info.json）。</summary>
     public const string BackupInfoFileName = "backup_info.json";
@@ -43,10 +48,12 @@ public static class DirectoryCopier
     /// <summary>
     /// 把 source 目录（或单个文件）的内容复制进 target 目录。
     /// excludeRelative 里的相对路径会被跳过（例如备份的元数据文件不该被还原进游戏目录）。
+    /// <paramref name="consumeSource"/> 为 true 表示 source 是「用完即弃」的暂存内容
+    /// （例如刚解压出来的目录）：与目标同分区时直接改名搬过去，省掉一整趟字节复制。
     /// </summary>
     public static CopySummary Copy(string source, string target, CopyConflictPolicy policy = CopyConflictPolicy.Overwrite,
-        OperationJournal? journal = null, IProgress<double>? progress = null, CancellationToken token = default,
-        IReadOnlyCollection<string>? excludeRelative = null)
+        OperationJournal? journal = null, IProgress<ProgressSample>? progress = null, CancellationToken token = default,
+        IReadOnlyCollection<string>? excludeRelative = null, bool consumeSource = false)
     {
         var errors = new List<string>();
         var total = 0;
@@ -69,15 +76,37 @@ public static class DirectoryCopier
             }
 
             var targetRoot = Path.GetFullPath(target);
-            var pairs = Collect(source, targetRoot, excludeRelative);
+            var plan = Collect(source, targetRoot, excludeRelative);
 
+            var pairs = plan.Pairs;
             total = pairs.Count;
             if (total == 0) return new CopySummary(0, 0, 0, 0, errors);
+
+            var totalBytes = plan.TotalBytes;
+
+            // 源是暂存内容且与目标同分区时，逐文件「改名」就位，不搬字节
+            var sameVolume = consumeSource && PathGuard.SameVolume(source, targetRoot);
 
             Directory.CreateDirectory(targetRoot);
 
             var finished = 0;
+            var doneBytes = 0L;
             var lastReported = -1.0;
+
+            // 按字节报进度：单个 1GB 的文件也会一路有反馈，而不是只在文件收尾时跳一下
+            void Report(bool force)
+            {
+                if (progress is null) return;
+
+                var value = totalBytes > 0
+                    ? Math.Min(1, (double)doneBytes / totalBytes)
+                    : (double)finished / total;
+
+                if (!force && value - lastReported < ProgressStep) return;
+
+                lastReported = value;
+                progress.Report(new ProgressSample(value, doneBytes, totalBytes));
+            }
 
             foreach (var pair in pairs)
             {
@@ -105,8 +134,23 @@ public static class DirectoryCopier
                         if (File.Exists(pair.Target)) journal?.BackupExisting(pair.Target);
                         else journal?.TrackCreated(pair.Target);
 
-                        CopyFile(pair.Source, pair.Target);
-                        bytes += new FileInfo(pair.Target).Length;
+                        if (sameVolume)
+                        {
+                            // 同分区改名：不搬字节，GB 级内容几乎瞬间就位
+                            File.Move(pair.Source, pair.Target, overwrite: true);
+                            doneBytes += pair.Size;
+                            Report(force: false);
+                        }
+                        else
+                        {
+                            CopyFile(pair.Source, pair.Target, chunk =>
+                            {
+                                doneBytes += chunk;
+                                Report(force: false);
+                            }, token);
+                        }
+
+                        bytes += pair.Size;
                     }
                 }
                 catch (OperationCanceledException)
@@ -121,17 +165,10 @@ public static class DirectoryCopier
                 }
 
                 finished++;
-                if (progress is null) continue;
-
-                var value = (double)finished / total;
-                // 进度节流：变化不足 1% 不回调
-                if (value - lastReported < 0.01 && finished != total) continue;
-
-                lastReported = value;
-                progress.Report(value);
+                Report(force: false);
             }
 
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             if (failed > 0)
                 Log.Warn($"复制完成：共 {total} 个文件，失败 {failed}，跳过 {skipped}");
@@ -151,18 +188,28 @@ public static class DirectoryCopier
         }
     }
 
-    /// <summary>1MB 缓冲的流式单文件复制，避免大文件整份进内存。</summary>
-    public static void CopyFile(string sourceFile, string targetFile)
+    /// <summary>
+    /// 流式单文件复制，避免大文件整份进内存。
+    /// <paramref name="onChunk"/> 每写完一块回调一次（用于字节级进度）；
+    /// <see cref="FileOptions.SequentialScan"/> 给系统一个顺序读的提示，读大文件更快。
+    /// </summary>
+    public static void CopyFile(string sourceFile, string targetFile, Action<int>? onChunk = null,
+        CancellationToken token = default)
     {
-        using var input = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize);
-        using var output = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize);
+        using var input = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize,
+            FileOptions.SequentialScan);
+        using var output = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize,
+            FileOptions.SequentialScan);
 
         var buffer = new byte[BufferSize];
         int read;
 
         while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
         {
+            token.ThrowIfCancellationRequested();
+
             output.Write(buffer, 0, read);
+            onChunk?.Invoke(read);
         }
     }
 
@@ -311,18 +358,26 @@ public static class DirectoryCopier
         return cleaned;
     }
 
+    /// <summary>「来源文件 → 目标文件」对照表，连同总字节数（一次枚举就把进度分母算出来）。</summary>
+    private sealed record CopyPlan(List<(string Source, string Target, long Size)> Pairs, long TotalBytes);
+
     /// <summary>枚举「来源文件 → 目标文件」的对照表。</summary>
-    private static List<(string Source, string Target)> Collect(string source, string targetRoot,
+    private static CopyPlan Collect(string source, string targetRoot,
         IReadOnlyCollection<string>? excludeRelative)
     {
-        var pairs = new List<(string, string)>();
+        var pairs = new List<(string Source, string Target, long Size)>();
+        var bytes = 0L;
 
         if (File.Exists(source))
         {
             if (!IsExcluded(Path.GetFileName(source), excludeRelative))
-                pairs.Add((source, Path.Combine(targetRoot, Path.GetFileName(source))));
+            {
+                var size = SafeLength(source);
+                pairs.Add((source, Path.Combine(targetRoot, Path.GetFileName(source)), size));
+                bytes += size;
+            }
 
-            return pairs;
+            return new CopyPlan(pairs, bytes);
         }
 
         var sourceRoot = Path.GetFullPath(source);
@@ -332,10 +387,24 @@ public static class DirectoryCopier
             var relative = Path.GetRelativePath(sourceRoot, file);
             if (IsExcluded(relative.Replace('\\', '/'), excludeRelative)) continue;
 
-            pairs.Add((file, Path.GetFullPath(Path.Combine(targetRoot, relative))));
+            var size = SafeLength(file);
+            pairs.Add((file, Path.GetFullPath(Path.Combine(targetRoot, relative)), size));
+            bytes += size;
         }
 
-        return pairs;
+        return new CopyPlan(pairs, bytes);
+    }
+
+    private static long SafeLength(string file)
+    {
+        try
+        {
+            return new FileInfo(file).Length;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private static bool IsExcluded(string relative, IReadOnlyCollection<string>? excludeRelative)

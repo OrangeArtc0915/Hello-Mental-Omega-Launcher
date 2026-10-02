@@ -424,7 +424,7 @@ public partial class PagePackages : LauncherPage
         {
             var name = entry.Name;
             var outcome = await Task.Run(() =>
-                PackageInstaller.Install(instance, type, name, policy, progress.Progress, progress.Token));
+                PackageInstaller.Install(instance, type, name, policy, progress.Sample, progress.Token));
 
             progress.Finish();
 
@@ -528,7 +528,7 @@ public partial class PagePackages : LauncherPage
                 var gameDir = instance.GameDir;
 
                 var outcome = await Task.Run(() =>
-                    BackupService.Restore(backupPath, gameDir, progress.Progress, progress.Token));
+                    BackupService.Restore(backupPath, gameDir, progress.Sample, progress.Token));
 
                 success = outcome.Success;
                 message = outcome.Message;
@@ -546,7 +546,7 @@ public partial class PagePackages : LauncherPage
             else
             {
                 var outcome = await Task.Run(() => PackageInstaller.Uninstall(
-                    instance, type, name, allowFullRestore: false, progress.Progress, progress.Token));
+                    instance, type, name, allowFullRestore: false, progress.Sample, progress.Token));
 
                 success = outcome.Success;
                 message = outcome.Message;

@@ -448,13 +448,25 @@ public partial class PageInstances : LauncherPage
             }
         }
 
+        // 压缩力度让用户定：GB 级实例上 Deflate 的 CPU 开销能差好几倍，而包大小通常只差几个百分点
+        var levelChoice = ChoiceWindow.Ask(owner, "导出压缩级别",
+            "选择导出时的压缩力度。",
+            "「快速」耗时明显更短，包会略大几个百分点——游戏资源大多本身已压过，实际差距通常很小；" +
+            "「最小」更省空间，但在大实例上会慢不少。",
+            new ChoiceOption("快速", "fast", ButtonTone.Solid),
+            new ChoiceOption("最小", "small"));
+
+        if (levelChoice is null) return;
+
+        var level = levelChoice == "fast" ? CompressionLevel.Fastest : CompressionLevel.Optimal;
+
         var progress = ProgressWindow.Open(owner, "导出实例", $"正在导出「{instance.Name}」…");
 
         try
         {
             var id = instance.Id;
             var result = await Task.Run(() =>
-                InstanceManager.Export(id, target, CompressionLevel.Optimal, progress.Progress, progress.Token));
+                InstanceManager.Export(id, target, level, progress.Sample, progress.Token));
 
             progress.Finish();
 
@@ -499,7 +511,7 @@ public partial class PageInstances : LauncherPage
         try
         {
             var (result, instanceId) = await Task.Run(() =>
-                InstanceManager.Import(source, progress.Progress, progress.Token));
+                InstanceManager.Import(source, progress.Sample, progress.Token));
 
             progress.Finish();
 
@@ -637,7 +649,7 @@ public partial class PageInstances : LauncherPage
 
             var outcome = await Task.Run(() => BackupService.Backup(
                 instance.GameDir, name, instance.Id, instance.Name, packages, overwrite,
-                progress.Progress, progress.Token));
+                progress.Sample, progress.Token));
 
             progress.Finish();
 
@@ -688,7 +700,7 @@ public partial class PageInstances : LauncherPage
         {
             var gameDir = instance.GameDir;
             var outcome = await Task.Run(() =>
-                BackupService.BackupOriginal(gameDir, overwrite, progress.Progress, progress.Token));
+                BackupService.BackupOriginal(gameDir, overwrite, progress.Sample, progress.Token));
 
             progress.Finish();
 
@@ -738,7 +750,7 @@ public partial class PageInstances : LauncherPage
             var target = instance.GameDir;
 
             var outcome = await Task.Run(() =>
-                BackupService.Restore(source, target, progress.Progress, progress.Token));
+                BackupService.Restore(source, target, progress.Sample, progress.Token));
 
             progress.Finish();
 

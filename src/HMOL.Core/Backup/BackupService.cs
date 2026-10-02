@@ -154,7 +154,7 @@ public static class BackupService
     public static BackupOutcome Backup(string sourceDirectory, string backupName,
         string sourceInstanceId = "", string sourceInstanceName = "",
         IReadOnlyDictionary<string, List<string>>? installedPackages = null, bool overwrite = false,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (!IsValidName(backupName, out var error)) return Fail(error);
 
@@ -228,7 +228,7 @@ public static class BackupService
             });
 
             Publish(staging, target);
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var sizeText = FormatSize(backupSize);
             var message = $"已备份到：\n{target}\n\n共 {summary.Total} 个文件，共 {sizeText}" +
@@ -256,7 +256,7 @@ public static class BackupService
     /// overwrite 为 false 且已存在原版备份时直接失败。
     /// </summary>
     public static BackupOutcome BackupOriginal(string sourceDirectory, bool overwrite = false,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(sourceDirectory) || !Directory.Exists(sourceDirectory))
             return Fail($"源目录不存在：{sourceDirectory}");
@@ -313,7 +313,7 @@ public static class BackupService
             });
 
             Publish(staging, OriginalBackupPath);
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var message = $"原版游戏备份创建成功\n备份位置：{OriginalBackupPath}\n共 {summary.Total} 个文件" +
                           (summary.Failed > 0 ? $"\n（其中 {summary.Failed} 个文件复制失败）" : string.Empty);
@@ -341,7 +341,7 @@ public static class BackupService
     /// 目标目录现有内容先整体搬进隔离区，复制失败或取消会原样搬回来。
     /// </summary>
     public static BackupOutcome Restore(string backupDirectory, string targetDirectory,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(backupDirectory) || !Directory.Exists(backupDirectory))
             return Fail($"备份目录不存在：{backupDirectory}");
@@ -352,7 +352,8 @@ public static class BackupService
         var target = PathGuard.NormalizeRoot(targetDirectory);
         if (target.Length == 0) return Fail($"目标目录无法解析：{targetDirectory}");
 
-        var journal = new OperationJournal(Paths.Temp);
+        // 隔离区放目标同分区：跨盘时「把现有内容整体搬走」会退化成整目录复制
+        var journal = new OperationJournal(Paths.ScratchFor(target));
 
         try
         {
@@ -389,7 +390,7 @@ public static class BackupService
             }
 
             journal.Commit();
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var warning = GameLocator.IsMoDirectory(target)
                 ? string.Empty

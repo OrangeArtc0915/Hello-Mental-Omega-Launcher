@@ -7,11 +7,17 @@ using HMOL.Core.App;
 namespace HMOL.Core.IO;
 
 /// <summary>
-/// 随包分发的 7-Zip 独立命令行（<c>runtime\7zip\7za.exe</c>）的调用封装，用于**创建** 7z 压缩包。
+/// 随包分发的 7-Zip 独立命令行（<c>runtime\7zip\7za.exe</c>）的调用封装，用于**创建**与**解压** 7z。
 ///
-/// 为什么必须借外部程序：项目已引的 SharpCompress 只能**写** zip / tar / gz，没有 7z 写入能力；
-/// 7z 的容器格式本身也没有可用的托管实现。rar 更极端——专有格式，没有任何开源库能写，
-/// 因此 rar 只支持导入（解压）不支持导出。
+/// 为什么必须借外部程序：
+/// <list type="bullet">
+/// <item>创建：项目已引的 SharpCompress 只能**写** zip / tar / gz，没有 7z 写入能力；
+/// 7z 的容器格式本身也没有可用的托管实现。</item>
+/// <item>解压：SharpCompress 的托管 7z 实现对 GB 级固实包慢得离谱（几分钟起步），
+/// 而且会把 <c>Size = 0</c> 的空文件当成「没有流」直接抛错跳过，装出来的包是残缺的；
+/// 原生实现两个毛病都没有。</item>
+/// </list>
+/// 注：<c>7za.exe</c>（Standalone 版）**不支持 rar**，rar 只能继续走 SharpCompress。
 /// </summary>
 public static class SevenZipTool
 {
@@ -84,6 +90,53 @@ public static class SevenZipTool
         foreach (var entry in entries) startInfo.ArgumentList.Add(entry);
         startInfo.ArgumentList.Add("-t7z");
         startInfo.ArgumentList.Add($"-mx={Math.Clamp(level, 0, 9)}");
+
+        return Run(startInfo, progress, token);
+    }
+
+    /// <summary>
+    /// 用 7-Zip 把 <paramref name="archivePath"/> 解压到 <paramref name="destinationDirectory"/>。
+    /// 不加 <c>-spf</c>：7-Zip 默认会剥掉条目里的盘符与 ".."，不会写到目标目录之外。
+    /// </summary>
+    public static (bool Ok, string Error) Extract(string archivePath, string destinationDirectory,
+        IProgress<double>? progress, CancellationToken token)
+    {
+        var exe = ExePath;
+        if (exe is null) return (false, MissingMessage);
+
+        if (!File.Exists(archivePath)) return (false, $"压缩包不存在：{archivePath}");
+
+        try
+        {
+            Directory.CreateDirectory(destinationDirectory);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"无法创建解压目录：{ex.Message}");
+        }
+
+        var startInfo = new ProcessStartInfo(exe)
+        {
+            WorkingDirectory = destinationDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+
+        startInfo.ArgumentList.Add("x");
+        startInfo.ArgumentList.Add(archivePath);
+        startInfo.ArgumentList.Add($"-o{destinationDirectory}");
+
+        return Run(startInfo, progress, token);
+    }
+
+    /// <summary>跑一次 7-Zip 并收集输出。公共开关（不询问 / 进度到 stdout / 中文不乱码）在这里统一加。</summary>
+    private static (bool Ok, string Error) Run(ProcessStartInfo startInfo, IProgress<double>? progress,
+        CancellationToken token)
+    {
         startInfo.ArgumentList.Add("-y");         // 不询问
         startInfo.ArgumentList.Add("-bsp1");      // 进度写 stdout
         startInfo.ArgumentList.Add("-bse1");      // 错误写 stderr
@@ -177,8 +230,9 @@ public static class SevenZipTool
     }
 
     /// <summary>
-    /// 定位组件：优先用程序记录的 exe 目录，其次用进程自身的 exe 目录。
-    /// 单文件发布下 <see cref="AppContext.BaseDirectory"/> 在 .NET 5+ 就是 exe 目录，两条兜底是为了稳妥。
+    /// 定位组件：从 exe 目录（以及进程自己的 exe 目录）**逐级往上**找 <c>runtime\7zip\7za.exe</c>。
+    /// 逐级往上是为了开发场景——调试输出的 exe 在 <c>bin\Debug\net8.0-windows</c> 里，
+    /// 而 runtime 在仓库根；便携版把 exe 放进子目录时同理。最多往上 6 层，不在盘上乱翻。
     /// </summary>
     private static string? Resolve()
     {
@@ -201,6 +255,25 @@ public static class SevenZipTool
     }
 
     private static IEnumerable<string> EnumerateBaseDirectories()
+    {
+        const int maxDepth = 6;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var start in StartDirectories())
+        {
+            var directory = start;
+
+            for (var depth = 0; depth <= maxDepth && !string.IsNullOrEmpty(directory); depth++)
+            {
+                if (seen.Add(directory)) yield return directory;
+
+                directory = Path.GetDirectoryName(directory);
+            }
+        }
+    }
+
+    private static IEnumerable<string> StartDirectories()
     {
         yield return Paths.ExecutableDirectory;
 

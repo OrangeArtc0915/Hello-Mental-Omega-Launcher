@@ -17,11 +17,33 @@ namespace HMOL.App;
 ///
 /// 加 <c>--capture-page &lt;页面&gt;</c>（home / instances / packages / multiplayer / log / settings，
 /// 也接受 0-5 的下标）可以截指定页面：先切到那一页再等动效收敛。不给就截主页（与原来一致）。
+/// 加 <c>--capture-setup &lt;分类&gt;</c> 则在设置页里再切到某个分类
+/// （0-11 下标，或 appearance / background / layout 等名字），用来单独截某一类设置。
 /// </summary>
 internal static class DebugCapture
 {
     /// <summary>等动效收敛的时间：页面入场动画最长约 0.5 秒，这里留一倍余量。</summary>
     private const int SettleMs = 1200;
+
+    /// <summary>设置分类切换还要多等一会儿（卡片有淡入）。</summary>
+    private const int SettleWithCategoryMs = 1600;
+
+    /// <summary>设置分类名 → 下标。与 MainWindow 里 PanSetupNav 的顺序一致。</summary>
+    private static readonly Dictionary<string, int> SetupCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["appearance"] = 0,
+        ["nickname"] = 1,
+        ["weather"] = 2,
+        ["sites"] = 3,
+        ["background"] = 4,
+        ["music"] = 5,
+        ["layout"] = 6,
+        ["extensions"] = 7,
+        ["autostart"] = 8,
+        ["gamepath"] = 9,
+        ["update"] = 10,
+        ["about"] = 11
+    };
 
     /// <summary>读命令行里的 <c>--capture-home</c> 参数。没给或路径为空返回 false。</summary>
     public static bool TryReadPath(IReadOnlyList<string> args, out string? path)
@@ -80,6 +102,28 @@ internal static class DebugCapture
         _ => "主页"
     };
 
+    /// <summary>
+    /// 读 <c>--capture-setup &lt;分类&gt;</c>：接受 0-11 的下标或 <see cref="SetupCategories"/> 里的名字。
+    /// 没给返回 -1（表示不切分类）。
+    /// </summary>
+    private static int ReadSetupCategory(IReadOnlyList<string> args)
+    {
+        for (var i = 0; i < args.Count - 1; i++)
+        {
+            if (!string.Equals(args[i], "--capture-setup", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var value = args[i + 1].Trim();
+
+            if (int.TryParse(value, out var index)) return index;
+            if (SetupCategories.TryGetValue(value, out var mapped)) return mapped;
+
+            Log.Warn($"无法识别的设置分类：{value}，本次按默认分类截。");
+            return -1;
+        }
+
+        return -1;
+    }
+
     /// <summary>读 <c>--capture-size 宽x高</c>（形如 940x580）：先把窗口改成这个尺寸再截，用来检查小窗口下的排版。</summary>
     private static (double Width, double Height)? ReadSize(IReadOnlyList<string> args)
     {
@@ -115,12 +159,21 @@ internal static class DebugCapture
         }
 
         // 指定了页面就先切过去，等动效收敛再截（不要的话截的就是主页，与原来一致）
-        var page = ReadPage(args);
+        var setupCategory = ReadSetupCategory(args);
+        var page = setupCategory >= 0 ? NavPages.Settings : ReadPage(args);
         if (page != NavPages.Home) window.SwitchToPage(page);
 
-        Log.Info($"自动截图：目标页面={PageName(page)}，输出={path}");
+        // 设置页里再切到指定分类（例如 --capture-setup background 截「主页背景」那一类）
+        if (setupCategory >= 0) window.SelectSetupCategory(setupCategory);
 
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SettleMs) };
+        Log.Info($"自动截图：目标页面={PageName(page)}" +
+                 (setupCategory >= 0 ? $"，设置分类={setupCategory}" : string.Empty) +
+                 $"，输出={path}");
+
+        var timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(setupCategory >= 0 ? SettleWithCategoryMs : SettleMs)
+        };
 
         timer.Tick += (_, _) =>
         {

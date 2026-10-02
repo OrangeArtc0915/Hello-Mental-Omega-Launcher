@@ -84,9 +84,10 @@ public static class PackageInstaller
     /// <summary>安装一个包；成功时写入精确安装记录与实例的已安装列表。</summary>
     public static InstallOutcome Install(GameInstance instance, PackageType type, string packageName,
         CopyConflictPolicy policy = CopyConflictPolicy.Overwrite,
-        IProgress<double>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         var extractDirectory = string.Empty;
+        var scratch = string.Empty;
         OperationJournal? journal = null;
 
         try
@@ -103,6 +104,15 @@ public static class PackageInstaller
             if (!File.Exists(target.SourcePath) && !Directory.Exists(target.SourcePath))
                 return Fail($"包文件不存在：{target.SourcePath}");
 
+            // 解压暂存与隔离区都放在游戏目录所在分区：
+            // 跨盘时 GB 级内容要先写到系统盘再复制过来（白写一遍，还可能写满系统盘），
+            // 而隔离区的跨盘移动更会退化成整目录复制。
+            scratch = Paths.ScratchFor(instance.GameDir);
+
+            // 分阶段计时：万一还慢，日志里能直接看出是解压还是铺入在耗时
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var extractMs = 0L;
+
             // 1) 压缩包先解压到临时目录
             var contentRoot = target.SourcePath;
 
@@ -110,13 +120,13 @@ public static class PackageInstaller
             {
                 token.ThrowIfCancellationRequested();
 
-                extractDirectory = Path.Combine(Paths.Temp, $"install_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
+                extractDirectory = Path.Combine(scratch, $"install_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
                 Directory.CreateDirectory(extractDirectory);
 
                 Log.Info($"正在解压：{target.SourcePath} → {extractDirectory}");
 
                 if (!ArchiveExtractor.TryExtract(target.SourcePath, extractDirectory, out var error,
-                        progress is null ? null : new ProgressSpan(progress, 0, 0.3), token))
+                        progress is null ? null : new ProgressSpan(progress, 0, 0.85), token))
                 {
                     TryDeleteDirectory(extractDirectory);
                     return Fail($"解压失败：{error}");
@@ -129,21 +139,28 @@ public static class PackageInstaller
                 }
 
                 contentRoot = ArchiveExtractor.ResolveSingleTopDirectory(extractDirectory);
+                extractMs = watch.ElapsedMilliseconds;
+                watch.Restart();
             }
 
             // 2) 先算出本次会落到游戏目录的文件，覆盖前做快照
             var relativeFiles = ResolveTargetFiles(instance.GameDir, contentRoot, target.TargetDirectory, packageName);
             var snapshot = InstallRecordStore.SnapshotExistingFiles(instance.GameDir, relativeFiles);
 
-            journal = new OperationJournal(Paths.Temp);
+            journal = new OperationJournal(scratch);
 
             // 3) 目录级替换：目标目录已存在时整体搬进隔离区，再铺新内容
             if (ShouldReplaceWholeDirectory(target, policy) && journal.MoveToQuarantine(target.TargetDirectory) is null)
                 return Fail($"目标目录已存在且无法替换：{target.TargetDirectory}");
 
-            // 4) 复制（覆盖前留 .bak，未覆盖的登记为新建）
+            // 4) 铺到游戏目录（覆盖前留 .bak，未覆盖的登记为新建）。
+            // 压缩包的内容是刚解压出来的暂存副本，同分区时逐文件改名就位，不再复制一遍字节。
             var summary = DirectoryCopier.Copy(contentRoot, target.TargetDirectory, policy, journal,
-                progress is null ? null : new ProgressSpan(progress, 0.3, 0.95), token);
+                progress is null ? null : new ProgressSpan(progress, target.IsArchive ? 0.85 : 0, 0.97), token,
+                consumeSource: target.IsArchive);
+
+            Log.Info($"安装耗时：解压 {extractMs} ms，铺入 {watch.ElapsedMilliseconds} ms" +
+                     $"（{summary.Total} 个文件，{BackupService.FormatSize(summary.BytesCopied)}）");
 
             if (summary.Total == 0)
             {
@@ -189,7 +206,7 @@ public static class PackageInstaller
             });
 
             journal.Commit();
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var message = $"已安装：{recordName}\n共处理 {summary.Total} 个文件" +
                           (summary.Skipped > 0 ? $"（跳过已存在 {summary.Skipped} 个）" : string.Empty) +
@@ -220,6 +237,7 @@ public static class PackageInstaller
         finally
         {
             TryDeleteDirectory(extractDirectory);
+            Paths.CleanupScratch(scratch);
         }
     }
 
@@ -232,7 +250,7 @@ public static class PackageInstaller
     /// </list>
     /// </summary>
     public static UninstallOutcome Uninstall(GameInstance instance, PackageType type, string packageName,
-        bool allowFullRestore = true, IProgress<double>? progress = null, CancellationToken token = default)
+        bool allowFullRestore = true, IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         try
         {
@@ -276,9 +294,9 @@ public static class PackageInstaller
     // ————— 选择性卸载 —————
 
     private static UninstallOutcome UninstallSelective(GameInstance instance, PackageType type,
-        string packageName, InstallRecord record, IProgress<double>? progress, CancellationToken token)
+        string packageName, InstallRecord record, IProgress<ProgressSample>? progress, CancellationToken token)
     {
-        var journal = new OperationJournal(Paths.Temp);
+        var journal = new OperationJournal(Paths.ScratchFor(instance.GameDir));
         var targetRoot = PathGuard.NormalizeRoot(instance.GameDir);
 
         var deleted = 0;
@@ -363,7 +381,7 @@ public static class PackageInstaller
             InstallRecordStore.Delete(instance, type, packageName);
 
             journal.Commit();
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var warning = instance.IsValid
                 ? string.Empty
@@ -386,10 +404,10 @@ public static class PackageInstaller
 
     // ————— 全量恢复原版 —————
 
-    private static UninstallOutcome UninstallFull(GameInstance instance, IProgress<double>? progress, CancellationToken token)
+    private static UninstallOutcome UninstallFull(GameInstance instance, IProgress<ProgressSample>? progress, CancellationToken token)
     {
         var targetRoot = PathGuard.NormalizeRoot(instance.GameDir);
-        var journal = new OperationJournal(Paths.Temp);
+        var journal = new OperationJournal(Paths.ScratchFor(instance.GameDir));
 
         try
         {
@@ -430,7 +448,7 @@ public static class PackageInstaller
             InstallRecordStore.DeleteAll(instance);
 
             journal.Commit();
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var warning = instance.IsValid
                 ? string.Empty
@@ -452,11 +470,11 @@ public static class PackageInstaller
     // ————— 地图包（单 .map 文件）卸载 —————
 
     private static UninstallOutcome UninstallMap(GameInstance instance, string packageName,
-        IProgress<double>? progress, CancellationToken token)
+        IProgress<ProgressSample>? progress, CancellationToken token)
     {
         var gameRoot = PathGuard.NormalizeRoot(instance.GameDir);
         var mapsCustom = Path.Combine(gameRoot, "Maps", "Custom");
-        var journal = new OperationJournal(Paths.Temp);
+        var journal = new OperationJournal(Paths.ScratchFor(instance.GameDir));
 
         var candidates = new List<string>();
         var record = FindRecord(instance, PackageType.Map, packageName);
@@ -500,7 +518,7 @@ public static class PackageInstaller
             InstallRecordStore.Delete(instance, PackageType.Map, packageName);
 
             journal.Commit();
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1));
 
             var message = deleted == 0
                 ? $"在 Maps\\Custom 中未找到与「{packageName}」匹配的文件，可能已被手动删除，仅清除了安装记录。"

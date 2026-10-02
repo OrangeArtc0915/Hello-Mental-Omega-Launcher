@@ -29,6 +29,13 @@
                          Minimum="0"
                          Value="0" />
 
+            <!-- 实时速度与预计剩余时间。拿不到字节明细时整行收起，不留空行 -->
+            <TextBlock x:Name="LabRate"
+                       Margin="0,8,0,0"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource Text.Tertiary}"
+                       Visibility="Collapsed" />
+
             <StackPanel Margin="0,14,0,0"
                         HorizontalAlignment="Right"
                         Orientation="Horizontal">
