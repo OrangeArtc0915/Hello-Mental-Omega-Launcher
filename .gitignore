@@ -17,16 +17,23 @@ Data/
 /Web/
 
 # ---- 签名工具与证书 ----
-# 目录里是 makecert / signtool 这些工具，没必要入库；私钥与 pfx 绝对不能入库。
-# 写 /签名/* 而不是 /签名/：整目录排除后 git 不会往里看，下面的放行规则就失效了。
+# 目录里是 makecert / signtool 这些工具，没必要入库；私钥、pfx 与公钥证书一律不入库。
+# 写 /签名/* 而不是 /签名/：整目录排除，连目录里的临时文件一起挡掉。
 /签名/*
 *.pfx
 *.pvk
 *.spc
 *.cer
-# 公钥证书不含私钥，要随发行包一起分发，也方便别人核对签名来源，故单独放行。
-# 注意：这条必须待在 *.cer 后面，否则会被上面的规则重新排除。
-!/签名/HMOL-mmm.cer
+
+# ---- 第三方工具与运行时组件：只在本地保留，不入库 ----
+# build-tools 下除 obfuscate.ps1（HMOL 自己的构建脚本，要入库）以外，都是 ConfuserEx 混淆器；
+# runtime 是 7-Zip / EasyTier / n2n / TAP 等第三方二进制。
+# 打包发行包时仍需它们在本机，所以只从 git 里移除、不删本地文件。
+/build-tools/*
+!/build-tools/confuserex/
+/build-tools/confuserex/*
+!/build-tools/confuserex/obfuscate.ps1
+/runtime/
 
 # ---- 本地参考文档：仅供本人查阅，永远不入库 ----
 /docs/联机互通协议.md
