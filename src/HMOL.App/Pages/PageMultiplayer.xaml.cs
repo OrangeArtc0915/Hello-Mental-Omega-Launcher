@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -43,8 +45,6 @@ public partial class PageMultiplayer : LauncherPage
     /// <summary>收藏队友一行。</summary>
     private sealed record FriendRow(string Name, string Ip, string Community, string Times);
 
-    private readonly OutlineButton[] _tabs;
-
     /// <summary>本页动画：键统一带 <c>mp:</c> 前缀，离开页面时一次收干净。</summary>
     private readonly PageAnimator _anim = new("mp:");
 
@@ -74,16 +74,13 @@ public partial class PageMultiplayer : LauncherPage
     {
         InitializeComponent();
 
-        _tabs = [BtnTabNetwork, BtnTabHall, BtnTabPeers];
-
-        // 入场计划：页头 → 页签 → 三个子视图（延迟 200ms 封顶，整体在 500ms 内）
+        // 入场计划：页头 → 四个子视图（延迟 200ms 封顶，整体在 500ms 内）；分类切换交给窗口侧栏
         _anim.Group(0, HeaderMultiplayer);
-        _anim.Group(40, PanMpTabs);
-        _anim.Group(80, BarNotice, PanNetwork, PanHall, PanPeers);
+        _anim.Group(80, BarNotice, PanNetwork, PanHall, PanPeers, PanLog);
 
         HookSession();
         LoadForm();
-        SwitchTab(0);
+        SwitchCategory(0);
         RefreshConnectionUi();
         RefreshPeers();
         RefreshHall();
@@ -131,6 +128,7 @@ public partial class PageMultiplayer : LauncherPage
         }
 
         RefreshHudButton();
+        UpdateEngineHint();
         _anim.Play();
     }
 
@@ -143,9 +141,14 @@ public partial class PageMultiplayer : LauncherPage
     /// <summary>本页自己管入场动画（见 <see cref="PageAnimator"/>）。</summary>
     public override bool HandlesEnterAnimation => true;
 
-    public override int SubViewCount => _tabs.Length;
+    /// <summary>四个子视图：组网 / 大厅 / 对端 / 引擎日志。</summary>
+    public override int SubViewCount => 4;
 
-    public override void SelectSubView(int index) => SwitchTab(index);
+    /// <summary>
+    /// 自检也走窗口那条路：侧栏切换与视图显隐一次全覆盖。
+    /// </summary>
+    public override void SelectSubView(int index)
+        => (Window.GetWindow(this) as MainWindow)?.SelectMultiplayerCategory(index);
 
     // ————— 会话事件 —————
 
@@ -214,26 +217,30 @@ public partial class PageMultiplayer : LauncherPage
         if (lines.Count > 300) lines.RemoveRange(0, 100);
     }
 
-    // ————— 页签 —————
+    // ————— 子视图切换 —————
 
-    private void OnTabClick(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// 切换本页显示的子视图（组网 / 大厅 / 对端 / 引擎日志）。侧栏选中态由
+    /// <see cref="MainWindow"/> 负责，这里只管视图本身的显隐。
+    /// </summary>
+    internal void SwitchCategory(int index)
     {
-        if (sender is not FrameworkElement { Tag: string tag }) return;
-        if (int.TryParse(tag, out var index)) SwitchTab(index);
+        var view = Math.Clamp(index, 0, 3);
+
+        PanNetwork.Visibility = view == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PanHall.Visibility = view == 1 ? Visibility.Visible : Visibility.Collapsed;
+        PanPeers.Visibility = view == 2 ? Visibility.Visible : Visibility.Collapsed;
+        PanLog.Visibility = view == 3 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (view == 1) RefreshHall();
+        if (view == 3) UpdateEngineHint();
     }
 
-    private void SwitchTab(int index)
+    /// <summary>本页内部要跳回某个子视图时走这里，让侧栏选中态跟着一起走。</summary>
+    private void GoToCategory(int index)
     {
-        var tab = Math.Clamp(index, 0, _tabs.Length - 1);
-
-        for (var i = 0; i < _tabs.Length; i++)
-            _tabs[i].Tone = i == tab ? ButtonTone.Solid : ButtonTone.Outline;
-
-        PanNetwork.Visibility = tab == 0 ? Visibility.Visible : Visibility.Collapsed;
-        PanHall.Visibility = tab == 1 ? Visibility.Visible : Visibility.Collapsed;
-        PanPeers.Visibility = tab == 2 ? Visibility.Visible : Visibility.Collapsed;
-
-        if (tab == 1) RefreshHall();
+        if (Window.GetWindow(this) is MainWindow window) window.SelectMultiplayerCategory(index);
+        else SwitchCategory(index);
     }
 
     // ————— 表单 —————
@@ -251,6 +258,7 @@ public partial class PageMultiplayer : LauncherPage
         TxtRoomName.Text = string.IsNullOrWhiteSpace(settings.RoomName) ? NewRoomName() : settings.RoomName;
         TxtRoomKey.Text = settings.RoomKey;
         TxtManualIp.Text = string.IsNullOrWhiteSpace(settings.ManualIp) ? $"{NodeCatalog.N2nDefaultSubnet}.66" : settings.ManualIp;
+        ChkHideForeignPeers.IsChecked = settings.HideForeignPeers;
 
         _loadingForm = false;
 
@@ -273,6 +281,7 @@ public partial class PageMultiplayer : LauncherPage
         var addressMode = _addressMode;
         var manualIp = ManualIp;
         var publishing = _publishing;
+        var hideForeignPeers = ChkHideForeignPeers.IsChecked == true;
 
         MultiplayerSettingsStore.Update(settings =>
         {
@@ -282,6 +291,7 @@ public partial class PageMultiplayer : LauncherPage
             settings.AddressMode = addressMode;
             settings.ManualIp = manualIp;
             settings.PublishRoom = publishing;
+            settings.HideForeignPeers = hideForeignPeers;
 
             if (kind == NetworkEngineKind.N2n) settings.N2nNode = node;
             else settings.EasyTierNode = node;
@@ -499,7 +509,8 @@ public partial class PageMultiplayer : LauncherPage
         SaveForm();
 
         var options = new NetworkSessionOptions(
-            room, RoomKey, SelectedNode(), Nickname, isOwner, _addressMode, ManualIp);
+            room, RoomKey, SelectedNode(), Nickname, isOwner, _addressMode, ManualIp,
+            HideForeignPeers: ChkHideForeignPeers.IsChecked == true);
 
         _connectCts?.Dispose();
         _connectCts = new CancellationTokenSource();
@@ -831,7 +842,7 @@ public partial class PageMultiplayer : LauncherPage
 
         if (string.IsNullOrWhiteSpace(ChatCrypt.SanitizeText(SettingsStore.Current.Nickname, 32)))
         {
-            ShowNotice("请先在「设置 → 联机昵称」里填写昵称，再进入大厅。", isError: true);
+            ShowNotice("请先在「设置 → 联机设置」里填写昵称，再进入大厅。", isError: true);
             RefreshNickname();
             return;
         }
@@ -1035,7 +1046,7 @@ public partial class PageMultiplayer : LauncherPage
         if (Session.IsConnected || Session.IsBusy) await DisconnectInternalAsync();
 
         ShowNotice($"已接受 {invite.Name} 的邀请，正在加入房间…");
-        SwitchTab(0);
+        GoToCategory(0);
 
         await ConnectInternalAsync(isOwner: false);
     }
@@ -1110,7 +1121,7 @@ public partial class PageMultiplayer : LauncherPage
 
         SaveForm();
         RefreshSharePreview();
-        SwitchTab(0);
+        GoToCategory(0);
 
         ShowNotice($"已填入房间 {row.Community}，请确认节点后点「连接」。");
     }
@@ -1134,7 +1145,7 @@ public partial class PageMultiplayer : LauncherPage
         SelectNode(row.Node);
         SaveForm();
         RefreshSharePreview();
-        SwitchTab(0);
+        GoToCategory(0);
 
         ShowNotice($"已填入公开房间 {row.Community}（节点 {SelectedNode()}），确认后点「连接」。");
     }
@@ -1542,9 +1553,62 @@ public partial class PageMultiplayer : LauncherPage
 
         LabEngineEmpty.Visibility = Visibility.Collapsed;
         ScrollEngineOutput.ScrollToEnd();
+        UpdateEngineHint();
     }
 
     private readonly List<string> _engineTexts = [];
+
+    /// <summary>刷新日志视图上的行数与空状态提示。</summary>
+    private void UpdateEngineHint()
+    {
+        if (LabEngineHint is null) return;
+
+        LabEngineHint.Text = _engineTexts.Count == 0 ? string.Empty : $"共 {_engineTexts.Count} 行";
+        LabEngineEmpty.Visibility = _engineTexts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>导出引擎日志：把当前累积的输出写成带 BOM 的 UTF-8 文本，方便发给别人排查。</summary>
+    private void OnExportEngineLogClick(object sender, RoutedEventArgs e)
+    {
+        if (_engineTexts.Count == 0)
+        {
+            ShowNotice("还没有可导出的引擎日志。", isError: true);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "导出联机引擎日志",
+            FileName = $"HMOL_multiplayer_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
+            Filter = "文本文件 (*.txt)|*.txt"
+        };
+
+        var owner = OwnerWindow;
+        var confirmed = owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner);
+        if (confirmed != true) return;
+
+        try
+        {
+            // 带 BOM 写出，记事本 / Excel 打开中文才不乱码
+            File.WriteAllText(dialog.FileName, string.Join(Environment.NewLine, _engineTexts), new UTF8Encoding(true));
+
+            Log.Info($"已导出 {_engineTexts.Count} 行联机引擎日志到 {dialog.FileName}");
+            ShowNotice($"已导出 {_engineTexts.Count} 行到：\n{dialog.FileName}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"导出联机引擎日志失败：{ex.Message}", ex);
+            ShowNotice($"导出失败：{ex.Message}", isError: true);
+        }
+    }
+
+    /// <summary>只看当前视图：清掉面板与已累积的文本，下次连接会重新记录。</summary>
+    private void OnClearEngineLogClick(object sender, RoutedEventArgs e)
+    {
+        _engineTexts.Clear();
+        PanEngineOutput.Children.Clear();
+        UpdateEngineHint();
+    }
 
     private void ShowNotice(string message, bool isError = false)
     {
@@ -1569,12 +1633,12 @@ public partial class PageMultiplayer : LauncherPage
         if (raw.Length == 0)
         {
             LabNickname.Text = "未设置";
-            LabNicknameHint.Text = "还没有联机昵称：请到「设置 → 联机昵称」填写后再进入大厅。";
+            LabNicknameHint.Text = "还没有联机昵称：请到「设置 → 联机设置」填写后再进入大厅。";
         }
         else
         {
             LabNickname.Text = raw;
-            LabNicknameHint.Text = "昵称取自「设置 → 联机昵称」，改动后重新进入大厅即可生效。";
+            LabNicknameHint.Text = "昵称取自「设置 → 联机设置」，改动后重新进入大厅即可生效。";
         }
     }
 }

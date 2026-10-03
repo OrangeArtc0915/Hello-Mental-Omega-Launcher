@@ -28,6 +28,12 @@ public sealed record NetworkPeer(string Name, string Ip, string Latency, string 
 /// <see cref="ManualIp"/> 只在 <see cref="AddressMode"/> 为 <see cref="NetworkAddressMode.Manual"/> 时生效；
 /// 传 null 或空串表示「用配置里的 ManualIp」，与旧版界面把表单值直接交给引擎等价。
 /// </para>
+///
+/// <para>
+/// <see cref="HideForeignPeers"/> 只在组网层不隔离房间时（n2n 公共节点要求固定小组名）起作用：
+/// 勾上就只显示「在本房间里宣布过」的对端。默认 false——过滤会连带隐藏不使用 HMOL 房间协议的
+/// 其它启动器，与「支持跨启动器互通」的目标冲突。
+/// </para>
 /// </summary>
 public sealed record NetworkSessionOptions(
     string RoomName,
@@ -36,7 +42,8 @@ public sealed record NetworkSessionOptions(
     string Nickname,
     bool IsOwner,
     NetworkAddressMode AddressMode,
-    string? ManualIp);
+    string? ManualIp,
+    bool HideForeignPeers = false);
 
 /// <summary>引擎启动结果。Ok 为 false 时 Message 是可以直接展示给用户的中文原因。</summary>
 public sealed record EngineStartResult(bool Ok, string Message, string? LocalIp);
@@ -67,6 +74,13 @@ public interface INetworkEngine : IAsyncDisposable
 
     /// <summary>已获得的虚拟 IP；未就绪时为 null。</summary>
     string? LocalIp { get; }
+
+    /// <summary>
+    /// 组网层是否已经把不同房间隔开。EasyTier 拿房间名当网络名（<c>--network-name</c>），天然隔开；
+    /// n2n 走「公共节点 + 固定小组名」（如 fox）时不隔开——同一个小组里会混进别的房间、
+    /// 甚至别的启动器的人，上层需要按「房间聊天里宣布过」自行过滤对端。
+    /// </summary>
+    bool NetworkIsolatesRoom { get; }
 
     /// <summary>
     /// 引擎最近输出（最后 40 行拼接，行间为 <see cref="Environment.NewLine"/>），

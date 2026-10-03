@@ -286,12 +286,12 @@
                 </StackPanel>
             </c:SurfaceCard>
 
-            <!-- 联机昵称 -->
-            <c:SurfaceCard x:Name="CardNickname" Margin="0,14,0,0" Title="联机昵称">
+            <!-- 联机设置：昵称 + 游戏内 HUD -->
+            <c:SurfaceCard x:Name="CardNickname" Margin="0,14,0,0" Title="联机设置">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="联机时显示的本地昵称，留空表示还没设置" />
+                               Text="联机昵称（与 CnCNet 客户端的玩家名共用同一个值，留空表示还没设置）" />
                     <Border Height="34"
                             Margin="0,8,0,0"
                             Padding="10,0"
@@ -318,6 +318,62 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap" />
+
+                    <!-- 游戏内 HUD：置顶小浮窗，可在这里直接开 / 关，方便调试 -->
+                    <Border Height="1"
+                            Margin="0,14,0,0"
+                            Background="{DynamicResource Border.Default}" />
+                    <TextBlock Margin="0,12,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="游戏内 HUD" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnHudToggle"
+                                         Content="打开游戏 HUD"
+                                         Tone="Solid"
+                                         Click="OnHudToggleClick" />
+                        <TextBlock x:Name="LabHudStatus"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- 游戏内 HUD 的透明度：整块（底色 + 文字）一起变，与窗口/卡片透明度互不影响 -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="HUD 透明度" />
+                        <Slider x:Name="SldHudOpacity"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="0.4"
+                                Maximum="1"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnHudOpacityChanged" />
+                        <TextBlock x:Name="LabHudOpacity"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="只影响游戏内那个置顶浮窗（含文字与底色），最低 40%；与「外观」里的窗口透明度、卡片透明度互不影响。改完立即生效并自动保存。" />
                 </StackPanel>
             </c:SurfaceCard>
 

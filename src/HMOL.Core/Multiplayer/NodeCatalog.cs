@@ -1,12 +1,19 @@
 namespace HMOL.Core.Multiplayer;
 
 /// <summary>内置公共节点。</summary>
-public sealed record PublicNode(string Address, string Description);
+/// <param name="Address">节点地址（<c>host:port</c>，可带 <c>tcp://</c> / <c>udp://</c> 前缀）。</param>
+/// <param name="Description">下拉框里显示的名字。</param>
+/// <param name="Community">
+/// 该节点要求的小组名。为 <c>null</c> 表示沿用用户填的房间名；
+/// 部分公益 supernode 只服务某个固定小组（如 fox），此时必须传它要求的小组名才能注册上。
+/// </param>
+public sealed record PublicNode(string Address, string Description, string? Community = null);
 
 /// <summary>
 /// 内置节点列表与节点地址工具。对应旧版 nodes.py。
 ///
-/// n2n 节点是历史上公开的公益节点（2026-08 实测大部分已失效，保留供自定义与参考）；
+/// n2n 侧：2026-10 实测可用的是一批只服务固定小组（fox）的公益 supernode，
+/// 其余历史节点（aobacore / bugxia / ntop）多数已失效，保留仅供自定义时参考；
 /// EasyTier 用的是官方公共节点。
 /// </summary>
 public static class NodeCatalog
@@ -20,9 +27,19 @@ public static class NodeCatalog
     /// <summary>EasyTier 默认网段前三级（nodes.py:33 <c>ET_DEFAULT_SUBNET</c>）。</summary>
     public const string EasyTierDefaultSubnet = "10.0.0";
 
-    /// <summary>n2n 内置公共节点（nodes.py:10-18 <c>N2N_PUBLIC_NODES</c>）。</summary>
+    /// <summary>这批公益 supernode 要求的固定小组名。</summary>
+    public const string N2nFixedCommunity = "fox";
+
+    /// <summary>n2n 内置公共节点。列表顺序即默认优先顺序，可用的排前面。</summary>
     public static IReadOnlyList<PublicNode> N2nPublicNodes { get; } =
     [
+        // —— 2026-10 实测在线，均只服务 fox 小组 ——
+        new("n2n.hxsh.store:5199", "上海腾讯云（小组名固定 fox）", N2nFixedCommunity),
+        new("n2n.sfcs.eu.org:10086", "韩国甲骨文（小组名固定 fox）", N2nFixedCommunity),
+        new("hnzsct.moyann.com:10086", "中山电信家宽（小组名固定 fox）", N2nFixedCommunity),
+        new("ouno.eu.org:10084", "成都联通家宽（小组名固定 fox）", N2nFixedCommunity),
+
+        // —— 历史公益节点（多数已失效，保留供自定义与参考） ——
         new("n2n.aobacore.com:9555", "融合节点(北京/上海/广州/香港/日本/孟买)"),
         new("bj.n2n.aobacore.com:9555", "北京节点"),
         new("sh.n2n.aobacore.com:9555", "上海节点"),
@@ -58,6 +75,22 @@ public static class NodeCatalog
     /// <summary>引擎用：n2n 节点原始地址列表（内置 + 自定义）。</summary>
     public static IReadOnlyList<string> N2nNodeValues()
         => BuildValues(N2nPublicNodes);
+
+    /// <summary>
+    /// 该节点要求的小组名；返回 <c>null</c> 表示沿用用户填的房间名。
+    /// 自定义节点不在内置表里，一律按 <c>null</c> 处理。
+    /// </summary>
+    public static string? N2nCommunityFor(string? node)
+    {
+        if (string.IsNullOrWhiteSpace(node)) return null;
+
+        foreach (var item in N2nPublicNodes)
+        {
+            if (string.Equals(item.Address, node.Trim(), StringComparison.OrdinalIgnoreCase)) return item.Community;
+        }
+
+        return null;
+    }
 
     /// <summary>去掉 tcp:// udp:// 等前缀，返回 host:port。</summary>
     public static string StripScheme(string node)

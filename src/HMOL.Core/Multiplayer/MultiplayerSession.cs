@@ -46,6 +46,9 @@ public sealed class MultiplayerSession : IAsyncDisposable
     private readonly List<string> _output = [];
     private readonly List<SessionPeer> _peers = [];
 
+    /// <summary>上一次「不在本房间、已隐藏」的对端数；只在变化时写日志，避免每 3 秒刷一条。</summary>
+    private int _hiddenForeignPeers = -1;
+
     private readonly Action<string>? _log;
 
     /// <summary>串行化连接 / 断开 / 守护重启，避免状态互相踩。</summary>
@@ -398,17 +401,44 @@ public sealed class MultiplayerSession : IAsyncDisposable
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : chat.BannedPeers().Select(item => item.Ip).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // 组网层没隔离房间时（n2n 公共节点要求固定小组名，如 fox），同一个小组里会有别的房间、
+        // 甚至别的启动器的人。用户在联机页勾了「只显示本房间的对端」才过滤：
+        // 依据是「在本房间里宣布过」，因而会连带隐藏不讲 HMOL 房间协议的其它启动器，默认不开。
+        var announced = !engine.NetworkIsolatesRoom && _options?.HideForeignPeers == true
+            ? chat?.AnnouncedPeers()
+            : null;
+
+        var hidden = 0;
+
         var peers = new List<SessionPeer>(raw.Count);
 
         foreach (var peer in raw)
         {
             if (string.IsNullOrWhiteSpace(peer.Ip) || banned.Contains(peer.Ip)) continue;
 
+            if (announced is not null && !announced.Contains(peer.Ip))
+            {
+                hidden++;
+                continue;
+            }
+
             var name = string.Empty;
             if (names is not null && names.TryGetValue(peer.Ip, out var nick)) name = nick;
-            if (string.IsNullOrWhiteSpace(name)) name = peer.Name;
+
+            // 拿不到昵称时退回虚拟 IP，不要用引擎给的 hostname：
+            // EasyTier 的 peer list 报的是对端电脑名（hostname），当成「名字」显示既不是联机昵称，
+            // 也等于把别人的机器名暴露在房间里。n2n 那边本来就只有 IP。
+            if (string.IsNullOrWhiteSpace(name)) name = peer.Ip;
 
             peers.Add(new SessionPeer(name, peer.Ip, peer.Latency, peer.Status));
+        }
+
+        if (hidden != _hiddenForeignPeers)
+        {
+            _hiddenForeignPeers = hidden;
+
+            if (hidden > 0)
+                Log.Info($"这个公共节点不隔离房间，同小组里有 {hidden} 个对端不属于本房间，已从对端列表隐藏");
         }
 
         // 房间聊天只认同引擎给出的对端 IP

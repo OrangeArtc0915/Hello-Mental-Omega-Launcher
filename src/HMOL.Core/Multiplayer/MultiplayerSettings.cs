@@ -40,8 +40,8 @@ public sealed class MultiplayerSettings
     /// <summary>EasyTier 上次使用的节点。</summary>
     public string EasyTierNode { get; set; } = "udp://39.108.52.138:11010";
 
-    /// <summary>n2n 上次使用的节点。</summary>
-    public string N2nNode { get; set; } = "n2n.aobacore.com:9555";
+    /// <summary>n2n 上次使用的节点。默认取内置列表里当前实测可用的第一个。</summary>
+    public string N2nNode { get; set; } = NodeCatalog.N2nPublicNodes[0].Address;
 
     /// <summary>房间名（旧版的 community / 小组名）。</summary>
     public string RoomName { get; set; } = string.Empty;
@@ -58,6 +58,13 @@ public sealed class MultiplayerSettings
 
     /// <summary>是否把本房间公开给联机大厅（旧版界面的「公开房间」勾选，新版随配置持久化）。</summary>
     public bool PublishRoom { get; set; }
+
+    /// <summary>
+    /// 是否「只显示本房间的对端」。默认关闭：判断依据是「在本房间里宣布过」，
+    /// 会连带隐藏不使用 HMOL 房间协议的其它启动器，与「支持互相联机」的目标冲突，
+    /// 因此做成可选。仅在组网层不隔离房间时（n2n 公共节点固定小组名 fox）才有意义。
+    /// </summary>
+    public bool HideForeignPeers { get; set; }
 
     /// <summary>用户自定义节点（内置节点之外的补充）。</summary>
     public List<string> CustomNodes { get; set; } = [];
@@ -89,4 +96,10 @@ public sealed class MultiplayerSettings
 
     /// <summary>游戏内 HUD 上次关闭时的上坐标。为 null 表示还没记录过，用默认落点。</summary>
     public double? HudTop { get; set; }
+
+    /// <summary>
+    /// 游戏内 HUD 的不透明度（0.25–1，1 为不透明）。整块 HUD 一起变（底色 + 文字），
+    /// 与全局的「窗口透明度 / 卡片透明度」互不影响。超出范围按边界处理。
+    /// </summary>
+    public double HudOpacity { get; set; } = 1;
 }

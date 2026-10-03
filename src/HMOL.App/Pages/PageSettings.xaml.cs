@@ -13,6 +13,7 @@ using HMOL.App.Windows;
 using HMOL.Core.App;
 using HMOL.Core.Appearance;
 using HMOL.Core.Extensions;
+using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Layout;
 using HMOL.Core.Logging;
@@ -138,7 +139,7 @@ public sealed class ExtensionRow
 
 /// <summary>
 /// 设置页。只做 <see cref="Settings"/> 里已有的字段：主题模式、强调色、窗口透明度、界面缩放、
-/// 联机昵称、天气城市、常用网站、主页背景、背景音乐。
+/// 联机设置（昵称与游戏内 HUD）、天气城市、常用网站、主页背景、背景音乐。
 /// 改动立即生效并自动保存。
 /// </summary>
 public partial class PageSettings : LauncherPage
@@ -159,6 +160,12 @@ public partial class PageSettings : LauncherPage
     private bool _appearanceReady;
 
     private bool _suppressNicknameChanged;
+
+    /// <summary>构造期与刷新期不让 HUD 透明度滑块的事件回写到配置。</summary>
+    private bool _suppressHudOpacity;
+
+    /// <summary>HUD 透明度滑块是否已经可以响应事件（构造收尾时才置位，理由同 <see cref="_appearanceReady"/>）。</summary>
+    private bool _hudOpacityReady;
 
     private bool _suppressWeatherCityChanged;
 
@@ -194,6 +201,8 @@ public partial class PageSettings : LauncherPage
         RefreshSelection();
         RefreshAppearance();
         RefreshNickname();
+        RefreshHudOpacity();
+        RefreshHudToggle();
         RefreshWeatherCity();
         RefreshSites();
         RefreshBackground();
@@ -205,9 +214,13 @@ public partial class PageSettings : LauncherPage
 
         // 构造收尾：此时滑块与标签都建好了，之后才允许响应 ValueChanged（构造期的夹值事件必须忽略）
         _appearanceReady = true;
+        _hudOpacityReady = true;
 
         // 自动换曲、播放失败跳过等状态变化都要反映到界面
         BgmPlayer.StateChanged += OnBgmStateChanged;
+
+        // HUD 可能在别处（联机页 / 托盘 / HUD 自己的 × 按钮）被开关，这里跟着刷新按钮状态
+        MultiplayerHub.StateChanged += OnHubStateChanged;
     }
 
     public override void OnEnter()
@@ -215,6 +228,8 @@ public partial class PageSettings : LauncherPage
         RefreshSelection();
         RefreshAppearance();
         RefreshNickname();
+        RefreshHudOpacity();
+        RefreshHudToggle();
         RefreshWeatherCity();
         RefreshSites();
         RefreshBackground();
@@ -520,11 +535,29 @@ public partial class PageSettings : LauncherPage
         LabUpdateStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "Status.Warn" : "Text.Tertiary");
     }
 
-    // ————— 联机昵称 —————
+    // ————— 联机设置：昵称 —————
 
+    /// <summary>
+    /// 联机昵称与 CnCNet 客户端的玩家名（Handle）共用同一个值：
+    /// 游戏里有 Handle 就以它为准（顺手同步回 HMOL 设置），没有就沿用 HMOL 里存的名字。
+    /// </summary>
     private void RefreshNickname()
     {
         if (TxtNickname is null) return;
+
+        var gameDir = InstanceManager.Current?.GameDir;
+        var handle = CnCNetProfile.ReadHandle(gameDir);
+
+        if (handle is not null && !string.Equals(handle, SettingsStore.Current.Nickname, StringComparison.Ordinal))
+        {
+            SettingsStore.Current.Nickname = handle;
+            SettingsStore.Save();
+
+            Log.Info($"已按 CnCNet 玩家名同步联机昵称：{handle}");
+        }
+
+        // 有游戏目录时按客户端的 MaxNameLength 限制输入长度，避免两个名字被截成不一样
+        TxtNickname.MaxLength = string.IsNullOrWhiteSpace(gameDir) ? 0 : CnCNetProfile.MaxNameLength(gameDir);
 
         _suppressNicknameChanged = true;
         TxtNickname.Text = SettingsStore.Current.Nickname;
@@ -537,13 +570,16 @@ public partial class PageSettings : LauncherPage
     {
         if (_suppressNicknameChanged || LabNicknameHint is null) return;
 
-        LabNicknameHint.Text = "有未保存的改动，点「保存昵称」后生效。";
+        LabNicknameHint.Text = "有未保存的改动，点「保存昵称」后生效（会同时写入 CnCNet 玩家名）。";
         LabNicknameHint.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
     }
 
     private void OnSaveNicknameClick(object sender, RoutedEventArgs e) => CommitNickname();
 
-    /// <summary>把输入框里的昵称写回设置并落盘；没有变化时不做无谓的写文件。</summary>
+    /// <summary>
+    /// 保存昵称：写回 HMOL 设置，并同步写入 CnCNet 客户端的 <c>[MultiPlayer] Handle</c>，
+    /// 让启动器与 CnCNet 的玩家名始终一致。
+    /// </summary>
     private void CommitNickname()
     {
         if (TxtNickname is null) return;
@@ -558,7 +594,24 @@ public partial class PageSettings : LauncherPage
             Log.Info("已更新联机昵称设置");
         }
 
-        RefreshNicknameHint();
+        var gameDir = InstanceManager.Current?.GameDir;
+
+        if (string.IsNullOrWhiteSpace(gameDir) || nickname.Length == 0)
+        {
+            RefreshNicknameHint();
+            return;
+        }
+
+        var error = CnCNetProfile.WriteHandle(gameDir, nickname);
+
+        if (error is null)
+        {
+            Log.Info($"CnCNet 玩家名已同步为：{nickname}");
+            RefreshNicknameHint();
+            return;
+        }
+
+        SetNicknameHint($"CnCNet 玩家名没同步成功：{error}", warn: true);
     }
 
     private void RefreshNicknameHint()
@@ -566,11 +619,91 @@ public partial class PageSettings : LauncherPage
         if (LabNicknameHint is null) return;
 
         var nickname = SettingsStore.Current.Nickname;
+        var gameDir = InstanceManager.Current?.GameDir;
+        var file = CnCNetProfile.SettingsFileOf(gameDir);
 
-        LabNicknameHint.Text = string.IsNullOrWhiteSpace(nickname)
+        var head = string.IsNullOrWhiteSpace(nickname)
             ? "未设置昵称，联机时会使用默认名称。"
             : $"当前昵称：{nickname}";
-        LabNicknameHint.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
+
+        var sync = file is null
+            ? "没找到 CnCNet 设置文件（如 RA2MO.ini），保存后只改 HMOL 的昵称。"
+            : $"与 CnCNet 玩家名共用同一个值：保存后会写入 {Path.GetFileName(file)} 的 [MultiPlayer] Handle（最长 {CnCNetProfile.MaxNameLength(gameDir!)} 个字符）。";
+
+        SetNicknameHint($"{head}\n{sync}", warn: false);
+    }
+
+    private void SetNicknameHint(string message, bool warn)
+    {
+        LabNicknameHint.Text = message;
+        LabNicknameHint.SetResourceReference(TextBlock.ForegroundProperty, warn ? "Status.Warn" : "Text.Tertiary");
+    }
+
+    // ————— 游戏内 HUD —————
+
+    /// <summary>把联机配置里的 HUD 透明度刷到滑块上（构造、进入页面、切分类时调用）。</summary>
+    private void RefreshHudOpacity()
+    {
+        if (SldHudOpacity is null) return;
+
+        _suppressHudOpacity = true;
+        SldHudOpacity.Value = Math.Clamp(MultiplayerSettingsStore.Current.HudOpacity, SldHudOpacity.Minimum, 1);
+        _suppressHudOpacity = false;
+
+        UpdateHudOpacityLabel();
+    }
+
+    /// <summary>
+    /// HUD 透明度即时生效：写进联机配置（<c>Data\multiplayer.json</c>）后，
+    /// 让已经开着的 HUD 立刻刷新；还没开过就等下次显示时自然带上。
+    /// </summary>
+    private void OnHudOpacityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressHudOpacity || !_hudOpacityReady) return;
+
+        var value = Math.Round(e.NewValue, 2);
+
+        MultiplayerSettingsStore.Update(settings => settings.HudOpacity = value);
+        MultiplayerHub.ApplyHudOpacity();
+
+        UpdateHudOpacityLabel();
+    }
+
+    private void UpdateHudOpacityLabel()
+        => LabHudOpacity.Text = $"{(int)Math.Round(SldHudOpacity.Value * 100)}%";
+
+    /// <summary>刷新「游戏 HUD」开关：按钮文案 / 色调与状态说明都跟着实际可见性走。</summary>
+    private void RefreshHudToggle()
+    {
+        if (BtnHudToggle is null) return;
+
+        var visible = MultiplayerHub.HudVisible;
+
+        BtnHudToggle.Content = visible ? "关闭游戏 HUD" : "打开游戏 HUD";
+        BtnHudToggle.Tone = visible ? ButtonTone.Danger : ButtonTone.Solid;
+
+        LabHudStatus.Text = visible
+            ? "正在显示：可在屏幕上拖动；点浮窗右上角的 × 只是隐藏，这里会同步变回「打开」。"
+            : "点左边按钮打开置顶浮窗，联机时看状态与对端，也方便先调好看不看清楚。";
+    }
+
+    /// <summary>开 / 关游戏内 HUD。不用连接房间也能开，便于调试外观与可读性。</summary>
+    private void OnHudToggleClick(object sender, RoutedEventArgs e)
+    {
+        MultiplayerHub.ToggleHud();
+        RefreshHudToggle();
+    }
+
+    /// <summary>HUD 在别处被开关（联机页 / 托盘 / 浮窗自己的 ×）时同步按钮状态。可能来自后台线程。</summary>
+    private void OnHubStateChanged()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.InvokeAsync(RefreshHudToggle);
+            return;
+        }
+
+        RefreshHudToggle();
     }
 
     // ————— 天气城市 —————

@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using HMOL.App.Controls.Svg;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 
@@ -18,6 +19,9 @@ public sealed record HudRow(string Name, string Ip, string Latency);
 /// </summary>
 public partial class MultiplayerHudWindow : Window
 {
+    /// <summary>HUD 透明度的下限：再低就完全看不清内容了。</summary>
+    public const double MinOpacity = 0.4;
+
     /// <summary>默认落点（屏幕左上偏下），与旧版 DEFAULT_POS 一致。</summary>
     private const double DefaultLeft = 16;
     private const double DefaultTop = 32;
@@ -50,6 +54,28 @@ public partial class MultiplayerHudWindow : Window
 
         // 关窗（真正销毁的那次）也落一次盘，兜住没有走隐藏按钮就退出程序的情况
         Closed += (_, _) => SavePosition();
+
+        // HUD 是固定深色底，关闭按钮的图标也要换成浅色：否则浅色主题下会是一枚深色图标，看不清
+        Loaded += (_, _) => ApplyCloseIconBrush();
+
+        ApplyOpacity();
+    }
+
+    /// <summary>把关闭按钮的图标换成 HUD 专用的浅色（<see cref="RoundIconButton"/> 按 Tone 取的是主题色）。</summary>
+    private void ApplyCloseIconBrush()
+    {
+        if (BtnHudClose.Template?.FindName("IconElement", BtnHudClose) is SvgIcon icon)
+            icon.SetResourceReference(SvgIcon.IconBrushProperty, "Text.OnHudDim");
+    }
+
+    /// <summary>
+    /// 按联机配置里的「HUD 透明度」刷新整块 HUD。设置页改了值之后由
+    /// <see cref="Services.MultiplayerHub.ApplyHudOpacity"/> 调过来，不用重建窗口。
+    /// </summary>
+    public void ApplyOpacity()
+    {
+        var raw = MultiplayerSettingsStore.Current.HudOpacity;
+        Frame.Opacity = double.IsFinite(raw) ? Math.Clamp(raw, MinOpacity, 1) : 1;
     }
 
     /// <summary>用户点了 HUD 上的关闭按钮。</summary>
@@ -65,21 +91,21 @@ public partial class MultiplayerHudWindow : Window
 
         foreach (var row in rows)
         {
-            var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
+            var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 3) };
 
-            line.Children.Add(NewText("●", 10, "Status.Success"));
+            line.Children.Add(NewText("●", 11, "Status.Success"));
 
             line.Children.Add(NewText(
                 string.IsNullOrWhiteSpace(row.Name) ? row.Ip : row.Name,
-                11,
-                "Text.Primary",
+                12.5,
+                "Text.OnHud",
                 FontWeights.SemiBold,
-                maxWidth: 140));
+                maxWidth: 150));
 
-            line.Children.Add(NewText(row.Ip, 10.5, "Text.Tertiary", monospace: true, margin: new Thickness(8, 0, 0, 0)));
+            line.Children.Add(NewText(row.Ip, 11.5, "Text.OnHudDim", monospace: true, margin: new Thickness(9, 0, 0, 0)));
 
             if (!string.IsNullOrWhiteSpace(row.Latency))
-                line.Children.Add(NewText($"{row.Latency} ms", 10.5, "Text.Tertiary", monospace: true, margin: new Thickness(8, 0, 0, 0)));
+                line.Children.Add(NewText($"{row.Latency} ms", 11.5, "Text.OnHudDim", monospace: true, margin: new Thickness(9, 0, 0, 0)));
 
             PanRows.Children.Add(line);
         }

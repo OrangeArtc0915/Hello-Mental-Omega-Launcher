@@ -39,6 +39,9 @@ public partial class MainWindow : Window
     /// <summary>设置页的分类项，下标与 <c>Tag</c> 里的分类序号一一对应。</summary>
     private readonly NavItem[] _setupCategories;
 
+    /// <summary>联机页的分类项（组网 / 大厅 / 对端 / 引擎日志），下标与 <c>Tag</c> 一一对应。</summary>
+    private readonly NavItem[] _mpCategories;
+
     private readonly bool _ready;
     private int _currentPage = -1;
     private bool _glassEnabled;
@@ -50,8 +53,17 @@ public partial class MainWindow : Window
     /// <summary>程序化改分类选中态时挡掉 Checked，不然会「选中 → 事件 → 再选中」地转圈。</summary>
     private bool _suppressSetupCategory;
 
+    /// <summary>离开联机页再回来时接着显示哪个分类。</summary>
+    private int _mpCategory;
+
+    /// <summary>程序化改联机分类选中态时挡掉 Checked。</summary>
+    private bool _suppressMpCategory;
+
     /// <summary>进入设置页之前停留的页面，供侧栏「返回」用。</summary>
     private int _pageBeforeSettings = NavPages.Home;
+
+    /// <summary>进入联机页之前停留的页面，供侧栏「返回」用。</summary>
+    private int _pageBeforeMultiplayer = NavPages.Home;
 
     /// <summary>用户明确要求退出（托盘菜单 / 程序自身收尾），此时才允许真正关闭窗口。</summary>
     private bool _exitRequested;
@@ -76,6 +88,15 @@ public partial class MainWindow : Window
             SetupCatGamePath,
             SetupCatUpdate,
             SetupCatAbout,
+        ];
+
+        // 联机分类项按 Tag 顺序抓成表，理由与设置分类栏相同
+        _mpCategories =
+        [
+            MpCatNetwork,
+            MpCatHall,
+            MpCatPeers,
+            MpCatLog,
         ];
 
         // 图标是资源引用，写错只会静默不显示；这里记一条自检日志，便于确认真的加载到了
@@ -352,8 +373,9 @@ public partial class MainWindow : Window
         }
 #endif
 
-        // 记下是从哪个页面进的设置，设置页里的「返回」要回到那儿
+        // 记下是从哪个页面进的设置 / 联机，它们侧栏里的「返回」要回到那儿
         if (page == NavPages.Settings && from >= 0) _pageBeforeSettings = from;
+        if (page == NavPages.Multiplayer && from >= 0) _pageBeforeMultiplayer = from;
 
         _currentPage = page;
         SyncNavSelection(page);
@@ -412,17 +434,20 @@ public partial class MainWindow : Window
     // ————— 设置页的分类侧栏 —————
 
     /// <summary>
-    /// 在设置页用分类栏顶替主导航栏，切到别的页面再换回来。
-    /// 只切两个 StackPanel 自己的 Visibility，主导航项各自的显隐（<see cref="ApplyLayout"/> 设的）不受影响。
+    /// 在设置页 / 联机页用各自的分类栏顶替主导航栏，切到别的页面再换回来。
+    /// 只切三个 StackPanel 自己的 Visibility，主导航项各自的显隐（<see cref="ApplyLayout"/> 设的）不受影响。
     /// </summary>
     private void ApplySidebarMode(int page)
     {
         var inSetup = page == NavPages.Settings;
+        var inMultiplayer = page == NavPages.Multiplayer;
 
         PanSetupNav.Visibility = inSetup ? Visibility.Visible : Visibility.Collapsed;
-        PanSidebarNav.Visibility = inSetup ? Visibility.Collapsed : Visibility.Visible;
+        PanMultiplayerNav.Visibility = inMultiplayer ? Visibility.Visible : Visibility.Collapsed;
+        PanSidebarNav.Visibility = inSetup || inMultiplayer ? Visibility.Collapsed : Visibility.Visible;
 
         if (inSetup) SelectSetupCategory(_setupCategory);
+        else if (inMultiplayer) SelectMultiplayerCategory(_mpCategory);
     }
 
     private void OnSetupCategoryChecked(object sender, RoutedEventArgs e)
@@ -457,6 +482,42 @@ public partial class MainWindow : Window
         _suppressSetupCategory = false;
 
         (GetPage(NavPages.Settings) as PageSettings)?.SwitchCategory(index);
+    }
+
+    // ————— 联机页的分类侧栏 —————
+
+    private void OnMultiplayerCategoryChecked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || _suppressMpCategory) return;
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+        if (!int.TryParse(tag, out var index)) return;
+
+        SelectMultiplayerCategory(index);
+    }
+
+    /// <summary>侧栏「返回」：回到进联机页之前停留的那个页面。</summary>
+    private void OnMultiplayerBackClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is NavItem item) item.IsChecked = false;
+
+        SwitchToPage(_pageBeforeMultiplayer);
+    }
+
+    /// <summary>切到联机页的某个分类：同步侧栏选中态，再让联机页换上对应的视图。</summary>
+    internal void SelectMultiplayerCategory(int index)
+    {
+        if (index < 0 || index >= _mpCategories.Length) index = 0;
+        _mpCategory = index;
+
+        // 程序化改选中态同样会触发 Checked，这里挡掉避免回环
+        _suppressMpCategory = true;
+
+        for (var i = 0; i < _mpCategories.Length; i++)
+            _mpCategories[i].IsChecked = i == index;
+
+        _suppressMpCategory = false;
+
+        (GetPage(NavPages.Multiplayer) as PageMultiplayer)?.SwitchCategory(index);
     }
 
     // ————— 页面进入动画 —————

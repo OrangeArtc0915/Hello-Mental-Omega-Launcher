@@ -463,6 +463,18 @@ public partial class PagePackages : LauncherPage
         var hasRecord = HasInstallRecord(instance, type, name);
         var hasOriginalBackup = Directory.Exists(BackupService.OriginalBackupPath);
 
+        // 游戏目录里的 .bak-<时间戳> 备份可能成千上万，扫全盘不能压在主线程上，先到后台扫一遍
+        IReadOnlyList<PackageInstaller.RevertPoint> revertPoints;
+        try
+        {
+            revertPoints = await Task.Run(() => PackageInstaller.ListRevertPoints(instance));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"扫描可回退时间点失败：{ex.Message}");
+            revertPoints = [];
+        }
+
         var options = new List<ChoiceOption>();
         var detail = new System.Text.StringBuilder();
 
@@ -481,6 +493,9 @@ public partial class PagePackages : LauncherPage
                     options.Add(new ChoiceOption("选择性卸载", "selective", ButtonTone.Solid));
                 else
                     detail.Append("  注意：还没有 MO 原版备份，无法还原被覆盖的原版文件，只能选全量恢复。\n");
+
+                detail.Append("• 按文件删除：从安装记录里逐个勾选，只删勾中的文件，其余保留在游戏目录，被覆盖的原版同样从 MO 原版备份还原。\n");
+                options.Add(new ChoiceOption("按文件删除…", "files"));
             }
             else
             {
@@ -499,12 +514,32 @@ public partial class PagePackages : LauncherPage
                 detail.Append($"  但当前没有 MO 原版备份（{BackupService.OriginalBackupPath}），请先执行「备份原版游戏」。");
         }
 
+        // 时间点回退与具体包无关，只要游戏目录里还留着 .bak- 备份就提供
+        if (revertPoints.Count > 0)
+        {
+            detail.Append($"• 回到某个时间点：把历次安装覆盖文件时留下的 .bak-<时间戳> 备份覆盖回原位置，" +
+                          $"当前有 {revertPoints.Count} 个时间点可选。\n");
+            options.Add(new ChoiceOption("回到某个时间点…", "revert"));
+        }
+
         options.Add(new ChoiceOption("取消", "cancel"));
 
         var choice = ChoiceWindow.Ask(owner, "卸载包",
             $"卸载「{name}」（{PackageTypes.Of(type).DisplayName}包）", detail.ToString(), options.ToArray());
 
         if (choice is null || choice == "cancel") return;
+
+        if (choice == "files")
+        {
+            await UninstallFilesAsync(owner, instance, type, name);
+            return;
+        }
+
+        if (choice == "revert")
+        {
+            await RevertToPointAsync(owner, instance, revertPoints);
+            return;
+        }
 
         if (choice == "full" && !hasOriginalBackup)
         {
@@ -565,6 +600,151 @@ public partial class PagePackages : LauncherPage
         ShowNotice(message, !success);
         Notify(message, choice == "full" ? "全量恢复" : "卸载",
             success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    /// 「按文件删除」：先让用户从安装记录里勾选文件，确认后交给 Core 逐个删除，
+    /// 未勾选的部分留在游戏目录、记录也跟着缩减。
+    /// </summary>
+    private async Task UninstallFilesAsync(Window? owner, GameInstance instance, PackageType type, string name)
+    {
+        // 记录名有「去扩展名」与「原名」两种候选，和 HasInstallRecord 一样逐个试；
+        // 用实际命中的那个交给 Core —— Core 内部同样按候选名去找记录。
+        InstallRecord? record = null;
+        var recordName = name;
+
+        foreach (var candidate in InstallRecordStore.CandidateNames(name))
+        {
+            record = InstallRecordStore.Load(instance, type, candidate);
+
+            if (record is not null)
+            {
+                recordName = candidate;
+                break;
+            }
+        }
+
+        if (record is not { Files.Count: > 0 })
+        {
+            ShowNotice("这个包没有精确安装记录，无法按文件删除。", true);
+            return;
+        }
+
+        var root = PathGuard.NormalizeRoot(instance.GameDir);
+
+        // 记录里的文件可能已被手动删掉，勾选列表里标注一下，用户心里有数
+        var items = record.Files.Select(file =>
+        {
+            var exists = PathGuard.TryResolve(root, file, out var full) && File.Exists(full);
+            return new PickItem(file, exists ? file : file + "（已不存在）");
+        }).ToList();
+
+        var picked = PickWindow.Pick(owner, "按文件删除",
+            $"从「{name}」的安装记录里勾选要删除的文件（共 {items.Count} 个）：", items, PickMode.Multi);
+
+        if (picked is null || picked.Count == 0) return;
+
+        // 删文件是破坏性操作，选完必须再确认一次
+        var answer = ChoiceWindow.Ask(owner, "确认删除文件",
+            $"将从游戏目录删除这 {picked.Count} 个文件。",
+            "被覆盖的原版文件会从 MO 原版备份还原；未勾选的文件保留。这是破坏性操作，删除后无法撤销。",
+            new ChoiceOption("删除", "delete", ButtonTone.Danger),
+            new ChoiceOption("取消", "cancel"));
+
+        if (answer != "delete") return;
+
+        var progress = ProgressWindow.Open(owner, "按文件删除", $"正在删除「{name}」的 {picked.Count} 个文件…");
+
+        var success = false;
+        var message = string.Empty;
+
+        try
+        {
+            var files = picked.ToList();
+            var selectedName = recordName;
+
+            var outcome = await Task.Run(() => PackageInstaller.UninstallFiles(
+                instance, type, selectedName, files, progress.Sample, progress.Token));
+
+            success = outcome.Success;
+            message = outcome.Message;
+        }
+        catch (Exception ex)
+        {
+            progress.Finish();
+            Log.Error($"按文件卸载失败：{name}", ex);
+            ShowNotice($"按文件删除失败：{ex.Message}", true);
+            return;
+        }
+
+        progress.Finish();
+
+        ShowNotice(message, !success);
+        Notify(message, "按文件删除", success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    /// 「回到某个时间点」：单选一个 .bak- 时间点，二次确认后用备份覆盖回原位。
+    /// </summary>
+    private async Task RevertToPointAsync(Window? owner, GameInstance instance,
+        IReadOnlyList<PackageInstaller.RevertPoint> points)
+    {
+        var items = points
+            .Select(point => new PickItem(point.Stamp, point.Time.ToString("yyyy-MM-dd HH:mm:ss"),
+                $"该时间点有 {point.FileCount} 个文件可回退"))
+            .ToList();
+
+        var picked = PickWindow.Pick(owner, "回到某个时间点",
+            "选择一个要回退到的备份时间点：来自历次安装覆盖文件时留下的 .bak-<时间戳> 备份。",
+            items, PickMode.Single);
+
+        if (picked is null || picked.Count == 0) return;
+
+        var stamp = picked[0];
+        var point = points.FirstOrDefault(item => string.Equals(item.Stamp, stamp, StringComparison.OrdinalIgnoreCase));
+
+        if (point is null) return;
+
+        // 回退会用备份盖掉当前文件，同样属于破坏性操作，必须再明确确认一次
+        var answer = ChoiceWindow.Ask(owner, "确认回退",
+            $"回到 {point.Time:yyyy-MM-dd HH:mm:ss} 这个时间点？",
+            $"会用该时间点的 {point.FileCount} 个 .bak 备份覆盖当前文件，当前内容会被替换；备份文件本身会保留。\n" +
+            "如果这个时间点对应某个包的安装，该包会被视为已撤销：新建的文件会删除，并从「已安装」列表移除。",
+            new ChoiceOption("回退", "revert", ButtonTone.Danger),
+            new ChoiceOption("取消", "cancel"));
+
+        if (answer != "revert") return;
+
+        var progress = ProgressWindow.Open(owner, "回到时间点",
+            $"正在回退到 {point.Time:yyyy-MM-dd HH:mm:ss}…");
+
+        var success = false;
+        var message = string.Empty;
+
+        try
+        {
+            var outcome = await Task.Run(() => PackageInstaller.RevertToPoint(
+                instance, stamp, progress.Sample, progress.Token));
+
+            success = outcome.Success;
+            message = outcome.Message;
+        }
+        catch (Exception ex)
+        {
+            progress.Finish();
+            Log.Error($"按时间点回退失败：{stamp}", ex);
+            ShowNotice($"回退失败：{ex.Message}", true);
+            return;
+        }
+
+        progress.Finish();
+
+        ShowNotice(message, !success);
+        Notify(message, "回到时间点", success ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
         await RefreshAsync();
     }

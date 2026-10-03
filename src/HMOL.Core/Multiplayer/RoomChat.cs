@@ -408,6 +408,15 @@ public sealed class RoomChat : IAsyncDisposable
         lock (_lock) return _targets.Count;
     }
 
+    /// <summary>
+    /// 在本房间里真正说过话的对端 IP（收到过能解开的消息，说明对方知道同一个房间密钥）。
+    /// 公共 n2n 节点要求固定小组名时不隔离房间，只能靠这个判断「谁是自己人」。
+    /// </summary>
+    public IReadOnlySet<string> AnnouncedPeers()
+    {
+        lock (_lock) return new HashSet<string>(_peers.Keys, StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>设置本机要公开的房间公告；心跳循环会周期性广播。</summary>
     public void SetRoomAnnounce(string? community, string? roomIp, string? node = null, string? latency = null)
     {

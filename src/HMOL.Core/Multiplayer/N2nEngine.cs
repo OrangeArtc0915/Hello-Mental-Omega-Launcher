@@ -49,6 +49,12 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
 
     public string DisplayName => "n2n";
 
+    /// <summary>
+    /// 用房间名当小组名时是隔开的；公共节点要求固定小组名（如 fox）时不隔开，
+    /// 同一个小组里会有别的房间甚至别的启动器的人。
+    /// </summary>
+    public bool NetworkIsolatesRoom => NodeCatalog.N2nCommunityFor(CurrentNode()) is null;
+
     protected override string EnginePrefix => "n2n";
 
     private void ReorderNodes(string? preferred)
@@ -190,7 +196,15 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
             parts.AddRange(["-a", Quote(manualIp.Contains('/') ? manualIp : $"{manualIp}/24")]);
         }
 
-        parts.AddRange(["-c", Quote(_options.RoomName)]);
+        // 部分公益节点只服务固定小组（如 fox）：此时必须传它要求的小组名才注册得上，
+        // 房间名不参与 n2n 组网，房间隔离改由 HMOL 自己的密钥与房间逻辑负责。
+        var community = NodeCatalog.N2nCommunityFor(node);
+        if (community is not null)
+        {
+            LogLine($"节点 {node} 固定使用小组名「{community}」，房间名不参与 n2n 组网");
+        }
+
+        parts.AddRange(["-c", Quote(community ?? _options.RoomName)]);
 
         if (!string.IsNullOrEmpty(_options.RoomKey)) parts.AddRange(["-k", Quote(_options.RoomKey)]);
 
