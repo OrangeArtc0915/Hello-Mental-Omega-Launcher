@@ -21,6 +21,18 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
     private const int Mtu = 1500;
 
     /// <summary>
+    /// 单个节点的就绪等待上限。旧版固定 45 秒——节点挂着也照等，
+    /// 用户看到的就是"进度条不动"。现在超时就换下一个，最坏情况的总等待反而更短。
+    /// </summary>
+    private const double NodeReadySeconds = 20;
+
+    /// <summary>一次连接最多换几个节点：够覆盖探测失准的情况，又不至于让用户干等太久。</summary>
+    private const int MaxNodeAttempts = 3;
+
+    /// <summary>连接前探测单个节点的超时。</summary>
+    private const double ProbeTimeoutSeconds = 1.5;
+
+    /// <summary>
     /// easytier WARN/ERROR 里的内部调试噪音（连接保活/路由同步/网卡探测），对用户无意义。
     /// </summary>
     private static readonly string[] LogNoise =
@@ -86,6 +98,9 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
 
     public string DisplayName => "EasyTier";
 
+    /// <summary>房间名就是 EasyTier 的网络名，不同房间不在同一个网络里，对端一定是自己人。</summary>
+    public bool NetworkIsolatesRoom => true;
+
     protected override string EnginePrefix => "easytier";
 
     /// <summary>把下拉框选中的节点排到候选列表最前面，保证首选就是用户选的那个。</summary>
@@ -112,6 +127,78 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
     private static string? FallbackUdp(string node)
         => node.StartsWith("tcp://", StringComparison.OrdinalIgnoreCase) ? "udp://" + node[6..] : null;
 
+    /// <summary>
+    /// 连接前探一遍候选节点。分三档排序：测到延迟的（越小越靠前）、测不出来的
+    /// （UDP-only 节点或 ICMP 被拦，不代表不可用）、明确连不上的排最后。
+    /// <b>不丢任何节点</b>——探测只影响顺序，真连不上还有后面的换节点重试兜底；
+    /// 用户显式选中的节点只要不是"明确连不上"，仍然排第一。
+    /// </summary>
+    private async Task ProbeNodesAsync(IProgress<string>? progress, CancellationToken cancellationToken)
+    {
+        if (_nodes.Count <= 1) return;
+
+        var preferred = CurrentNode();
+        var preferredIndex = _nodes.IndexOf(preferred);
+
+        progress?.Report($"正在探测 {_nodes.Count} 个节点的连通性...");
+
+        var probes = await Task
+            .WhenAll(_nodes.Select(node => ProbeOneAsync(node, cancellationToken)))
+            .ConfigureAwait(false);
+
+        var ranked = Enumerable.Range(0, _nodes.Count)
+            .Select(i => (Index: i, Node: _nodes[i], Probe: probes[i]))
+            .OrderBy(item => item.Probe switch { null => 1, < 0 => 2, _ => 0 })
+            .ThenBy(item => item.Probe is > 0 ? item.Probe!.Value : int.MaxValue)
+            .ThenBy(item => item.Index)
+            .ToList();
+
+        var ordered = ranked.Select(item => item.Node).ToList();
+
+        if (preferredIndex >= 0 && probes[preferredIndex] is not < 0)
+        {
+            ordered.Remove(preferred);
+            ordered.Insert(0, preferred);
+        }
+
+        _nodes.Clear();
+        _nodes.AddRange(ordered);
+        _nodeIndex = 0;
+
+        LogLine("节点探测：" + string.Join("、", ranked.Select(item => item.Probe switch
+        {
+            null => $"{item.Node}=未测出",
+            < 0 => $"{item.Node}=连不上",
+            _ => $"{item.Node}={item.Probe}ms"
+        })));
+    }
+
+    /// <summary>
+    /// 探测单个节点：返回延迟毫秒；<c>null</c> 表示测不出来（UDP-only 或 ICMP 被拦，不代表不可用）；
+    /// <c>-1</c> 表示明确连不上。
+    /// </summary>
+    private static async Task<int?> ProbeOneAsync(string node, CancellationToken cancellationToken)
+    {
+        var (host, port) = NodeCatalog.NodeHostPort(node);
+        if (string.IsNullOrWhiteSpace(host)) return -1;
+
+        // tcp:// 直接建连最准；没写协议或 udp:// 的节点用一次 ICMP，通不了只算"未测出"
+        if (node.Contains("tcp://", StringComparison.OrdinalIgnoreCase))
+        {
+            var latency = await NetworkToolkit
+                .TcpLatencyAsync(host, port, ProbeTimeoutSeconds, cancellationToken)
+                .ConfigureAwait(false);
+
+            return latency ?? -1;
+        }
+
+        var ping = await NetworkToolkit
+            .PingAsync(host, 1, ProbeTimeoutSeconds, cancellationToken)
+            .ConfigureAwait(false);
+
+        return ping.Ok > 0 ? (int)Math.Round(ping.AvgMs) : null;
+    }
+
     public async Task<EngineStartResult> StartAsync(
         NetworkSessionOptions options,
         IProgress<string>? progress,
@@ -137,37 +224,53 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
             var cleaned = await CleanupStaleProcessesAsync(_instanceName, 120, cancellationToken).ConfigureAwait(false);
             if (cleaned > 0) LogLine($"已清理 {cleaned} 个残留 easytier 进程");
 
-            // 最多两次：第二次不再重试（与旧版 start(_retry) 的语义一致）
-            for (var retry = true; ; retry = false)
+            // 先探一遍节点，把明确连不上的排到后面（只排序、不丢节点）
+            await ProbeNodesAsync(progress, cancellationToken).ConfigureAwait(false);
+
+            // 依次尝试节点：单个节点超时就换下一个，最多换 MaxNodeAttempts 个
+            var tried = 0;
+            var portConflictRetried = false;
+
+            while (true)
             {
                 _rpcPort = FreeTcpPort();
+                tried++;
 
                 var result = await StartOnceAsync(progress, cancellationToken).ConfigureAwait(false);
-                if (result.Ok || !retry) return result;
+                if (result.Ok) return result;
 
-                if (PortConflictDetected())
+                // RPC 端口被残留进程占住：清理后换个端口、用同一个节点再试一次（不占节点次数）
+                if (!portConflictRetried && PortConflictDetected())
                 {
+                    portConflictRetried = true;
+                    tried--;
+
                     var again = await CleanupStaleProcessesAsync(_instanceName, 120, cancellationToken).ConfigureAwait(false);
                     LogLine(again > 0
                         ? $"检测到 {again} 个残留 easytier 进程，已清理后重试"
                         : "检测到 RPC 端口被占用，更换端口后重试");
-                }
-                else if (_nodes.Count > 1)
-                {
-                    var old = CurrentNode();
-                    var udp = FallbackUdp(old);
 
-                    // 先按当前长度算出插入位置，再插入并切到下一个节点（与旧版 next_node 顺序一致）
-                    if (udp is not null && !_nodes.Contains(udp)) _nodes.Insert((_nodeIndex + 1) % _nodes.Count, udp);
-
-                    _nodeIndex = (_nodeIndex + 1) % _nodes.Count;
-                    LogLine($"节点 {old} 连接超时，自动切换 {CurrentNode()} 重试...");
+                    await StopAsync().ConfigureAwait(false);
+                    await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+                    continue;
                 }
-                else
+
+                if (tried >= MaxNodeAttempts || _nodes.Count <= 1)
                 {
                     await StopAsync().ConfigureAwait(false);
-                    return result;
+                    return tried >= MaxNodeAttempts && _nodes.Count > 1
+                        ? result with { Message = $"{result.Message}（已依次尝试 {tried} 个节点）" }
+                        : result;
                 }
+
+                var old = CurrentNode();
+                var udp = FallbackUdp(old);
+
+                // 先按当前长度算出插入位置，再插入并切到下一个节点（与旧版 next_node 顺序一致）
+                if (udp is not null && !_nodes.Contains(udp)) _nodes.Insert((_nodeIndex + 1) % _nodes.Count, udp);
+
+                _nodeIndex = (_nodeIndex + 1) % _nodes.Count;
+                LogLine($"节点 {old} 未在 {NodeReadySeconds:0} 秒内就绪，自动切换 {CurrentNode()} 重试（第 {tried + 1} 个节点）...");
 
                 await StopAsync().ConfigureAwait(false);
                 await Task.Delay(500, cancellationToken).ConfigureAwait(false);
@@ -203,7 +306,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         var watch = Stopwatch.StartNew();
         var lastProgress = 0;
 
-        while (watch.Elapsed < TimeSpan.FromSeconds(45))
+        while (watch.Elapsed < TimeSpan.FromSeconds(NodeReadySeconds))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -238,7 +341,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
             if (elapsed - lastProgress >= 15)
             {
                 lastProgress = elapsed;
-                progress?.Report($"正在连接节点并等待分配虚拟 IP（{elapsed}s）...");
+                progress?.Report($"正在连接节点 {node}（已等待 {elapsed}s）...");
             }
 
             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);

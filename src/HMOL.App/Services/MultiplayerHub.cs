@@ -113,6 +113,28 @@ internal static class MultiplayerHub
         lock (Lock) _hud?.Hide();
     }
 
+    /// <summary>
+    /// 设置页改了「HUD 透明度」后调用：HUD 已经建出来就立刻刷新，
+    /// 还没建过就什么都不做——下次 <see cref="ShowHud"/> 建窗口时会自然带上新值。
+    /// </summary>
+    public static void ApplyHudOpacity()
+    {
+        MultiplayerHudWindow? hud;
+
+        lock (Lock) hud = _hud;
+
+        if (hud is null) return;
+
+        try
+        {
+            hud.ApplyOpacity();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"刷新 HUD 透明度失败：{ex.Message}");
+        }
+    }
+
     private static MultiplayerHudWindow CreateHud()
     {
         var hud = new MultiplayerHudWindow();

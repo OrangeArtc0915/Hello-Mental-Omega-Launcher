@@ -31,8 +31,12 @@
             <!-- 步骤指示：圆点 + 步骤名，由代码生成 -->
             <StackPanel x:Name="PanSteps" Grid.Row="0" Orientation="Horizontal" />
 
-            <!-- 四步内容 -->
-            <Grid Grid.Row="1" Margin="0,18,0,0">
+            <!-- 五步内容。内容区可滚动：第 5 步较长，也顺便兼容大字号 / 小屏 -->
+            <ScrollViewer Grid.Row="1"
+                          Margin="0,18,0,0"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <Grid>
 
                 <!-- 第 1 步 · 欢迎 -->
                 <StackPanel x:Name="StepWelcome">
@@ -44,27 +48,59 @@
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
                                TextWrapping="Wrap"
-                               Text="这个向导会带你做完第一次运行需要做对的事，做完之后就能直接启动游戏。" />
+                               Text="这个向导会带你做完第一次运行需要做对的事，做完之后就能直接启动游戏。向导只负责「问」和「记」：不会安装任何东西，也不会改动你的游戏文件。" />
 
-                    <StackPanel Margin="0,16,0,0">
+                    <TextBlock Margin="0,16,0,6"
+                               FontSize="12"
+                               Text="HMOL 主要帮你做四件事" />
+                    <StackPanel>
                         <TextBlock FontSize="12"
                                    Foreground="{DynamicResource Text.Primary}"
+                                   TextWrapping="Wrap"
+                                   Text="· 一个启动器管多个游戏实例：原版、装不同 Mod 的版本各存一份，互不干扰" />
+                        <TextBlock Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   TextWrapping="Wrap"
+                                   Text="· 装包与卸载：INI / 地图 / 任务 / 插件四类资源包，装错了能单独卸掉" />
+                        <TextBlock Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   TextWrapping="Wrap"
+                                   Text="· 备份与还原：覆盖原文件前自动留备份，随时能退回原版状态" />
+                        <TextBlock Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   TextWrapping="Wrap"
+                                   Text="· 联机：把几台电脑组进同一个虚拟局域网，和朋友直接开一局" />
+                    </StackPanel>
+
+                    <TextBlock Margin="0,16,0,6"
+                               FontSize="12"
+                               Text="向导会依次带你做" />
+                    <StackPanel>
+                        <TextBlock FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
                                    Text="1. 指定游戏目录" />
                         <TextBlock Margin="0,6,0,0"
                                    FontSize="12"
-                                   Foreground="{DynamicResource Text.Primary}"
+                                   Foreground="{DynamicResource Text.Secondary}"
                                    Text="2. 检查运行环境（主程序与组网组件）" />
                         <TextBlock Margin="0,6,0,0"
                                    FontSize="12"
-                                   Foreground="{DynamicResource Text.Primary}"
+                                   Foreground="{DynamicResource Text.Secondary}"
                                    Text="3. 创建一个游戏实例" />
+                        <TextBlock Margin="0,6,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="4. 看两件建议尽早做的事（备份原版、联机怎么用）" />
                     </StackPanel>
 
                     <TextBlock Margin="0,16,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="向导只负责「问」和「记」：不会安装任何东西，也不会改动你的游戏文件。每一步都可以跳过或后退。" />
+                               Text="每一步都可以跳过或后退，中途退出也不会弄坏已有配置。" />
                 </StackPanel>
 
                 <!-- 第 2 步 · 选择游戏目录 -->
@@ -251,7 +287,91 @@
                                Foreground="{DynamicResource Text.Secondary}"
                                TextWrapping="Wrap" />
                 </StackPanel>
-            </Grid>
+
+                <!-- 第 5 步 · 接下来建议做的事 -->
+                <StackPanel x:Name="StepNext">
+                    <TextBlock FontSize="17"
+                               FontWeight="SemiBold"
+                               Text="接下来建议做这两件事" />
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="现在就能启动游戏了。但下面这两件事先做掉，后面会省很多麻烦。" />
+
+                    <!-- ① 备份原版游戏 -->
+                    <Border Margin="0,16,0,0"
+                            Padding="14,12"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Card}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Text="① 备份原版游戏" />
+                                <TextBlock Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource Status.Warn}"
+                                           Text="强烈建议先做，且要在还没装任何包的时候做" />
+                            </StackPanel>
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       TextWrapping="Wrap"
+                                       Text="在「游戏实例」页选中实例，点「备份原版游戏」，它会把一份干净的原版存到 backup\MO。" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       TextWrapping="Wrap"
+                                       Text="为什么非要它：装包时难免覆盖掉原版文件，只有靠这份备份才能把原文件还原回去——「按包卸载」（只删掉某个包带来的文件、其它包照旧）就是按它来还原的。" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Status.Warn}"
+                                       TextWrapping="Wrap"
+                                       Text="没有这份备份，卸载就只剩「全量恢复」一条路：整个游戏目录清空重来，你之前装的其它包会一起没掉。" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ② 联机 -->
+                    <Border Margin="0,10,0,0"
+                            Padding="14,12"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Card}">
+                        <StackPanel>
+                            <TextBlock FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Text="② 想和朋友联机" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       TextWrapping="Wrap"
+                                       Text="联机做的事：把你们几台电脑临时组进同一个虚拟局域网，直接开一局——不需要公网 IP，也不用去路由器上做端口映射。" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       TextWrapping="Wrap"
+                                       Text="怎么用：先到「设置 → 联机设置」填一个昵称（大厅和房间里靠它认人），再进「联机」页——选组网方案（EasyTier 或 n2n）、填房间名与密钥、点「进入」，然后把房间信息分享给队友。" />
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Tertiary}"
+                                       TextWrapping="Wrap"
+                                       Text="两点提示：EasyTier 免装驱动，n2n 需要先装 TAP 驱动（联机页的「网络工具箱」里能一键装）；联机双方必须选同一种组网方案、同一个房间名。" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="这两件事随时都能补做，不影响现在开始玩。" />
+                </StackPanel>
+                </Grid>
+            </ScrollViewer>
 
             <!-- 提示条：失败原因 / 需要用户注意的一句话 -->
             <TextBlock x:Name="LabNotice"

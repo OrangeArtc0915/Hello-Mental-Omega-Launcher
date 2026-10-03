@@ -223,7 +223,7 @@
                                                    GroupName="SetupNav"
                                                    Icon="lucide/user"
                                                    Tag="1"
-                                                   Text="联机昵称"
+                                                   Text="联机设置"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatWeatherCity"
                                                    GroupName="SetupNav"
@@ -285,6 +285,45 @@
                                                    Tag="11"
                                                    Text="关于与存储"
                                                    Checked="OnSetupCategoryChecked" />
+                                    </StackPanel>
+
+                                    <!--
+                                        联机分类栏：进联机页时顶替主导航，离开后还原。
+                                        GroupName 与设置分类栏同样必须区分开，否则两组会互抢选中。
+                                    -->
+                                    <StackPanel x:Name="PanMultiplayerNav"
+                                                Margin="0,12,0,0"
+                                                VerticalAlignment="Top"
+                                                Visibility="Collapsed">
+                                        <c:NavItem x:Name="MpNavBack"
+                                                   GroupName="MpBackNav"
+                                                   Icon="lucide/arrow-left"
+                                                   Text="返回"
+                                                   Click="OnMultiplayerBackClick" />
+                                        <c:NavItem x:Name="MpCatNetwork"
+                                                   GroupName="MpNav"
+                                                   Icon="lucide/network"
+                                                   Tag="0"
+                                                   Text="组网"
+                                                   Checked="OnMultiplayerCategoryChecked" />
+                                        <c:NavItem x:Name="MpCatHall"
+                                                   GroupName="MpNav"
+                                                   Icon="lucide/globe"
+                                                   Tag="1"
+                                                   Text="大厅"
+                                                   Checked="OnMultiplayerCategoryChecked" />
+                                        <c:NavItem x:Name="MpCatPeers"
+                                                   GroupName="MpNav"
+                                                   Icon="lucide/list"
+                                                   Tag="2"
+                                                   Text="对端"
+                                                   Checked="OnMultiplayerCategoryChecked" />
+                                        <c:NavItem x:Name="MpCatLog"
+                                                   GroupName="MpNav"
+                                                   Icon="lucide/scroll-text"
+                                                   Tag="3"
+                                                   Text="引擎日志"
+                                                   Checked="OnMultiplayerCategoryChecked" />
                                     </StackPanel>
                                 </Grid>
                             </ScrollViewer>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using HMOL.Core.App;
 using HMOL.Core.Backup;
@@ -291,10 +292,318 @@ public static class PackageInstaller
         }
     }
 
+    // ————— 按文件卸载 / 按时间点回退 —————
+
+    /// <summary>游戏目录里一个可回退的时间点：一次操作留下的 <c>.bak-&lt;时间戳&gt;</c> 分组。</summary>
+    /// <param name="Stamp">时间戳（yyyyMMddHHmmss），回退时按它匹配。</param>
+    /// <param name="Time">本地时间，界面直接显示。</param>
+    /// <param name="FileCount">该时间点留下的备份文件数。</param>
+    /// <param name="Samples">前几个文件的相对路径，供界面展示。</param>
+    public sealed record RevertPoint(string Stamp, DateTime Time, int FileCount, IReadOnlyList<string> Samples);
+
+    /// <summary>覆盖文件时留下的备份文件名里那一段分隔符。</summary>
+    private const string BakMarker = ".bak-";
+
+    /// <summary>
+    /// 按选定的文件卸载：只处理用户勾选的那几个文件，其余包与文件一律不动。
+    /// 安装记录跟着缩减——全勾完就删掉记录，只勾一部分则记录里保留剩下的，方便之后再卸。
+    /// 被这些文件覆盖掉的原版文件，从 MO 原版备份还原回去。
+    /// </summary>
+    public static UninstallOutcome UninstallFiles(GameInstance instance, PackageType type, string packageName,
+        IReadOnlyCollection<string> files, IProgress<ProgressSample>? progress = null, CancellationToken token = default)
+    {
+        try
+        {
+            if (instance is null) return FailUninstall("未指定实例");
+            if (string.IsNullOrWhiteSpace(packageName)) return FailUninstall("包名为空");
+            if (files is null || files.Count == 0) return FailUninstall("没有勾选任何文件");
+
+            if (!Directory.Exists(instance.GameDir))
+                return FailUninstall($"当前实例的游戏目录已不存在或被移动：{instance.GameDir}");
+
+            var record = FindRecord(instance, type, packageName);
+
+            if (record is not { Files.Count: > 0 })
+                return FailUninstall("这个包没有精确安装记录，无法按文件删除。请改用「按包卸载」或「全量恢复原版」。");
+
+            // 只认记录里确实存在的文件：界面传来的路径一律不当依据
+            var wanted = files
+                .Select(PathGuard.NormalizeRelative)
+                .Where(item => item.Length > 0)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var selected = record.Files
+                .Where(item => wanted.Contains(PathGuard.NormalizeRelative(item)))
+                .ToList();
+
+            if (selected.Count == 0)
+                return FailUninstall("勾选的文件都不在该包的安装记录里，已取消。");
+
+            return RunSelective(instance, type, packageName, record, selected, progress, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, "卸载已取消，已回滚本次改动");
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"按文件卸载失败：{packageName}", ex);
+            return FailUninstall($"按文件卸载失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 列出游戏目录里所有可回退的时间点。来源是各次安装 / 还原覆盖文件时留下的
+    /// <c>&lt;文件&gt;.bak-&lt;yyyyMMddHHmmss&gt;[-n]</c>：同一时间戳归为一个时间点，按时间倒序返回。
+    /// </summary>
+    public static IReadOnlyList<RevertPoint> ListRevertPoints(GameInstance instance)
+    {
+        var result = new List<RevertPoint>();
+
+        if (instance is null || !Directory.Exists(instance.GameDir)) return result;
+
+        var root = PathGuard.NormalizeRoot(instance.GameDir);
+        var groups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(root, "*" + BakMarker + "*", SearchOption.AllDirectories))
+            {
+                var stamp = StampOf(file);
+                if (stamp is null) continue;
+
+                if (!groups.TryGetValue(stamp, out var list))
+                {
+                    list = [];
+                    groups[stamp] = list;
+                }
+
+                list.Add(file);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"扫描可回退时间点失败：{ex.Message}");
+            return result;
+        }
+
+        foreach (var (stamp, files) in groups)
+        {
+            if (!TryParseStamp(stamp, out var time)) continue;
+
+            result.Add(new RevertPoint(stamp, time, files.Count,
+                files.Take(5).Select(item => Path.GetRelativePath(root, item).Replace('\\', '/')).ToList()));
+        }
+
+        return result.OrderByDescending(item => item.Time).ToList();
+    }
+
+    /// <summary>
+    /// 回退到某个时间点：把该时间点留下的所有 <c>.bak-&lt;时间戳&gt;</c> 复制回各自的原位置。
+    /// 目标文件当前内容会被替换掉——这正是「回退」的语义，所以调用前必须让用户确认。
+    /// 备份文件本身保留（万一又要回到回退前），整个过程可取消、失败可整体回滚。
+    /// </summary>
+    public static UninstallOutcome RevertToPoint(GameInstance instance, string stamp,
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
+    {
+        try
+        {
+            if (instance is null) return FailUninstall("未指定实例");
+            if (string.IsNullOrWhiteSpace(stamp)) return FailUninstall("未指定要回退的时间点");
+
+            if (!Directory.Exists(instance.GameDir))
+                return FailUninstall($"当前实例的游戏目录已不存在或被移动：{instance.GameDir}");
+
+            var root = PathGuard.NormalizeRoot(instance.GameDir);
+            var pairs = new List<(string Backup, string Target)>();
+
+            foreach (var file in Directory.EnumerateFiles(root, "*" + BakMarker + "*", SearchOption.AllDirectories))
+            {
+                if (!string.Equals(StampOf(file), stamp, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var target = file[..file.LastIndexOf(BakMarker, StringComparison.Ordinal)];
+                if (target.Length == 0) continue;
+
+                pairs.Add((file, target));
+            }
+
+            if (pairs.Count == 0)
+                return FailUninstall("这个时间点已经没有可回退的备份文件了（可能已被清理或恢复过）。");
+
+            var journal = new OperationJournal(Paths.ScratchFor(instance.GameDir));
+            var restored = 0;
+            var failed = 0;
+
+            // 记录这次到底还原了哪些文件（相对游戏目录），回退完据此判断哪些包的安装被整体撤销了
+            var restoredTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                for (var i = 0; i < pairs.Count; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    progress?.Report(new ProgressSample((double)i / pairs.Count));
+
+                    var (backup, target) = pairs[i];
+
+                    try
+                    {
+                        var directory = Path.GetDirectoryName(target);
+                        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+                        // 现有内容先搬进隔离区：提交=真删掉，回滚=原样搬回来
+                        if (File.Exists(target))
+                        {
+                            journal.MoveToQuarantine(target);
+                            if (File.Exists(target))
+                            {
+                                failed++;
+                                Log.Warn($"回退时无法移走现有文件，已跳过：{target}");
+                                continue;
+                            }
+                        }
+
+                        journal.TrackCreated(target);
+                        DirectoryCopier.CopyFile(backup, target);
+                        restored++;
+                        restoredTargets.Add(PathGuard.NormalizeRelative(Path.GetRelativePath(root, target)));
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        Log.Error($"回退文件失败：{target}", ex);
+                    }
+                }
+
+                if (token.IsCancellationRequested)
+                {
+                    journal.Rollback();
+                    return new UninstallOutcome(false, true, true, 0, 0, restored, failed, 0, "回退已取消，已回滚本次改动");
+                }
+
+                journal.Commit();
+                progress?.Report(new ProgressSample(1));
+
+                // 回退把某次安装覆盖的原版文件还原之后，那次安装等于被撤销了：
+                // 顺手把它新建的文件删掉，并从「已安装」列表与安装记录里移除，避免列表与实际不符。
+                var revertedPackages = MarkRevertedPackagesUninstalled(instance, restoredTargets);
+
+                Log.Info($"按时间点回退完成：{stamp}，恢复 {restored} 个文件，失败 {failed}，撤销 {revertedPackages} 个包");
+
+                var warning = instance.IsValid
+                    ? string.Empty
+                    : "\n⚠️ 回退后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件。";
+
+                return new UninstallOutcome(failed == 0, false, false, 0, 0, restored, failed, 0,
+                    $"已回退到 {FormatStamp(stamp)}\n恢复文件：{restored} 个（失败 {failed}）\n" +
+                    (revertedPackages > 0
+                        ? $"该时间点安装的 {revertedPackages} 个包已被整体撤销：已从「已安装」列表移除并删除安装记录。\n"
+                        : string.Empty) +
+                    "备份文件仍保留在游戏目录里（.bak- 开头的文件），确认没问题后可以自行删除。" + warning);
+            }
+            catch
+            {
+                journal.Rollback();
+                throw;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, "回退已取消，已回滚本次改动");
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"按时间点回退失败：{stamp}", ex);
+            return FailUninstall($"按时间点回退失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>从 <c>xxx.bak-20261002120000</c> / <c>xxx.bak-20261002120000-1</c> 里取出时间戳；不是这个形式返回 null。</summary>
+    private static string? StampOf(string file)
+    {
+        var name = Path.GetFileName(file);
+        var index = name.LastIndexOf(BakMarker, StringComparison.Ordinal);
+        if (index < 0) return null;
+
+        var tail = name[(index + BakMarker.Length)..];
+
+        // 同一秒内多次备份会加 -1 / -2 这样的去重后缀
+        var dash = tail.IndexOf('-');
+        if (dash >= 0) tail = tail[..dash];
+
+        return tail.Length == 14 && tail.All(char.IsAsciiDigit) ? tail : null;
+    }
+
+    private static bool TryParseStamp(string stamp, out DateTime time)
+        => DateTime.TryParseExact(stamp, "yyyyMMddHHmmss", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out time);
+
+    /// <summary>时间戳转成人看的时间（解析不了就原样显示）。</summary>
+    private static string FormatStamp(string stamp)
+        => TryParseStamp(stamp, out var time) ? time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : stamp;
+
+    /// <summary>
+    /// 回退后收拾安装记录：某个包「覆盖过的原版文件」若全部在这次回退里被还原，
+    /// 说明这次安装被整体撤销了——把它新建的文件删掉，再从「已安装」列表与安装记录里移除。
+    /// 返回被撤销的包数量。找不到对应记录时不做任何事（旧记录 / 备份已被清理的情况）。
+    /// </summary>
+    private static int MarkRevertedPackagesUninstalled(GameInstance instance, IReadOnlySet<string> restoredTargets)
+    {
+        if (restoredTargets.Count == 0) return 0;
+
+        var removed = 0;
+        var root = PathGuard.NormalizeRoot(instance.GameDir);
+
+        foreach (var record in InstallRecordStore.List(instance))
+        {
+            // 只认「覆盖过原版文件」的包：它的覆盖文件全部被还原，才算这次安装被整体撤销
+            if (record.OriginalSnapshot.Count == 0) continue;
+            if (!record.OriginalSnapshot.Keys.All(key => restoredTargets.Contains(PathGuard.NormalizeRelative(key)))) continue;
+
+            var type = PackageTypes.ParseOrNull(record.PackageType);
+            if (type is null) continue;
+
+            // 删除这次安装新建、回退还原不到的文件（快照里没有的 = 当初新建的）
+            foreach (var file in record.Files)
+            {
+                var relative = PathGuard.NormalizeRelative(file);
+
+                if (record.OriginalSnapshot.ContainsKey(relative)) continue;
+                if (!PathGuard.TryResolve(root, relative, out var full)) continue;
+
+                try
+                {
+                    if (File.Exists(full)) File.Delete(full);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"回退时删除新建文件失败：{full}（{ex.Message}）");
+                }
+            }
+
+            RemoveInstalledNames(instance, type.Value, record.PackageName);
+            InstallRecordStore.Delete(instance, type.Value, record.PackageName);
+            removed++;
+
+            Log.Info($"回退已撤销该时间点安装的包：{record.PackageName}（{record.PackageType}）");
+        }
+
+        return removed;
+    }
+
     // ————— 选择性卸载 —————
 
     private static UninstallOutcome UninstallSelective(GameInstance instance, PackageType type,
         string packageName, InstallRecord record, IProgress<ProgressSample>? progress, CancellationToken token)
+        => RunSelective(instance, type, packageName, record, record.Files, progress, token);
+
+    /// <summary>
+    /// 选择性卸载的公共实现。<paramref name="files"/> 是要删掉的那部分文件：
+    /// 传整个 <c>record.Files</c> 就是整包卸载，传子集就是「按文件删除」，安装记录跟着缩减。
+    /// </summary>
+    private static UninstallOutcome RunSelective(GameInstance instance, PackageType type,
+        string packageName, InstallRecord record, IReadOnlyList<string> files,
+        IProgress<ProgressSample>? progress, CancellationToken token)
     {
         var journal = new OperationJournal(Paths.ScratchFor(instance.GameDir));
         var targetRoot = PathGuard.NormalizeRoot(instance.GameDir);
@@ -309,7 +618,7 @@ public static class PackageInstaller
         try
         {
             // 1) 该包的文件搬进隔离区：提交=真删除，回滚=原样搬回
-            foreach (var relative in record.Files)
+            foreach (var relative in files)
             {
                 token.ThrowIfCancellationRequested();
 
@@ -376,9 +685,22 @@ public static class PackageInstaller
                     cleaned, "卸载已取消，已回滚本次改动");
             }
 
-            // 4) 更新已安装列表与安装记录
-            RemoveInstalledNames(instance, type, packageName);
-            InstallRecordStore.Delete(instance, type, packageName);
+            // 4) 更新已安装列表与安装记录：只删了一部分就缩减记录，全删完才整条清掉
+            var remaining = record.Files
+                .Where(item => !files.Contains(item, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            if (remaining.Count == 0)
+            {
+                RemoveInstalledNames(instance, type, packageName);
+                InstallRecordStore.Delete(instance, type, packageName);
+            }
+            else
+            {
+                record.Files = remaining;
+                record.Normalize();
+                InstallRecordStore.Save(record);
+            }
 
             journal.Commit();
             progress?.Report(new ProgressSample(1));
@@ -393,7 +715,10 @@ public static class PackageInstaller
             return new UninstallOutcome(deleteFailed == 0 && restoreFailed == 0, false, false,
                 deleted, deleteFailed, restored, restoreFailed, cleaned,
                 $"精确卸载完成\n包名：{packageName}\n删除文件：{deleted} 个（失败 {deleteFailed}）\n" +
-                $"还原原版：{restored} 个（失败 {restoreFailed}）\n清理空目录：{cleaned} 个" + warning);
+                $"还原原版：{restored} 个（失败 {restoreFailed}）\n清理空目录：{cleaned} 个" +
+                (remaining.Count > 0
+                    ? $"\n\n该包仍有 {remaining.Count} 个文件留在游戏目录，安装记录已保留，随时可以再卸。"
+                    : string.Empty) + warning);
         }
         catch
         {

@@ -13,7 +13,7 @@ using HMOL.Core.Multiplayer;
 namespace HMOL.App.Windows;
 
 /// <summary>
-/// 首次运行配置向导。四步：欢迎 → 选目录 → 检查环境 → 创建实例。
+/// 首次运行配置向导。五步：欢迎 → 选目录 → 检查环境 → 创建实例 → 接下来做什么。
 ///
 /// <para>
 /// 三条红线：不打扰老用户（判定与补标记在 <see cref="MainWindow.QueueFirstRunWizard"/>）、
@@ -22,12 +22,17 @@ namespace HMOL.App.Windows;
 /// </para>
 ///
 /// <para>
+/// 最后一步只讲「接下来建议做什么」，尤其把「备份原版游戏」为什么必须做说透——
+/// 没有这份备份，按包卸载就无从还原被覆盖的原文件，卸载只剩全量恢复一条路。
+/// </para>
+///
+/// <para>
 /// 状态只有下面几个字段，「上一步 / 下一步」的可用性全部由它们推导，不额外存状态。
 /// </para>
 /// </summary>
 public partial class ConfigWizardWindow : Window
 {
-    /// <summary>当前步骤（1..4）。</summary>
+    /// <summary>当前步骤（1..5）。</summary>
     private int _step = 1;
 
     /// <summary>创建过程中禁止重复点击。</summary>
@@ -49,7 +54,7 @@ public partial class ConfigWizardWindow : Window
     private readonly List<(Border Dot, TextBlock Number, TextBlock Label)> _indicators = [];
 
     /// <summary>各步固定的顺序，不要缓存候选目录之类的东西。</summary>
-    private static readonly string[] StepNames = ["欢迎", "选择目录", "检查环境", "创建实例"];
+    private static readonly string[] StepNames = ["欢迎", "选择目录", "检查环境", "创建实例", "接下来"];
 
     public ConfigWizardWindow()
     {
@@ -66,19 +71,20 @@ public partial class ConfigWizardWindow : Window
 
     private void SwitchStep(int step)
     {
-        if (step is < 1 or > 4) step = 1;
+        if (step is < 1 or > 5) step = 1;
         _step = step;
 
         StepWelcome.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
         StepDirectory.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
         StepEnvironment.Visibility = step == 3 ? Visibility.Visible : Visibility.Collapsed;
         StepCreate.Visibility = step == 4 ? Visibility.Visible : Visibility.Collapsed;
+        StepNext.Visibility = step == 5 ? Visibility.Visible : Visibility.Collapsed;
 
         HideNotice();
         UpdateStepIndicator();
 
         BtnPrev.Visibility = step == 1 ? Visibility.Collapsed : Visibility.Visible;
-        BtnNext.Content = step == 4 ? "完成" : "下一步";
+        BtnNext.Content = step == 5 ? "完成" : "下一步";
 
         switch (step)
         {
@@ -104,13 +110,25 @@ public partial class ConfigWizardWindow : Window
     {
         if (_busy) return;
 
-        if (_step < 4)
+        switch (_step)
         {
-            SwitchStep(_step + 1);
-            return;
-        }
+            // 第 4 步的「下一步」不是翻页，而是真的去建实例
+            case 4:
+                CreateInstance();
+                return;
 
-        CreateInstance();
+            // 第 5 步就是「完成」
+            default:
+                if (_step < 4)
+                {
+                    SwitchStep(_step + 1);
+                    return;
+                }
+
+                MarkFirstRunCompleted();
+                DialogResult = true;
+                return;
+        }
     }
 
     private void OnPrevClick(object sender, RoutedEventArgs e)
@@ -360,8 +378,10 @@ public partial class ConfigWizardWindow : Window
 
             MarkFirstRunCompleted();
 
-            ChoiceWindow.Info(this, "配置完成", $"{result.Message}，可以开始用了。");
-            DialogResult = true;
+            // 建完不直接关窗：再走一步把「备份原版游戏」和「联机怎么用」讲清楚。
+            // 这两件事新人最容易漏，而漏掉原版备份会让卸载只剩「全量恢复」一条路。
+            ChoiceWindow.Info(this, "实例已创建", $"{result.Message}。接下来还有两件建议尽早做的事。");
+            SwitchStep(5);
         }
         catch (Exception ex)
         {

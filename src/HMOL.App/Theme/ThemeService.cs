@@ -183,6 +183,11 @@ public static class ThemeService
         brushes["Surface.Sunken"] = ScaleAlpha(SunkenBase(dark));
         brushes["Surface.Overlay"] = dark ? ColorOf("#B3000000") : ColorOf("#59000000");
 
+        // 游戏内 HUD 的文字色：固定浅色，不跟主题走（HUD 底色固定在窗口 XAML 里）
+        brushes["Text.OnHud"] = ColorOf("#FFFFFF");
+        brushes["Text.OnHudDim"] = ColorOf("#D8DEE8");
+        brushes["Text.OnHudFaint"] = ColorOf("#AEB6C4");
+
         // 描边
         brushes["Border.Default"] = dark ? ColorOf("#2E3745") : ColorOf("#E2E6EF");
         brushes["Border.Strong"] = dark ? ColorOf("#414C5E") : ColorOf("#CBD2E0");

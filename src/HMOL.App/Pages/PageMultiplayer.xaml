@@ -94,11 +94,10 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- 页头：与其余页面同一形态（本页没有页级操作按钮，下面的页签是视图切换） -->
+        <!-- 页头：与其余页面同一形态（左侧分类栏负责在组网 / 大厅 / 对端 / 引擎日志之间切换） -->
         <c:PageHeader x:Name="HeaderMultiplayer"
                       Grid.Row="0"
                       Title="联机"
@@ -144,28 +143,9 @@
             </Grid>
         </Border>
 
-        <!-- 子页签：视图切换单独成行，不与页头操作混在一起 -->
-        <StackPanel x:Name="PanMpTabs" Grid.Row="2" Margin="0,14,0,0" Orientation="Horizontal">
-            <c:OutlineButton x:Name="BtnTabNetwork"
-                             Content="组网"
-                             Tag="0"
-                             Tone="Solid"
-                             Click="OnTabClick" />
-            <c:OutlineButton x:Name="BtnTabHall"
-                             Margin="8,0,0,0"
-                             Content="大厅"
-                             Tag="1"
-                             Click="OnTabClick" />
-            <c:OutlineButton x:Name="BtnTabPeers"
-                             Margin="8,0,0,0"
-                             Content="对端"
-                             Tag="2"
-                             Click="OnTabClick" />
-        </StackPanel>
-
         <!-- ═══════════════ 组网 ═══════════════ -->
         <ScrollViewer x:Name="PanNetwork"
-                      Grid.Row="3"
+                      Grid.Row="2"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
@@ -231,6 +211,16 @@
                         <Border Style="{StaticResource MpField}">
                             <TextBox x:Name="TxtRoomKey" Style="{StaticResource MpInput}" />
                         </Border>
+
+                        <!-- 只有组网层不隔离房间时才有意义（n2n 公共节点固定小组名 fox），默认不勾以免挡住别的启动器 -->
+                        <CheckBox x:Name="ChkHideForeignPeers"
+                                  Margin="0,12,0,0"
+                                  FontSize="12"
+                                  Foreground="{DynamicResource Text.Primary}"
+                                  Content="只显示本房间的对端" />
+                        <TextBlock Style="{StaticResource MpHint}"
+                                   Margin="0,6,0,0"
+                                   Text="公共 n2n 节点（小组名固定为 fox）不隔离房间，同一个小组里可能混着别的房间的人。勾上之后只显示在本房间里露过面的对端——但注意：不使用 HMOL 房间协议的其它启动器会被一并隐藏，想和它们联机就别勾（EasyTier 与自定义节点本来就不会混进外人，勾不勾都一样）。" />
 
                         <TextBlock Style="{StaticResource MpSection}" Text="虚拟 IP 模式" />
                         <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
@@ -361,20 +351,6 @@
                     </StackPanel>
                 </c:SurfaceCard>
 
-                <c:SurfaceCard Margin="0,14,0,0" Title="引擎输出" UseShadow="False" HasHoverEffect="False">
-                    <StackPanel>
-                        <ScrollViewer x:Name="ScrollEngineOutput"
-                                      Height="150"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <StackPanel x:Name="PanEngineOutput" />
-                        </ScrollViewer>
-                        <TextBlock x:Name="LabEngineEmpty"
-                                   Style="{StaticResource MpHint}"
-                                   Text="连接后这里会显示组网引擎的运行输出。" />
-                    </StackPanel>
-                </c:SurfaceCard>
-
                 <c:SurfaceCard Margin="0,14,0,0" Title="网络工具箱" UseShadow="False" HasHoverEffect="False">
                     <StackPanel>
                         <TextBlock Style="{StaticResource MpHint}"
@@ -411,7 +387,7 @@
 
         <!-- ═══════════════ 大厅 ═══════════════ -->
         <ScrollViewer x:Name="PanHall"
-                      Grid.Row="3"
+                      Grid.Row="2"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
@@ -583,7 +559,7 @@
 
         <!-- ═══════════════ 对端 ═══════════════ -->
         <ScrollViewer x:Name="PanPeers"
-                      Grid.Row="3"
+                      Grid.Row="2"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
@@ -657,6 +633,55 @@
                                        Style="{StaticResource MpHint}"
                                        Text="踢人与拉回仅房主可用" />
                         </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ═══════════════ 引擎日志 ═══════════════ -->
+        <ScrollViewer x:Name="PanLog"
+                      Grid.Row="2"
+                      Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Visibility="Collapsed">
+            <StackPanel>
+                <c:SurfaceCard Title="引擎日志" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource MpHint}"
+                                   Text="组网引擎（EasyTier / n2n）的运行输出与连接进度都会记在这里，方便排查连不上、慢等问题。" />
+
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:OutlineButton Content="导出日志"
+                                             Tone="Solid"
+                                             Click="OnExportEngineLogClick" />
+                            <c:OutlineButton Margin="8,0,0,0"
+                                             Content="清空"
+                                             Click="OnClearEngineLogClick" />
+                            <TextBlock x:Name="LabEngineHint"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource MpHint}" />
+                        </WrapPanel>
+
+                        <Border Margin="0,10,0,0"
+                                Padding="10,8"
+                                Background="{DynamicResource Surface.Sunken}"
+                                BorderBrush="{DynamicResource Border.Default}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource Radius.Button}">
+                            <ScrollViewer x:Name="ScrollEngineOutput"
+                                          Height="380"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PanEngineOutput" />
+                            </ScrollViewer>
+                        </Border>
+
+                        <TextBlock x:Name="LabEngineEmpty"
+                                   Style="{StaticResource MpHint}"
+                                   Margin="0,8,0,0"
+                                   Text="还没有日志：连接房间后这里会显示组网引擎的运行输出。" />
                     </StackPanel>
                 </c:SurfaceCard>
             </StackPanel>

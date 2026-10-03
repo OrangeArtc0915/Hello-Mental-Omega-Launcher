@@ -51,6 +51,14 @@
     <SolidColorBrush x:Key="Surface.Sunken" Color="#F1F3F8" />
     <SolidColorBrush x:Key="Surface.Overlay" Color="#59000000" />
 
+    <!--
+        游戏内 HUD 的文字色：固定浅色。HUD 的底色直接写在窗口 XAML 里（永远是深色，不跟主题走），
+        这里只提供配套的文字色，代码里也按这几个键取。
+    -->
+    <SolidColorBrush x:Key="Text.OnHud" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="Text.OnHudDim" Color="#D8DEE8" />
+    <SolidColorBrush x:Key="Text.OnHudFaint" Color="#AEB6C4" />
+
     <!-- 描边 -->
     <SolidColorBrush x:Key="Border.Default" Color="#E2E6EF" />
     <SolidColorBrush x:Key="Border.Strong" Color="#CBD2E0" />
