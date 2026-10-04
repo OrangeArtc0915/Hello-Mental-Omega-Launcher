@@ -41,6 +41,7 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 <span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">悲伤的天使</span>
 <span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">ㅤ弃世</span>
 <span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">07<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">沃尔玛购物袋</span></span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">快猫_Channel<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">雌小鬼</span></span>
 </div>
 
 ### 友链
