@@ -446,6 +446,11 @@ public partial class PageSettings : LauncherPage
         BtnUpdateSourceGitHub.Tone = source == LauncherUpdateSource.GitHub ? ButtonTone.Solid : ButtonTone.Outline;
         BtnUpdateSourceGitee.Tone = source == LauncherUpdateSource.Gitee ? ButtonTone.Solid : ButtonTone.Outline;
 
+        var multiThread = SettingsStore.Current.MultiThreadDownload;
+
+        BtnMultiThreadDownload.Content = multiThread ? "已开启" : "已关闭";
+        BtnMultiThreadDownload.Tone = multiThread ? ButtonTone.Solid : ButtonTone.Outline;
+
         LabUpdateLastCheck.Text = SettingsStore.Current.LastUpdateCheck is { } checkedAt
             ? $"上次检查：{checkedAt:yyyy-MM-dd HH:mm}"
             : "上次检查：还没有检查过";
@@ -488,6 +493,21 @@ public partial class PageSettings : LauncherPage
         SetUpdateStatus($"更新线路已改为「{tag}」。", warn: false);
 
         Log.Info($"更新线路已切换为 {tag}");
+    }
+
+    private void OnMultiThreadDownloadClick(object sender, RoutedEventArgs e)
+    {
+        var enabled = !SettingsStore.Current.MultiThreadDownload;
+
+        SettingsStore.Current.MultiThreadDownload = enabled;
+        SettingsStore.Save();
+
+        RefreshUpdate();
+        SetUpdateStatus(enabled
+            ? "已开启多线程下载：大文件会分片并发下载。"
+            : "已关闭多线程下载：改为单连接下载，适合并发连接被限速的网络。", warn: false);
+
+        Log.Info($"多线程下载已{(enabled ? "开启" : "关闭")}");
     }
 
     /// <summary>

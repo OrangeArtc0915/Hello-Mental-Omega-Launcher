@@ -110,6 +110,19 @@ public sealed class Settings
     /// </summary>
     public LauncherUpdateSource LauncherUpdateSource { get; set; } = LauncherUpdateSource.Auto;
 
+    /// <summary>
+    /// 「下载」页「更多下载」列表里文件的保存目录。留空表示用默认目录
+    /// （<see cref="Paths.Downloads"/>，即 <c>%LOCALAPPDATA%\HMOL\Downloads</c>）。
+    /// 补丁与组网组件的缓存不受它影响，仍留在程序数据目录。
+    /// </summary>
+    public string DownloadDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 大文件是否用多线程分片并发下载（默认开启）。个别网络下并发连接会被限速或干扰，
+    /// 关掉后退回单连接下载。
+    /// </summary>
+    public bool MultiThreadDownload { get; set; } = true;
+
     /// <summary>联机用的本地自定义昵称，留空表示还没设置。</summary>
     public string Nickname { get; set; } = string.Empty;
 

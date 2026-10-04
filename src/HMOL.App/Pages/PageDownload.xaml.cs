@@ -44,6 +44,7 @@ public partial class PageDownload : LauncherPage
         _anim.Group(80, BarNotice);
 
         RefreshRequiredFilesUi();
+        RefreshDownloadDirectory();
     }
 
     private Window? OwnerWindow => Window.GetWindow(this);
@@ -51,6 +52,7 @@ public partial class PageDownload : LauncherPage
     public override void OnEnter()
     {
         RefreshRequiredFilesUi();
+        RefreshDownloadDirectory();
         _ = LoadManifestAsync();
         _anim.Play();
     }
@@ -332,6 +334,74 @@ public partial class PageDownload : LauncherPage
         }
     }
 
+    // ————— 下载目录 —————
+
+    /// <summary>「更多下载」文件的保存目录：设置里选了就用它，否则用默认下载目录。</summary>
+    private static string DownloadTargetDirectory()
+    {
+        var custom = SettingsStore.Current.DownloadDirectory;
+        return string.IsNullOrWhiteSpace(custom) ? Paths.Downloads : custom;
+    }
+
+    private void RefreshDownloadDirectory()
+    {
+        if (LabDownloadDir is null) return;
+
+        var directory = DownloadTargetDirectory();
+        LabDownloadDir.Text = directory;
+        LabDownloadDir.ToolTip = directory;
+    }
+
+    /// <summary>让用户挑一个目录保存「更多下载」里的文件；补丁与组件缓存不受影响。</summary>
+    private void OnChangeDownloadDirClick(object sender, RoutedEventArgs e)
+    {
+        var current = DownloadTargetDirectory();
+
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "选择下载目录",
+            Multiselect = false
+        };
+
+        if (Directory.Exists(current)) dialog.InitialDirectory = current;
+
+        if (dialog.ShowDialog(OwnerWindow) != true) return;
+
+        var selected = dialog.FolderName?.Trim();
+        if (string.IsNullOrWhiteSpace(selected)) return;
+
+        try
+        {
+            Directory.CreateDirectory(selected);
+        }
+        catch (Exception ex)
+        {
+            ShowNotice($"下载目录不可用：{ex.Message}", isError: true);
+            return;
+        }
+
+        SettingsStore.Current.DownloadDirectory = selected;
+        SettingsStore.Save();
+
+        RefreshDownloadDirectory();
+        ShowNotice($"下载目录已改为：{selected}");
+    }
+
+    private void OnOpenDownloadDirClick(object sender, RoutedEventArgs e)
+    {
+        var directory = DownloadTargetDirectory();
+
+        try
+        {
+            Directory.CreateDirectory(directory);
+            ShellHelper.OpenFolder(directory);
+        }
+        catch (Exception ex)
+        {
+            ShowNotice($"打开下载目录失败：{ex.Message}", isError: true);
+        }
+    }
+
     // ————— 更多下载（survive 分支的 download.json） —————
 
     private void OnManifestRefreshClick(object sender, RoutedEventArgs e) => _ = LoadManifestAsync();
@@ -457,20 +527,21 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>下载「下载页文件」里的条目到本机 Downloads 目录；多分卷会按顺序合并成一个文件。</summary>
+    /// <summary>下载「下载页文件」里的条目到选定的下载目录；多分卷会按顺序合并成一个文件。</summary>
     private async Task DownloadManifestEntryAsync(ManifestEntry entry)
     {
         if (_busy) return;
 
         _busy = true;
 
-        var target = Path.Combine(Paths.Downloads, ManifestFileName(entry));
+        var directory = DownloadTargetDirectory();
+        var target = Path.Combine(directory, ManifestFileName(entry));
         var total = entry.Urls.Count;
         var progress = ProgressWindow.Open(OwnerWindow, "下载", $"正在下载 {entry.Name}…", canCancel: true);
 
         try
         {
-            Directory.CreateDirectory(Paths.Downloads);
+            Directory.CreateDirectory(directory);
 
             if (total <= 1)
             {

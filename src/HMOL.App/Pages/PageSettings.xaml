@@ -1222,6 +1222,19 @@
                                TextWrapping="Wrap"
                                Text="自动：GitHub 取不到时换 Gitee。国内网络下建议选「Gitee 优先」；无论选哪个，取不到都会自动换另一个源。" />
 
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="下载加速（多线程）" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnMultiThreadDownload" Click="OnMultiThreadDownloadClick" />
+                    </StackPanel>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="开启后大文件会分成多段并发下载（需要服务器支持断点续传），对启动器更新、下载页文件等通常更快；个别网络下并发连接会被限速或干扰，可关闭退回单连接。" />
+
                     <TextBlock x:Name="LabUpdateLastCheck"
                                Margin="0,16,0,0"
                                FontSize="12"
