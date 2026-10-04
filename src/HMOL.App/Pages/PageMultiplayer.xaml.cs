@@ -61,8 +61,8 @@ public partial class PageMultiplayer : LauncherPage
     private bool _suppressNodeChange;
     private bool _tapping;
 
-    /// <summary>未安装补丁的提示是否已经弹过（避免每次刷新都重复弹）。</summary>
-    private bool _patchHintShown;
+    /// <summary>上一次展示过的「必要文件」提示，避免同一句反复弹。</summary>
+    private string? _lastRequiredHint;
 
     private CancellationTokenSource? _connectCts;
     private CancellationTokenSource? _hallLoopCts;
@@ -349,6 +349,7 @@ public partial class PageMultiplayer : LauncherPage
         RefreshIpModeUi();
         SaveForm();
         RefreshSharePreview();
+        RefreshRequiredFilesUi();
     }
 
     private void RefreshPlanButtons()
@@ -1600,7 +1601,8 @@ public partial class PageMultiplayer : LauncherPage
     // ————— 联机补丁状态（下载与安装已挪到顶层「下载」页） —————
 
     /// <summary>
-    /// 未安装联机补丁时禁用其余子视图（组网 / 大厅 / 对端 / 日志），并提示到「下载」页下载安装。
+    /// 未安装联机补丁时禁用其余子视图（组网 / 大厅 / 对端 / 日志）；
+    /// 缺补丁或缺当前方案的组网组件时，提示到顶层「下载」页补齐。
     /// </summary>
     private void RefreshRequiredFilesUi()
     {
@@ -1610,16 +1612,34 @@ public partial class PageMultiplayer : LauncherPage
         PanContent.IsEnabled = installed;
         PanContent.Opacity = installed ? 1 : 0.6;
 
-        if (installed)
+        var hint = BuildRequiredHint(instance, installed);
+
+        if (hint is null)
         {
-            _patchHintShown = false;
+            _lastRequiredHint = null;
             return;
         }
 
-        if (_patchHintShown) return;
-        _patchHintShown = true;
+        if (string.Equals(hint, _lastRequiredHint, StringComparison.Ordinal)) return;
 
-        ShowNotice("当前实例未安装联机补丁，请到左侧「下载」页下载并安装后再使用联机功能。", isError: true);
+        _lastRequiredHint = hint;
+        ShowNotice(hint, isError: true);
+    }
+
+    /// <summary>缺什么就提示什么：优先补丁，其次当前方案所需的组网组件（樱花方案不需要）。</summary>
+    private string? BuildRequiredHint(GameInstance? instance, bool patchInstalled)
+    {
+        if (instance is null) return null;
+
+        if (!patchInstalled) return "当前实例未安装联机补丁，请先到左侧「下载」页下载并安装。";
+
+        if (_sakuraPlan) return null;
+
+        var missing = RuntimeComponents.MissingFor(_kind);
+        if (missing.Count == 0) return null;
+
+        var names = string.Join("、", missing.Select(RuntimeComponents.DisplayName));
+        return $"缺少组网组件（{names}），请先到左侧「下载」页下载。";
     }
 
     /// <summary>
