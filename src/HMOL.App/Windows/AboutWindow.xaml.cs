@@ -31,6 +31,67 @@ public partial class AboutWindow : Window
         };
 
         ResetHint();
+        BuildThanks();
+    }
+
+    /// <summary>
+    /// 把 <see cref="AppInfo.Thanks"/> 渲染成一排「名字 + 头衔」小标签；
+    /// 头衔为空的人只显示名字，不占一个空标签。
+    /// </summary>
+    private void BuildThanks()
+    {
+        if (PanThanks is null) return;
+
+        foreach (var credit in AppInfo.Thanks)
+        {
+            var hasTitle = !string.IsNullOrWhiteSpace(credit.Title);
+
+            var chip = new Border
+            {
+                Margin = new Thickness(0, 0, 8, 8),
+                Padding = new Thickness(10, 4, hasTitle ? 4 : 10, 4),
+                CornerRadius = new CornerRadius(999)
+            };
+            chip.SetResourceReference(Border.BackgroundProperty, "Surface.Sunken");
+
+            var line = new StackPanel { Orientation = Orientation.Horizontal };
+
+            var name = new TextBlock
+            {
+                Text = credit.Name,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
+            line.Children.Add(name);
+
+            if (hasTitle)
+            {
+                var titleText = new TextBlock
+                {
+                    Text = credit.Title,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                titleText.SetResourceReference(TextBlock.ForegroundProperty, "Text.OnAccent");
+
+                var title = new Border
+                {
+                    Margin = new Thickness(8, 0, 0, 0),
+                    Padding = new Thickness(7, 2, 7, 2),
+                    CornerRadius = new CornerRadius(999),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = titleText
+                };
+                title.SetResourceReference(Border.BackgroundProperty, "Accent.Base");
+
+                line.Children.Add(title);
+            }
+
+            chip.Child = line;
+            PanThanks.Children.Add(chip);
+        }
     }
 
     private void OnOpenGitHubClick(object sender, MouseButtonEventArgs e)

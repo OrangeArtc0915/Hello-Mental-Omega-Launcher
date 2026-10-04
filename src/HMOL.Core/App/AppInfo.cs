@@ -27,4 +27,42 @@ public static class AppInfo
 
     public const string QqGroup = "1034243331";
     public const string QqGroupUrl = "https://qm.qq.com/q/ia8Zv2AtEY";
+
+    /// <summary>
+    /// 鸣谢：参与测试与反馈的朋友。名字按顺序展示，<see cref="ThanksCredit.Title"/> 为空表示不显示头衔标签。
+    /// 「关于」窗口与 README 都从这里/同一份名单取值。
+    /// </summary>
+    public static readonly ThanksCredit[] Thanks =
+    [
+        new("罒ω罒", "猫娘"),
+        new("绮梦", "猪"),
+        new("心弦连", "猫娘"),
+        new("a114514", ""),
+        new("艾尔登皮蛋", ""),
+        new("安然的岛不叫安然", ""),
+        new("白小梦です", "梦梦酱"),
+        new("雪枫", "猪"),
+        new("Drawer😳", ""),
+        new("枫～", ""),
+        new("飞行", ""),
+        new("fs bga3", ""),
+        new("鸽尔德⁧ ~咕⁧‭", ""),
+        new("GinkgobilobaL", ""),
+        new("靖安司管", ""),
+        new("Lmsh", ""),
+        new("墨笙", ""),
+        new("ovide（内奸）", ""),
+        new("浅梦", ""),
+        new("世蓝喧", ""),
+        new("月見ヤチヨ是一", ""),
+        new("夜幕", ""),
+        new("YUN✨RÚ", ""),
+        new("zxc", ""),
+        new("悲伤的天使", ""),
+        new("ㅤ弃世", ""),
+        new("07", "沃尔玛购物袋")
+    ];
 }
+
+/// <summary>鸣谢名单里的一项：名字 + 头衔（头衔为空表示不显示）。</summary>
+public sealed record ThanksCredit(string Name, string Title);

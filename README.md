@@ -26,9 +26,10 @@
 
 ## 下载与运行
 
-1. 到 [Releases](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases) 下载 `HMOL-v1.2.3-win-x64.zip`。
-2. **完整解压**到任意目录（绿色便携，不要只把 exe 拖出来，旁边需要 `runtime\`）。
+1. 到 [Releases](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases) 下载最新的 `HMOL-v<版本>-win-x64.zip`。
+2. **完整解压**到任意目录（绿色便携；设置、实例、插件包与日志都留在该目录内）。
 3. 双击目录内的 `HMOL.exe` 启动。
+4. 组网组件（EasyTier / n2n / TAP / WinIPBroadcast）、7-Zip 与联机补丁**不随包分发**：首次使用联机时在程序内「下载」页按需获取。
 
 `HMOL.exe` 已带**代码签名**（自签证书 `CN=mmm`，含 DigiCert 时间戳）。该证书由发布方自建、并非公共 CA
 签发，因此没把证书装进本机「受信任的根证书颁发机构 / 受信任的发布者」的机器上，SmartScreen 仍可能拦
@@ -67,6 +68,14 @@ build.bat --skip-sign    :: 跳过签名（没有证书时用）
 - 版本号的**唯一来源**是 [src/HMOL.Core/App/AppInfo.cs](src/HMOL.Core/App/AppInfo.cs)，由 `build.bat` 读出后传给 MSBuild，不在 csproj 里写死。
 - 签名需要私钥 `签名\HMOL-mmm.pfx`，口令从环境变量 `HMOL_PFX_PASSWORD` 读；未设置时会交互询问，证书缺失或跳过签名只告警不中断。
 - 产物在 `publish\`：`HMOL.exe` 与 `HMOL-v<版本>-win-x64.zip`。
+
+---
+
+## 鸣谢
+
+感谢每一位参与测试与反馈的朋友（排名不分先后；括号内为头衔）：
+
+罒ω罒（猫娘）、绮梦（猪）、心弦连（猫娘）、a114514、艾尔登皮蛋、安然的岛不叫安然、白小梦です（梦梦酱）、雪枫（猪）、Drawer😳、枫～、飞行、fs bga3、鸽尔德⁧ ~咕⁧‭、GinkgobilobaL、靖安司管、Lmsh、墨笙、ovide（内奸）、浅梦、世蓝喧、月見ヤチヨ是一、夜幕、YUN✨RÚ、zxc、悲伤的天使、ㅤ弃世、07（沃尔玛购物袋）
 
 ---
 

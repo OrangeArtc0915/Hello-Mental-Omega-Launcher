@@ -19,6 +19,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <c:SurfaceCard Grid.Row="0" Title="关于">
@@ -209,7 +210,21 @@
             </StackPanel>
         </c:SurfaceCard>
 
-        <StackPanel Grid.Row="1"
+        <!-- 鸣谢：名单来自 AppInfo.Thanks，这里是纯展示 -->
+        <c:SurfaceCard x:Name="CardThanks"
+                       Grid.Row="1"
+                       Margin="0,12,0,0"
+                       Title="鸣谢">
+            <StackPanel>
+                <TextBlock FontSize="12"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           TextWrapping="Wrap"
+                           Text="感谢每一位参与测试与反馈的朋友（排名不分先后）：" />
+                <WrapPanel x:Name="PanThanks" Margin="0,10,0,-8" />
+            </StackPanel>
+        </c:SurfaceCard>
+
+        <StackPanel Grid.Row="2"
                     Margin="0,12,0,0"
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
