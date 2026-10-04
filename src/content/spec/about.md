@@ -13,35 +13,35 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 
 感谢每一位参与测试与反馈的朋友（排名不分先后）：
 
-| 测试人员 | 头衔 |
-| --- | --- |
-| 罒ω罒 | — |
-| 绮梦 | 猪 |
-| 心弦连 | — |
-| a114514 | — |
-| 艾尔登皮蛋 | — |
-| 安然的岛不叫安然 | — |
-| 白小梦です | — |
-| 雪枫 | — |
-| Drawer😳 | — |
-| 枫～ | — |
-| 飞行 | — |
-| fs bga3 | — |
-| 鸽尔德⁧ ~咕⁧‭ | — |
-| GinkgobilobaL | — |
-| 靖安司管 | — |
-| Lmsh | — |
-| 墨笙 | — |
-| ovide（内奸） | — |
-| 浅梦 | — |
-| 世蓝喧 | — |
-| 月見ヤチヨ是一 | — |
-| 夜幕 | — |
-| YUN✨RÚ | — |
-| zxc | — |
-| 悲伤的天使 | — |
-| ㅤ弃世 | — |
-| 07 | — |
+<div class="not-prose flex flex-wrap gap-2 my-4">
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">罒ω罒<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">猫娘</span></span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">绮梦<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">猪</span></span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">心弦连<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">猫娘</span></span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">a114514</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">艾尔登皮蛋</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">安然的岛不叫安然</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">白小梦です<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">梦梦酱</span></span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">雪枫<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">猪</span></span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">Drawer😳</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">枫～</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">飞行</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">fs bga3</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">鸽尔德⁧ ~咕⁧‭</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">GinkgobilobaL</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">靖安司管</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">Lmsh</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">墨笙</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">ovide（内奸）</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">浅梦</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">世蓝喧</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">月見ヤチヨ是一</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">夜幕</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">YUN✨RÚ</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">zxc</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">悲伤的天使</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">ㅤ弃世</span>
+<span class="inline-flex items-center h-8 pl-3 pr-2 rounded-full text-sm bg-black/[0.04] dark:bg-white/[0.08] text-black/80 dark:text-white/80">07<span class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white bg-[var(--primary)]">沃尔玛购物袋</span></span>
+</div>
 
 ### 友链
 
