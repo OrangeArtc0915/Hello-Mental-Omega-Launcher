@@ -49,12 +49,13 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 
 - **PAL-CE 启动器** —— 另一款好用的红警启动器（官网还在部署中，链接待补）。
 
-**启动器用到的开源项目**
+**启动器用到的第三方项目与服务**
 
 - [7-Zip](https://www.7-zip.org/) —— 创建与解压 7z 压缩包
 - [RePKG](https://github.com/notscuffed/RePKG) —— 解包 Wallpaper Engine 壁纸包
 - [EasyTier](https://github.com/EasyTier/EasyTier) —— 三层组网（联机方案之一）
 - [n2n](https://github.com/ntop/n2n) —— 二层组网（联机方案之一）
+- [樱花FRP](https://www.natfrp.com/) —— 端口映射直连（联机方案之一）
 - [TAP-Windows6 / OpenVPN](https://github.com/OpenVPN/tap-windows6) —— TAP 虚拟网卡驱动
 - [WinIPBroadcast](https://github.com/dechamps/WinIPBroadcast) —— 局域网广播转发
 - [cnc-ddraw](https://github.com/FunkyFr3sh/cnc-ddraw) —— 红警系列黑屏 / 兼容修复
@@ -63,6 +64,7 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 - [MQTTnet](https://github.com/dotnet/MQTTnet) —— 联机大厅通信
 - [lucide](https://lucide.dev/) —— 界面图标
 - [ConfuserEx](https://github.com/mkaring/ConfuserEx) —— 发布构建时的代码混淆
+- [Open-Meteo](https://open-meteo.com/) —— 主页天气小组件的数据源
 - 运行环境与游戏依赖：[.NET](https://dotnet.microsoft.com/)、[Visual C++ 运行库](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)、[DirectX](https://www.microsoft.com/download/details.aspx?id=35)、[XNA Framework](https://www.microsoft.com/download/details.aspx?id=20914)
 
 **本站（官网）用到的开源项目**
