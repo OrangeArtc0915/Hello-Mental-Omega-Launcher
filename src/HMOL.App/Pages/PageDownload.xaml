@@ -1,0 +1,231 @@
+<c:LauncherPage x:Class="HMOL.App.Pages.PageDownload"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:c="clr-namespace:HMOL.App.Controls"
+                xmlns:svg="clr-namespace:HMOL.App.Controls.Svg">
+
+    <c:LauncherPage.Resources>
+        <Style x:Key="DlLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Secondary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="DlHint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Tertiary}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </c:LauncherPage.Resources>
+
+    <Grid Margin="24,20,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头 -->
+        <c:PageHeader x:Name="HeaderDownload"
+                      Grid.Row="0"
+                      Title="下载"
+                      Subtitle="运行库（组网组件 / 7-Zip）与启动器补丁的下载入口"
+                      Icon="lucide/download" />
+
+        <!-- 免责提示：只提供运行库和启动器补丁 -->
+        <Border Grid.Row="1"
+                Margin="0,12,0,0"
+                Padding="12,10"
+                Background="{DynamicResource Status.WarnSoft}"
+                CornerRadius="{StaticResource Radius.Item}">
+            <StackPanel Orientation="Horizontal">
+                <svg:SvgIcon Width="16"
+                             Height="16"
+                             Margin="0,1,0,0"
+                             VerticalAlignment="Top"
+                             Icon="lucide/triangle-alert"
+                             IconBrush="{DynamicResource Status.Warn}" />
+                <TextBlock Margin="10,0,0,0"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Text.Primary}"
+                           TextWrapping="Wrap"
+                           Text="提示：只提供运行库和启动器补丁，不提供任何游戏资源！" />
+            </StackPanel>
+        </Border>
+
+        <!-- 提示条 -->
+        <Border x:Name="BarNotice"
+                Grid.Row="2"
+                Margin="0,10,0,0"
+                Padding="12,10"
+                Background="{DynamicResource Accent.Faint}"
+                CornerRadius="{StaticResource Radius.Item}"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <svg:SvgIcon x:Name="IconNotice"
+                             Grid.Column="0"
+                             Width="16"
+                             Height="16"
+                             Margin="0,1,0,0"
+                             VerticalAlignment="Top"
+                             Icon="lucide/info"
+                             IconBrush="{DynamicResource Accent.Base}" />
+                <TextBlock x:Name="LabNotice"
+                           Grid.Column="1"
+                           Margin="10,0,8,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource Text.Primary}"
+                           TextWrapping="Wrap" />
+                <c:RoundIconButton Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Icon="lucide/x"
+                                   IconSize="13"
+                                   Tone="Plain"
+                                   Click="OnDismissNoticeClick" />
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="3"
+                      Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- MO 联机补丁 -->
+                <c:SurfaceCard Title="MO 联机补丁" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock x:Name="LabPatchStatus"
+                                   FontSize="12.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Text.Primary}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock x:Name="LabPatchDetail"
+                                   Style="{StaticResource DlHint}"
+                                   Margin="0,6,0,0" />
+                        <WrapPanel Margin="0,12,0,0">
+                            <c:OutlineButton x:Name="BtnDownloadRequired"
+                                             Content="下载联机必要文件"
+                                             Tone="Solid"
+                                             Click="OnDownloadRequiredClick" />
+                            <c:OutlineButton x:Name="BtnInstallPatch"
+                                             Margin="8,0,0,0"
+                                             Content="安装联机补丁"
+                                             Click="OnInstallPatchClick" />
+                        </WrapPanel>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <!-- 组网与运行组件 -->
+                <c:SurfaceCard Margin="0,14,0,0"
+                               Title="组网与运行组件"
+                               UseShadow="False"
+                               HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource DlHint}"
+                                   Text="这些组件不再随启动器一起分发，用到时按需下载到启动器目录的 runtime\ 下。下载线路与更新共用（设置 → 更新线路）。" />
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="EasyTier 组网组件" />
+                            <TextBlock x:Name="LabRtEasyTier" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                            <c:OutlineButton x:Name="BtnRtEasyTier" Grid.Column="2" Tag="EasyTier" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                        </Grid>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="n2n 组网组件" />
+                            <TextBlock x:Name="LabRtN2n" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                            <c:OutlineButton x:Name="BtnRtN2n" Grid.Column="2" Tag="N2n" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                        </Grid>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="TAP 虚拟网卡驱动" />
+                            <TextBlock x:Name="LabRtTap" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                            <c:OutlineButton x:Name="BtnRtTap" Grid.Column="2" Tag="Tap" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                        </Grid>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="WinIPBroadcast 广播转发" />
+                            <TextBlock x:Name="LabRtWinIpBroadcast" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                            <c:OutlineButton x:Name="BtnRtWinIpBroadcast" Grid.Column="2" Tag="WinIpBroadcast" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                        </Grid>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="7-Zip 解压组件" />
+                            <TextBlock x:Name="LabRt7z" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                            <c:OutlineButton x:Name="BtnRt7z" Grid.Column="2" Tag="7z" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                        </Grid>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <!-- 更多下载：来自仓库 survive 分支的 download.json，可随时增删条目 -->
+                <c:SurfaceCard Margin="0,14,0,0" Title="更多下载" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LabManifestHint"
+                                       Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource DlHint}" />
+                            <c:OutlineButton x:Name="BtnManifestRefresh"
+                                             Grid.Column="1"
+                                             Margin="8,0,0,0"
+                                             Content="刷新列表"
+                                             Click="OnManifestRefreshClick" />
+                        </Grid>
+                        <StackPanel x:Name="PanManifestItems" Margin="0,10,0,0" />
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <!-- 说明 -->
+                <c:SurfaceCard Margin="0,14,0,0" Title="说明" UseShadow="False" HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource DlHint}"
+                                   Text="联机需要三部分：组网组件（runtime，按方案下载）、樱花 Frp 引擎（frpc）和 MO 联机补丁。补丁会解压到当前实例的游戏根目录，安装方式与插件包一致。未安装补丁时，「联机」页的组网 / 大厅 / 对端等功能不可用。" />
+                        <TextBlock Style="{StaticResource DlHint}"
+                                   Margin="0,6,0,0"
+                                   Text="没有游戏实例也可以先下载补丁；但要安装到游戏目录，需要先在「游戏实例」页创建并选择一个实例。" />
+                        <TextBlock Style="{StaticResource DlHint}"
+                                   Margin="0,6,0,0"
+                                   Text="下载线路与启动器更新共用（设置 → 更新线路）：一个源失败会自动换另一个。大文件已分卷，下载后自动合并。" />
+                    </StackPanel>
+                </c:SurfaceCard>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</c:LauncherPage>

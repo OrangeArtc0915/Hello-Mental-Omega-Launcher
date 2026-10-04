@@ -143,9 +143,12 @@
             </Grid>
         </Border>
 
+        <!-- 内容区：补丁未安装时整块禁用（由代码控制 IsEnabled）；「联机补丁」分类是独立视图，不受影响 -->
+        <Grid x:Name="PanContent" Grid.Row="2">
+
         <!-- ═══════════════ 组网 ═══════════════ -->
         <ScrollViewer x:Name="PanNetwork"
-                      Grid.Row="2"
+                      Grid.Row="0"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
@@ -423,7 +426,7 @@
 
         <!-- ═══════════════ 大厅 ═══════════════ -->
         <ScrollViewer x:Name="PanHall"
-                      Grid.Row="2"
+                      Grid.Row="0"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
@@ -595,7 +598,7 @@
 
         <!-- ═══════════════ 对端 ═══════════════ -->
         <ScrollViewer x:Name="PanPeers"
-                      Grid.Row="2"
+                      Grid.Row="0"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
@@ -676,7 +679,7 @@
 
         <!-- ═══════════════ 引擎日志 ═══════════════ -->
         <ScrollViewer x:Name="PanLog"
-                      Grid.Row="2"
+                      Grid.Row="0"
                       Margin="0,12,0,0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
@@ -722,5 +725,6 @@
                 </c:SurfaceCard>
             </StackPanel>
         </ScrollViewer>
+        </Grid>
     </Grid>
 </c:LauncherPage>

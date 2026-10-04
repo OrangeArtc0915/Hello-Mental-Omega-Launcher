@@ -33,7 +33,7 @@ public static class SevenZipTool
     public const int LevelNormal = 5;
     public const int LevelUltra = 9;
 
-    private static readonly Lazy<string?> Resolved = new(Resolve, isThreadSafe: true);
+    private static Lazy<string?> Resolved = new(Resolve, isThreadSafe: true);
 
     private static readonly Regex PercentPattern = new(@"(\d{1,3})%", RegexOptions.Compiled);
 
@@ -42,6 +42,12 @@ public static class SevenZipTool
 
     /// <summary>组件绝对路径，不可用时为 null。</summary>
     public static string? ExePath => Resolved.Value;
+
+    /// <summary>
+    /// 清掉已缓存的解析结果。<see cref="SevenZipComponent"/> 下载安装完 7za.exe 后调用，
+    /// 否则「找不到」的结果会一直被缓存，本次运行内再也认不出新装好的组件。
+    /// </summary>
+    public static void ResetCache() => Resolved = new Lazy<string?>(Resolve, isThreadSafe: true);
 
     /// <summary>
     /// 把 <paramref name="sourceDirectory"/> 的**顶层条目**原样打包成 7z。

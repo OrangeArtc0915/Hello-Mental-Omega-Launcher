@@ -12,6 +12,7 @@ using HMOL.App.Services;
 using HMOL.App.Windows;
 using HMOL.App.Windows.Multiplayer;
 using HMOL.Core.App;
+using HMOL.Core.Instances;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 
@@ -60,6 +61,9 @@ public partial class PageMultiplayer : LauncherPage
     private bool _suppressNodeChange;
     private bool _tapping;
 
+    /// <summary>未安装补丁的提示是否已经弹过（避免每次刷新都重复弹）。</summary>
+    private bool _patchHintShown;
+
     private CancellationTokenSource? _connectCts;
     private CancellationTokenSource? _hallLoopCts;
     private Task? _hallLoopTask;
@@ -89,12 +93,10 @@ public partial class PageMultiplayer : LauncherPage
         RefreshHall();
         RefreshOwnerButtons();
         RefreshHudButton();
+        RefreshRequiredFilesUi();
 
         // 樱花 Frp 的输出与 EasyTier / n2n 共用「引擎日志」，方便一起排查
         PanSakuraPlan.Log += AppendEngineLine;
-
-        if (!RuntimeLocator.IsRuntimePresent)
-            ShowNotice(RuntimeLocator.MissingRuntimeMessage, isError: true);
     }
 
     private MultiplayerSession Session => MultiplayerHub.Session;
@@ -135,6 +137,11 @@ public partial class PageMultiplayer : LauncherPage
 
         RefreshHudButton();
         UpdateEngineHint();
+        RefreshRequiredFilesUi();
+
+        // 首次进联机页的必要文件引导放到页面渲染之后，避免打断入场动画与导航
+        Dispatcher.InvokeAsync(MaybePromptRequiredFiles);
+
         _anim.Play();
     }
 
@@ -503,10 +510,31 @@ public partial class PageMultiplayer : LauncherPage
             return;
         }
 
-        if (!RuntimeLocator.IsRuntimePresent)
+        // 虚拟局域网方案要先备齐组网组件（runtime 不再随包分发，缺就现场下载）
+        if (!_sakuraPlan)
         {
-            ShowNotice(RuntimeLocator.MissingRuntimeMessage, isError: true);
-            return;
+            var missing = RuntimeComponents.MissingFor(_kind);
+
+            if (missing.Count > 0)
+            {
+                var names = string.Join("、", missing.Select(RuntimeComponents.DisplayName));
+
+                var answer = ChoiceWindow.Confirm(OwnerWindow, "需要组网组件",
+                    $"当前方案需要 {names}，本机还没有，是否现在下载？",
+                    confirmText: "下载并安装", cancelText: "取消");
+
+                if (!answer) return;
+
+                foreach (var component in missing)
+                {
+                    if (await RequiredFilesFlow.EnsureRuntimeAsync(OwnerWindow, component, confirm: false)) continue;
+
+                    ShowNotice($"缺少 {RuntimeComponents.DisplayName(component)}，无法连接。", isError: true);
+                    return;
+                }
+
+                RefreshRequiredFilesUi();
+            }
         }
 
         var room = RoomName;
@@ -1567,6 +1595,55 @@ public partial class PageMultiplayer : LauncherPage
             BtnTapInstall.IsEnabled = true;
             _tapping = false;
         }
+    }
+
+    // ————— 联机补丁状态（下载与安装已挪到顶层「下载」页） —————
+
+    /// <summary>
+    /// 未安装联机补丁时禁用其余子视图（组网 / 大厅 / 对端 / 日志），并提示到「下载」页下载安装。
+    /// </summary>
+    private void RefreshRequiredFilesUi()
+    {
+        var instance = InstanceManager.Current;
+        var installed = MultiplayerRequiredFiles.IsPatchInstalled(instance);
+
+        PanContent.IsEnabled = installed;
+        PanContent.Opacity = installed ? 1 : 0.6;
+
+        if (installed)
+        {
+            _patchHintShown = false;
+            return;
+        }
+
+        if (_patchHintShown) return;
+        _patchHintShown = true;
+
+        ShowNotice("当前实例未安装联机补丁，请到左侧「下载」页下载并安装后再使用联机功能。", isError: true);
+    }
+
+    /// <summary>
+    /// 第一次进联机页且补丁没装时弹一次引导，引导去「下载」页。只提示一次（记录在联机配置里）。
+    /// </summary>
+    private void MaybePromptRequiredFiles()
+    {
+        if (MultiplayerSettingsStore.Current.RequiredFilesPrompted) return;
+
+        MultiplayerSettingsStore.Update(settings => settings.RequiredFilesPrompted = true);
+
+        var instance = InstanceManager.Current;
+        if (MultiplayerRequiredFiles.IsPatchInstalled(instance)) return;
+
+        var choice = ChoiceWindow.Ask(OwnerWindow, "需要联机必要文件",
+            "第一次使用联机功能，需要先下载联机必要文件：运行库（组网组件 / 7-Zip）+ 樱花 Frp 引擎 + MO 联机补丁。",
+            "这些都在左侧「下载」页统一下载；补丁会解压到当前实例的游戏根目录。\n" +
+            "未安装补丁前，联机页的「组网 / 大厅 / 对端」等功能不可用。",
+            new ChoiceOption("前往下载", "go", ButtonTone.Solid),
+            new ChoiceOption("稍后", "later"));
+
+        if (choice != "go") return;
+
+        (Window.GetWindow(this) as MainWindow)?.SwitchToPage(NavPages.Download);
     }
 
     // ————— 引擎输出与提示条 —————
