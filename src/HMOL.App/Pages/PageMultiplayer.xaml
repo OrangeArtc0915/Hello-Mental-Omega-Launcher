@@ -163,9 +163,23 @@
                                              Tag="N2n"
                                              Content="n2n（二层，需 TAP 驱动）"
                                              Click="OnPlanClick" />
+                            <c:OutlineButton x:Name="BtnPlanSakura"
+                                             Margin="8,0,0,0"
+                                             Tag="Sakura"
+                                             Content="樱花 Frp（端口映射直连）"
+                                             Click="OnPlanClick" />
                         </StackPanel>
                         <TextBlock x:Name="LabPlanHint" Style="{StaticResource MpHint}" Margin="0,8,0,0" />
+                    </StackPanel>
+                </c:SurfaceCard>
 
+                <!-- 虚拟局域网方案（EasyTier / n2n）的参数：节点、房间、虚拟 IP。选樱花 Frp 时整卡换成下面那张 -->
+                <c:SurfaceCard x:Name="CardVpnPlan"
+                               Margin="0,14,0,0"
+                               Title="组网参数"
+                               UseShadow="False"
+                               HasHoverEffect="False">
+                    <StackPanel>
                         <TextBlock Style="{StaticResource MpSection}" Text="节点服务器" />
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -258,7 +272,21 @@
                     </StackPanel>
                 </c:SurfaceCard>
 
-                <c:SurfaceCard Margin="0,14,0,0" Title="连接" UseShadow="False" HasHoverEffect="False">
+                <!-- 樱花 Frp：端口映射直连，与虚拟局域网那套参数无关 -->
+                <c:SurfaceCard x:Name="CardSakuraPlan"
+                               Margin="0,14,0,0"
+                               Title="樱花 Frp 参数"
+                               UseShadow="False"
+                               HasHoverEffect="False"
+                               Visibility="Collapsed">
+                    <c:SakuraPlanPanel x:Name="PanSakuraPlan" />
+                </c:SurfaceCard>
+
+                <c:SurfaceCard x:Name="CardConnect"
+                               Margin="0,14,0,0"
+                               Title="连接"
+                               UseShadow="False"
+                               HasHoverEffect="False">
                     <StackPanel>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -318,7 +346,11 @@
                     </StackPanel>
                 </c:SurfaceCard>
 
-                <c:SurfaceCard Margin="0,14,0,0" Title="分享给队友" UseShadow="False" HasHoverEffect="False">
+                <c:SurfaceCard x:Name="CardShare"
+                               Margin="0,14,0,0"
+                               Title="分享给队友"
+                               UseShadow="False"
+                               HasHoverEffect="False">
                     <StackPanel>
                         <TextBlock Style="{StaticResource MpHint}"
                                    Text="复制下面的说明给队友（队友粘贴后即可一键加入），也可以直接粘贴队友发来的分享文本加入。" />
@@ -356,17 +388,20 @@
                         <TextBlock Style="{StaticResource MpHint}"
                                    Text="涉及系统改动的操作都会先说明再执行；装驱动、开关防火墙、改网卡跃点等需要管理员权限时会弹出系统提权确认。" />
                         <WrapPanel Margin="0,10,0,0">
-                            <c:OutlineButton Content="连通性检测" Click="OnNetCheckClick" />
+                            <c:OutlineButton x:Name="BtnNetCheck" Content="连通性检测" Click="OnNetCheckClick" />
                             <c:OutlineButton Margin="8,0,0,0"
                                              Content="防火墙控制"
                                              Click="OnFirewallClick" />
-                            <c:OutlineButton Margin="8,0,0,0"
+                            <c:OutlineButton x:Name="BtnMetric"
+                                             Margin="8,0,0,0"
                                              Content="网卡优先级"
                                              Click="OnMetricClick" />
-                            <c:OutlineButton Margin="8,0,0,0"
+                            <c:OutlineButton x:Name="BtnTransfer"
+                                             Margin="8,0,0,0"
                                              Content="文件传输"
                                              Click="OnFileTransferClick" />
-                            <c:OutlineButton Margin="8,0,0,0"
+                            <c:OutlineButton x:Name="BtnMoreSettings"
+                                             Margin="8,0,0,0"
                                              Content="更多设置"
                                              Click="OnMoreSettingsClick" />
                             <c:OutlineButton x:Name="BtnHud"
@@ -376,7 +411,8 @@
                             <c:OutlineButton Margin="8,0,0,0"
                                              Content="大厅延迟代码"
                                              Click="OnLagCodeClick" />
-                            <c:OutlineButton Margin="8,0,0,0"
+                            <c:OutlineButton x:Name="BtnWinIpBroadcast"
+                                             Margin="8,0,0,0"
                                              Content="广播转发服务"
                                              Click="OnWinIpBroadcastClick" />
                         </WrapPanel>
@@ -649,7 +685,7 @@
                 <c:SurfaceCard Title="引擎日志" UseShadow="False" HasHoverEffect="False">
                     <StackPanel>
                         <TextBlock Style="{StaticResource MpHint}"
-                                   Text="组网引擎（EasyTier / n2n）的运行输出与连接进度都会记在这里，方便排查连不上、慢等问题。" />
+                                   Text="组网引擎（EasyTier / n2n）与樱花 Frp 的运行输出、连接进度都会记在这里，方便排查连不上、慢等问题。" />
 
                         <WrapPanel Margin="0,10,0,0">
                             <c:OutlineButton Content="导出日志"

@@ -18,6 +18,7 @@ internal static class MultiplayerHub
     private static MultiplayerHudWindow? _hud;
     private static FileTransfer? _transfer;
     private static SupernodeServer? _server;
+    private static SakuraFrpcRunner? _sakura;
 
     /// <summary>共享的联机会话（首次访问时创建，日志转投运行日志页）。</summary>
     public static MultiplayerSession Session
@@ -306,6 +307,23 @@ internal static class MultiplayerHub
         catch (Exception ex) { Log.Warn($"停止自建节点失败：{ex.Message}"); }
     }
 
+    // ————— 樱花FRP 隧道（端口映射直连） —————
+
+    /// <summary>
+    /// 共享的 frpc 隧道进程。放在 Hub 里而不是联机页里，是为了「离开联机页隧道照旧跑」——
+    /// 房主往往正在打游戏，一关掉界面就把隧道掐了会直接掉线。程序退出时由 <see cref="Shutdown"/> 收尾。
+    /// </summary>
+    public static SakuraFrpcRunner SakuraFrpc
+    {
+        get
+        {
+            lock (Lock)
+            {
+                return _sakura ??= new SakuraFrpcRunner();
+            }
+        }
+    }
+
     // ————— 退出清理 —————
 
     /// <summary>真正退出前清理：关掉 HUD、断开并释放会话。由 App 调用。</summary>
@@ -314,19 +332,25 @@ internal static class MultiplayerHub
         MultiplayerHudWindow? hud;
         MultiplayerSession? session;
         FileTransfer? transfer;
+        SakuraFrpcRunner? sakura;
 
         lock (Lock)
         {
             hud = _hud;
             session = _session;
             transfer = _transfer;
+            sakura = _sakura;
             _hud = null;
             _session = null;
             _transfer = null;
+            _sakura = null;
         }
 
         try { hud?.Close(); }
         catch (Exception ex) { Log.Warn($"关闭联机 HUD 失败：{ex.Message}"); }
+
+        try { sakura?.Dispose(); }
+        catch (Exception ex) { Log.Warn($"停止樱花FRP 隧道失败：{ex.Message}"); }
 
         try { transfer?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); }
         catch (Exception ex) { Log.Warn($"停止文件传输失败：{ex.Message}"); }
