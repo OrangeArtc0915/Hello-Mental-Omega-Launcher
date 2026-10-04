@@ -9,14 +9,19 @@
  * 站点配置（src/config.ts）、导航、页脚、首页都从这里取值，
  * 避免同一个事实在多处硬编码后互相对不上。
  */
+import { hmol as hmolInfo } from "../data/hmol-info";
+
 export const HMOL = {
 	/** 程序全名，对应 AppInfo.Name */
 	name: "Hello Mental Omega Launcher",
 	/** 简称，用于导航标题与徽标 */
 	shortName: "HMOL",
-	/** 当前版本号，对应 AppInfo.Version / VersionDisplay */
-	version: "1.3.0",
-	versionDisplay: "v1.3.0",
+	/**
+	 * 当前版本号。**不要在这里手写**：直接取构建时读到的 AppInfo.Version，
+	 * 免得每次发版都要回来改一遍、还容易漏。
+	 */
+	version: hmolInfo.version,
+	versionDisplay: hmolInfo.versionDisplay,
 	/** 作者，对应 AppInfo.Author */
 	author: "mmm",
 	/** 许可摘要，对应 AppInfo.License 与仓库根 LICENSE */

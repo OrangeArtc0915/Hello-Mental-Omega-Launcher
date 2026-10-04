@@ -23,6 +23,7 @@ HMOL 是面向《心灵终结》（Mental Omega）玩家的 Windows 桌面启动
 |---|---|
 | 名称 | Hello Mental Omega Launcher（HMOL） |
 | 版本 | v1.5.3 |
+| 支持 | **1.5.x 为长期支持（LTS）系列**：优先收到修复与兼容性更新 |
 | 作者 | mmm |
 | 许可 | 保留所有权利（专有软件） |
 | 平台 | Windows 10 1809+ / Windows 11（x64） |

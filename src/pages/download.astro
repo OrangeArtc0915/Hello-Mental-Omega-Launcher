@@ -59,7 +59,7 @@ const installSteps = [
 	},
 	{
 		title: "完整解压",
-		desc: "把压缩包**整体解压**到一个可写目录（例如 D:\\HMOL\\）。不要只把 HMOL.exe 单独拖出来，runtime\\ 必须一起解压，否则联机与 7z 导出不可用。",
+		desc: "把压缩包**整体解压**到一个可写目录（例如 D:\\HMOL\\）。程序数据（实例、备份、配置、日志）都保存在该目录内，卸载时直接删目录即可。",
 	},
 	{
 		title: "双击运行",
@@ -126,6 +126,13 @@ const installSteps = [
 							<span class="btn-regular h-6 text-xs px-2 rounded-lg">
 								自包含 · 免安装 .NET
 							</span>
+							{
+								hmol.isLts && (
+									<span class="h-6 text-xs px-2 rounded-lg font-bold text-white bg-[var(--primary)]">
+										LTS
+									</span>
+								)
+							}
 						</div>
 						<p class="text-sm text-black/60 dark:text-white/60">
 							{hmol.name}（HMOL）· 当前源码版本 {hmol.versionDisplay}
@@ -138,6 +145,15 @@ const installSteps = [
 								</>
 							)}
 						</p>
+						{
+							hmol.isLts && (
+								<p class="text-sm text-black/45 dark:text-white/65 mt-1">
+									{`${hmol.ltsSeries}.x`} 为<strong class="text-[var(--primary)]"
+										>长期支持（LTS）</strong
+									>系列：优先收到修复与兼容性更新。
+								</p>
+							)
+						}
 					</div>
 				</div>
 			</div>
@@ -216,18 +232,19 @@ const installSteps = [
 					before:w-1 before:h-6 before:rounded-md before:bg-[var(--primary)]
 					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
 			>
-				为什么是压缩包
+				发行包里有什么
 			</h2>
 			<div
 				class="card-base !p-5 border border-black/5 dark:border-white/5 mb-4"
 			>
 				<p class="font-bold text-black/85 dark:text-white/85 mb-2">
-					必须完整解压，不能只取 HMOL.exe。
+					压缩包里只有一个 HMOL.exe 与许可文件。
 				</p>
 				<p class="text-sm text-black/60 dark:text-white/60">
-					组网组件（EasyTier / n2n / TAP 驱动等，约 35 MB 的第三方二进制）与 7-Zip
-					不内嵌进 exe，而是随包放在 <code>runtime\</code> 目录里供程序就近调用。
-					只解压出 HMOL.exe 会导致联机功能与 7z 导出不可用。
+					程序自带 .NET 8 运行时，整体解压到任意可写目录即可使用。组网组件（EasyTier /
+					n2n / TAP 驱动 / WinIPBroadcast）、7-Zip 与联机补丁<strong
+						>不再随包分发</strong
+					>，首次使用联机时在程序内「下载」页按需获取（GitHub / Gitee 双线路）。
 				</p>
 			</div>
 			<dl class="mb-10">

@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { docsUrl, renderDocInline, renderDocMarkdown } from "./hmol-docs";
+import { replaceHmolTokens } from "../utils/hmol-vars";
 import { url } from "../utils/url-utils";
 
 export interface FaqItem {
@@ -152,7 +153,7 @@ function parseFaq(
 function loadFaqGroups(source: FaqSource): FaqGroup[] {
 	const abs = path.resolve(process.cwd(), source.file);
 	try {
-		const md = fs.readFileSync(abs, "utf-8");
+		const md = replaceHmolTokens(fs.readFileSync(abs, "utf-8"));
 		const parsed = parseFaq(md);
 		const groups = parsed
 			.filter((g) => g.items.length > 0)

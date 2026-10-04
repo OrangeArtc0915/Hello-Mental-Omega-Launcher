@@ -35,7 +35,14 @@ export interface HmolInfo {
 	qqGroupUrl: string;
 	/** 发行压缩包文件名（build.bat: HMOL-v%VERSION%-win-x64.zip） */
 	zipName: string;
+	/** 当前版本是否属于 LTS（长期支持）系列 */
+	isLts: boolean;
+	/** LTS 系列号，如 "1.5"（非 LTS 时仅作展示用） */
+	ltsSeries: string;
 }
+
+/** 被标记为 LTS（长期支持）的系列。1.5.x 起为 LTS。 */
+const LTS_SERIES = "1.5";
 
 /** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（2026-10 快照） */
 const FALLBACK: HmolInfo = {
@@ -56,6 +63,8 @@ const FALLBACK: HmolInfo = {
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
 	zipName: "HMOL-v1.5.3-win-x64.zip",
+	isLts: true,
+	ltsSeries: LTS_SERIES,
 };
 
 const APPINFO_REL = path.join("src", "HMOL.Core", "App", "AppInfo.cs");
@@ -106,6 +115,8 @@ function loadInfo(): HmolInfo {
 			qqGroup: v.QqGroup || FALLBACK.qqGroup,
 			qqGroupUrl: v.QqGroupUrl || FALLBACK.qqGroupUrl,
 			zipName: `HMOL-v${v.Version}-win-x64.zip`,
+			isLts: v.Version.startsWith(`${LTS_SERIES}.`),
+			ltsSeries: LTS_SERIES,
 		};
 	} catch (error) {
 		console.warn(

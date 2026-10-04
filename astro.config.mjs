@@ -24,6 +24,7 @@ import { GithubCardComponent } from "./src/plugins/rehype-component-github-card.
 import { rehypeMermaid } from "./src/plugins/rehype-mermaid.mjs";
 import { parseDirectiveNode } from "./src/plugins/remark-directive-rehype.js";
 import { remarkExcerpt } from "./src/plugins/remark-excerpt.js";
+import { remarkHmolVars } from "./src/plugins/remark-hmol-vars.ts";
 import { remarkMermaid } from "./src/plugins/remark-mermaid.js";
 import { remarkReadingTime } from "./src/plugins/remark-reading-time.mjs";
 
@@ -148,6 +149,7 @@ export default defineConfig({
 	],
 	markdown: {
 		remarkPlugins: [
+			remarkHmolVars,
 			remarkMath,
 			remarkReadingTime,
 			remarkExcerpt,
