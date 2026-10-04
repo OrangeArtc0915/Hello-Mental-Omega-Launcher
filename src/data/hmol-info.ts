@@ -5,8 +5,9 @@
  * - 版本号、作者、仓库、QQ 群：构建时读取 `src/HMOL.Core/App/AppInfo.cs`（唯一来源）
  * - 产物名与目标平台：`build.bat` 第 7 步组装发行包时的 `HMOL-v%VERSION%-win-x64.zip`、
  *   以及 `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`
- * - 发行包内容：`build.bat` 第 7 步（HMOL.exe、存在的 README.md/NOTICE/LICENSE、runtime\）
- * - 运行时组件：仓库根 `runtime\` 目录清单（7zip / easytier / n2n / tap / winipbroadcast）
+ * - 发行包内容：`build.bat` 第 7 步（HMOL.exe、存在的 README.md/NOTICE/LICENSE）
+ * - 运行库：不再随包分发，由启动器「下载」页按需下载到 exe 旁的 `runtime\`
+ *   （7zip / easytier / n2n / tap / winipbroadcast）
  *
  * 读不到 AppInfo.cs 时会回退到 FALLBACK 常量并在构建日志里打印警告，
  * 这样在「只拷贝 Web 目录去构建」的场景下也不会直接把构建打挂。
@@ -39,8 +40,8 @@ export interface HmolInfo {
 /** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（2026-10 快照） */
 const FALLBACK: HmolInfo = {
 	name: "Hello Mental Omega Launcher",
-	version: "1.4.0",
-	versionDisplay: "v1.4.0",
+	version: "1.5.0",
+	versionDisplay: "v1.5.0",
 	author: "mmm",
 	license: "保留所有权利",
 	githubUrl:
@@ -54,7 +55,7 @@ const FALLBACK: HmolInfo = {
 		"https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases",
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
-	zipName: "HMOL-v1.4.0-win-x64.zip",
+	zipName: "HMOL-v1.5.0-win-x64.zip",
 };
 
 const APPINFO_REL = path.join("src", "HMOL.Core", "App", "AppInfo.cs");
@@ -130,21 +131,17 @@ export const releaseLinks = {
 export const systemRequirements = [
 	{ label: "操作系统", value: "Windows 10 1809+ / Windows 11（仅 x64）" },
 	{ label: "运行时", value: "无需安装 —— .NET 8 运行时已打进单文件 exe" },
-	{ label: "磁盘", value: "含 runtime\\ 组网组件，建议预留 1 GB 以上" },
+	{ label: "磁盘", value: "运行库按需下载，建议预留 1 GB 以上（含 runtime\\ 组网组件）" },
 	{ label: "权限", value: "普通权限即可；安装 TAP 虚拟网卡等少数操作会再提权" },
 ] as const;
 
 /**
- * 发行压缩包内容（build.bat 第 6 步组装，逐条对应）：
+ * 发行压缩包内容（build.bat 第 7 步组装，逐条对应）：
  * 1. publish\HMOL.exe —— 自包含单文件
  * 2. 仓库根存在 README.md / NOTICE / LICENSE 时复制进包（本仓库目前只有 LICENSE）
- * 3. runtime\ —— 组网组件与 7-Zip，不内嵌进 exe
+ * 运行库（runtime\）不再随包：由启动器「下载」页按需下载到 exe 旁。
  */
 export const packageContents = [
 	{ name: "HMOL.exe", desc: "启动器本体，自包含 .NET 8 单文件" },
 	{ name: "LICENSE", desc: "许可声明（保留所有权利）" },
-	{
-		name: "runtime\\",
-		desc: "组网组件与 7-Zip：7zip\\、easytier\\、n2n\\、tap\\、winipbroadcast\\",
-	},
 ] as const;
