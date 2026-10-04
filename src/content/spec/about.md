@@ -47,7 +47,7 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 
 **同类启动器**
 
-- **PAL-CE 启动器** —— 另一款好用的红警启动器（官网还在部署中，链接待补）。
+- [PAL-CE 启动器](https://launcher.mycnc.net/) —— 另一款好用的红警启动器
 
 **启动器用到的第三方项目与服务**
 
