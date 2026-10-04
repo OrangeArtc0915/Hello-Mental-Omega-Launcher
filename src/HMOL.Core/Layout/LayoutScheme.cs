@@ -126,7 +126,8 @@ public sealed class LayoutScheme
 
     /// <summary>
     /// 把元素清单对齐到当前实际存在的元素：丢掉已不存在的（旧方案文件里可能留着已删元素），
-    /// 补上清单里新增的（放在末尾，默认显示）。对未知元素一律安全忽略，不抛异常。
+    /// 补上清单里新增的（默认显示）。新增项尽量插在「清单里前一个元素」之后，保持与清单一致的
+    /// 相对顺序——否则版本升级新增的导航项会一律掉到末尾。对未知元素一律安全忽略，不抛异常。
     /// 顺手把每条记录的坐标裁到合法范围（见 <see cref="LayoutItem.ClampBounds"/>）。
     /// </summary>
     public void Normalize(IReadOnlyList<string> knownElementIds, Action<string>? onDropped = null)
@@ -153,9 +154,23 @@ public sealed class LayoutScheme
             kept.Add(item);
         }
 
-        foreach (var id in knownElementIds)
+        for (var index = 0; index < knownElementIds.Count; index++)
         {
-            if (seen.Add(id)) kept.Add(new LayoutItem { ElementId = id });
+            var id = knownElementIds[index];
+            if (!seen.Add(id)) continue;
+
+            // 往前找清单里最近的、已经存在的元素，插到它后面
+            var insertAt = kept.Count;
+            for (var back = index - 1; back >= 0; back--)
+            {
+                var position = kept.FindIndex(item => Same(item.ElementId, knownElementIds[back]));
+                if (position < 0) continue;
+
+                insertAt = position + 1;
+                break;
+            }
+
+            kept.Insert(insertAt, new LayoutItem { ElementId = id });
         }
 
         Items = kept;
