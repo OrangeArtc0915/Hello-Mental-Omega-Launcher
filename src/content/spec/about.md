@@ -93,9 +93,9 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 
 如果本项目对你有帮助，欢迎赞助支持我们的服务器和开发。
 
-| 支付宝 | 微信 |
-|--------|------|
-| <img src="../docs/alipay.png" alt="支付宝" loading="eager" fetchpriority="high" decoding="sync" /> | <img src="../docs/wechat.jpg" alt="微信" loading="eager" fetchpriority="high" decoding="sync" /> |
+| 微信 |
+|------|
+| <img src="../docs/wechat.jpg" alt="微信" loading="eager" fetchpriority="high" decoding="sync" /> |
 
 ---
 
