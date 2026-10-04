@@ -17,14 +17,14 @@ namespace HMOL.Core.Multiplayer;
 /// </para>
 ///
 /// <para>
-/// 下载走双线路（GitHub / Gitee），顺序与启动器自更新共用同一份偏好，
+/// 下载走双线路（GitHub / Gitee）的发行版附件，顺序与启动器自更新共用同一份偏好，
 /// 具体由 <see cref="RequiredAssetDownloader"/> 负责。
 /// </para>
 /// </summary>
 public static class MultiplayerRequiredFiles
 {
-    /// <summary>仓库里的压缩包名（同时是下载到本机后的文件名）。</summary>
-    private const string PatchArchiveName = "MO-补丁-联机.zip";
+    /// <summary>发行版附件里的压缩包名（同时是下载到本机后的文件名）。</summary>
+    private const string PatchArchiveName = "MO-online-patch.zip";
 
     /// <summary>下载物存放目录：<c>Data\MultiplayerRequired</c>。刻意不放在 packages 目录，避免进包列表。</summary>
     public static string DownloadDirectory => Path.Combine(Paths.Data, "MultiplayerRequired");

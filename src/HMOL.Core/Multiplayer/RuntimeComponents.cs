@@ -61,19 +61,8 @@ public static class RuntimeComponents
         _ => component.ToString().ToLowerInvariant()
     };
 
-    /// <summary>仓库里的压缩包名（同时是下载到本机后的文件名）。</summary>
+    /// <summary>发行版附件里的压缩包名（同时是下载到本机后的文件名）。</summary>
     public static string ArchiveName(RuntimeComponent component) => FolderName(component) + ".zip";
-
-    /// <summary>
-    /// 分卷文件名。Gitee 对匿名 raw 下载有大小上限（超过会 403「large file require login」），
-    /// 因此超过阈值的组件拆成多卷，下载后按顺序合并再解压；未拆分的组件返回整包名。
-    /// </summary>
-    public static string[] PartNames(RuntimeComponent component) => component switch
-    {
-        RuntimeComponent.EasyTier =>
-            ["easytier.zip.001", "easytier.zip.002", "easytier.zip.003", "easytier.zip.004"],
-        _ => [ArchiveName(component)]
-    };
 
     /// <summary>判断组件是否齐备用的标志文件。</summary>
     public static string MarkerFile(RuntimeComponent component) => component switch
@@ -122,8 +111,7 @@ public static class RuntimeComponents
         => RequiredFor(kind).Where(component => !IsInstalled(component)).ToArray();
 
     /// <summary>
-    /// 确保某个组件就绪：已安装直接返回；否则下载（双线路、必要时分卷合并）后解压到
-    /// <c>runtime\&lt;组件&gt;\</c>。
+    /// 确保某个组件就绪：已安装直接返回；否则从发行版附件下载后解压到 <c>runtime\&lt;组件&gt;\</c>。
     /// </summary>
     public static async Task<(bool Ok, string Message)> EnsureAsync(RuntimeComponent component,
         LauncherUpdateSource preferred, IProgress<double>? downloadProgress = null,
@@ -134,46 +122,13 @@ public static class RuntimeComponents
         var name = DisplayName(component);
         var archive = ArchivePath(component);
 
-        // 合并后的压缩包已在且有效 → 无需重下
+        // 压缩包已在且有效 → 无需重下
         if (!(File.Exists(archive) && ArchiveExtractor.IsSupportedArchive(archive)))
         {
-            var parts = PartNames(component);
+            var download = await RequiredAssetDownloader.DownloadAsync(
+                ArchiveName(component), archive, preferred, downloadProgress, token).ConfigureAwait(false);
 
-            if (parts.Length <= 1)
-            {
-                var download = await RequiredAssetDownloader.DownloadAsync(
-                    parts[0], archive, preferred, downloadProgress, token).ConfigureAwait(false);
-
-                if (!download.Success) return (false, download.Message);
-            }
-            else
-            {
-                var partPaths = new List<string>();
-
-                for (var index = 0; index < parts.Length; index++)
-                {
-                    var partPath = Path.Combine(DownloadDirectory, parts[index]);
-
-                    var download = await RequiredAssetDownloader.DownloadAsync(
-                            parts[index], partPath, preferred, downloadProgress, token, expectArchive: false)
-                        .ConfigureAwait(false);
-
-                    if (!download.Success)
-                        return (false, $"{name} 第 {index + 1}/{parts.Length} 卷下载失败：{download.Message}");
-
-                    partPaths.Add(partPath);
-                }
-
-                if (!MergeParts(partPaths, archive)) return (false, $"{name} 分卷合并失败");
-
-                if (!ArchiveExtractor.IsSupportedArchive(archive))
-                {
-                    // 分卷残缺或串了源：清掉本机分卷并删除坏合并结果，避免下次又拿坏分卷合并
-                    CleanupPartFiles(component);
-                    TryDelete(archive);
-                    return (false, $"{name} 合并后的压缩包无效，请重试（已清掉本机分卷）");
-                }
-            }
+            if (!download.Success) return (false, download.Message);
         }
 
         var (ok, message) = RequiredAssetDownloader.ExtractInto(archive, InstallDirectory(component), extractProgress, token);
@@ -183,52 +138,5 @@ public static class RuntimeComponents
 
         Log.Info($"组网组件已安装：{name} → {InstallDirectory(component)}");
         return (true, $"{name} 已就绪");
-    }
-
-    /// <summary>按顺序把分卷拼成完整压缩包。</summary>
-    private static bool MergeParts(IReadOnlyList<string> partPaths, string destination)
-    {
-        try
-        {
-            using var output = File.Create(destination);
-
-            foreach (var part in partPaths)
-            {
-                if (!File.Exists(part)) return false;
-
-                using var input = File.OpenRead(part);
-                input.CopyTo(output);
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Log.Error($"合并分卷失败：{destination}", ex);
-            return false;
-        }
-    }
-
-    /// <summary>清掉本机已下载的分卷（不含合并后的整包）。</summary>
-    private static void CleanupPartFiles(RuntimeComponent component)
-    {
-        foreach (var part in PartNames(component))
-        {
-            if (string.Equals(part, ArchiveName(component), StringComparison.OrdinalIgnoreCase)) continue;
-
-            TryDelete(Path.Combine(DownloadDirectory, part));
-        }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path)) File.Delete(path);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn($"清理文件失败：{path}（{ex.Message}）");
-        }
     }
 }

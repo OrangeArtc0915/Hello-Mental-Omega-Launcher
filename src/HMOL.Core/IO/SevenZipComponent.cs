@@ -17,7 +17,7 @@ namespace HMOL.Core.IO;
 /// </summary>
 public static class SevenZipComponent
 {
-    /// <summary>仓库里的压缩包名。</summary>
+    /// <summary>发行版附件里的压缩包名。</summary>
     public const string ArchiveName = "7zip.zip";
 
     /// <summary>下载物存放目录。</summary>

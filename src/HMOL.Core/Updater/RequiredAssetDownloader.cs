@@ -6,43 +6,38 @@ using HMOL.Core.Packages;
 namespace HMOL.Core.Updater;
 
 /// <summary>
-/// 从仓库 <c>Resources</c> 分支的「HMOL Online Required Files」目录下载必要文件（组网组件 / 7-Zip / MO 联机补丁）。
+/// 下载页组件的下载器（补丁 / 组网组件 / 运行库）。
+///
+/// <para>
+/// 这些组件集中放在仓库一个专用发行版的**附件**里（见 <see cref="ReleaseTag"/>）：
+/// 发行版附件在 GitHub 与 Gitee 上都能匿名下载、且不受 Gitee 匿名 raw 的 10 MB 上限影响，
+/// 因此大文件不必再分卷。
+/// </para>
 ///
 /// <para>
 /// 线路顺序与启动器自更新共用同一份偏好（<see cref="Settings.LauncherUpdateSource"/>）：
-/// GitHub 优先或 Gitee 优先，一个源失败自动换另一个。落地后按文件头复核是不是真压缩包，
-/// 避免服务器用 HTML 错误页顶替文件。
+/// 一个源失败自动换另一个。落地后按文件头复核是不是真压缩包，避免服务器用 HTML 错误页顶替文件。
 /// </para>
 /// </summary>
 public static class RequiredAssetDownloader
 {
-    /// <summary>资源所在仓库分支（GitHub 与 Gitee 同名）。</summary>
-    public const string BranchName = "Resources";
+    /// <summary>下载页组件所在发行版的 tag。</summary>
+    public const string ReleaseTag = "components";
 
-    /// <summary>资源目录（已 URL 编码，两种线路共用）。</summary>
-    private const string FolderPath = "HMOL%20Online%20Required%20Files";
-
-    /// <summary>GitHub 的 raw 直链。</summary>
+    /// <summary>GitHub 的发行版附件直链。</summary>
     public static string GitHubUrl(string fileName)
-        => AppInfo.GitHubUrl
-               .Replace("https://github.com/", "https://raw.githubusercontent.com/", StringComparison.OrdinalIgnoreCase)
-           + $"/{BranchName}/{FolderPath}/{Uri.EscapeDataString(fileName)}";
+        => $"{AppInfo.GitHubUrl}/releases/download/{ReleaseTag}/{Uri.EscapeDataString(fileName)}";
 
-    /// <summary>Gitee 的 raw 直链。</summary>
+    /// <summary>Gitee 的发行版附件直链。</summary>
     public static string GiteeUrl(string fileName)
-        => $"{AppInfo.GiteeUrl}/raw/{BranchName}/{FolderPath}/{Uri.EscapeDataString(fileName)}";
-
-    /// <summary>分卷文件的最小合理大小。小于它就当作错误页（Gitee 403 页才 55 字节）。</summary>
-    private const long MinPartBytes = 64 * 1024;
+        => $"{AppInfo.GiteeUrl}/releases/download/{ReleaseTag}/{Uri.EscapeDataString(fileName)}";
 
     /// <summary>
     /// 下载 <paramref name="fileName"/> 到 <paramref name="destinationPath"/>，双线路兜底。
     /// 目标已存在且是有效压缩包时会跳过下载（由 <see cref="ResumableDownloader"/> 判定）。
-    /// <paramref name="expectArchive"/> 为 false 时按「分卷」处理：不做压缩包校验，只卡最小体积。
     /// </summary>
     public static async Task<DownloadResult> DownloadAsync(string fileName, string destinationPath,
-        LauncherUpdateSource preferred, IProgress<double>? progress = null, CancellationToken token = default,
-        bool expectArchive = true)
+        LauncherUpdateSource preferred, IProgress<double>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(fileName)) return new DownloadResult(false, null, 0, "文件名为空");
 
@@ -70,10 +65,10 @@ public static class RequiredAssetDownloader
             }
 
             // 服务器可能用 200 页面顶替文件（路径写错时返回 HTML），落地后按文件头复核
-            if (!IsAcceptable(destinationPath, expectArchive))
+            if (!ArchiveExtractor.IsSupportedArchive(destinationPath))
             {
-                errors.Add($"{name}：{(expectArchive ? "下载到的不是有效压缩包" : "下载到的分卷过小，疑似错误页")}");
-                Log.Warn($"从 {name} 下载的 {fileName} 不可用，已删除");
+                errors.Add($"{name}：下载到的不是有效压缩包");
+                Log.Warn($"从 {name} 下载的 {fileName} 不是有效压缩包，已删除");
                 TryDelete(destinationPath);
                 continue;
             }
@@ -84,10 +79,6 @@ public static class RequiredAssetDownloader
 
         return new DownloadResult(false, null, 0, "两个线路都下载失败：" + string.Join("；", errors));
     }
-
-    /// <summary>落地文件是否可用：整包看是不是压缩包，分卷看体积是否不像错误页。</summary>
-    private static bool IsAcceptable(string path, bool expectArchive)
-        => expectArchive ? ArchiveExtractor.IsSupportedArchive(path) : LengthOf(path) >= MinPartBytes;
 
     /// <summary>把下载物解压到目标目录。压缩包内若只有一个顶层目录，则以其为内容根。</summary>
     public static (bool Ok, string Message) ExtractInto(string archivePath, string destinationDirectory,
