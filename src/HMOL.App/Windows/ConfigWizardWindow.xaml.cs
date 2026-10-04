@@ -322,8 +322,7 @@ public partial class ConfigWizardWindow : Window
         }
         else
         {
-            LabRuntimeState.Text = $"{missing}。联机暂时用不了，但不影响单机；"
-                                   + "重新解压完整发行包即可补齐 runtime 目录。";
+            LabRuntimeState.Text = $"{missing}。联机暂时用不了，但不影响单机。";
             LabRuntimeState.SetResourceReference(TextBlock.ForegroundProperty, "Status.Warn");
         }
     }

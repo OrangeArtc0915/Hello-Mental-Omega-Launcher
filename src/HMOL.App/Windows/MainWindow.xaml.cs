@@ -12,6 +12,7 @@ using HMOL.App.Controls;
 using HMOL.App.Interop;
 using HMOL.App.Layout;
 using HMOL.App.Pages;
+using HMOL.App.Services;
 using HMOL.App.Theme;
 using HMOL.Core.App;
 using HMOL.Core.Instances;
@@ -147,7 +148,7 @@ public partial class MainWindow : Window
     /// </para>
     /// </summary>
     private void QueueFirstRunWizard()
-        => Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        => Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(async () =>
         {
             var settings = SettingsStore.Current;
 
@@ -163,6 +164,9 @@ public partial class MainWindow : Window
 
                 return;
             }
+
+            // 首次启动、向导之前：先提示补齐 7-Zip 组件（缺失时可跳过，不影响单机）
+            await RequiredFilesFlow.EnsureSevenZipOnStartupAsync(this);
 
             new ConfigWizardWindow { Owner = this }.ShowDialog();
         }));
@@ -400,6 +404,7 @@ public partial class MainWindow : Window
             NavPages.Instances => new PageInstances(),
             NavPages.Packages => new PagePackages(),
             NavPages.Multiplayer => new PageMultiplayer(),
+            NavPages.Download => new PageDownload(),
             NavPages.Log => new PageLog(),
             NavPages.Settings => new PageSettings(),
             _ => new PageHome()
@@ -425,6 +430,7 @@ public partial class MainWindow : Window
         NavInstances.IsChecked = page == NavPages.Instances;
         NavPackages.IsChecked = page == NavPages.Packages;
         NavMultiplayer.IsChecked = page == NavPages.Multiplayer;
+        NavDownload.IsChecked = page == NavPages.Download;
         NavLog.IsChecked = page == NavPages.Log;
         NavSettings.IsChecked = page == NavPages.Settings;
 

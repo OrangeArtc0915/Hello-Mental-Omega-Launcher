@@ -183,16 +183,22 @@
                                                    Tag="3"
                                                    Text="联机"
                                                    Checked="OnNavChecked" />
+                                        <c:NavItem x:Name="NavDownload"
+                                                   GroupName="MainNav"
+                                                   Icon="lucide/download"
+                                                   Tag="4"
+                                                   Text="下载"
+                                                   Checked="OnNavChecked" />
                                         <c:NavItem x:Name="NavLog"
                                                    GroupName="MainNav"
                                                    Icon="lucide/scroll-text"
-                                                   Tag="4"
+                                                   Tag="5"
                                                    Text="运行日志"
                                                    Checked="OnNavChecked" />
                                         <c:NavItem x:Name="NavSettings"
                                                    GroupName="MainNav"
                                                    Icon="lucide/settings"
-                                                   Tag="5"
+                                                   Tag="6"
                                                    Text="设置"
                                                    Checked="OnNavChecked" />
                                     </StackPanel>

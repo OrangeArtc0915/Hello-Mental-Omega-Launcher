@@ -196,14 +196,10 @@ if exist "LICENSE"   copy /y "LICENSE"   "%PKG%\LICENSE"   >nul
 rem 公钥证书不随包分发：签名后的 exe 里已经带着证书，发行包里不再放 .cer 散文件。
 rem 私钥只在 %SIGNPFX%，绝不随包分发。
 
-rem 组网组件（EasyTier / n2n / TAP 驱动）不内嵌进 exe：35 MB 的第三方二进制
-rem 进 exe 会让混淆器去加密它们，也会让单文件变得笨重。改为随包放在 runtime\ 下，
-rem 程序运行时就近调用。缺这个目录时联机页会明确提示重新解压完整发行包。
-if exist "runtime" (
-    xcopy /e /i /y /q "runtime" "%PKG%\runtime" >nul
-) else (
-    echo [警告] 没有找到 runtime 目录，发行包里将不含组网组件，联机功能不可用
-)
+rem runtime\ 不再随包分发：组网组件（EasyTier / n2n / TAP / WinIPBroadcast）与 7-Zip
+rem 改为运行时按需下载（仓库 Resources 分支的「HMOL Online Required Files」目录），
+rem 解压回 exe 旁的 runtime\。首次启动会提示下载 7-Zip，联机时按方案下载组网组件。
+rem 本地保留 runtime\ 只用于开发调试，不再进发行包。
 
 powershell -NoProfile -Command "Compress-Archive -Path '%PKG%\*' -DestinationPath '%DISTDIR%\%ZIPNAME%' -Force"
 if errorlevel 1 goto :failed
