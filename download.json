@@ -1,0 +1,4 @@
+{
+  "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名，url 是下载直链；改完提交到 survive 分支，下载页刷新即生效。",
+  "items": []
+}
