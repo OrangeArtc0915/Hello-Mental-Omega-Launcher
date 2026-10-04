@@ -9,7 +9,7 @@
     {
       "name": "MO 中文输入补丁",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/Chinese%20input%20patch/MO-%E8%A1%A5%E4%B8%81-%E4%B8%AD%E6%96%87%E8%BE%93%E5%85%A5.zip",
-      "note": "解压到游戏根目录，修复游戏内无法输入中文。"
+      "note": "解压到游戏根目录；修复 CNC 大厅不能输入中文。"
     },
     {
       "name": "EasyTier 组网组件（4 个分卷）",
