@@ -10,6 +10,7 @@ using HMOL.App.Layout;
 using HMOL.App.Services;
 using HMOL.App.Theme;
 using HMOL.App.Windows;
+using HMOL.App.Windows.Multiplayer;
 using HMOL.Core.App;
 using HMOL.Core.Appearance;
 using HMOL.Core.Extensions;
@@ -203,6 +204,7 @@ public partial class PageSettings : LauncherPage
         RefreshNickname();
         RefreshHudOpacity();
         RefreshHudToggle();
+        RefreshSakuraPanel();
         RefreshWeatherCity();
         RefreshSites();
         RefreshBackground();
@@ -230,6 +232,7 @@ public partial class PageSettings : LauncherPage
         RefreshNickname();
         RefreshHudOpacity();
         RefreshHudToggle();
+        RefreshSakuraPanel();
         RefreshWeatherCity();
         RefreshSites();
         RefreshBackground();
@@ -468,7 +471,7 @@ public partial class PageSettings : LauncherPage
         RefreshUpdate();
         SetUpdateStatus(enabled
             ? "已开启：下次启动会在后台检查一次新版本。"
-            : "已关闭：启动时不再检查，仍可点下面的按钮手动检查。", warn: false);
+            : "已关闭：启动时不再提示普通更新（跨主/次版本的强制更新仍会检查），也可点下面的按钮手动检查。", warn: false);
 
         Log.Info($"启动时自动检查更新已{(enabled ? "开启" : "关闭")}");
     }
@@ -704,6 +707,49 @@ public partial class PageSettings : LauncherPage
         }
 
         RefreshHudToggle();
+    }
+
+    // ————— 樱花FRP 内嵌面板 —————
+
+    /// <summary>
+    /// 刷新「樱花FRP 内嵌面板」开关。这个面板依赖本机的 WebView2 运行时，
+    /// 没装就直接把按钮禁用并写明原因 —— 樱花 Frp 直连本身不受影响，只是少了个内嵌入口。
+    /// </summary>
+    private void RefreshSakuraPanel()
+    {
+        if (BtnSakuraPanel is null) return;
+
+        var available = MultiplayerSakuraPanelWindow.IsRuntimeAvailable();
+        var enabled = available && MultiplayerSettingsStore.Current.SakuraPanelEnabled;
+
+        BtnSakuraPanel.Content = enabled ? "已启用" : "未启用";
+        BtnSakuraPanel.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
+        BtnSakuraPanel.IsEnabled = available;
+
+        SetSakuraPanelHint(available
+                ? enabled
+                    ? "「樱花 Frp 直连」窗口里会多出「内嵌面板」按钮，可以在启动器里登录樱花FRP、建隧道与看流量。"
+                    : "打开后，「樱花 Frp 直连」窗口里会多一个「内嵌面板」按钮（默认关闭）。"
+                : "本机没有 WebView2 运行时，打不开这个面板；樱花 Frp 直连照常可用，建隧道去官网 natfrp.com 即可。",
+            warn: !available);
+    }
+
+    private void OnSakuraPanelToggleClick(object sender, RoutedEventArgs e)
+    {
+        if (!MultiplayerSakuraPanelWindow.IsRuntimeAvailable()) return;
+
+        var enabled = !MultiplayerSettingsStore.Current.SakuraPanelEnabled;
+
+        MultiplayerSettingsStore.Update(settings => settings.SakuraPanelEnabled = enabled);
+
+        RefreshSakuraPanel();
+        Log.Info($"樱花FRP 内嵌面板已{(enabled ? "开启" : "关闭")}");
+    }
+
+    private void SetSakuraPanelHint(string message, bool warn)
+    {
+        LabSakuraPanel.Text = message;
+        LabSakuraPanel.SetResourceReference(TextBlock.ForegroundProperty, warn ? "Status.Warn" : "Text.Tertiary");
     }
 
     // ————— 天气城市 —————

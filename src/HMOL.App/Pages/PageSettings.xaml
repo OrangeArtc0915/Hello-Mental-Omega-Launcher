@@ -374,6 +374,26 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="只影响游戏内那个置顶浮窗（含文字与底色），最低 40%；与「外观」里的窗口透明度、卡片透明度互不影响。改完立即生效并自动保存。" />
+
+                    <!-- 樱花FRP 内嵌面板：可选功能，依赖本机的 WebView2 运行时 -->
+                    <Border Height="1"
+                            Margin="0,14,0,0"
+                            Background="{DynamicResource Border.Default}" />
+                    <TextBlock Margin="0,12,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="樱花FRP 内嵌面板" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnSakuraPanel"
+                                         Content="未启用"
+                                         Click="OnSakuraPanelToggleClick" />
+                        <TextBlock x:Name="LabSakuraPanel"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
             </c:SurfaceCard>
 

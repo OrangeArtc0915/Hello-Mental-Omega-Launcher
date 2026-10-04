@@ -32,6 +32,11 @@ internal static class LauncherUpdateFlow
     /// <summary>
     /// 启动时的自动检查。顺序有讲究：先弹上次的失败提示（有则跳过本次检查），再看设置开关。
     /// 「没有更新」与「检查失败」都不打扰用户，只记日志。
+    ///
+    /// <para>
+    /// 例外：强制更新（跨主/次版本）不看「启动时自动检查更新」这个开关 —— 旧版本本来就不该继续用，
+    /// 所以照常查一次网络；查到的新版本若不是强制更新，才按开关决定提不提示。
+    /// </para>
     /// </summary>
     public static async Task StartupCheckAsync(Window owner, string? failureNote, bool silenced)
     {
@@ -53,16 +58,20 @@ internal static class LauncherUpdateFlow
                 return;
             }
 
-            if (!SettingsStore.Current.CheckUpdateOnStartup)
-            {
-                Log.Info("启动时自动检查更新已关闭，跳过");
-                return;
-            }
+            var checkOnStartup = SettingsStore.Current.CheckUpdateOnStartup;
+
+            if (!checkOnStartup) Log.Info("启动时自动检查更新已关闭，本次只查有没有强制更新");
 
             var result = await CheckAsync();
 
             // 检查失败要静默：网络问题不该打扰启动
             if (result.Status != UpdateCheckStatus.Available || result.Update is null) return;
+
+            if (!checkOnStartup && !SemVer.IsForcedUpdate(result.Update.Version, AppInfo.Version))
+            {
+                Log.Info($"新版本 {result.Update.Version} 不是强制更新，而启动时检查已关闭，本次不提示");
+                return;
+            }
 
             await InstallAsync(owner, result.Update);
         }
@@ -72,35 +81,74 @@ internal static class LauncherUpdateFlow
         }
     }
 
-    /// <summary>确认是否更新，然后下载、交棒给替换脚本，最后退出进程让脚本完成替换。</summary>
+    /// <summary>
+    /// 确认是否更新，然后下载、交棒给替换脚本，最后退出进程让脚本完成替换。
+    ///
+    /// <para>
+    /// 主版本或次版本变化（1.3.0→1.4.0、1.3.0→2.3.0）算「强制更新」：不给「稍后」，
+    /// 只要没点「现在更新」，无论是打开发布页还是直接关掉确认框，都会退出程序 ——
+    /// 跨了主/次版本意味着服务端接口或约定已经变了，让旧版本继续跑只会到处出错。
+    /// 只有修订号变化（1.3.0→1.3.1）才交给用户自己选。
+    /// </para>
+    /// </summary>
     public static async Task InstallAsync(Window owner, LauncherUpdateInfo info)
     {
         try
         {
-            // 有新版本但没找到可自动更新的文件（发布页上没挂裸 exe 也没挂 zip）：只能去发布页
-            if (info.Asset is null)
+            var forced = SemVer.IsForcedUpdate(info.Version, AppInfo.Version);
+            var canAutoInstall = info.Asset is not null;
+
+            // 非强制 + 发布页上没有可自动更新的文件（既没挂裸 exe 也没挂 zip）：照旧不打扰，直接给发布页
+            if (!canAutoInstall && !forced)
             {
                 ShellHelper.OpenUrl(info.ReleasePageUrl);
                 return;
             }
 
-            var choice = ChoiceWindow.Ask(owner, "发现新版本",
-                $"启动器有新版本 v{info.Version}（来自 {info.Source}）。",
-                "更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n" +
-                "更新时程序会自动关闭，替换完成后重新打开。",
-                new ChoiceOption($"现在更新到 v{info.Version}", "install", ButtonTone.Solid),
-                new ChoiceOption("稍后", "later"),
-                new ChoiceOption("打开发布页", "page"));
+            string? choice;
 
-            Log.Info($"更新确认框返回 {choice ?? "<关闭>"}");
+            if (forced)
+            {
+                // 能自动更新时主推「现在更新」；不能的话只能引导去发布页
+                ChoiceOption[] options = canAutoInstall
+                    ? [new ChoiceOption($"现在更新到 v{info.Version}", "install", ButtonTone.Solid),
+                       new ChoiceOption("打开发布页", "page")]
+                    : [new ChoiceOption("打开发布页手动下载", "page", ButtonTone.Solid)];
+
+                choice = ChoiceWindow.Ask(owner, "必须更新",
+                    $"启动器有新版本 v{info.Version}，本次必须更新后才能继续使用（来自 {info.Source}）。",
+                    "这次更新跨了主版本或次版本，旧版本不再可用。\n" +
+                    "更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n" +
+                    "没有完成更新的话，启动器会直接退出。",
+                    options);
+            }
+            else
+            {
+                choice = ChoiceWindow.Ask(owner, "发现新版本",
+                    $"启动器有新版本 v{info.Version}（来自 {info.Source}）。",
+                    "更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n" +
+                    "更新时程序会自动关闭，替换完成后重新打开。",
+                    new ChoiceOption($"现在更新到 v{info.Version}", "install", ButtonTone.Solid),
+                    new ChoiceOption("稍后", "later"),
+                    new ChoiceOption("打开发布页", "page"));
+            }
+
+            Log.Info($"更新确认框返回 {choice ?? "<关闭>"}（{(forced ? "强制" : "可选")}更新）");
 
             if (choice == "page")
             {
                 ShellHelper.OpenUrl(info.ReleasePageUrl);
+
+                if (forced) ExitForForcedUpdate();
                 return;
             }
 
-            if (choice != "install") return;
+            if (choice != "install")
+            {
+                // 直接关掉确认框等于拒绝更新：强制更新下不给「继续用旧版本」这条路
+                if (forced) ExitForForcedUpdate();
+                return;
+            }
 
             var progress = ProgressWindow.Open(owner, "正在更新启动器",
                 $"正在下载 v{info.Version}…", canCancel: true);
@@ -144,5 +192,16 @@ internal static class LauncherUpdateFlow
         {
             Log.Error("更新流程异常", ex);
         }
+    }
+
+    /// <summary>
+    /// 强制更新没被接受时退出程序。确认框里已经写明「没有完成更新的话启动器会直接退出」，
+    /// 所以这里不再多弹一次，记日志即可。
+    /// </summary>
+    private static void ExitForForcedUpdate()
+    {
+        Log.Warn("强制更新未完成，退出启动器");
+
+        Application.Current.Shutdown();
     }
 }

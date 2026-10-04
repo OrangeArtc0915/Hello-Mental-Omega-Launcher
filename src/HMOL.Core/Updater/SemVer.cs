@@ -41,6 +41,27 @@ public static class SemVer
     public static bool IsNewer(string? candidate, string? baseline)
         => Compare(candidate, baseline) > 0;
 
+    /// <summary>
+    /// 从 baseline 升到 candidate 是否属于「强制更新」：只看主版本与次版本，
+    /// 任一变化就要求必须更新（1.3.0→1.4.0、1.3.0→2.3.0 都算强制），
+    /// 只有修订号变化（1.3.0→1.3.1）才交给用户自己选。
+    ///
+    /// <para>
+    /// 段数不同按补 0 处理（4.5 与 4.5.0 视为一致）；版本号无法解析时返回 false —— 宁可让用户自己判断，
+    /// 也不要因为一个看不懂的号就把人挡在门外。
+    /// </para>
+    /// </summary>
+    public static bool IsForcedUpdate(string? candidate, string? baseline)
+    {
+        if (!TryParse(candidate, out var next) || !TryParse(baseline, out var current)) return false;
+
+        return !string.Equals(Segment(next, 0), Segment(current, 0), StringComparison.OrdinalIgnoreCase)
+               || !string.Equals(Segment(next, 1), Segment(current, 1), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Segment(string[] segments, int index)
+        => index < segments.Length ? segments[index] : "0";
+
     /// <summary>去掉 tag 上的 v / V 前缀，供显示用（比较时不必先去前缀，<see cref="Compare"/> 自己会处理）。</summary>
     public static string Normalize(string? value)
     {

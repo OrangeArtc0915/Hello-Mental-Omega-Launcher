@@ -102,4 +102,28 @@ public sealed class MultiplayerSettings
     /// 与全局的「窗口透明度 / 卡片透明度」互不影响。超出范围按边界处理。
     /// </summary>
     public double HudOpacity { get; set; } = 1;
+
+    // ————— 樱花FRP（端口映射直连） —————
+
+    /// <summary>樱花FRP 访问密钥。落盘时经 DPAPI 加密，配置文件里看不到明文。</summary>
+    [JsonConverter(typeof(ProtectedStringConverter))]
+    public string SakuraAccessKey { get; set; } = string.Empty;
+
+    /// <summary>上次启动过的樱花FRP 隧道 ID。</summary>
+    public int SakuraTunnelId { get; set; }
+
+    /// <summary>新建樱花FRP 隧道时默认用的名字。</summary>
+    public string SakuraTunnelName { get; set; } = "心灵终结";
+
+    /// <summary>
+    /// 是否在启动器里内嵌樱花FRP 网页面板（需要本机装了 WebView2 运行时）。
+    /// 默认关闭：没装 WebView2 的机器上打不开，开着只会徒增困惑。
+    /// </summary>
+    public bool SakuraPanelEnabled { get; set; }
+
+    /// <summary>
+    /// 联机页当前选中的是不是樱花FRP 方案。它不算组网引擎（不分配虚拟 IP、没有房间与对端列表），
+    /// 塞不进 <see cref="Engine"/> 那个枚举，所以单独记一个开关。
+    /// </summary>
+    public bool UseSakuraFrp { get; set; }
 }

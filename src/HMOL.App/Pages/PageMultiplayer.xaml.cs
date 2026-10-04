@@ -49,6 +49,9 @@ public partial class PageMultiplayer : LauncherPage
     private readonly PageAnimator _anim = new("mp:");
 
     private NetworkEngineKind _kind = NetworkEngineKind.EasyTier;
+
+    /// <summary>组网方案里是不是选了樱花 Frp（端口映射直连，不走虚拟局域网引擎）。</summary>
+    private bool _sakuraPlan;
     private NetworkAddressMode _addressMode = NetworkAddressMode.Auto;
 
     private bool _publishing;
@@ -86,6 +89,9 @@ public partial class PageMultiplayer : LauncherPage
         RefreshHall();
         RefreshOwnerButtons();
         RefreshHudButton();
+
+        // 樱花 Frp 的输出与 EasyTier / n2n 共用「引擎日志」，方便一起排查
+        PanSakuraPlan.Log += AppendEngineLine;
 
         if (!RuntimeLocator.IsRuntimePresent)
             ShowNotice(RuntimeLocator.MissingRuntimeMessage, isError: true);
@@ -252,6 +258,7 @@ public partial class PageMultiplayer : LauncherPage
         var settings = MultiplayerSettingsStore.Current;
 
         _kind = settings.Engine;
+        _sakuraPlan = settings.UseSakuraFrp;
         _addressMode = settings.AddressMode;
         _publishing = settings.PublishRoom;
 
@@ -286,6 +293,7 @@ public partial class PageMultiplayer : LauncherPage
         MultiplayerSettingsStore.Update(settings =>
         {
             settings.Engine = kind;
+            settings.UseSakuraFrp = _sakuraPlan;
             settings.RoomName = room;
             settings.RoomKey = key;
             settings.AddressMode = addressMode;
@@ -311,13 +319,23 @@ public partial class PageMultiplayer : LauncherPage
     {
         if (sender is not FrameworkElement { Tag: string tag }) return;
 
-        var kind = string.Equals(tag, "N2n", StringComparison.OrdinalIgnoreCase)
-            ? NetworkEngineKind.N2n
-            : NetworkEngineKind.EasyTier;
+        if (string.Equals(tag, "Sakura", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_sakuraPlan) return;
 
-        if (kind == _kind) return;
+            _sakuraPlan = true;
+        }
+        else
+        {
+            var kind = string.Equals(tag, "N2n", StringComparison.OrdinalIgnoreCase)
+                ? NetworkEngineKind.N2n
+                : NetworkEngineKind.EasyTier;
 
-        _kind = kind;
+            if (!_sakuraPlan && kind == _kind) return;
+
+            _sakuraPlan = false;
+            _kind = kind;
+        }
 
         RefreshPlanButtons();
         RefreshNodeOptions();
@@ -328,13 +346,35 @@ public partial class PageMultiplayer : LauncherPage
 
     private void RefreshPlanButtons()
     {
-        BtnPlanEasyTier.Tone = _kind == NetworkEngineKind.EasyTier ? ButtonTone.Solid : ButtonTone.Outline;
-        BtnPlanN2n.Tone = _kind == NetworkEngineKind.N2n ? ButtonTone.Solid : ButtonTone.Outline;
-        PanN2nTools.Visibility = _kind == NetworkEngineKind.N2n ? Visibility.Visible : Visibility.Collapsed;
+        BtnPlanEasyTier.Tone = !_sakuraPlan && _kind == NetworkEngineKind.EasyTier ? ButtonTone.Solid : ButtonTone.Outline;
+        BtnPlanN2n.Tone = !_sakuraPlan && _kind == NetworkEngineKind.N2n ? ButtonTone.Solid : ButtonTone.Outline;
+        BtnPlanSakura.Tone = _sakuraPlan ? ButtonTone.Solid : ButtonTone.Outline;
 
-        LabPlanHint.Text = _kind == NetworkEngineKind.N2n
-            ? "n2n 是二层组网，对依赖广播的老游戏兼容性最好，但首次使用必须先安装 TAP 虚拟网卡驱动。"
-            : "EasyTier 是三层组网，免装驱动，用内置公共节点即可开房（推荐）。";
+        // 樱花 Frp 是端口映射、不分虚拟 IP：参数卡与「连接」卡都换成它自己的那一套
+        CardVpnPlan.Visibility = _sakuraPlan ? Visibility.Collapsed : Visibility.Visible;
+        CardSakuraPlan.Visibility = _sakuraPlan ? Visibility.Visible : Visibility.Collapsed;
+        CardConnect.Visibility = _sakuraPlan ? Visibility.Collapsed : Visibility.Visible;
+
+        // 它也没有房间与分享口令，分享文本那一卡整块收起来
+        CardShare.Visibility = _sakuraPlan ? Visibility.Collapsed : Visibility.Visible;
+
+        // 工具箱里跟虚拟网卡/局域网相关的那几件（连通性检测、网卡优先级、文件传输、更多设置、广播转发）在樱花方案下用不上；
+        // 游戏 HUD 也一并收起（HUD 是给虚拟局域网那套用的，樱花方案下从设置页开关即可），只留防火墙与延迟代码
+        var vpnTools = _sakuraPlan ? Visibility.Collapsed : Visibility.Visible;
+        BtnNetCheck.Visibility = vpnTools;
+        BtnMetric.Visibility = vpnTools;
+        BtnTransfer.Visibility = vpnTools;
+        BtnMoreSettings.Visibility = vpnTools;
+        BtnWinIpBroadcast.Visibility = vpnTools;
+        BtnHud.Visibility = vpnTools;
+
+        PanN2nTools.Visibility = !_sakuraPlan && _kind == NetworkEngineKind.N2n ? Visibility.Visible : Visibility.Collapsed;
+
+        LabPlanHint.Text = _sakuraPlan
+            ? "樱花 Frp 是端口映射直连：不用装虚拟网卡、不分配虚拟 IP，主机开一条隧道把地址发给队友，队友在客户端里直连（见下方「樱花 Frp 参数」）。人少、临时开一局很方便。"
+            : _kind == NetworkEngineKind.N2n
+                ? "n2n 是二层组网，对依赖广播的老游戏兼容性最好，但首次使用必须先安装 TAP 虚拟网卡驱动。"
+                : "EasyTier 是三层组网，免装驱动，用内置公共节点即可开房（推荐）。";
     }
 
     private void RefreshNodeOptions()
