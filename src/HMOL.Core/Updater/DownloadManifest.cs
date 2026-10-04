@@ -4,19 +4,29 @@ using HMOL.Core.Logging;
 
 namespace HMOL.Core.Updater;
 
-/// <summary>下载页文件里的一条：名字 + 下载地址。</summary>
-public sealed record ManifestEntry(string Name, string Url);
+/// <summary>
+/// 下载页文件里的一条：名字 + 一个或多个下载地址 + 可选说明。
+/// 多个地址表示分卷，下载时会按顺序合并成一个文件（如 EasyTier 的 4 个分卷）。
+/// </summary>
+public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, string Note)
+{
+    /// <summary>首个地址，用于「打开链接」与推断文件名。</summary>
+    public string PrimaryUrl => Urls.Count > 0 ? Urls[0] : string.Empty;
+}
 
 /// <summary>
 /// 下载页文件（仓库 <c>survive</c> 分支根目录的 <c>download.json</c>）。
 ///
 /// <para>
-/// 结构是一个数组，每项含名字与链接：
+/// 结构是一个数组，每项含名字、地址与可选说明：
 /// <code>
-/// { "items": [ { "name": "示例资源", "url": "https://example.com/a.zip" } ] }
+/// { "items": [
+///   { "name": "示例资源", "url": "https://example.com/a.zip", "note": "说明文字" },
+///   { "name": "分卷资源", "urls": ["...001", "...002"], "note": "下载后自动合并" }
+/// ] }
 /// </code>
-/// 根节点直接用数组（<c>[ { "name": ..., "url": ... } ]</c>）也支持；
-/// 字段名兼容 <c>name / 名字 / 名称 / title</c> 与 <c>url / 下载地址 / address / link / 地址</c>。
+/// 根节点直接用数组也支持；字段名兼容 <c>name / 名字 / 名称 / title</c>、
+/// <c>url / urls / 下载地址 / address / link / 地址</c>、<c>note / 说明 / 描述 / desc</c>。
 /// 目的是让下载页内容不改启动器就能更新：往这个文件里加条目即可。
 /// </para>
 ///
@@ -36,6 +46,8 @@ public static class DownloadManifest
 
     private static readonly string[] NameKeys = ["name", "名字", "名称", "title"];
     private static readonly string[] UrlKeys = ["url", "下载地址", "address", "link", "地址"];
+    private static readonly string[] UrlArrayKeys = ["urls", "下载地址列表", "parts", "分卷"];
+    private static readonly string[] NoteKeys = ["note", "说明", "描述", "desc"];
     private static readonly string[] ListKeys = ["items", "downloads", "list", "文件", "下载"];
 
     /// <summary>GitHub 的 raw 直链。</summary>
@@ -120,17 +132,19 @@ public static class DownloadManifest
                 if (element.ValueKind == JsonValueKind.String)
                 {
                     var only = element.GetString()?.Trim() ?? string.Empty;
-                    if (only.Length > 0) Add(result, only, only);
+                    if (only.Length > 0) Add(result, only, [only], string.Empty);
                     continue;
                 }
 
                 if (element.ValueKind != JsonValueKind.Object) continue;
 
-                var url = ReadString(element, UrlKeys);
-                if (url.Length == 0) continue;
+                var urls = ReadUrls(element);
+                if (urls.Count == 0) continue;
 
                 var name = ReadString(element, NameKeys);
-                Add(result, name.Length > 0 ? name : url, url);
+                var note = ReadString(element, NoteKeys);
+
+                Add(result, name.Length > 0 ? name : urls[0], urls, note);
             }
         }
         catch (JsonException ex)
@@ -141,12 +155,45 @@ public static class DownloadManifest
         return result;
     }
 
-    /// <summary>同一个链接只保留第一次出现。</summary>
-    private static void Add(List<ManifestEntry> result, string name, string url)
+    /// <summary>同一个（首个）链接只保留第一次出现。</summary>
+    private static void Add(List<ManifestEntry> result, string name, List<string> urls, string note)
     {
-        if (result.Any(item => string.Equals(item.Url, url, StringComparison.OrdinalIgnoreCase))) return;
+        if (result.Any(item => string.Equals(item.PrimaryUrl, urls[0], StringComparison.OrdinalIgnoreCase))) return;
 
-        result.Add(new ManifestEntry(name, url));
+        result.Add(new ManifestEntry(name, urls, note));
+    }
+
+    /// <summary>读地址：优先 <c>urls</c> 数组，兼容单个 <c>url</c>；顺序去重。</summary>
+    private static List<string> ReadUrls(JsonElement element)
+    {
+        var urls = new List<string>();
+
+        void Push(string value)
+        {
+            var trimmed = value.Trim();
+            if (trimmed.Length == 0) return;
+            if (urls.Contains(trimmed, StringComparer.OrdinalIgnoreCase)) return;
+
+            urls.Add(trimmed);
+        }
+
+        var single = ReadString(element, UrlKeys);
+
+        foreach (var key in UrlArrayKeys)
+        {
+            if (!element.TryGetProperty(key, out var value) || value.ValueKind != JsonValueKind.Array) continue;
+
+            foreach (var item in value.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String) Push(item.GetString() ?? string.Empty);
+            }
+
+            break;
+        }
+
+        if (single.Length > 0) urls.Insert(0, single);
+
+        return urls;
     }
 
     private static bool TryGetArray(JsonElement root, out JsonElement array)

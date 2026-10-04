@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using HMOL.App.Animation;
@@ -378,7 +379,7 @@ public partial class PageDownload : LauncherPage
         if (items.Count == 0)
         {
             LabManifestHint.Text = "下载列表暂无条目：在仓库 survive 分支的 download.json 里按 "
-                                   + "{\"name\":\"名称\",\"url\":\"下载地址\"} 添加即可。";
+                                   + "{\"name\":\"名称\",\"url\":\"下载地址\",\"note\":\"说明（可选）\"} 添加即可。";
             return;
         }
 
@@ -386,37 +387,57 @@ public partial class PageDownload : LauncherPage
 
         foreach (var entry in items)
         {
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, ToolTip = string.Join("\n", entry.Urls) };
+
             var name = new TextBlock
             {
                 Text = entry.Name,
                 FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = entry.Url
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
             name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
+            text.Children.Add(name);
 
-            var open = new OutlineButton { Content = "打开链接", Margin = new Thickness(8, 0, 0, 0) };
+            if (entry.Note.Length > 0)
+            {
+                var note = new TextBlock
+                {
+                    Text = entry.Note,
+                    FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 3, 0, 0)
+                };
+                note.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
+                text.Children.Add(note);
+            }
+
+            var open = new OutlineButton
+            {
+                Content = "打开链接",
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
             open.Click += (_, _) => OpenManifestEntry(entry);
 
             var download = new OutlineButton
             {
-                Content = "下载",
+                Content = entry.Urls.Count > 1 ? $"下载（{entry.Urls.Count} 卷）" : "下载",
                 Tone = ButtonTone.Solid,
-                Margin = new Thickness(8, 0, 0, 0)
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
             };
             download.Click += async (_, _) => await DownloadManifestEntryAsync(entry);
 
-            var row = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            Grid.SetColumn(name, 0);
+            Grid.SetColumn(text, 0);
             Grid.SetColumn(open, 1);
             Grid.SetColumn(download, 2);
 
-            row.Children.Add(name);
+            row.Children.Add(text);
             row.Children.Add(open);
             row.Children.Add(download);
 
@@ -428,7 +449,7 @@ public partial class PageDownload : LauncherPage
     {
         try
         {
-            ShellHelper.OpenUrl(entry.Url);
+            ShellHelper.OpenUrl(entry.PrimaryUrl);
         }
         catch (Exception ex)
         {
@@ -436,7 +457,7 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>下载「下载页文件」里的条目到本机 Downloads 目录。</summary>
+    /// <summary>下载「下载页文件」里的条目到本机 Downloads 目录；多分卷会按顺序合并成一个文件。</summary>
     private async Task DownloadManifestEntryAsync(ManifestEntry entry)
     {
         if (_busy) return;
@@ -444,16 +465,62 @@ public partial class PageDownload : LauncherPage
         _busy = true;
 
         var target = Path.Combine(Paths.Downloads, ManifestFileName(entry));
+        var total = entry.Urls.Count;
         var progress = ProgressWindow.Open(OwnerWindow, "下载", $"正在下载 {entry.Name}…", canCancel: true);
 
         try
         {
             Directory.CreateDirectory(Paths.Downloads);
 
-            var result = await ResumableDownloader.DownloadAsync(entry.Url, target, progress.Progress, progress.Token);
+            if (total <= 1)
+            {
+                var single = await ResumableDownloader.DownloadAsync(
+                    entry.PrimaryUrl, target, progress.Progress, progress.Token);
 
-            if (result.Success) ShowNotice($"已下载：{result.FilePath}");
-            else ShowNotice($"下载失败：{result.Message}", isError: true);
+                if (single.Success) ShowNotice($"已下载：{single.FilePath}");
+                else ShowNotice($"下载失败：{single.Message}", isError: true);
+
+                return;
+            }
+
+            // 多分卷：逐卷下到临时文件，再按顺序合并
+            var parts = new List<string>();
+
+            for (var index = 0; index < total; index++)
+            {
+                progress.SetDetail($"正在下载 {entry.Name}（第 {index + 1}/{total} 卷）…");
+
+                var partPath = $"{target}.part{index + 1:000}";
+                var result = await ResumableDownloader.DownloadAsync(
+                    entry.Urls[index], partPath, progress.Progress, progress.Token);
+
+                if (!result.Success)
+                {
+                    ShowNotice($"第 {index + 1}/{total} 卷下载失败：{result.Message}", isError: true);
+                    return;
+                }
+
+                parts.Add(partPath);
+            }
+
+            progress.SetDetail($"正在合并 {total} 个分卷…");
+
+            await using (var output = File.Create(target))
+            {
+                foreach (var part in parts)
+                {
+                    await using var input = File.OpenRead(part);
+                    await input.CopyToAsync(output, progress.Token);
+                }
+            }
+
+            foreach (var part in parts)
+            {
+                try { File.Delete(part); }
+                catch { /* 清不掉也无妨 */ }
+            }
+
+            ShowNotice($"已下载并合并 {total} 个分卷：{target}");
         }
         catch (Exception ex)
         {
@@ -467,24 +534,31 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>从链接末段推出保存文件名；推不出就用条目名，再不行给个兜底名。</summary>
+    /// <summary>从首个链接末段推出保存文件名；多分卷时去掉分卷号，推不出就用条目名兜底。</summary>
     private static string ManifestFileName(ManifestEntry entry)
+    {
+        var name = FileNameFromUrl(entry.PrimaryUrl);
+
+        if (entry.Urls.Count > 1) name = Regex.Replace(name, @"\.\d{3}$", string.Empty);
+
+        if (name.Length == 0) name = PathGuard.SanitizeFileName(entry.Name);
+
+        return name.Length > 0 ? name : "download.bin";
+    }
+
+    private static string FileNameFromUrl(string url)
     {
         try
         {
-            if (Uri.TryCreate(entry.Url, UriKind.Absolute, out var uri))
-            {
-                var name = PathGuard.SanitizeFileName(Uri.UnescapeDataString(Path.GetFileName(uri.AbsolutePath)));
-                if (name.Length > 0) return name;
-            }
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return PathGuard.SanitizeFileName(Uri.UnescapeDataString(Path.GetFileName(uri.AbsolutePath)));
         }
         catch
         {
-            // 解析不了就走下面的兜底
+            // 解析不了就返回空，由调用方兜底
         }
 
-        var fallback = PathGuard.SanitizeFileName(entry.Name);
-        return fallback.Length > 0 ? fallback : "download.bin";
+        return string.Empty;
     }
 
     // ————— 提示条 —————
