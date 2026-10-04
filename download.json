@@ -1,4 +1,13 @@
 {
   "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名，url 是下载直链；改完提交到 survive 分支，下载页刷新即生效。",
-  "items": []
+  "items": [
+    {
+      "name": "MO 联机补丁（联机必需）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/MO-%E8%A1%A5%E4%B8%81-%E8%81%94%E6%9C%BA.zip"
+    },
+    {
+      "name": "MO 中文输入补丁",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/Chinese%20input%20patch/MO-%E8%A1%A5%E4%B8%81-%E4%B8%AD%E6%96%87%E8%BE%93%E5%85%A5.zip"
+    }
+  ]
 }
