@@ -193,6 +193,7 @@ public partial class PageSettings : LauncherPage
             CardBackground,
             CardMusic,
             CardLayout,
+            CardHome,
             CardExtensions,
             CardAutoStart,
             CardGamePath,
@@ -210,6 +211,7 @@ public partial class PageSettings : LauncherPage
         RefreshBackground();
         RefreshMusic();
         RefreshLayout();
+        RefreshHomeMode();
         RefreshAutoStart();
         RefreshExtensions();
         RefreshUpdate();
@@ -238,6 +240,7 @@ public partial class PageSettings : LauncherPage
         RefreshBackground();
         RefreshMusic();
         RefreshLayout();
+        RefreshHomeMode();
         RefreshAutoStart();
 
         // 扩展列表：只读一遍扩展目录（不执行任何扩展内容、不写盘）
@@ -265,7 +268,7 @@ public partial class PageSettings : LauncherPage
     // ————— 分类卡片 —————
 
     /// <summary>设置分类数量。窗口侧栏的分类项、下面的卡片表都按这个数对齐。</summary>
-    private const int CategoryCount = 12;
+    private const int CategoryCount = 13;
 
     /// <summary>一个分类一张卡片，只给自检用。</summary>
     public override int SubViewCount => CategoryCount;
@@ -293,6 +296,7 @@ public partial class PageSettings : LauncherPage
             CardBackground,
             CardMusic,
             CardLayout,
+            CardHome,
             CardExtensions,
             CardAutoStart,
             CardGamePath,
@@ -1347,6 +1351,37 @@ public partial class PageSettings : LauncherPage
                                (overridden == 0 ? "，未做任何调整。" : $"，已调整 {overridden} 项。");
 
         RefreshWidgetToggles();
+    }
+
+    // ————— 主页设置：显示模式 —————
+
+    /// <summary>主页显示模式：默认 / 简洁，按钮实心表示当前选中。</summary>
+    private void RefreshHomeMode()
+    {
+        if (BtnHomeModeDefault is null) return;
+
+        var simple = SettingsStore.Current.HomeMode == HomeMode.Simple;
+
+        BtnHomeModeDefault.Tone = simple ? ButtonTone.Outline : ButtonTone.Solid;
+        BtnHomeModeSimple.Tone = simple ? ButtonTone.Solid : ButtonTone.Outline;
+
+        LabHomeModeHint.Text = simple
+            ? "当前：简洁模式 —— 主页只留右下角启动入口，其余留空以露出背景图。"
+            : "当前：默认模式 —— 完整主页。";
+    }
+
+    private void OnHomeModeClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+        if (!Enum.TryParse<HomeMode>(tag, out var mode)) return;
+
+        SettingsStore.Current.HomeMode = mode;
+        SettingsStore.Save();
+
+        // 主页在切回去时会走 OnEnter → Refresh，按新模式重排，这里不必强刷
+        RefreshHomeMode();
+
+        Log.Info($"主页显示模式已切换为 {mode}");
     }
 
     /// <summary>主页三块小组件的开关：显示时用强调色实心，隐藏时描边，文案里直接写清当前状态。</summary>

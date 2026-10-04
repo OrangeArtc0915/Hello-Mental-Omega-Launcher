@@ -905,6 +905,43 @@
                 </StackPanel>
             </c:SurfaceCard>
 
+            <!-- 主页设置：默认 / 简洁两种显示模式 -->
+            <c:SurfaceCard x:Name="CardHome" Margin="0,14,0,0" Title="主页设置">
+                <StackPanel>
+                    <TextBlock FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="显示模式" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnHomeModeDefault"
+                                         Tag="Default"
+                                         Content="默认模式"
+                                         Click="OnHomeModeClick" />
+                        <c:OutlineButton x:Name="BtnHomeModeSimple"
+                                         Margin="8,0,0,0"
+                                         Tag="Simple"
+                                         Content="简洁模式"
+                                         Click="OnHomeModeClick" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="LabHomeModeHint"
+                               Margin="0,8,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Primary}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="默认模式：完整主页，含欢迎横幅、当前实例卡片、切换实例与日历 / 天气 / 常用网站小组件。" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="简洁模式：像 HMCL，主页只保留右下角一个「启动游戏」按钮，旁边的小箭头可切换实例；其余区域留空，尽可能露出背景图。此模式下「界面布局」里的自由定位与主页小组件不再生效。" />
+                </StackPanel>
+            </c:SurfaceCard>
+
             <!-- 扩展模块：声明式小组件扩展的增删改、启停与目录入口 -->
             <c:SurfaceCard x:Name="CardExtensions" Margin="0,14,0,0" Title="扩展模块">
                 <StackPanel>

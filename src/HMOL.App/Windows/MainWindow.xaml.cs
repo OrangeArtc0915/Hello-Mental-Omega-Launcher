@@ -84,6 +84,7 @@ public partial class MainWindow : Window
             SetupCatBackground,
             SetupCatMusic,
             SetupCatLayout,
+            SetupCatHome,
             SetupCatExtensions,
             SetupCatAutoStart,
             SetupCatGamePath,

@@ -453,6 +453,9 @@ public partial class PageHome : LauncherPage
         AddGroup(40, CardCurrent, CardSwitch, CardEmpty, CardNote);
         AddGroup(80, CardCalendar, CardWeather, CardSites, PanExtensionWidgets);
 
+        // 简洁模式浮层跟着舞台一起入场（默认模式下它是折叠的，动画无副作用）
+        AddGroup(40, PanSimple);
+
         return plan;
 
         void AddGroup(double baseDelay, params FrameworkElement[] items)
@@ -622,8 +625,19 @@ public partial class PageHome : LauncherPage
     }
 
     // ————— 刷新 —————
+
+    /// <summary>主页是否处于「简洁模式」（只留右下角一个启动入口）。</summary>
+    private static bool IsSimpleMode() => SettingsStore.Current.HomeMode == HomeMode.Simple;
+
     private void Refresh()
     {
+        var simple = IsSimpleMode();
+
+        // 模式决定整块内容的显隐：简洁模式收起横幅、小组件与舞台卡，只留右下角浮层
+        CardBanner.Visibility = simple ? Visibility.Collapsed : Visibility.Visible;
+        GrdWidgets.Visibility = simple ? Visibility.Collapsed : Visibility.Visible;
+        PanSimple.Visibility = simple ? Visibility.Visible : Visibility.Collapsed;
+
         ApplyWidgetVisibility();
 
         if (CardCurrent is null) return;
@@ -631,15 +645,25 @@ public partial class PageHome : LauncherPage
         var instances = InstanceManager.All;
         var hasInstance = instances.Count > 0;
 
-        // 自由定位只换位置，显示与否仍按「有没有实例」判断
-        CardEmpty.Visibility = hasInstance ? Visibility.Collapsed : Visibility.Visible;
-        CardCurrent.Visibility = hasInstance ? Visibility.Visible : Visibility.Collapsed;
-        CardSwitch.Visibility = hasInstance ? Visibility.Visible : Visibility.Collapsed;
-        CardNote.Visibility = hasInstance ? Visibility.Visible : Visibility.Collapsed;
+        // 自由定位只换位置，显示与否仍按「有没有实例」判断；简洁模式下舞台卡一律收起
+        CardEmpty.Visibility = !simple && !hasInstance ? Visibility.Visible : Visibility.Collapsed;
+        CardCurrent.Visibility = !simple && hasInstance ? Visibility.Visible : Visibility.Collapsed;
+        CardSwitch.Visibility = !simple && hasInstance ? Visibility.Visible : Visibility.Collapsed;
+        CardNote.Visibility = !simple && hasInstance ? Visibility.Visible : Visibility.Collapsed;
 
         RefreshBanner();
 
-        if (!hasInstance) return;
+        // 简洁模式：实例切换菜单与当前实例名
+        PanSimpleSwitch.ItemsSource = instances.Select(instance => new SwitchRowItem(instance)).ToList();
+        LabSimpleInstance.Text = hasInstance
+            ? InstanceManager.Current?.Name ?? string.Empty
+            : "还没有游戏实例";
+
+        if (!hasInstance)
+        {
+            UpdateLaunchState();
+            return;
+        }
 
         PanSwitch.ItemsSource = instances.Select(instance => new SwitchRowItem(instance)).ToList();
         LabSwitchEmpty.Visibility = instances.Count <= 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -704,6 +728,11 @@ public partial class PageHome : LauncherPage
         if (instance is null) return;
 
         LabInstanceName.Text = instance.Name;
+
+        // 简洁模式浮层上的实例名（目录失效时补一句，避免用户在简洁模式下看不出问题）
+        if (LabSimpleInstance is not null)
+            LabSimpleInstance.Text = instance.IsValid ? instance.Name : $"{instance.Name}（目录不可用）";
+
         LabPath.Text = instance.GameDir;
         LabPath.ToolTip = instance.GameDir;
         LabSummary.Text = instance.Summary;
@@ -765,6 +794,25 @@ public partial class PageHome : LauncherPage
 
         LabLaunchHint.Text = hint;
         LabLaunchHint.Visibility = string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
+
+        // 简洁模式浮层：与主卡片同一状态；没有实例时按钮改为「创建实例」
+        if (LabSimpleLaunch is not null)
+        {
+            if (instance is null)
+            {
+                LabSimpleLaunch.Text = "创建实例";
+                IconSimpleLaunch.Icon = "lucide/circle-plus";
+                BtnSimpleLaunch.Tone = ButtonTone.Solid;
+                BtnSimpleLaunch.IsEnabled = true;
+            }
+            else
+            {
+                LabSimpleLaunch.Text = running ? "停止游戏" : "启动游戏";
+                IconSimpleLaunch.Icon = running ? "lucide/square" : "lucide/play";
+                BtnSimpleLaunch.Tone = running ? ButtonTone.Danger : ButtonTone.Solid;
+                BtnSimpleLaunch.IsEnabled = running || (instance is { IsValid: true } && !_launching);
+            }
+        }
 
         void SetState(string text, string foregroundKey, string backgroundKey, string dotKey)
         {
@@ -1244,6 +1292,35 @@ public partial class PageHome : LauncherPage
 
         InstanceManager.SetCurrent(instance.Id);
         Refresh();
+    }
+
+    // ————— 简洁模式浮层 —————
+
+    private void OnSimpleSwitchClick(object sender, RoutedEventArgs e)
+        => PopSimpleSwitch.IsOpen = !PopSimpleSwitch.IsOpen;
+
+    private void OnSimpleSwitchItemClick(object sender, MouseButtonEventArgs e)
+    {
+        PopSimpleSwitch.IsOpen = false;
+
+        if (sender is not FrameworkElement { Tag: GameInstance instance }) return;
+        if (ReferenceEquals(instance, InstanceStore.Current)) return;
+
+        InstanceManager.SetCurrent(instance.Id);
+        Refresh();
+    }
+
+    /// <summary>简洁模式的启动按钮：没有实例时跳去「游戏实例」页，其余与主启动按钮完全一致。</summary>
+    private void OnSimpleLaunchClick(object sender, RoutedEventArgs e)
+    {
+        if (InstanceManager.Current is null)
+        {
+            PopSimpleSwitch.IsOpen = false;
+            (Window.GetWindow(this) as MainWindow)?.SwitchToPage(NavPages.Instances);
+            return;
+        }
+
+        OnLaunchClick(sender, e);
     }
 
     private void OnLaunchClick(object sender, RoutedEventArgs e)

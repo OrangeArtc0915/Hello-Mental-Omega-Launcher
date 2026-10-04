@@ -18,6 +18,16 @@ public enum AccentTheme
     Purple = 3
 }
 
+/// <summary>主页显示模式。</summary>
+public enum HomeMode
+{
+    /// <summary>默认模式：完整主页（欢迎横幅 + 当前实例 + 切换实例 + 小组件）。</summary>
+    Default = 0,
+
+    /// <summary>简洁模式：只留右下角一个启动入口，其余留空以尽量露出背景图。</summary>
+    Simple = 1
+}
+
 /// <summary>主页背景设置。素材文件会被复制进 Paths.Backgrounds，避免用户原图被移走后背景失效。</summary>
 public sealed class BackgroundSettings
 {
@@ -131,6 +141,9 @@ public sealed class Settings
 
     /// <summary>背景音乐。</summary>
     public BgmSettings Bgm { get; set; } = new();
+
+    /// <summary>主页显示模式。旧配置文件里没有这个字段时按默认（完整主页）处理。</summary>
+    public HomeMode HomeMode { get; set; } = HomeMode.Default;
 
     /// <summary>主页小组件（日历 / 天气 / 常用网站）的显隐。</summary>
     public HomeWidgetSettings HomeWidgets { get; set; } = new();
