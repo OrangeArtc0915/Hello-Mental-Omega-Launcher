@@ -1,45 +1,95 @@
 {
-  "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名；url 是单个直链，urls 是多个直链（分卷，下载后自动按顺序合并）；note 是可选的说明文字。改完提交到 survive 分支，下载页刷新即生效。",
+  "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名；url 是单个直链，urls 是多个直链（分卷，下载后自动按顺序合并）；note 是可选的说明文字。默认都指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
   "items": [
     {
       "name": "MO 联机补丁（联机必需）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/MO-%E8%A1%A5%E4%B8%81-%E8%81%94%E6%9C%BA.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/MO-online-patch.zip",
       "note": "解压到游戏根目录即完成安装。正常请用上方「MO 联机补丁」卡片自动下载并安装。"
     },
     {
       "name": "MO 中文输入补丁",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/Chinese%20input%20patch/MO-%E8%A1%A5%E4%B8%81-%E4%B8%AD%E6%96%87%E8%BE%93%E5%85%A5.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/MO-chinese-input-patch.zip",
       "note": "解压到游戏根目录；修复 CNC 大厅不能输入中文。"
     },
     {
-      "name": "EasyTier 组网组件（4 个分卷）",
-      "urls": [
-        "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/easytier.zip.001",
-        "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/easytier.zip.002",
-        "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/easytier.zip.003",
-        "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/easytier.zip.004"
-      ],
-      "note": "文件较大，分成 4 卷存放；点「下载」会逐卷下载并自动合并成 easytier.zip（解压到 runtime\\easytier\\）。正常联机建议用上方「组网与运行组件」卡片自动安装。"
+      "name": "EasyTier 组网组件",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/easytier.zip",
+      "note": "解压到 runtime\\easytier\\。正常联机建议用上方「组网与运行组件」卡片自动安装。"
     },
     {
       "name": "n2n 组网组件",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/n2n.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/n2n.zip",
       "note": "解压到 runtime\\n2n\\；n2n 方案需要它。"
     },
     {
       "name": "TAP 虚拟网卡驱动",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/tap.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/tap.zip",
       "note": "解压到 runtime\\tap\\；n2n 方案还需用它安装 TAP 虚拟网卡驱动。"
     },
     {
       "name": "WinIPBroadcast 广播转发",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/winipbroadcast.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/winipbroadcast.zip",
       "note": "解压到 runtime\\winipbroadcast\\；用于把局域网广播转发到虚拟网卡。"
     },
     {
       "name": "7-Zip 解压组件",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/raw/Resources/HMOL%20Online%20Required%20Files/7zip.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/7zip.zip",
       "note": "解压到 runtime\\7zip\\；缺失时 7z 压缩包会退回较慢的解压实现。"
+    },
+    {
+      "name": "DirectX 9.0c（June 2010 完整包）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/DirectX9c-Jun2010.zip",
+      "note": "解压后运行 DXSETUP.exe 安装；游戏提示缺 d3dx9_*.dll 时装它。"
+    },
+    {
+      "name": ".NET 桌面运行时 10.0.10（x64）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/windowsdesktop-runtime-10.0.10-win-x64.exe",
+      "note": "双击直接安装。"
+    },
+    {
+      "name": "Visual C++ 运行库 2019",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/VC_redist-2019.exe",
+      "note": "双击直接安装；游戏提示缺 msvcp140.dll / vcruntime140.dll 时装它。"
+    },
+    {
+      "name": "XNA Framework 4.0",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/XNA-Framework-4.0.msi",
+      "note": "双击直接安装。"
+    },
+    {
+      "name": ".NET Framework 4.0（Web 安装程序）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/NET-Framework-4.0-web.exe",
+      "note": "双击直接安装；需要联网下载组件。"
+    },
+    {
+      "name": ".NET Framework 4.8（Web 安装程序）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/NET-Framework-4.8-web.exe",
+      "note": "双击直接安装；需要联网下载组件。"
+    },
+    {
+      "name": "Visual Studio 2019 Community（Web 安装程序）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/VS-Community-2019-web.exe",
+      "note": "网页引导安装器，按需自取。"
+    },
+    {
+      "name": "Visual Studio 2019 Professional（Web 安装程序）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/VS-Professional-2019-web.exe",
+      "note": "网页引导安装器，按需自取。"
+    },
+    {
+      "name": "红警系列黑屏补丁 · cnc-ddraw 7.1.0.0（推荐）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-cnc-ddraw-7.1.0.0.zip",
+      "note": "Win10 / Win11 黑屏或卡顿优先用它。解压后把 ddraw.dll、ddraw.ini、Shaders\\ 等放进游戏根目录，用 cnc-ddraw config.exe 调设置。"
+    },
+    {
+      "name": "红警系列黑屏补丁 · wined3d 方案",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-wined3d-fix.zip",
+      "note": "解压后把 ddraw.dll、libwine.dll、wined3d.dll 放进游戏根目录。与上面二选一。"
+    },
+    {
+      "name": "红警系列黑屏补丁 · 旧版 ddraw.dll（3 个版本）",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-ddraw-legacy.zip",
+      "note": "含「作者要求加入的补丁」「其他补丁」「旧版」三个 ddraw.dll，按需取一个放进游戏根目录。"
     }
   ]
 }
