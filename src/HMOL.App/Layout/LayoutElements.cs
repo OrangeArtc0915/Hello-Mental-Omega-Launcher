@@ -42,6 +42,7 @@ public static class LayoutElements
         new("nav_instances", "游戏实例", "lucide/layers", GroupNav, "NavInstances", ContainerNav),
         new("nav_packages", "包管理", "lucide/package", GroupNav, "NavPackages", ContainerNav),
         new("nav_multiplayer", "联机", "lucide/network", GroupNav, "NavMultiplayer", ContainerNav),
+        new("nav_download", "下载", "lucide/download", GroupNav, "NavDownload", ContainerNav),
         new("nav_log", "运行日志", "lucide/scroll-text", GroupNav, "NavLog", ContainerNav),
         // 设置页是布局编辑器的唯一入口，允许隐藏等于把用户锁在外面，因此不可隐藏
         new("nav_settings", "设置", "lucide/settings", GroupNav, "NavSettings", ContainerNav, CanHide: false),
