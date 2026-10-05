@@ -7,7 +7,7 @@
         MinWidth="380"
         MinHeight="380"
         Background="{DynamicResource Surface.Window}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         ShowInTaskbar="False"
@@ -28,7 +28,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Item}">
+                    CornerRadius="{DynamicResource Radius.Item}">
                 <ScrollViewer x:Name="ScrollHistory"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
@@ -48,7 +48,7 @@
                         Background="{DynamicResource Surface.Sunken}"
                         BorderBrush="{DynamicResource Border.Default}"
                         BorderThickness="1"
-                        CornerRadius="{StaticResource Radius.Button}">
+                        CornerRadius="{DynamicResource Radius.Button}">
                     <TextBox x:Name="TxtInput"
                              Background="Transparent"
                              BorderThickness="0"

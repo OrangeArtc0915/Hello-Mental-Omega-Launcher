@@ -96,7 +96,7 @@
                             Height="54"
                             HorizontalAlignment="Center"
                             Background="{DynamicResource Accent.Faint}"
-                            CornerRadius="{StaticResource Radius.Card}">
+                            CornerRadius="{DynamicResource Radius.Card}">
                         <svg:SvgIcon Width="26"
                                      Height="26"
                                      HorizontalAlignment="Center"

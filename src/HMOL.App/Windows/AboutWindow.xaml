@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Surface.Window}"
         Foreground="{DynamicResource Text.Primary}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -29,7 +29,7 @@
                     <Border Width="48"
                             Height="48"
                             ClipToBounds="True"
-                            CornerRadius="{StaticResource Radius.Item}">
+                            CornerRadius="{DynamicResource Radius.Item}">
                         <Image Width="48"
                                Height="48"
                                Source="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"

@@ -5,7 +5,7 @@
         Width="480"
         Height="560"
         Background="{DynamicResource Surface.Window}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         ShowInTaskbar="False"
@@ -31,7 +31,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtNode"
                          Background="Transparent"
                          BorderThickness="0"

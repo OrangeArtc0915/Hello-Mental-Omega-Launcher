@@ -154,6 +154,153 @@
                                          Click="OnAccentClick" />
                     </StackPanel>
 
+                    <!-- 自定义强调色：HSL 滑块 + hex 输入 + 从背景图取色 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="自定义强调色" />
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="BorAccentPreview"
+                                Width="34"
+                                Height="34"
+                                Background="{DynamicResource Accent.Bright}"
+                                CornerRadius="{DynamicResource Radius.Small}" />
+
+                        <Border Grid.Column="1"
+                                Height="34"
+                                Margin="8,0,8,0"
+                                Padding="10,0"
+                                Background="{DynamicResource Surface.Sunken}"
+                                BorderBrush="{DynamicResource Border.Default}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource Radius.Button}">
+                            <TextBox x:Name="TxtAccentHex"
+                                     VerticalContentAlignment="Center"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     CaretBrush="{DynamicResource Text.Primary}"
+                                     FontSize="12.5"
+                                     Foreground="{DynamicResource Text.Primary}"
+                                     KeyDown="OnAccentHexKeyDown"
+                                     ToolTip="输入 #RRGGBB，回车或点「应用」生效" />
+                        </Border>
+
+                        <c:OutlineButton x:Name="BtnAccentApply"
+                                         Grid.Column="2"
+                                         Content="应用"
+                                         Tone="Solid"
+                                         Click="OnApplyCustomAccentClick" />
+                    </Grid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="色相" />
+                        <Slider x:Name="SldAccentHue"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="0"
+                                Maximum="359"
+                                SmallChange="1"
+                                LargeChange="15"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnAccentPickerChanged" />
+                        <TextBlock x:Name="LabAccentHue"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="饱和度" />
+                        <Slider x:Name="SldAccentSat"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="35"
+                                Maximum="100"
+                                SmallChange="1"
+                                LargeChange="5"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnAccentPickerChanged" />
+                        <TextBlock x:Name="LabAccentSat"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="明度" />
+                        <Slider x:Name="SldAccentLight"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="38"
+                                Maximum="62"
+                                SmallChange="1"
+                                LargeChange="4"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnAccentPickerChanged" />
+                        <TextBlock x:Name="LabAccentLight"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnAccentFromBg"
+                                         Content="从背景图取色"
+                                         Click="OnAccentFromBackgroundClick" />
+                        <c:OutlineButton x:Name="BtnAccentClear"
+                                         Margin="8,0,0,0"
+                                         Content="用预设色"
+                                         Click="OnClearCustomAccentClick" />
+                    </StackPanel>
+                    <TextBlock x:Name="LabAccentHint"
+                               Margin="0,8,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap" />
+
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
@@ -163,32 +310,118 @@
                                 Height="34"
                                 Margin="0,0,8,0"
                                 Background="{DynamicResource Accent.Deep}"
-                                CornerRadius="{StaticResource Radius.Small}" />
+                                CornerRadius="{DynamicResource Radius.Small}" />
                         <Border Width="34"
                                 Height="34"
                                 Margin="0,0,8,0"
                                 Background="{DynamicResource Accent.Base}"
-                                CornerRadius="{StaticResource Radius.Small}" />
+                                CornerRadius="{DynamicResource Radius.Small}" />
                         <Border Width="34"
                                 Height="34"
                                 Margin="0,0,8,0"
                                 Background="{DynamicResource Accent.Bright}"
-                                CornerRadius="{StaticResource Radius.Small}" />
+                                CornerRadius="{DynamicResource Radius.Small}" />
                         <Border Width="34"
                                 Height="34"
                                 Margin="0,0,8,0"
                                 Background="{DynamicResource Accent.Hover}"
-                                CornerRadius="{StaticResource Radius.Small}" />
+                                CornerRadius="{DynamicResource Radius.Small}" />
                         <Border Width="34"
                                 Height="34"
                                 Margin="0,0,8,0"
                                 Background="{DynamicResource Accent.Soft}"
-                                CornerRadius="{StaticResource Radius.Small}" />
+                                CornerRadius="{DynamicResource Radius.Small}" />
                         <Border Width="34"
                                 Height="34"
                                 Background="{DynamicResource Accent.Faint}"
-                                CornerRadius="{StaticResource Radius.Small}" />
+                                CornerRadius="{DynamicResource Radius.Small}" />
                     </StackPanel>
+
+                    <!-- 界面字体：从系统已安装字体里挑一个 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="界面字体" />
+                    <ComboBox x:Name="CmbAppFont"
+                              Margin="0,8,0,0"
+                              SelectionChanged="OnAppFontChanged" />
+                    <TextBlock x:Name="LabFontPreview"
+                               Margin="0,8,0,0"
+                               FontSize="13"
+                               Foreground="{DynamicResource Text.Primary}"
+                               Text="字体预览：Aa 心灵终结 1234567" />
+
+                    <!-- 卡片圆角：整体缩放 Radius.* -->
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="卡片圆角" />
+                        <Slider x:Name="SldCornerRadius"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="0.5"
+                                Maximum="1.6"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnCornerRadiusChanged" />
+                        <TextBlock x:Name="LabCornerRadius"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+
+                    <!-- 界面动效：总开关 + 速度 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="界面动效" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnAnimations" Click="OnToggleAnimationsClick" />
+                    </StackPanel>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="动效速度" />
+                        <Slider x:Name="SldAnimSpeed"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="0.5"
+                                Maximum="2"
+                                SmallChange="0.1"
+                                LargeChange="0.5"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnAnimSpeedChanged" />
+                        <TextBlock x:Name="LabAnimSpeed"
+                                   Grid.Column="2"
+                                   Width="44"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="关掉动效后所有过渡 / 淡入 / 呼吸效果直接落到终态；速度只在动效开启时起作用。字体与圆角改完立即生效。" />
 
                     <!-- 窗口透明度：作用于主窗口整体，拖动即时生效 -->
                     <Grid Margin="0,16,0,0">
@@ -298,7 +531,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtNickname"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"
@@ -409,7 +642,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtWeatherCity"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"
@@ -460,7 +693,7 @@
                                     <Border Margin="0,0,0,6"
                                             Padding="10,6,4,6"
                                             Background="{DynamicResource Surface.Sunken}"
-                                            CornerRadius="{StaticResource Radius.Item}">
+                                            CornerRadius="{DynamicResource Radius.Item}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
@@ -528,7 +761,7 @@
                                 Background="{DynamicResource Surface.Sunken}"
                                 BorderBrush="{DynamicResource Border.Default}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius.Button}">
+                                CornerRadius="{DynamicResource Radius.Button}">
                             <TextBox x:Name="TxtSiteName"
                                      VerticalContentAlignment="Center"
                                      Background="Transparent"
@@ -544,7 +777,7 @@
                                 Background="{DynamicResource Surface.Sunken}"
                                 BorderBrush="{DynamicResource Border.Default}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius.Button}">
+                                CornerRadius="{DynamicResource Radius.Button}">
                             <TextBox x:Name="TxtSiteUrl"
                                      VerticalContentAlignment="Center"
                                      Background="Transparent"
@@ -681,6 +914,175 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="背景铺满整个窗口（含标题栏与侧栏），界面面板是半透明的。视频背景只做暗化、不做模糊。" />
+
+                    <!-- 轮播清单 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="轮播清单" />
+                    <ItemsControl x:Name="PanBackgroundList" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,5"
+                                        Padding="9,6"
+                                        CornerRadius="{DynamicResource Radius.Item}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource Accent.Faint}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource Text.Primary}"
+                                                       Text="{Binding Title}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,2,0,0"
+                                                       FontSize="10.5"
+                                                       Foreground="{DynamicResource Text.Tertiary}"
+                                                       Text="{Binding Kind}" />
+                                        </StackPanel>
+
+                                        <c:OutlineButton Grid.Column="1"
+                                                         Margin="8,0,0,0"
+                                                         Content="使用"
+                                                         Tag="{Binding FileName}"
+                                                         Click="OnUseBackgroundClick" />
+                                        <c:OutlineButton Grid.Column="2"
+                                                         Margin="8,0,0,0"
+                                                         Content="移除"
+                                                         Tone="Danger"
+                                                         Tag="{Binding FileName}"
+                                                         Click="OnRemoveBackgroundClick" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="LabBackgroundListEmpty"
+                               Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="清单还是空的：点上面的「选择图片 / 动图 / 视频」导入，导入后会自动进来。" />
+
+                    <!-- 轮播设置 -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="76" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="轮播间隔" />
+                        <Slider x:Name="SldRotateInterval"
+                                Grid.Column="1"
+                                Margin="8,0,8,0"
+                                Minimum="10"
+                                Maximum="600"
+                                SmallChange="5"
+                                LargeChange="30"
+                                Style="{StaticResource SettingSlider}"
+                                ValueChanged="OnRotateIntervalChanged" />
+                        <TextBlock x:Name="LabRotateInterval"
+                                   Grid.Column="2"
+                                   Width="52"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Right" />
+                    </Grid>
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnRotate"
+                                         Content="已关闭"
+                                         Click="OnToggleRotateClick" />
+                        <c:OutlineButton x:Name="BtnRotateShuffle"
+                                         Margin="8,0,0,0"
+                                         Content="顺序"
+                                         Click="OnToggleShuffleClick" />
+                    </StackPanel>
+
+                    <!-- 填充方式 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="填充方式" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnFillCover"
+                                         Tag="Cover"
+                                         Content="铺满"
+                                         Click="OnBackgroundFillClick" />
+                        <c:OutlineButton x:Name="BtnFillFit"
+                                         Margin="8,0,0,0"
+                                         Tag="Fit"
+                                         Content="适应"
+                                         Click="OnBackgroundFillClick" />
+                        <c:OutlineButton x:Name="BtnFillStretch"
+                                         Margin="8,0,0,0"
+                                         Tag="Fill"
+                                         Content="拉伸"
+                                         Click="OnBackgroundFillClick" />
+                        <c:OutlineButton x:Name="BtnFillTile"
+                                         Margin="8,0,0,0"
+                                         Tag="Tile"
+                                         Content="平铺"
+                                         Click="OnBackgroundFillClick" />
+                    </StackPanel>
+
+                    <!-- 鼠标视差 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="鼠标视差" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnParallax"
+                                         Content="已关闭"
+                                         Click="OnToggleParallaxClick" />
+                    </StackPanel>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="开启后背景会随光标轻微位移；「平铺」只对静态图片有效。" />
+
+                    <!-- 每页独立背景 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="每页独立背景" />
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="CmbBgPage"
+                                  Grid.Column="0"
+                                  SelectionChanged="OnBackgroundPageChanged" />
+                        <ComboBox x:Name="CmbBgPageMaterial"
+                                  Grid.Column="1"
+                                  Margin="8,0,0,0"
+                                  SelectionChanged="OnBackgroundPageMaterialChanged" />
+                    </Grid>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="给某个页面单独指定背景；选「跟随全局」就用上面的当前背景（含轮播）。" />
                 </StackPanel>
             </c:SurfaceCard>
 
@@ -789,7 +1191,7 @@
                                 <DataTemplate>
                                     <Border Margin="0,0,0,6"
                                             Padding="10,4,4,4"
-                                            CornerRadius="{StaticResource Radius.Item}">
+                                            CornerRadius="{DynamicResource Radius.Item}">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
@@ -939,6 +1341,82 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="简洁模式：像 HMCL，主页只保留右下角一个「启动游戏」按钮，旁边的小箭头可切换实例；其余区域留空，尽可能露出背景图。此模式下「界面布局」里的自由定位与主页小组件不再生效。" />
+
+                    <!-- 附加小组件：打开后出现在主页，可在布局编辑器里自由摆放 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="附加小组件（打开后可在布局编辑器里自由摆放）" />
+
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnExtraClock"
+                                         Tag="Clock"
+                                         Click="OnExtraWidgetToggleClick" />
+                        <c:OutlineButton x:Name="BtnExtraMemo"
+                                         Margin="8,0,0,0"
+                                         Tag="Memo"
+                                         Click="OnExtraWidgetToggleClick" />
+                        <c:OutlineButton x:Name="BtnExtraMusic"
+                                         Margin="8,0,0,0"
+                                         Tag="Music"
+                                         Click="OnExtraWidgetToggleClick" />
+                    </StackPanel>
+
+                    <!-- 时钟：制式与日期 -->
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnClock24" Click="OnClockFormatClick" />
+                        <c:OutlineButton x:Name="BtnClockDate"
+                                         Margin="8,0,0,0"
+                                         Click="OnClockDateClick" />
+                    </StackPanel>
+
+                    <!-- 便签 -->
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="便签标题" />
+                    <Border Height="34"
+                            Margin="0,6,0,0"
+                            Padding="10,0"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Button}">
+                        <TextBox x:Name="TxtMemoTitle"
+                                 VerticalContentAlignment="Center"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{DynamicResource Text.Primary}"
+                                 Foreground="{DynamicResource Text.Primary}"
+                                 TextChanged="OnExtraTextChanged" />
+                    </Border>
+
+                    <TextBlock Margin="0,10,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="便签正文" />
+                    <Border MinHeight="76"
+                            Margin="0,6,0,0"
+                            Padding="10,6"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Button}">
+                        <TextBox x:Name="TxtMemoText"
+                                 AcceptsReturn="True"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{DynamicResource Text.Primary}"
+                                 Foreground="{DynamicResource Text.Primary}"
+                                 TextChanged="OnExtraTextChanged"
+                                 TextWrapping="Wrap" />
+                    </Border>
+
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="时钟、便签与音乐控制都可以在「界面布局」编辑器里拖动、缩放与隐藏。" />
                 </StackPanel>
             </c:SurfaceCard>
 
@@ -954,7 +1432,7 @@
                     <Border Margin="0,8,0,0"
                             Padding="10,8"
                             Background="{DynamicResource Status.WarnSoft}"
-                            CornerRadius="{StaticResource Radius.Item}">
+                            CornerRadius="{DynamicResource Radius.Item}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -1035,7 +1513,7 @@
                                     <Border Margin="0,0,0,6"
                                             Padding="10,8"
                                             Background="{DynamicResource Surface.Sunken}"
-                                            CornerRadius="{StaticResource Radius.Item}">
+                                            CornerRadius="{DynamicResource Radius.Item}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
@@ -1048,7 +1526,7 @@
                                                     Height="26"
                                                     VerticalAlignment="Top"
                                                     Background="{DynamicResource Surface.Card}"
-                                                    CornerRadius="{StaticResource Radius.Small}">
+                                                    CornerRadius="{DynamicResource Radius.Small}">
                                                 <svg:SvgIcon Width="14"
                                                              Height="14"
                                                              HorizontalAlignment="Center"
@@ -1289,6 +1767,99 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="更新只会替换启动器本身：设置、缓存、实例与游戏文件都不会动。" />
+                </StackPanel>
+            </c:SurfaceCard>
+
+            <!-- 窗口与音效：自定义标题文字、窗口图标、启动 / 关闭音效 -->
+            <c:SurfaceCard x:Name="CardLook" Margin="0,14,0,0" Title="窗口与音效">
+                <StackPanel>
+                    <TextBlock FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="窗口标题文字" />
+                    <Border Height="34"
+                            Margin="0,6,0,0"
+                            Padding="10,0"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Button}">
+                        <TextBox x:Name="TxtWindowTitle"
+                                 VerticalContentAlignment="Center"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{DynamicResource Text.Primary}"
+                                 Foreground="{DynamicResource Text.Primary}"
+                                 TextChanged="OnWindowTitleChanged" />
+                    </Border>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="留空表示用默认名（Hello Mental Omega Launcher）；标题栏与任务栏都会跟着改。" />
+
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="窗口图标" />
+                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnPickIcon"
+                                         Content="选择图标"
+                                         Tone="Solid"
+                                         Click="OnPickIconClick" />
+                        <c:OutlineButton x:Name="BtnClearIcon"
+                                         Margin="8,0,0,0"
+                                         Content="用内置图标"
+                                         Click="OnClearIconClick" />
+                    </StackPanel>
+                    <TextBlock x:Name="LabIconStatus"
+                               Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="启动音效" />
+                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnPickStartSound"
+                                         Content="选择音效"
+                                         Click="OnPickStartSoundClick" />
+                        <c:OutlineButton x:Name="BtnClearStartSound"
+                                         Margin="8,0,0,0"
+                                         Content="清除"
+                                         Click="OnClearStartSoundClick" />
+                    </StackPanel>
+                    <TextBlock x:Name="LabStartSoundStatus"
+                               Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="关闭音效" />
+                    <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnPickStopSound"
+                                         Content="选择音效"
+                                         Click="OnPickStopSoundClick" />
+                        <c:OutlineButton x:Name="BtnClearStopSound"
+                                         Margin="8,0,0,0"
+                                         Content="清除"
+                                         Click="OnClearStopSoundClick" />
+                    </StackPanel>
+                    <TextBlock x:Name="LabStopSoundStatus"
+                               Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Margin="0,10,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="图标与音效都会复制进数据目录的 custom 子目录，原文件删掉也不影响。关闭音效会在退出前留约 0.7 秒播出来。" />
                 </StackPanel>
             </c:SurfaceCard>
 

@@ -12,7 +12,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Surface.Window}"
         Foreground="{DynamicResource Text.Primary}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -39,7 +39,7 @@
                                             Margin="1"
                                             Padding="{TemplateBinding Padding}"
                                             Background="{DynamicResource Common.Transparent}"
-                                            CornerRadius="{StaticResource Radius.Small}">
+                                            CornerRadius="{DynamicResource Radius.Small}">
                                         <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                                     </Border>
                                     <ControlTemplate.Triggers>
@@ -74,7 +74,7 @@
                                 Margin="0,0,6,0"
                                 Padding="14,7"
                                 Background="{DynamicResource Common.Transparent}"
-                                CornerRadius="{StaticResource Radius.Small}">
+                                CornerRadius="{DynamicResource Radius.Small}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               ContentSource="Header" />
@@ -194,7 +194,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Item}">
+                                    CornerRadius="{DynamicResource Radius.Item}">
                                 <ListBox x:Name="ListSchemes"
                                          ItemTemplate="{StaticResource SchemeRowTemplate}"
                                          SelectionChanged="OnSchemeSelectionChanged"
@@ -215,6 +215,16 @@
                                                  Content="删除方案"
                                                  Tone="Danger"
                                                  Click="OnSchemeDeleteClick" />
+                                <c:OutlineButton x:Name="BtnSchemeExport"
+                                                 Margin="0,6,0,0"
+                                                 Content="导出方案"
+                                                 ToolTip="把当前方案存成 JSON，方便备份或分享"
+                                                 Click="OnSchemeExportClick" />
+                                <c:OutlineButton x:Name="BtnSchemeImport"
+                                                 Margin="0,6,0,0"
+                                                 Content="导入方案"
+                                                 ToolTip="从别人的 JSON 文件导入一套方案"
+                                                 Click="OnSchemeImportClick" />
                             </StackPanel>
                         </Grid>
 
@@ -238,7 +248,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Item}">
+                                    CornerRadius="{DynamicResource Radius.Item}">
                                 <Grid>
                                     <ListBox x:Name="ListHidden"
                                              ItemTemplate="{StaticResource ElementRowTemplate}"
@@ -279,7 +289,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Item}">
+                                    CornerRadius="{DynamicResource Radius.Item}">
                                 <Grid>
                                     <ListBox x:Name="ListShown"
                                              ItemTemplate="{StaticResource ElementRowTemplate}"
@@ -345,7 +355,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Item}">
+                            CornerRadius="{DynamicResource Radius.Item}">
                         <l:HomeLayoutPreview x:Name="PanHomePreview" MinHeight="240" />
                     </Border>
 
@@ -363,7 +373,7 @@
                             <TextBlock FontSize="11"
                                        Foreground="{DynamicResource Text.Tertiary}"
                                        TextWrapping="Wrap"
-                                       Text="拖动方块移动、拉手柄缩放、双击居中。虚线框表示该控件仍跟随流式布局；侧栏是固定布局，不参与自由定位。" />
+                                       Text="拖动方块移动、拉手柄缩放、双击居中。虚线框表示仍跟随流式布局，半透明表示已隐藏；横幅与三块小组件也在这里拖动缩放。启动入口类控件不允许隐藏。" />
                         </StackPanel>
 
                         <Border Grid.Row="1"
@@ -371,7 +381,7 @@
                                 Background="{DynamicResource Surface.Sunken}"
                                 BorderBrush="{DynamicResource Border.Default}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius.Item}">
+                                CornerRadius="{DynamicResource Radius.Item}">
                             <ListBox x:Name="ListHome"
                                      ItemTemplate="{StaticResource ElementRowTemplate}"
                                      SelectionChanged="OnHomeSelectionChanged"
@@ -388,6 +398,16 @@
                                              Content="恢复默认位置与大小"
                                              ToolTip="清掉坐标，让这个控件回到流式布局"
                                              Click="OnHomeResetClick" />
+                            <c:OutlineButton x:Name="BtnHomeHide"
+                                             Margin="0,6,0,0"
+                                             Content="隐藏这个控件"
+                                             ToolTip="主页上不再显示它（启动入口类控件不可隐藏）"
+                                             Click="OnHomeHideClick" />
+                            <c:OutlineButton x:Name="BtnHomeShow"
+                                             Margin="0,6,0,0"
+                                             Content="显示这个控件"
+                                             ToolTip="让隐藏的控件重新出现"
+                                             Click="OnHomeShowClick" />
                         </StackPanel>
                     </Grid>
                 </Grid>

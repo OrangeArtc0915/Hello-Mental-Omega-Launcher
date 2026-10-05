@@ -6,7 +6,7 @@
         Title="联机 HUD"
         AllowsTransparency="True"
         Background="{x:Null}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.OnHud}"
         ResizeMode="NoResize"
         ShowActivated="False"
@@ -28,7 +28,7 @@
             Background="#FF0B0E13"
             BorderBrush="#FF4A5566"
             BorderThickness="1"
-            CornerRadius="{StaticResource Radius.Card}"
+            CornerRadius="{DynamicResource Radius.Card}"
             MouseLeftButtonDown="OnDragAreaMouseDown">
         <StackPanel Margin="11,9,11,11">
             <Grid>

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using HMOL.Core.App;
 
 namespace HMOL.App.Animation;
 
@@ -28,7 +29,8 @@ public static class AnimationEngine
     private static int _suspendCount;
     private static bool _hooked;
 
-    public static bool IsEnabled => _suspendCount == 0;
+    /// <summary>批量构建界面时用 Suspend 临时关闭；用户在设置里关掉「界面动效」时也整体关闭。</summary>
+    public static bool IsEnabled => _suspendCount == 0 && SettingsStore.Current.AnimationsEnabled;
 
     /// <summary>帧驱动被调用的次数，用于排查动画是否真的在推进。</summary>
     public static long TickCount { get; private set; }
@@ -76,6 +78,10 @@ public static class AnimationEngine
             completed?.Invoke();
             return;
         }
+
+        // 动效速度：倍率越大动画越快（时长越短）
+        var speed = SettingsStore.Current.AnimationSpeed;
+        if (Math.Abs(speed - 1) > 0.001 && speed > 0) durationMs /= speed;
 
         Running[key] = new Entry
         {

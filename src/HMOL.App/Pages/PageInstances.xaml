@@ -44,7 +44,7 @@
                         Margin="0,0,0,10"
                         Padding="12,10"
                         Background="{DynamicResource Accent.Faint}"
-                        CornerRadius="{StaticResource Radius.Item}"
+                        CornerRadius="{DynamicResource Radius.Item}"
                         Visibility="Collapsed">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -115,7 +115,7 @@
                                                 Width="38"
                                                 Height="38"
                                                 Background="{DynamicResource Accent.Faint}"
-                                                CornerRadius="{StaticResource Radius.Item}">
+                                                CornerRadius="{DynamicResource Radius.Item}">
                                             <Grid>
                                                 <!-- 游戏自带图标：有就显示图片 -->
                                                 <Image Width="26"
@@ -167,7 +167,7 @@
                                                 Padding="8,2"
                                                 VerticalAlignment="Top"
                                                 Background="{DynamicResource Accent.Faint}"
-                                                CornerRadius="{StaticResource Radius.Pill}"
+                                                CornerRadius="{DynamicResource Radius.Pill}"
                                                 Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}">
                                             <TextBlock FontSize="10.5"
                                                        FontWeight="SemiBold"
@@ -274,7 +274,7 @@
                                 Height="54"
                                 HorizontalAlignment="Center"
                                 Background="{DynamicResource Accent.Faint}"
-                                CornerRadius="{StaticResource Radius.Card}">
+                                CornerRadius="{DynamicResource Radius.Card}">
                             <svg:SvgIcon Width="26"
                                          Height="26"
                                          HorizontalAlignment="Center"
@@ -367,7 +367,7 @@
                                 <DataTemplate>
                                     <Border Margin="0,0,0,6"
                                             Padding="10,8"
-                                            CornerRadius="{StaticResource Radius.Item}"
+                                            CornerRadius="{DynamicResource Radius.Item}"
                                             Cursor="Hand"
                                             Tag="{Binding}"
                                             MouseEnter="OnBackupRowEnter"
@@ -399,7 +399,7 @@
                                                     Height="24"
                                                     VerticalAlignment="Center"
                                                     Background="{DynamicResource Surface.Card}"
-                                                    CornerRadius="{StaticResource Radius.Small}">
+                                                    CornerRadius="{DynamicResource Radius.Small}">
                                                 <svg:SvgIcon Width="13"
                                                              Height="13"
                                                              HorizontalAlignment="Center"

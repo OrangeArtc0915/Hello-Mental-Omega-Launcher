@@ -25,7 +25,7 @@
                                     <Border x:Name="Bd"
                                             Padding="{TemplateBinding Padding}"
                                             Background="{DynamicResource Common.Transparent}"
-                                            CornerRadius="{StaticResource Radius.Small}">
+                                            CornerRadius="{DynamicResource Radius.Small}">
                                         <ContentPresenter HorizontalAlignment="Stretch" />
                                     </Border>
                                     <ControlTemplate.Triggers>
@@ -52,7 +52,7 @@
             <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Button}" />
+            <Setter Property="CornerRadius" Value="{DynamicResource Radius.Button}" />
         </Style>
 
         <Style x:Key="MpInput" TargetType="TextBox">
@@ -110,7 +110,7 @@
                 Margin="0,12,0,0"
                 Padding="12,10"
                 Background="{DynamicResource Accent.Faint}"
-                CornerRadius="{StaticResource Radius.Item}"
+                CornerRadius="{DynamicResource Radius.Item}"
                 Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -708,7 +708,7 @@
                                 Background="{DynamicResource Surface.Sunken}"
                                 BorderBrush="{DynamicResource Border.Default}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius.Button}">
+                                CornerRadius="{DynamicResource Radius.Button}">
                             <ScrollViewer x:Name="ScrollEngineOutput"
                                           Height="380"
                                           HorizontalScrollBarVisibility="Disabled"

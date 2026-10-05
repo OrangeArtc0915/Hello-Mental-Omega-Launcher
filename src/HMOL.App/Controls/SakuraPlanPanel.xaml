@@ -33,7 +33,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtKey"
                          VerticalContentAlignment="Center"
                          Background="Transparent"
@@ -116,7 +116,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtTunnelName"
                          VerticalContentAlignment="Center"
                          Background="Transparent"
@@ -199,7 +199,7 @@
                 Margin="0,10,0,0"
                 Padding="12,10"
                 Background="{DynamicResource Accent.Faint}"
-                CornerRadius="{StaticResource Radius.Item}"
+                CornerRadius="{DynamicResource Radius.Item}"
                 Visibility="Collapsed">
             <StackPanel>
                 <TextBlock FontSize="12"

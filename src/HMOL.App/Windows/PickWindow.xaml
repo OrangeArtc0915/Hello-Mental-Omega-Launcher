@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Surface.Window}"
         Foreground="{DynamicResource Text.Primary}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -44,7 +44,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Item}">
+                    CornerRadius="{DynamicResource Radius.Item}">
                 <ScrollViewer Margin="4"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">

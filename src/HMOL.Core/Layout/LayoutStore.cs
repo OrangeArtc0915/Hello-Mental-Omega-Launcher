@@ -183,6 +183,7 @@ public static class LayoutStore
             Id = MakeId(trimmed),
             Name = trimmed,
             Description = copyFrom is null ? "自定义布局" : $"复制自 {copyFrom.Name}",
+            Version = LayoutScheme.CurrentVersion,
         };
 
         if (copyFrom is not null) scheme.Items = copyFrom.Items.Select(item => item.Clone()).ToList();
@@ -277,6 +278,74 @@ public static class LayoutStore
             string.Equals(scheme.Name, trimmed, StringComparison.OrdinalIgnoreCase));
 
         return duplicated ? "已有同名方案，请换一个。" : null;
+    }
+
+    /// <summary>把一个方案写到指定文件（导出分享用）。失败原因写进 <paramref name="error"/>。</summary>
+    public static bool ExportTo(LayoutScheme scheme, string path, out string? error)
+    {
+        error = null;
+
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+            File.WriteAllText(path, JsonSerializer.Serialize(scheme, Options));
+            Log.Info($"已导出布局方案「{scheme.Name}」→ {path}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            Log.Error($"导出布局方案失败：{path}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 从文件导入一个方案：名称撞车时补序号、Id 重新生成，加入列表后返回。
+    /// 导入的若是旧版本方案（Version 1），保留其版本号，交给主页在首次应用时换算坐标。
+    /// </summary>
+    public static LayoutScheme? ImportFrom(string path, IReadOnlyList<string> knownElementIds, out string? error)
+    {
+        error = null;
+
+        var scheme = ReadFrom(path, out var readError);
+        if (scheme is null)
+        {
+            error = readError ?? "文件内容无法解析。";
+            return null;
+        }
+
+        var name = MakeUniqueName(scheme.Name);
+        scheme.Id = MakeId(name);
+        scheme.Name = name;
+        scheme.Normalize(knownElementIds);
+
+        if (!Save(scheme))
+        {
+            error = "写入方案失败，请检查数据目录是否可写。";
+            return null;
+        }
+
+        Log.Info($"已导入布局方案「{scheme.Name}」（来自 {Path.GetFileName(path)}）");
+        return scheme;
+    }
+
+    /// <summary>导出 / 导入时给方案名找一个不冲突的版本：撞车就补「(2)」「(3)」。</summary>
+    private static string MakeUniqueName(string? name)
+    {
+        var baseName = (name ?? string.Empty).Trim();
+
+        if (baseName.Length == 0) baseName = "导入的方案";
+        if (baseName.Length > 18) baseName = baseName[..18];
+
+        var candidate = baseName;
+
+        for (var index = 2; ValidateName(candidate, null) is not null && index < 100; index++)
+            candidate = $"{baseName} ({index})";
+
+        return candidate;
     }
 
     private static LayoutScheme ResolveActive()

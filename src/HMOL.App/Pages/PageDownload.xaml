@@ -54,7 +54,7 @@
                     Padding="10,6"
                     VerticalAlignment="Center"
                     Background="{DynamicResource Surface.Sunken}"
-                    CornerRadius="{StaticResource Radius.Item}">
+                    CornerRadius="{DynamicResource Radius.Item}">
                 <TextBlock x:Name="LabDownloadDir"
                            FontSize="12"
                            Foreground="{DynamicResource Text.Primary}"
@@ -82,7 +82,7 @@
                 Margin="0,12,0,0"
                 Padding="12,10"
                 Background="{DynamicResource Status.WarnSoft}"
-                CornerRadius="{StaticResource Radius.Item}">
+                CornerRadius="{DynamicResource Radius.Item}">
             <StackPanel Orientation="Horizontal">
                 <svg:SvgIcon Width="16"
                              Height="16"
@@ -105,7 +105,7 @@
                 Margin="0,10,0,0"
                 Padding="12,10"
                 Background="{DynamicResource Accent.Faint}"
-                CornerRadius="{StaticResource Radius.Item}"
+                CornerRadius="{DynamicResource Radius.Item}"
                 Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>

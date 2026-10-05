@@ -23,9 +23,15 @@ public sealed class HomeLayoutPreview : Grid
     /// <summary>拖动/缩放的像素下限，太小就抓不住了。</summary>
     private const double MinPixelSize = 40;
 
+    /// <summary>对齐辅助线的判定距离（像素）：只画线提示，不做吸附。</summary>
+    private const double GuideThreshold = 6;
+
     private static readonly string[] HandlePositions = ["tl", "t", "tr", "l", "r", "bl", "b", "br"];
 
     private readonly Dictionary<string, Box> _boxes = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>对齐辅助线画在最上层，不参与命中测试。</summary>
+    private Canvas? _guideLayer;
 
     private IReadOnlyList<LayoutItem> _items = [];
     private string? _selectedId;
@@ -65,6 +71,10 @@ public sealed class HomeLayoutPreview : Grid
             _boxes[info.Id] = box;
             Children.Add(box.Root);
         }
+
+        _guideLayer = new Canvas { IsHitTestVisible = false };
+        Panel.SetZIndex(_guideLayer, 10);
+        Children.Add(_guideLayer);
 
         Relayout();
         UpdateVisuals();
@@ -188,13 +198,17 @@ public sealed class HomeLayoutPreview : Grid
         {
             var selected = LayoutScheme.Same(box.Info.Id, _selectedId);
             var free = box.Item is { HasBounds: true };
+            var hidden = box.Item is { Visible: false };
 
             box.Frame.StrokeThickness = selected ? 2 : 1;
-            box.Frame.StrokeDashArray = free ? null : new DoubleCollection { 4, 3 };
-            box.Frame.SetResourceReference(Shape.StrokeProperty, selected ? "Accent.Bright" : free ? "Accent.Soft" : "Border.Strong");
-            box.Frame.SetResourceReference(Shape.FillProperty, free ? "Surface.Card" : "Surface.Sunken");
+            box.Frame.StrokeDashArray = free && !hidden ? null : new DoubleCollection { 4, 3 };
+            box.Frame.SetResourceReference(Shape.StrokeProperty,
+                selected ? "Accent.Bright" : free && !hidden ? "Accent.Soft" : "Border.Strong");
+            box.Frame.SetResourceReference(Shape.FillProperty, free && !hidden ? "Surface.Card" : "Surface.Sunken");
+            box.Frame.Opacity = hidden ? 0.45 : 1;
+
             box.Title.SetResourceReference(TextBlock.ForegroundProperty, selected ? "Accent.Base" : "Text.Primary");
-            box.Subtitle.Text = free ? "自由定位" : "流式";
+            box.Subtitle.Text = hidden ? "已隐藏" : free ? "自由定位" : "流式";
 
             foreach (var handle in box.Handles.Values)
                 handle.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
@@ -237,7 +251,9 @@ public sealed class HomeLayoutPreview : Grid
         var moved = drag.StartRect;
         moved.Offset(point.X - drag.StartPoint.X, point.Y - drag.StartPoint.Y);
 
-        WriteBox(drag.Box.Item!, ClampRect(moved));
+        var rect = ClampRect(moved);
+        WriteBox(drag.Box.Item!, rect);
+        UpdateGuides(rect);
     }
 
     private void StartResize(Box box, string position, MouseButtonEventArgs e)
@@ -279,7 +295,9 @@ public sealed class HomeLayoutPreview : Grid
         if (handle.Contains('t')) top = Math.Min(start.Top + deltaY, bottom - MinPixelSize);
         if (handle.Contains('b')) bottom = Math.Max(start.Bottom + deltaY, top + MinPixelSize);
 
-        WriteBox(drag.Box.Item!, ClampRect(new Rect(left, top, right - left, bottom - top)));
+        var rect = ClampRect(new Rect(left, top, right - left, bottom - top));
+        WriteBox(drag.Box.Item!, rect);
+        UpdateGuides(rect);
     }
 
     private void EndDrag(object sender, MouseButtonEventArgs e)
@@ -288,8 +306,86 @@ public sealed class HomeLayoutPreview : Grid
 
         drag.Capture?.ReleaseMouseCapture();
         _drag = null;
+        ClearGuides();
         e.Handled = true;
     }
+
+    // ————— 对齐辅助线 —————
+
+    /// <summary>
+    /// 拖动 / 缩放时画对齐辅助线：正在移动的三条边（左/中/右、上/中/下）与其它方块或预览边界
+    /// 在阈值内对齐就画一条虚线。<b>只提示、不改位置</b>，不引入网格吸附。
+    /// </summary>
+    private void UpdateGuides(Rect moving)
+    {
+        ClearGuides();
+
+        if (_guideLayer is null || _drag is not { } drag) return;
+
+        var xs = new List<double> { 0, ActualWidth / 2, ActualWidth };
+        var ys = new List<double> { 0, ActualHeight / 2, ActualHeight };
+
+        foreach (var box in _boxes.Values)
+        {
+            if (ReferenceEquals(box, drag.Box) || box.Item is { Visible: false }) continue;
+
+            var rect = CurrentRect(box);
+
+            xs.Add(rect.Left);
+            xs.Add(rect.Left + rect.Width / 2);
+            xs.Add(rect.Right);
+
+            ys.Add(rect.Top);
+            ys.Add(rect.Top + rect.Height / 2);
+            ys.Add(rect.Bottom);
+        }
+
+        foreach (var x in new[] { moving.Left, moving.Left + moving.Width / 2, moving.Right })
+        {
+            if (Nearest(xs, x) is { } target) AddGuideLine(target, 0, target, ActualHeight);
+        }
+
+        foreach (var y in new[] { moving.Top, moving.Top + moving.Height / 2, moving.Bottom })
+        {
+            if (Nearest(ys, y) is { } target) AddGuideLine(0, target, ActualWidth, target);
+        }
+    }
+
+    /// <summary>在阈值内找最近的对齐位置；找不到返回 null。</summary>
+    private static double? Nearest(IEnumerable<double> targets, double value)
+    {
+        double? best = null;
+
+        foreach (var target in targets)
+        {
+            if (Math.Abs(target - value) > GuideThreshold) continue;
+            if (best is { } current && Math.Abs(current - value) <= Math.Abs(target - value)) continue;
+
+            best = target;
+        }
+
+        return best;
+    }
+
+    private void AddGuideLine(double x1, double y1, double x2, double y2)
+    {
+        if (_guideLayer is null) return;
+
+        var line = new Line
+        {
+            X1 = x1,
+            Y1 = y1,
+            X2 = x2,
+            Y2 = y2,
+            StrokeThickness = 1,
+            StrokeDashArray = new DoubleCollection { 3, 3 },
+        };
+        line.SetResourceReference(Shape.StrokeProperty, "Accent.Bright");
+
+        _guideLayer.Children.Add(line);
+    }
+
+    private void ClearGuides() => _guideLayer?.Children.Clear();
 
     // ————— 构造方块 —————
 

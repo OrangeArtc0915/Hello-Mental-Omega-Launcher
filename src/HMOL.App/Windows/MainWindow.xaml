@@ -15,7 +15,7 @@
         ResizeMode="CanResize"
         AllowsTransparency="False"
         Background="{x:Null}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         UseLayoutRounding="True"
@@ -29,7 +29,7 @@
                       UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
-    <Grid x:Name="RootGrid" UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <Grid x:Name="RootGrid" UseLayoutRounding="True" SnapsToDevicePixels="True" MouseMove="OnRootMouseMove">
 
         <!-- 窗口外的留白用来显示自绘投影，玻璃化不可用时会退化为贴边窗口 -->
         <Border x:Name="PanBack" Margin="8" SnapsToDevicePixels="False" UseLayoutRounding="False">
@@ -81,15 +81,17 @@
                         <Border Width="24"
                                 Height="24"
                                 ClipToBounds="True"
-                                CornerRadius="{StaticResource Radius.Small}">
-                            <Image Width="20"
+                                CornerRadius="{DynamicResource Radius.Small}">
+                            <Image x:Name="ImgTitleIcon"
+                                   Width="20"
                                    Height="20"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Source="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
                                    Stretch="Uniform" />
                         </Border>
-                        <TextBlock Margin="10,0,0,0"
+                        <TextBlock x:Name="LabTitleAppName"
+                                   Margin="10,0,0,0"
                                    VerticalAlignment="Center"
                                    FontSize="14"
                                    FontWeight="SemiBold"
@@ -204,6 +206,45 @@
                                     </StackPanel>
 
                                     <!--
+                                        设置分组栏：进设置页时先只列「个性化 / 更新与下载 / 联机 / 其他」四个大类，
+                                        点进去再换成该类的分类列表（PanSetupNav）。这样侧栏一次不会堆十几个入口。
+                                    -->
+                                    <StackPanel x:Name="PanSetupGroups"
+                                                Margin="0,12,0,0"
+                                                VerticalAlignment="Top"
+                                                Visibility="Collapsed">
+                                        <c:NavItem x:Name="SetupGroupsBack"
+                                                   GroupName="SetupGroupsBackNav"
+                                                   Icon="lucide/arrow-left"
+                                                   Text="返回"
+                                                   Click="OnSetupBackClick" />
+                                        <c:NavItem x:Name="SetupGroupPersonal"
+                                                   GroupName="SetupGroupNav"
+                                                   Icon="lucide/palette"
+                                                   Tag="0"
+                                                   Text="个性化"
+                                                   Checked="OnSetupGroupChecked" />
+                                        <c:NavItem x:Name="SetupGroupUpdate"
+                                                   GroupName="SetupGroupNav"
+                                                   Icon="lucide/download"
+                                                   Tag="1"
+                                                   Text="更新与下载"
+                                                   Checked="OnSetupGroupChecked" />
+                                        <c:NavItem x:Name="SetupGroupMultiplayer"
+                                                   GroupName="SetupGroupNav"
+                                                   Icon="lucide/network"
+                                                   Tag="2"
+                                                   Text="联机"
+                                                   Checked="OnSetupGroupChecked" />
+                                        <c:NavItem x:Name="SetupGroupOther"
+                                                   GroupName="SetupGroupNav"
+                                                   Icon="lucide/sparkles"
+                                                   Tag="3"
+                                                   Text="其他"
+                                                   Checked="OnSetupGroupChecked" />
+                                    </StackPanel>
+
+                                    <!--
                                         设置分类栏：进设置页时顶替上面的主导航，离开后还原。
                                         GroupName 必须与主导航不同——同名 RadioButton 会互相抢选中，
                                         而这两组本来就该各自记住自己的选中项。
@@ -213,88 +254,97 @@
                                                 Margin="0,12,0,0"
                                                 VerticalAlignment="Top"
                                                 Visibility="Collapsed">
-                                        <!-- 返回：不参与分类选中，单独分组，点完自己取消高亮 -->
+                                        <!-- 返回：回到分组列表（再点一次「返回」才离开设置页） -->
                                         <c:NavItem x:Name="SetupNavBack"
                                                    GroupName="SetupBackNav"
                                                    Icon="lucide/arrow-left"
-                                                   Text="返回"
-                                                   Click="OnSetupBackClick" />
+                                                   Text="返回分类"
+                                                   Click="OnSetupCategoryBackClick" />
                                         <c:NavItem x:Name="SetupCatAppearance"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/palette"
                                                    Tag="0"
                                                    Text="外观"
                                                    Checked="OnSetupCategoryChecked" />
-                                        <c:NavItem x:Name="SetupCatNickname"
+                                        <c:NavItem x:Name="SetupCatHome"
                                                    GroupName="SetupNav"
-                                                   Icon="lucide/user"
+                                                   Icon="lucide/monitor-cog"
                                                    Tag="1"
-                                                   Text="联机设置"
-                                                   Checked="OnSetupCategoryChecked" />
-                                        <c:NavItem x:Name="SetupCatWeatherCity"
-                                                   GroupName="SetupNav"
-                                                   Icon="lucide/globe"
-                                                   Tag="2"
-                                                   Text="天气城市"
-                                                   Checked="OnSetupCategoryChecked" />
-                                        <c:NavItem x:Name="SetupCatSites"
-                                                   GroupName="SetupNav"
-                                                   Icon="lucide/link-2"
-                                                   Tag="3"
-                                                   Text="常用网站"
+                                                   Text="主页设置"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatBackground"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/image"
-                                                   Tag="4"
+                                                   Tag="2"
                                                    Text="主页背景"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatMusic"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/music"
-                                                   Tag="5"
+                                                   Tag="3"
                                                    Text="背景音乐"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatLayout"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/grid-2x2"
-                                                   Tag="6"
+                                                   Tag="4"
                                                    Text="界面布局"
                                                    Checked="OnSetupCategoryChecked" />
-                                        <c:NavItem x:Name="SetupCatHome"
+                                        <c:NavItem x:Name="SetupCatSites"
                                                    GroupName="SetupNav"
-                                                   Icon="lucide/monitor-cog"
-                                                   Tag="7"
-                                                   Text="主页设置"
+                                                   Icon="lucide/link-2"
+                                                   Tag="5"
+                                                   Text="常用网站"
+                                                   Checked="OnSetupCategoryChecked" />
+                                        <c:NavItem x:Name="SetupCatWeatherCity"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/globe"
+                                                   Tag="6"
+                                                   Text="天气城市"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatExtensions"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/puzzle"
-                                                   Tag="8"
+                                                   Tag="7"
                                                    Text="扩展模块"
+                                                   Checked="OnSetupCategoryChecked" />
+
+                                        <c:NavItem x:Name="SetupCatUpdate"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/download"
+                                                   Tag="8"
+                                                   Text="程序更新"
+                                                   Checked="OnSetupCategoryChecked" />
+
+                                        <c:NavItem x:Name="SetupCatNickname"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/user"
+                                                   Tag="9"
+                                                   Text="联机设置"
+                                                   Checked="OnSetupCategoryChecked" />
+
+                                        <c:NavItem x:Name="SetupCatLook"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/sparkles"
+                                                   Tag="10"
+                                                   Text="窗口与音效"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatAutoStart"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/power"
-                                                   Tag="9"
+                                                   Tag="11"
                                                    Text="开机自启"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatGamePath"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/folder-open"
-                                                   Tag="10"
+                                                   Tag="12"
                                                    Text="游戏路径"
-                                                   Checked="OnSetupCategoryChecked" />
-                                        <c:NavItem x:Name="SetupCatUpdate"
-                                                   GroupName="SetupNav"
-                                                   Icon="lucide/download"
-                                                   Tag="11"
-                                                   Text="程序更新"
                                                    Checked="OnSetupCategoryChecked" />
                                         <c:NavItem x:Name="SetupCatAbout"
                                                    GroupName="SetupNav"
                                                    Icon="lucide/info"
-                                                   Tag="12"
+                                                   Tag="13"
                                                    Text="关于与存储"
                                                    Checked="OnSetupCategoryChecked" />
                                     </StackPanel>

@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using HMOL.App.Animation;
@@ -138,6 +139,26 @@ public sealed class ExtensionRow
     public string DeleteA11yName { get; }
 }
 
+/// <summary>背景轮播清单里的一行。</summary>
+public sealed class BackgroundRow
+{
+    public BackgroundRow(string fileName, bool isCurrent)
+    {
+        FileName = fileName;
+        IsCurrent = isCurrent;
+        Title = Path.GetFileName(fileName);
+        Kind = BackgroundService.DescribeKind(BackgroundService.DetectKind(fileName));
+    }
+
+    public string FileName { get; }
+
+    public string Title { get; }
+
+    public string Kind { get; }
+
+    public bool IsCurrent { get; }
+}
+
 /// <summary>
 /// 设置页。只做 <see cref="Settings"/> 里已有的字段：主题模式、强调色、窗口透明度、界面缩放、
 /// 联机设置（昵称与游戏内 HUD）、天气城市、常用网站、主页背景、背景音乐。
@@ -159,6 +180,12 @@ public partial class PageSettings : LauncherPage
     /// 从而触发 ValueChanged（此时标签可能还没建好），必须等构造结束才开始响应。
     /// </summary>
     private bool _appearanceReady;
+
+    /// <summary>构造期与刷新期不让取色器滑块的事件回写（理由同 <see cref="_appearanceReady"/>）。</summary>
+    private bool _suppressAccentPicker = true;
+
+    /// <summary>刷新字体下拉框选中项时不触发切换事件。</summary>
+    private bool _suppressFontChanged;
 
     private bool _suppressNicknameChanged;
 
@@ -187,17 +214,18 @@ public partial class PageSettings : LauncherPage
         _anim.Group(0, HeaderSettings);
         _anim.Group(40,
             CardAppearance,
-            CardNickname,
-            CardWeatherCity,
-            CardSites,
+            CardHome,
             CardBackground,
             CardMusic,
             CardLayout,
-            CardHome,
+            CardSites,
+            CardWeatherCity,
             CardExtensions,
+            CardUpdate,
+            CardNickname,
+            CardLook,
             CardAutoStart,
             CardGamePath,
-            CardUpdate,
             CardAbout);
 
         RefreshSelection();
@@ -212,9 +240,16 @@ public partial class PageSettings : LauncherPage
         RefreshMusic();
         RefreshLayout();
         RefreshHomeMode();
+        RefreshExtraWidgets();
+        RefreshLook();
         RefreshAutoStart();
+        BuildFontList();
+        BuildBackgroundPageList();
         RefreshExtensions();
         RefreshUpdate();
+
+        // 兜底：先显示第一张卡，避免任何路径下出现「所有卡片都可见」
+        SwitchCategory(0);
 
         // 构造收尾：此时滑块与标签都建好了，之后才允许响应 ValueChanged（构造期的夹值事件必须忽略）
         _appearanceReady = true;
@@ -241,6 +276,8 @@ public partial class PageSettings : LauncherPage
         RefreshMusic();
         RefreshLayout();
         RefreshHomeMode();
+        RefreshExtraWidgets();
+        RefreshLook();
         RefreshAutoStart();
 
         // 扩展列表：只读一遍扩展目录（不执行任何扩展内容、不写盘）
@@ -258,6 +295,8 @@ public partial class PageSettings : LauncherPage
     {
         CommitNickname();
         CommitWeatherCity();
+        CommitExtraWidgets();
+        CommitLook();
 
         _anim.Stop();
     }
@@ -268,7 +307,7 @@ public partial class PageSettings : LauncherPage
     // ————— 分类卡片 —————
 
     /// <summary>设置分类数量。窗口侧栏的分类项、下面的卡片表都按这个数对齐。</summary>
-    private const int CategoryCount = 13;
+    private const int CategoryCount = 14;
 
     /// <summary>一个分类一张卡片，只给自检用。</summary>
     public override int SubViewCount => CategoryCount;
@@ -290,25 +329,57 @@ public partial class PageSettings : LauncherPage
         SurfaceCard[] cards =
         [
             CardAppearance,
-            CardNickname,
-            CardWeatherCity,
-            CardSites,
+            CardHome,
             CardBackground,
             CardMusic,
             CardLayout,
-            CardHome,
+            CardSites,
+            CardWeatherCity,
             CardExtensions,
+            CardUpdate,
+            CardNickname,
+            CardLook,
             CardAutoStart,
             CardGamePath,
-            CardUpdate,
             CardAbout,
         ];
 
         for (var i = 0; i < cards.Length; i++)
-            cards[i].Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+        {
+            var card = cards[i];
+
+            if (i != index)
+            {
+                card.Visibility = Visibility.Collapsed;
+                continue;
+            }
+
+            var alreadyShown = card.Visibility == Visibility.Visible;
+            card.Visibility = Visibility.Visible;
+
+            // 已经显示着的那张（同分类重复调用）不重放动画
+            if (!alreadyShown) PlayCardEnter(card, i);
+        }
 
         // 换分类后回到顶部，否则会停在上一个分类的滚动位置
         ScrollCategory.ScrollToTop();
+    }
+
+    /// <summary>换分类时给内容一点淡入 + 轻微上移，切换不至于太生硬。</summary>
+    private void PlayCardEnter(SurfaceCard card, int index)
+    {
+        var offset = card.RenderTransform as TranslateTransform ?? new TranslateTransform();
+        card.RenderTransform = offset;
+
+        if (!AnimationEngine.IsEnabled)
+        {
+            card.Opacity = 1;
+            offset.Y = 0;
+            return;
+        }
+
+        AnimationEngine.Start($"set:switchFade:{index}", 0, 1, 170, Ease.OutFluent, value => card.Opacity = value);
+        AnimationEngine.Start($"set:switchSlide:{index}", 10, 0, 170, Ease.OutFluent, value => offset.Y = value);
     }
 
     // ————— 首次运行向导 —————
@@ -338,11 +409,137 @@ public partial class PageSettings : LauncherPage
         if (sender is not FrameworkElement { Tag: string tag }) return;
         if (!Enum.TryParse<AccentTheme>(tag, out var accent)) return;
 
-        ThemeService.SetTheme(ThemeService.Mode, accent);
+        ThemeService.SetPresetAccent(accent);
         SettingsStore.Save();
         RefreshSelection();
 
-        Log.Info($"强调色已切换为 {tag}");
+        Log.Info($"强调色已切换为预设 {tag}");
+    }
+
+    // ————— 自定义强调色取色器 —————
+
+    /// <summary>把当前生效的强调色同步到取色器（滑块 / hex / 预览），并刷新按钮状态。</summary>
+    private void RefreshAccentPicker()
+    {
+        if (BtnAccentApply is null) return;
+
+        var color = ThemeService.CurrentAccentColor;
+        var (hue, saturation, lightness) = ThemeService.ToHsl(color);
+
+        _suppressAccentPicker = true;
+        SldAccentHue.Value = Math.Round(hue);
+        SldAccentSat.Value = Math.Round(saturation * 100);
+        SldAccentLight.Value = Math.Round(lightness * 100);
+        _suppressAccentPicker = false;
+
+        UpdateAccentPreview(color);
+
+        BtnAccentClear.IsEnabled = ThemeService.HasCustomAccent;
+        SetAccentHint(ThemeService.HasCustomAccent
+            ? "当前使用自定义强调色；点「用预设色」可回到上面的预设。"
+            : "拖动滑块或直接填 #RRGGBB 后点「应用」；也可以从当前主页背景里取主色。", warn: false);
+    }
+
+    /// <summary>滑块 / hex / 预览三者同步，不落盘、不换主题。</summary>
+    private void UpdateAccentPreview(Color color)
+    {
+        // 构造期滑块被夹值会触发 ValueChanged，那时后面的标签还没建好
+        if (BorAccentPreview is null || LabAccentHue is null) return;
+
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+
+        BorAccentPreview.Background = brush;
+
+        // 用户正在输入 hex 时别把他打的字覆盖掉
+        if (!TxtAccentHex.IsKeyboardFocusWithin) TxtAccentHex.Text = ThemeService.ToHex(color);
+
+        LabAccentHue.Text = $"{SldAccentHue.Value:0}°";
+        LabAccentSat.Text = $"{SldAccentSat.Value:0}%";
+        LabAccentLight.Text = $"{SldAccentLight.Value:0}%";
+    }
+
+    private Color PickerColor()
+        => ThemeService.FromHsl(SldAccentHue.Value, SldAccentSat.Value / 100d, SldAccentLight.Value / 100d);
+
+    private void OnAccentPickerChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressAccentPicker || BorAccentPreview is null) return;
+        UpdateAccentPreview(PickerColor());
+    }
+
+    private void OnApplyCustomAccentClick(object sender, RoutedEventArgs e)
+    {
+        // hex 里填了有效颜色就用它，否则用当前滑块的颜色
+        var text = TxtAccentHex.Text?.Trim();
+        var hex = ThemeService.TryParseColor(text, out var parsed)
+            ? ThemeService.ToHex(parsed)
+            : ThemeService.ToHex(PickerColor());
+
+        if (!ThemeService.SetCustomAccent(hex))
+        {
+            SetAccentHint("颜色格式不对，请用 #RRGGBB。", warn: true);
+            return;
+        }
+
+        SettingsStore.Save();
+        RefreshSelection();
+
+        Log.Info($"强调色已设为自定义 {ThemeService.ToHex(ThemeService.CurrentAccentColor)}");
+    }
+
+    private void OnAccentHexKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+
+        OnApplyCustomAccentClick(sender, e);
+        e.Handled = true;
+    }
+
+    private void OnAccentFromBackgroundClick(object sender, RoutedEventArgs e)
+    {
+        var path = BackgroundService.ResolveExistingFile(SettingsStore.Current.Background.FileName);
+
+        if (path is null)
+        {
+            SetAccentHint("还没有可用的主页背景，先去「主页背景」选一张图片。", warn: true);
+            return;
+        }
+
+        var color = AccentExtractor.FromImage(path);
+
+        if (color is null)
+        {
+            SetAccentHint("这张背景取不出可用的颜色，换一张试试（纯灰或过暗的图信息量太少）。", warn: true);
+            return;
+        }
+
+        ThemeService.SetCustomAccent(ThemeService.ToHex(color.Value));
+        SettingsStore.Save();
+        RefreshSelection();
+
+        var applied = ThemeService.ToHex(ThemeService.CurrentAccentColor);
+        SetAccentHint($"已从背景图取色：{applied}", warn: false);
+        Log.Info($"强调色已从背景图取色：{applied}");
+    }
+
+    private void OnClearCustomAccentClick(object sender, RoutedEventArgs e)
+    {
+        if (!ThemeService.HasCustomAccent) return;
+
+        ThemeService.ClearCustomAccent();
+        SettingsStore.Save();
+        RefreshSelection();
+
+        SetAccentHint("已回到预设强调色。", warn: false);
+    }
+
+    private void SetAccentHint(string message, bool warn)
+    {
+        if (LabAccentHint is null) return;
+
+        LabAccentHint.Text = message;
+        LabAccentHint.SetResourceReference(TextBlock.ForegroundProperty, warn ? "Status.Warn" : "Text.Tertiary");
     }
 
     private void RefreshSelection()
@@ -356,8 +553,10 @@ public partial class PageSettings : LauncherPage
         BtnAccentGreen.Tone = AccentTone(AccentTheme.Green);
         BtnAccentPurple.Tone = AccentTone(AccentTheme.Purple);
 
+        RefreshAccentPicker();
+
         ButtonTone AccentTone(AccentTheme theme)
-            => ThemeService.Accent == theme ? ButtonTone.Solid : ButtonTone.Outline;
+            => !ThemeService.HasCustomAccent && ThemeService.Accent == theme ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
     // ————— 窗口透明度 / 界面缩放 —————
@@ -416,6 +615,10 @@ public partial class PageSettings : LauncherPage
         SldOpacity.Value = Math.Clamp(SettingsStore.Current.WindowOpacity, Settings.MinWindowOpacity, Settings.MaxWindowOpacity);
         SldScale.Value = Math.Clamp(SettingsStore.Current.UiScale, Settings.MinUiScale, Settings.MaxUiScale);
         SldSurfaceOpacity.Value = Math.Clamp(SettingsStore.Current.SurfaceOpacity, Settings.MinSurfaceOpacity, Settings.MaxSurfaceOpacity);
+
+        if (SldCornerRadius is not null) SldCornerRadius.Value = SettingsStore.Current.CornerRadiusScale;
+        if (SldAnimSpeed is not null) SldAnimSpeed.Value = SettingsStore.Current.AnimationSpeed;
+
         _suppressAppearanceChanged = false;
 
         RefreshAppearanceLabels();
@@ -426,11 +629,132 @@ public partial class PageSettings : LauncherPage
         if (LabOpacity is not null) LabOpacity.Text = $"{SettingsStore.Current.WindowOpacity * 100:0}%";
         if (LabScale is not null) LabScale.Text = $"{SettingsStore.Current.UiScale:0.00}×";
         if (LabSurfaceOpacity is not null) LabSurfaceOpacity.Text = $"{SettingsStore.Current.SurfaceOpacity * 100:0}%";
+
+        if (LabCornerRadius is not null) LabCornerRadius.Text = $"{SettingsStore.Current.CornerRadiusScale:0.00}×";
+
+        var animations = SettingsStore.Current.AnimationsEnabled;
+
+        if (LabAnimSpeed is not null) LabAnimSpeed.Text = $"{SettingsStore.Current.AnimationSpeed:0.0}×";
+        if (SldAnimSpeed is not null) SldAnimSpeed.IsEnabled = animations;
+
+        if (BtnAnimations is not null)
+        {
+            BtnAnimations.Content = animations ? "已开启" : "已关闭";
+            BtnAnimations.Tone = animations ? ButtonTone.Solid : ButtonTone.Outline;
+        }
     }
 
     /// <summary>让主窗口按最新设置重设透明度与缩放。</summary>
     private void ApplyAppearanceToWindow()
         => (Window.GetWindow(this) as MainWindow)?.ApplyAppearance();
+
+    // ————— 界面字体 / 圆角 / 动效 —————
+
+    /// <summary>字体下拉框里代表「内置默认字体」的那一项。</summary>
+    private const string DefaultFontLabel = "（默认）系统界面字体";
+
+    /// <summary>把系统已安装字体的名字填进下拉框；首项是内置默认。构造时调一次。</summary>
+    private void BuildFontList()
+    {
+        if (CmbAppFont is null) return;
+
+        var names = new List<string> { DefaultFontLabel };
+
+        try
+        {
+            names.AddRange(Fonts.SystemFontFamilies
+                .Select(font => font.Source)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(name => name, StringComparer.CurrentCulture));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"枚举系统字体失败，只保留默认项：{ex.Message}");
+        }
+
+        _suppressFontChanged = true;
+
+        CmbAppFont.ItemsSource = names;
+        CmbAppFont.SelectedItem = ResolveFontSelection(SettingsStore.Current.AppFontFamily, names);
+
+        _suppressFontChanged = false;
+
+        UpdateFontPreview();
+    }
+
+    private static string ResolveFontSelection(string configured, IReadOnlyList<string> names)
+    {
+        if (string.IsNullOrWhiteSpace(configured)) return DefaultFontLabel;
+
+        var match = names.FirstOrDefault(name => string.Equals(name, configured, StringComparison.CurrentCultureIgnoreCase));
+
+        // 字体被卸载 / 名字对不上时落回默认项，不显示一个选不中的空白
+        return match ?? DefaultFontLabel;
+    }
+
+    private void OnAppFontChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressFontChanged) return;
+        if (CmbAppFont.SelectedItem is not string name) return;
+
+        SettingsStore.Current.AppFontFamily = name == DefaultFontLabel ? string.Empty : name;
+        SettingsStore.Save();
+
+        AppearanceService.Apply();
+        UpdateFontPreview();
+
+        Log.Info($"界面字体已切换为 {(string.IsNullOrWhiteSpace(SettingsStore.Current.AppFontFamily) ? "默认" : name)}");
+    }
+
+    private void UpdateFontPreview()
+    {
+        if (LabFontPreview is null) return;
+
+        var name = SettingsStore.Current.AppFontFamily;
+
+        LabFontPreview.FontFamily = string.IsNullOrWhiteSpace(name)
+            ? new FontFamily(AppearanceService.DefaultFont)
+            : new FontFamily(name);
+    }
+
+    private void OnCornerRadiusChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_appearanceReady || _suppressAppearanceChanged) return;
+
+        var value = Math.Round(e.NewValue, 2);
+        if (Math.Abs(value - SettingsStore.Current.CornerRadiusScale) < 0.001) return;
+
+        SettingsStore.Current.CornerRadiusScale = value;
+        SettingsStore.Save();
+
+        AppearanceService.Apply();
+        RefreshAppearanceLabels();
+    }
+
+    private void OnAnimSpeedChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_appearanceReady || _suppressAppearanceChanged) return;
+
+        var value = Math.Round(e.NewValue, 1);
+        if (Math.Abs(value - SettingsStore.Current.AnimationSpeed) < 0.001) return;
+
+        SettingsStore.Current.AnimationSpeed = value;
+        SettingsStore.Save();
+        RefreshAppearanceLabels();
+    }
+
+    private void OnToggleAnimationsClick(object sender, RoutedEventArgs e)
+    {
+        var enabled = !SettingsStore.Current.AnimationsEnabled;
+
+        SettingsStore.Current.AnimationsEnabled = enabled;
+        SettingsStore.Save();
+
+        RefreshAppearanceLabels();
+
+        Log.Info($"界面动效已{(enabled ? "开启" : "关闭")}");
+    }
 
     // ————— 程序更新 —————
 
@@ -1090,12 +1414,212 @@ public partial class PageSettings : LauncherPage
         background.FileName = fileName;
         background.FromWallpaperPackage = fromWallpaperPackage;
 
+        // 顺手进轮播清单：导入即入库，之后想轮播不用再手动加一遍
+        if (!background.Playlist.Contains(fileName, StringComparer.OrdinalIgnoreCase))
+            background.Playlist.Add(fileName);
+
+        SettingsStore.Save();
+
+        RefreshBackground();
+        RefreshBackgroundPageMaterials();
+        ApplyBackgroundToWindow();
+
+        SetBackgroundStatus(message, warn: false);
+    }
+
+    // ————— 轮播 / 填充 / 视差 —————
+
+    /// <summary>把清单里的某一张设为当前背景。</summary>
+    private void OnUseBackgroundClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string fileName }) return;
+
+        SettingsStore.Current.Background.FileName = fileName;
         SettingsStore.Save();
 
         RefreshBackground();
         ApplyBackgroundToWindow();
 
-        SetBackgroundStatus(message, warn: false);
+        SetBackgroundStatus($"已切换背景：{fileName}", warn: false);
+    }
+
+    /// <summary>从轮播清单与素材库里移除一张。</summary>
+    private void OnRemoveBackgroundClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string fileName }) return;
+
+        var background = SettingsStore.Current.Background;
+
+        background.Playlist.RemoveAll(name => string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase));
+
+        var wasCurrent = string.Equals(background.FileName, fileName, StringComparison.OrdinalIgnoreCase);
+
+        if (!BackgroundService.Delete(fileName))
+            SetBackgroundStatus("这一张正被占用删不掉（多半是正在播放的视频），已先从清单里移除。", warn: true);
+
+        // 当前背景被删了：顺位到清单第一张，没有就回到主题渐变
+        if (wasCurrent)
+        {
+            background.FileName = background.Playlist.FirstOrDefault();
+            background.FromWallpaperPackage = false;
+        }
+
+        SettingsStore.Save();
+
+        RefreshBackground();
+        RefreshBackgroundPageMaterials();
+        ApplyBackgroundToWindow();
+    }
+
+    private void OnToggleRotateClick(object sender, RoutedEventArgs e)
+    {
+        var background = SettingsStore.Current.Background;
+
+        background.RotateEnabled = !background.RotateEnabled;
+        SettingsStore.Save();
+
+        RefreshBackground();
+        ApplyBackgroundToWindow();
+
+        SetBackgroundStatus(background.RotateEnabled
+            ? $"已开启轮播：每 {background.RotateSeconds} 秒换下一张。"
+            : "已关闭轮播。", warn: false);
+    }
+
+    private void OnRotateIntervalChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressSliderChanged) return;
+
+        var seconds = (int)Math.Round(e.NewValue);
+        if (seconds == SettingsStore.Current.Background.RotateSeconds) return;
+
+        SettingsStore.Current.Background.RotateSeconds = seconds;
+        SettingsStore.Save();
+
+        RefreshBackgroundLabels();
+        ApplyBackgroundToWindow();
+    }
+
+    private void OnToggleShuffleClick(object sender, RoutedEventArgs e)
+    {
+        var background = SettingsStore.Current.Background;
+
+        background.RotateShuffle = !background.RotateShuffle;
+        SettingsStore.Save();
+
+        RefreshBackground();
+        ApplyBackgroundToWindow();
+    }
+
+    private void OnBackgroundFillClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+        if (!Enum.TryParse<BackgroundFill>(tag, out var fill)) return;
+
+        SettingsStore.Current.Background.Fill = fill;
+        SettingsStore.Save();
+
+        RefreshBackground();
+        ApplyBackgroundToWindow();
+    }
+
+    private void OnToggleParallaxClick(object sender, RoutedEventArgs e)
+    {
+        var background = SettingsStore.Current.Background;
+
+        background.Parallax = !background.Parallax;
+        SettingsStore.Save();
+
+        RefreshBackground();
+        ApplyBackgroundToWindow();
+    }
+
+    // ————— 每页独立背景 —————
+
+    /// <summary>「该页背景」下拉里代表「跟随全局」的那一项。</summary>
+    private const string FollowGlobalLabel = "跟随全局";
+
+    /// <summary>支持独立背景的页面：标识与显示名。标识要与 MainWindow.PageKey 一致。</summary>
+    private static readonly (string Key, string Label)[] BackgroundPages =
+    [
+        ("home", "主页"),
+        ("instances", "游戏实例"),
+        ("packages", "包管理"),
+        ("multiplayer", "联机"),
+        ("download", "下载"),
+        ("log", "运行日志"),
+        ("settings", "设置")
+    ];
+
+    private bool _suppressBackgroundPage;
+
+    /// <summary>填「页面」下拉；构造时调一次。</summary>
+    private void BuildBackgroundPageList()
+    {
+        if (CmbBgPage is null) return;
+
+        _suppressBackgroundPage = true;
+
+        CmbBgPage.ItemsSource = BackgroundPages.Select(page => page.Label).ToList();
+        CmbBgPage.SelectedIndex = 0;
+
+        _suppressBackgroundPage = false;
+
+        RefreshBackgroundPageMaterials();
+    }
+
+    /// <summary>按当前选中的页面刷新「该页背景」下拉：跟随全局 + 素材库。</summary>
+    private void RefreshBackgroundPageMaterials()
+    {
+        if (CmbBgPageMaterial is null) return;
+
+        var background = SettingsStore.Current.Background;
+        var key = SelectedBackgroundPageKey();
+
+        var items = new List<string> { FollowGlobalLabel };
+        items.AddRange(BackgroundService.ListLibrary());
+
+        _suppressBackgroundPage = true;
+
+        CmbBgPageMaterial.ItemsSource = items;
+
+        var current = background.PageOverrides.TryGetValue(key, out var configured) ? configured : null;
+        CmbBgPageMaterial.SelectedItem = current is not null && items.Contains(current) ? current : FollowGlobalLabel;
+
+        _suppressBackgroundPage = false;
+    }
+
+    private string SelectedBackgroundPageKey()
+    {
+        var index = CmbBgPage.SelectedIndex;
+        return index >= 0 && index < BackgroundPages.Length ? BackgroundPages[index].Key : "home";
+    }
+
+    private void OnBackgroundPageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressBackgroundPage) return;
+        RefreshBackgroundPageMaterials();
+    }
+
+    private void OnBackgroundPageMaterialChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressBackgroundPage) return;
+        if (CmbBgPageMaterial.SelectedItem is not string selected) return;
+
+        var background = SettingsStore.Current.Background;
+        var key = SelectedBackgroundPageKey();
+
+        if (selected == FollowGlobalLabel) background.PageOverrides.Remove(key);
+        else background.PageOverrides[key] = selected;
+
+        SettingsStore.Save();
+        ApplyBackgroundToWindow();
+
+        var label = BackgroundPages.First(page => page.Key == key).Label;
+
+        SetBackgroundStatus(selected == FollowGlobalLabel
+            ? $"「{label}」已改为跟随全局背景。"
+            : $"「{label}」已改用：{selected}", warn: false);
     }
 
     /// <summary>让主窗口按最新设置重铺背景。</summary>
@@ -1109,6 +1633,7 @@ public partial class PageSettings : LauncherPage
         _suppressSliderChanged = true;
         SldBlur.Value = Math.Clamp(background.BlurRadius, 0, 30);
         SldDim.Value = Math.Clamp(background.DimPercent, 0, 80);
+        SldRotateInterval.Value = background.RotateSeconds;
         _suppressSliderChanged = false;
 
         var path = BackgroundService.ResolveExistingFile(background.FileName);
@@ -1127,7 +1652,35 @@ public partial class PageSettings : LauncherPage
                                  (background.FromWallpaperPackage ? "（来自壁纸包）" : string.Empty);
         }
 
+        // 轮播清单：只列素材还在的
+        var playlist = background.Playlist
+            .Where(name => BackgroundService.ResolveExistingFile(name) is not null)
+            .ToList();
+
+        PanBackgroundList.ItemsSource = playlist
+            .Select(name => new BackgroundRow(name, string.Equals(name, background.FileName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        LabBackgroundListEmpty.Visibility = playlist.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        BtnRotate.Content = background.RotateEnabled ? "已开启" : "已关闭";
+        BtnRotate.Tone = background.RotateEnabled ? ButtonTone.Solid : ButtonTone.Outline;
+
+        BtnRotateShuffle.Content = background.RotateShuffle ? "随机" : "顺序";
+        BtnRotateShuffle.Tone = background.RotateShuffle ? ButtonTone.Solid : ButtonTone.Outline;
+
+        BtnFillCover.Tone = FillTone(BackgroundFill.Cover);
+        BtnFillFit.Tone = FillTone(BackgroundFill.Fit);
+        BtnFillStretch.Tone = FillTone(BackgroundFill.Fill);
+        BtnFillTile.Tone = FillTone(BackgroundFill.Tile);
+
+        BtnParallax.Content = background.Parallax ? "已开启" : "已关闭";
+        BtnParallax.Tone = background.Parallax ? ButtonTone.Solid : ButtonTone.Outline;
+
         RefreshBackgroundLabels();
+
+        ButtonTone FillTone(BackgroundFill fill)
+            => background.Fill == fill ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
     private void RefreshBackgroundLabels()
@@ -1136,6 +1689,7 @@ public partial class PageSettings : LauncherPage
 
         LabBlur.Text = background.BlurRadius <= 0 ? "关闭" : background.BlurRadius.ToString();
         LabDim.Text = $"{background.DimPercent}%";
+        LabRotateInterval.Text = $"{background.RotateSeconds} 秒";
     }
 
     private void SetBackgroundStatus(string message, bool warn)
@@ -1383,6 +1937,237 @@ public partial class PageSettings : LauncherPage
 
         Log.Info($"主页显示模式已切换为 {mode}");
     }
+
+    // ————— 主页附加小组件（时钟 / 便签 / 快捷启动 / 音乐控制） —————
+
+    /// <summary>构造期与刷新期不让文本框的改动回写。</summary>
+    private bool _suppressExtraWidgetChanged;
+
+    /// <summary>刷新附加小组件的开关与文本。构造与进页面时各调一次。</summary>
+    private void RefreshExtraWidgets()
+    {
+        if (BtnExtraClock is null) return;
+
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        SyncToggle(BtnExtraClock, "时钟", extras.Clock);
+        SyncToggle(BtnExtraMemo, "便签", extras.Memo);
+        SyncToggle(BtnExtraMusic, "音乐", extras.Music);
+
+        BtnClock24.Content = extras.Clock24Hour ? "24 小时制" : "12 小时制";
+        BtnClock24.Tone = extras.Clock24Hour ? ButtonTone.Solid : ButtonTone.Outline;
+
+        BtnClockDate.Content = extras.ClockShowDate ? "显示日期" : "隐藏日期";
+        BtnClockDate.Tone = extras.ClockShowDate ? ButtonTone.Solid : ButtonTone.Outline;
+
+        _suppressExtraWidgetChanged = true;
+
+        TxtMemoTitle.Text = extras.MemoTitle;
+        TxtMemoText.Text = extras.MemoText;
+
+        _suppressExtraWidgetChanged = false;
+
+        static void SyncToggle(OutlineButton button, string name, bool on)
+        {
+            button.Content = $"{name}：{(on ? "已开启" : "已关闭")}";
+            button.Tone = on ? ButtonTone.Solid : ButtonTone.Outline;
+        }
+    }
+
+    private void OnExtraWidgetToggleClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        switch (tag)
+        {
+            case "Clock": extras.Clock = !extras.Clock; break;
+            case "Memo": extras.Memo = !extras.Memo; break;
+            case "Music": extras.Music = !extras.Music; break;
+            default: return;
+        }
+
+        SettingsStore.Save();
+        RefreshExtraWidgets();
+
+        Log.Info($"主页附加小组件已切换：{tag}");
+    }
+
+    private void OnClockFormatClick(object sender, RoutedEventArgs e)
+    {
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        extras.Clock24Hour = !extras.Clock24Hour;
+        SettingsStore.Save();
+        RefreshExtraWidgets();
+    }
+
+    private void OnClockDateClick(object sender, RoutedEventArgs e)
+    {
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        extras.ClockShowDate = !extras.ClockShowDate;
+        SettingsStore.Save();
+        RefreshExtraWidgets();
+    }
+
+    /// <summary>便签与快捷启动的文本：编辑时先记进内存，离开设置页统一落盘。</summary>
+    private void OnExtraTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressExtraWidgetChanged) return;
+
+        CaptureExtraWidgetText();
+    }
+
+    private void CaptureExtraWidgetText()
+    {
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        extras.MemoTitle = TxtMemoTitle.Text;
+        extras.MemoText = TxtMemoText.Text;
+    }
+
+    private void CommitExtraWidgets()
+    {
+        if (TxtMemoTitle is null) return;
+
+        CaptureExtraWidgetText();
+        SettingsStore.Save();
+    }
+
+    // ————— 窗口与音效 —————
+
+    /// <summary>构造期与刷新期不让标题文本框的改动回写。</summary>
+    private bool _suppressLookChanged;
+
+    /// <summary>刷新自定义标题与三个素材的状态。</summary>
+    private void RefreshLook()
+    {
+        if (TxtWindowTitle is null) return;
+
+        _suppressLookChanged = true;
+        TxtWindowTitle.Text = SettingsStore.Current.WindowTitle;
+        _suppressLookChanged = false;
+
+        var settings = SettingsStore.Current;
+
+        LabIconStatus.Text = DescribeLookFile(settings.WindowIconFile, "当前：内置图标");
+        LabStartSoundStatus.Text = DescribeLookFile(settings.StartupSoundFile, "当前：不播放");
+        LabStopSoundStatus.Text = DescribeLookFile(settings.ShutdownSoundFile, "当前：不播放");
+
+        BtnClearIcon.IsEnabled = !string.IsNullOrWhiteSpace(settings.WindowIconFile);
+        BtnClearStartSound.IsEnabled = !string.IsNullOrWhiteSpace(settings.StartupSoundFile);
+        BtnClearStopSound.IsEnabled = !string.IsNullOrWhiteSpace(settings.ShutdownSoundFile);
+    }
+
+    private static string DescribeLookFile(string? fileName, string emptyText)
+        => CustomizationService.Resolve(fileName) is { } path ? $"当前：{Path.GetFileName(path)}" : emptyText;
+
+    /// <summary>标题是边打边预览的，这里只记进内存，离开设置页时统一落盘。</summary>
+    private void OnWindowTitleChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressLookChanged) return;
+
+        SettingsStore.Current.WindowTitle = TxtWindowTitle.Text;
+        ApplyCustomizationToWindow();
+    }
+
+    private void OnPickIconClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择窗口图标",
+            Filter = $"图片 ({CustomizationService.IconPattern})|{CustomizationService.IconPattern}|所有文件 (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        if (CustomizationService.Import(dialog.FileName, "icon") is not { } name)
+        {
+            SetLookStatus("导入图标失败，换一张图试试。", warn: true);
+            return;
+        }
+
+        SettingsStore.Current.WindowIconFile = name;
+        SettingsStore.Save();
+
+        RefreshLook();
+        ApplyCustomizationToWindow();
+    }
+
+    private void OnClearIconClick(object sender, RoutedEventArgs e)
+    {
+        CustomizationService.Delete(SettingsStore.Current.WindowIconFile);
+        SettingsStore.Current.WindowIconFile = string.Empty;
+        SettingsStore.Save();
+
+        RefreshLook();
+        ApplyCustomizationToWindow();
+    }
+
+    private void OnPickStartSoundClick(object sender, RoutedEventArgs e) => PickSound(startup: true);
+
+    private void OnPickStopSoundClick(object sender, RoutedEventArgs e) => PickSound(startup: false);
+
+    private void PickSound(bool startup)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = startup ? "选择启动音效" : "选择关闭音效",
+            Filter = $"音频 ({CustomizationService.SoundPattern})|{CustomizationService.SoundPattern}|所有文件 (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        if (CustomizationService.Import(dialog.FileName, startup ? "startup" : "shutdown") is not { } name)
+        {
+            SetLookStatus("导入音效失败，换一个文件试试。", warn: true);
+            return;
+        }
+
+        if (startup) SettingsStore.Current.StartupSoundFile = name;
+        else SettingsStore.Current.ShutdownSoundFile = name;
+
+        SettingsStore.Save();
+        RefreshLook();
+
+        // 立刻试听
+        CustomizationService.PlaySound(name);
+    }
+
+    private void OnClearStartSoundClick(object sender, RoutedEventArgs e) => ClearSound(startup: true);
+
+    private void OnClearStopSoundClick(object sender, RoutedEventArgs e) => ClearSound(startup: false);
+
+    private void ClearSound(bool startup)
+    {
+        if (startup)
+        {
+            CustomizationService.Delete(SettingsStore.Current.StartupSoundFile);
+            SettingsStore.Current.StartupSoundFile = string.Empty;
+        }
+        else
+        {
+            CustomizationService.Delete(SettingsStore.Current.ShutdownSoundFile);
+            SettingsStore.Current.ShutdownSoundFile = string.Empty;
+        }
+
+        SettingsStore.Save();
+        RefreshLook();
+    }
+
+    private void SetLookStatus(string message, bool warn)
+    {
+        LabIconStatus.Text = message;
+        LabIconStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "Status.Warn" : "Text.Tertiary");
+    }
+
+    private void ApplyCustomizationToWindow()
+        => (Window.GetWindow(this) as MainWindow)?.ApplyCustomization();
+
+    /// <summary>离开设置页时把标题落盘（边打边存太吵）。</summary>
+    private void CommitLook() => SettingsStore.Save();
 
     /// <summary>主页三块小组件的开关：显示时用强调色实心，隐藏时描边，文案里直接写清当前状态。</summary>
     private void RefreshWidgetToggles()

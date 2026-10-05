@@ -119,6 +119,10 @@ public partial class App : Application
         Log.Info("门锁校验通过，继续启动");
 
         ThemeService.Initialize(SettingsStore.Current.ThemeMode, SettingsStore.Current.Accent);
+
+        // 字体与圆角也走资源覆盖：界面用 DynamicResource 引用，改设置时能实时生效
+        AppearanceService.Apply();
+
         MultiplayerSettingsStore.Load();
 
         // 扩展：把界面层实际存在的图标登记给核心（清单校验要用），再扫一遍扩展目录。

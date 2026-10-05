@@ -111,9 +111,16 @@ public static class BackgroundService
         {
             Directory.CreateDirectory(StorageDirectory);
 
-            // 先清旧的再放新的：背景只保留一份，素材目录不会越攒越大。
-            // 用户有可能直接选中素材目录里的文件，那就别把它自己删掉。
-            ClearFiles(sourcePath);
+            // 不再清旧素材：支持多张壁纸轮播，素材目录相当于一个小素材库。
+            // 素材越攒越多时可以在设置里逐张移除，或用「清除背景」一次清空。
+            // 用户有可能直接选中素材目录里的文件，那就复用它，别复制成两份。
+            var existing = Path.GetFullPath(sourcePath);
+            if (string.Equals(Path.GetDirectoryName(existing), Path.GetFullPath(StorageDirectory), StringComparison.OrdinalIgnoreCase))
+            {
+                var keptName = Path.GetFileName(existing);
+                Log.Info($"背景素材已在素材库中，直接复用：{keptName}");
+                return new BackgroundImport(true, $"已设为背景：{keptName}", kind, keptName);
+            }
 
             var targetName = BuildTargetName(Path.GetExtension(sourcePath));
             var targetPath = Path.Combine(StorageDirectory, targetName);
@@ -143,6 +150,47 @@ public static class BackgroundService
         catch (Exception ex)
         {
             Log.Warn($"清除背景素材失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>素材库里可当背景的文件名（排序后），给轮播清单与列表用。</summary>
+    public static IReadOnlyList<string> ListLibrary()
+    {
+        try
+        {
+            if (!Directory.Exists(StorageDirectory)) return [];
+
+            return Directory.EnumerateFiles(StorageDirectory)
+                .Where(IsSupportedMedia)
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name!)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"枚举背景素材失败：{ex.Message}");
+            return [];
+        }
+    }
+
+    /// <summary>删掉一张素材。正在播放的视频可能被占用删不掉，这时返回 false。</summary>
+    public static bool Delete(string? fileName)
+    {
+        var path = ResolvePath(fileName);
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+
+        try
+        {
+            File.Delete(path);
+            Log.Info($"已移除背景素材：{Path.GetFileName(path)}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"背景素材删除失败（可能正被占用）：{ex.Message}");
+            return false;
         }
     }
 

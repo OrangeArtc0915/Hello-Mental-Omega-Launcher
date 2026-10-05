@@ -97,6 +97,16 @@ public sealed class LayoutScheme
 
     public const string DefaultName = "默认布局";
 
+    /// <summary>
+    /// 当前方案格式版本。
+    /// 1 或缺失 = 自由定位坐标以「主页舞台区」为基准；2 = 以整页内容区为基准。
+    /// 旧方案在首次应用到主页时按实测高度换算一次并升级到 2（见 PageHome.MigrateScheme）。
+    /// </summary>
+    public const int CurrentVersion = 2;
+
+    /// <summary>方案格式版本。旧文件里没有这个字段，读出来就是 1。</summary>
+    public int Version { get; set; } = 1;
+
     public string Id { get; set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;
@@ -118,6 +128,7 @@ public sealed class LayoutScheme
         Id = DefaultId,
         Name = DefaultName,
         Description = "系统默认布局",
+        Version = CurrentVersion,
     };
 
     public LayoutItem? Find(string? elementId) => string.IsNullOrWhiteSpace(elementId)

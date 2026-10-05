@@ -66,6 +66,74 @@ public static class ThemeService
         Apply();
     }
 
+    /// <summary>切换预设强调色（会清掉自定义色）。</summary>
+    public static void SetPresetAccent(AccentTheme accent)
+    {
+        Accent = accent;
+        SettingsStore.Current.Accent = accent;
+        SettingsStore.Current.CustomAccentColor = string.Empty;
+        Apply();
+    }
+
+    /// <summary>设置自定义强调色；颜色无法解析时返回 false 且不改动。</summary>
+    public static bool SetCustomAccent(string? hex)
+    {
+        if (!TryParseColor(hex, out var color)) return false;
+
+        // 存归一化之后的颜色：它才是实际生效的 Bright，免得「存的」和「看到的」对不上
+        SettingsStore.Current.CustomAccentColor = ToHex(DerivePalette(color).Bright);
+        Apply();
+        return true;
+    }
+
+    /// <summary>清掉自定义强调色，回到预设色。</summary>
+    public static void ClearCustomAccent()
+    {
+        SettingsStore.Current.CustomAccentColor = string.Empty;
+        Apply();
+    }
+
+    /// <summary>当前是否正在使用自定义强调色。</summary>
+    public static bool HasCustomAccent => TryParseColor(SettingsStore.Current.CustomAccentColor, out _);
+
+    /// <summary>当前生效的强调色（自定义优先，否则取预设的 Bright）。</summary>
+    public static Color CurrentAccentColor
+    {
+        get
+        {
+            if (TryParseColor(SettingsStore.Current.CustomAccentColor, out var custom)) return custom;
+            return Accents.TryGetValue(Accent, out var found) ? found.Bright : Accents[AccentTheme.Default].Bright;
+        }
+    }
+
+    /// <summary>解析 <c>#RRGGBB</c> / <c>#AARRGGBB</c> / 不带 # 的写法；失败返回 false。</summary>
+    public static bool TryParseColor(string? text, out Color color)
+    {
+        color = default;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+
+        var value = text.Trim();
+        if (!value.StartsWith('#')) value = "#" + value;
+
+        try
+        {
+            if (ColorConverter.ConvertFromString(value) is Color parsed)
+            {
+                color = parsed;
+                return true;
+            }
+        }
+        catch
+        {
+            // 解析不了按无效处理，由调用方提示
+        }
+
+        return false;
+    }
+
+    /// <summary>颜色格式化成 <c>#RRGGBB</c>。</summary>
+    public static string ToHex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
     public static void Apply()
     {
         IsDark = Mode switch
@@ -143,9 +211,87 @@ public static class ThemeService
         _systemWatcher.Start();
     }
 
+    /// <summary>取当前生效的色阶：自定义色优先（由任意色推导），否则用预设。</summary>
+    private static AccentPalette ResolvePalette(AccentTheme accent)
+        => TryParseColor(SettingsStore.Current.CustomAccentColor, out var custom)
+            ? DerivePalette(custom)
+            : Accents.TryGetValue(accent, out var found) ? found : Accents[AccentTheme.Default];
+
+    /// <summary>
+    /// 由任意颜色推导一整套色阶，尽量贴近手工预设的关系：Bright 就是选中的颜色
+    /// （先做饱和度 / 明度归一化，保证白字按钮可读），Base / Deep / Hover 依次压暗，Soft / Faint 是浅色底。
+    /// </summary>
+    private static AccentPalette DerivePalette(Color main)
+    {
+        var (h, s, l) = ToHsl(main);
+
+        // 归一化：太亮白字看不清，太暗按钮糊成一团；饱和度太低就不像「强调色」
+        s = Math.Clamp(s, 0.35, 0.95);
+        l = Math.Clamp(l, 0.38, 0.62);
+
+        var bright = FromHsl(h, s, l);
+
+        return new AccentPalette(
+            Mix(bright, Colors.Black, 0.52),
+            Mix(bright, Colors.Black, 0.26),
+            bright,
+            Mix(bright, Colors.Black, 0.08),
+            Mix(bright, Colors.White, 0.81),
+            Mix(bright, Colors.White, 0.93));
+    }
+
+    /// <summary>RGB → HSL（H 0-360，S/L 0-1）。取色器用来把当前色同步到滑块。</summary>
+    public static (double H, double S, double L) ToHsl(Color color)
+    {
+        double r = color.R / 255d, g = color.G / 255d, b = color.B / 255d;
+
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var delta = max - min;
+        var l = (max + min) / 2;
+
+        if (delta < 1e-6) return (0, 0, l);
+
+        var s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+
+        double h;
+        if (Math.Abs(max - r) < 1e-6) h = (g - b) / delta + (g < b ? 6 : 0);
+        else if (Math.Abs(max - g) < 1e-6) h = (b - r) / delta + 2;
+        else h = (r - g) / delta + 4;
+
+        return (h * 60, s, l);
+    }
+
+    /// <summary>HSL → RGB（H 0-360，S/L 0-1）。取色器用来把三个滑块换算成颜色。</summary>
+    public static Color FromHsl(double h, double s, double l)
+    {
+        h = ((h % 360) + 360) % 360;
+        s = Math.Clamp(s, 0, 1);
+        l = Math.Clamp(l, 0, 1);
+
+        var c = (1 - Math.Abs(2 * l - 1)) * s;
+        var x = c * (1 - Math.Abs(h / 60 % 2 - 1));
+        var m = l - c / 2;
+
+        var (r, g, b) = h switch
+        {
+            < 60 => (c, x, 0d),
+            < 120 => (x, c, 0d),
+            < 180 => (0d, c, x),
+            < 240 => (0d, x, c),
+            < 300 => (x, 0d, c),
+            _ => (c, 0d, x)
+        };
+
+        return Color.FromRgb(
+            (byte)Math.Round((r + m) * 255),
+            (byte)Math.Round((g + m) * 255),
+            (byte)Math.Round((b + m) * 255));
+    }
+
     private static Dictionary<string, Color> BuildBrushes(bool dark, AccentTheme accent)
     {
-        var palette = Accents.TryGetValue(accent, out var found) ? found : Accents[AccentTheme.Default];
+        var palette = ResolvePalette(accent);
 
         var brushes = new Dictionary<string, Color>(40);
 
@@ -212,7 +358,7 @@ public static class ThemeService
     /// <summary>窗口整体底纹：极淡的冷色斜向渐变，卡片浮起来时不至于贴在一块死板上。</summary>
     private static LinearGradientBrush BuildWindowGradient(bool dark, AccentTheme accent)
     {
-        var palette = Accents.TryGetValue(accent, out var found) ? found : Accents[AccentTheme.Default];
+        var palette = ResolvePalette(accent);
 
         var edge = dark
             ? Mix(ColorOf("#161A22"), palette.Base, 0.16)
@@ -233,7 +379,7 @@ public static class ThemeService
 
     private static LinearGradientBrush BuildCardCover(bool dark, AccentTheme accent)
     {
-        var palette = Accents.TryGetValue(accent, out var found) ? found : Accents[AccentTheme.Default];
+        var palette = ResolvePalette(accent);
 
         var from = dark ? Mix(palette.Deep, Colors.Black, 0.35) : palette.Deep;
         var to = dark ? Mix(palette.Base, Colors.Black, 0.25) : palette.Bright;

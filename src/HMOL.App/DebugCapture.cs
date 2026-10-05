@@ -18,7 +18,7 @@ namespace HMOL.App;
 /// 加 <c>--capture-page &lt;页面&gt;</c>（home / instances / packages / multiplayer / log / settings，
 /// 也接受 0-5 的下标）可以截指定页面：先切到那一页再等动效收敛。不给就截主页（与原来一致）。
 /// 加 <c>--capture-setup &lt;分类&gt;</c> 则在设置页里再切到某个分类
-/// （0-12 下标，或 appearance / background / layout / home 等名字），用来单独截某一类设置。
+/// （0-13 下标，或 appearance / home / look / background 等名字），用来单独截某一类设置。
 /// </summary>
 internal static class DebugCapture
 {
@@ -32,18 +32,19 @@ internal static class DebugCapture
     private static readonly Dictionary<string, int> SetupCategories = new(StringComparer.OrdinalIgnoreCase)
     {
         ["appearance"] = 0,
-        ["nickname"] = 1,
-        ["weather"] = 2,
-        ["sites"] = 3,
-        ["background"] = 4,
-        ["music"] = 5,
-        ["layout"] = 6,
-        ["home"] = 7,
-        ["extensions"] = 8,
-        ["autostart"] = 9,
-        ["gamepath"] = 10,
-        ["update"] = 11,
-        ["about"] = 12
+        ["home"] = 1,
+        ["background"] = 2,
+        ["music"] = 3,
+        ["layout"] = 4,
+        ["sites"] = 5,
+        ["weather"] = 6,
+        ["extensions"] = 7,
+        ["update"] = 8,
+        ["nickname"] = 9,
+        ["look"] = 10,
+        ["autostart"] = 11,
+        ["gamepath"] = 12,
+        ["about"] = 13
     };
 
     /// <summary>读命令行里的 <c>--capture-home</c> 参数。没给或路径为空返回 false。</summary>

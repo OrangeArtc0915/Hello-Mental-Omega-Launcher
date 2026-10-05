@@ -5,7 +5,7 @@
         Width="420"
         Height="410"
         Background="{DynamicResource Surface.Window}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         ShowInTaskbar="False"
@@ -25,7 +25,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtTarget"
                          Background="Transparent"
                          BorderThickness="0"
@@ -46,7 +46,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtCount"
                          Background="Transparent"
                          BorderThickness="0"

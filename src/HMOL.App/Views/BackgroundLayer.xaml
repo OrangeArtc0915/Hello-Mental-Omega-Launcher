@@ -4,8 +4,15 @@
              IsHitTestVisible="False">
     <!-- 整层不参与命中测试：背景铺在标题栏与侧栏下面，不能挡住按钮 -->
     <Grid x:Name="PanRoot" ClipToBounds="True">
-        <!-- 静态图与动图共用这一个 Image：动图靠换 Source 逐帧播放 -->
+        <!-- 静态图与动图共用 Image：动图靠换 Source 逐帧播放；平铺用 Rectangle + ImageBrush -->
         <Grid x:Name="PanMedia">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="TfParallax" />
+            </Grid.RenderTransform>
+
+            <!-- 平铺背景：只对静态图片使用 -->
+            <Rectangle x:Name="RecBackground" Visibility="Collapsed" />
+
             <!-- 模糊只给图片与 GIF（效果在代码里挂上去）：视频叠 BlurEffect 需要整帧软件合成，
                  代价过高，旧版对视频也只做暗化（HMOL_qt.py 第 6712 行 _draw_video_bg） -->
             <Image x:Name="ImgBackground"

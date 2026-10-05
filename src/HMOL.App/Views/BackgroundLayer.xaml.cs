@@ -6,6 +6,7 @@ using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using HMOL.App.Animation;
+using HMOL.Core.App;
 using HMOL.Core.Appearance;
 using HMOL.Core.Logging;
 
@@ -29,6 +30,11 @@ public partial class BackgroundLayer : UserControl
 
     private readonly DispatcherTimer _gifTimer = new();
 
+    /// <summary>轮播定时器：按设置的间隔换下一张。</summary>
+    private readonly DispatcherTimer _rotateTimer = new();
+
+    private readonly Random _random = new();
+
     /// <summary>图片的模糊效果。在代码里挂而不是写进 XAML：效果对象不适合用 x:Name 取。</summary>
     private readonly BlurEffect _blur = new() { Radius = 0, RenderingBias = RenderingBias.Performance };
 
@@ -39,12 +45,66 @@ public partial class BackgroundLayer : UserControl
     private bool _videoOpened;
     private string? _appliedPath;
 
+    /// <summary>当前是否走平铺渲染（Rectangle + ImageBrush），以及上次应用的填充方式。</summary>
+    private bool _tiling;
+    private BackgroundFill _appliedFill = BackgroundFill.Cover;
+
+    /// <summary>当前轮播队列与位置；队列内容由设置里的清单派生。</summary>
+    private List<string> _rotationQueue = [];
+    private int _rotationIndex;
+    private string _rotationKey = string.Empty;
+
+    /// <summary>当前页的独立背景（null 表示跟随全局）。</summary>
+    private string? _pageOverride;
+
     public BackgroundLayer()
     {
         InitializeComponent();
 
         ImgBackground.Effect = _blur;
         _gifTimer.Tick += OnGifTick;
+        _rotateTimer.Tick += OnRotateTick;
+    }
+
+    /// <summary>
+    /// 按设置铺背景：先按轮播编排算出「这一张」，再走单张应用。
+    /// <paramref name="overrideFile"/> 不为空时用它顶替当前背景（每页独立背景用）。
+    /// 主窗口在应用外观 / 主题变化 / 页面切换时调用。
+    /// </summary>
+    public void ApplyFromSettings(string? overrideFile = null)
+    {
+        var background = SettingsStore.Current.Background;
+
+        _pageOverride = overrideFile;
+
+        ArrangeRotation(background);
+
+        if (!background.Parallax)
+        {
+            TfParallax.X = 0;
+            TfParallax.Y = 0;
+        }
+
+        var fileName = overrideFile ?? (_rotationQueue.Count > 0
+            ? _rotationQueue[Math.Clamp(_rotationIndex, 0, _rotationQueue.Count - 1)]
+            : background.FileName);
+
+        Apply(fileName, background.BlurRadius, background.DimPercent, background.FadeMs);
+    }
+
+    /// <summary>鼠标视差：nx / ny 是 −1..1 的归一化位置。关闭视差时把位移归零。</summary>
+    public void SetParallax(double nx, double ny)
+    {
+        if (!SettingsStore.Current.Background.Parallax)
+        {
+            TfParallax.X = 0;
+            TfParallax.Y = 0;
+            return;
+        }
+
+        const double maxShift = 14;
+        TfParallax.X = -Math.Clamp(nx, -1, 1) * maxShift;
+        TfParallax.Y = -Math.Clamp(ny, -1, 1) * maxShift;
     }
 
     /// <summary>
@@ -54,11 +114,13 @@ public partial class BackgroundLayer : UserControl
     public void Apply(string? fileName, int blurRadius, int dimPercent, int fadeMs)
     {
         var path = BackgroundService.ResolveExistingFile(fileName);
+        var fill = SettingsStore.Current.Background.Fill;
 
-        // 只动了模糊 / 暗化，素材本身没换：别重头解码大图，更别让视频重头播
+        // 只动了模糊 / 暗化 / 填充方式，素材本身没换：别重头解码大图，更别让视频重头播
         if (path is not null && string.Equals(path, _appliedPath, StringComparison.OrdinalIgnoreCase))
         {
             ApplyLook(path, blurRadius, dimPercent);
+            if (fill != _appliedFill) ApplyFill(path, fill);
             return;
         }
 
@@ -87,22 +149,35 @@ public partial class BackgroundLayer : UserControl
             switch (kind)
             {
                 case BackgroundKind.Video:
+                    ApplyFill(path, fill);
                     StartVideo(path);
                     break;
 
                 case BackgroundKind.Gif:
+                    ApplyFill(path, fill);
                     LoadGif(path);
                     break;
 
                 default:
-                    ImgBackground.Source = LoadFrozen(path);
-                    ImgBackground.Visibility = Visibility.Visible;
+                    ApplyFill(path, fill);
 
-                    Log.Info($"背景：图片 {Path.GetFileName(path)}（模糊 {blur}，暗化 {dimPercent}%）");
+                    if (_tiling)
+                    {
+                        ShowTiled(path);
+                        Log.Info($"背景：图片平铺 {Path.GetFileName(path)}（{FillText(fill)}）");
+                    }
+                    else
+                    {
+                        ImgBackground.Source = LoadFrozen(path);
+                        ImgBackground.Visibility = Visibility.Visible;
+
+                        Log.Info($"背景：图片 {Path.GetFileName(path)}（模糊 {blur}，暗化 {dimPercent}%，{FillText(fill)}）");
+                    }
                     break;
             }
 
             _appliedPath = path;
+            _appliedFill = fill;
         }
         catch (Exception ex)
         {
@@ -112,6 +187,123 @@ public partial class BackgroundLayer : UserControl
         }
 
         FadeIn(fadeMs);
+    }
+
+    private static string FillText(BackgroundFill fill) => fill switch
+    {
+        BackgroundFill.Fit => "适应",
+        BackgroundFill.Fill => "拉伸",
+        BackgroundFill.Tile => "平铺",
+        _ => "铺满"
+    };
+
+    /// <summary>
+    /// 按填充方式配置静态图 / 视频的显示。平铺只对静态图片有意义，动图与视频退回铺满。
+    /// </summary>
+    private void ApplyFill(string path, BackgroundFill fill)
+    {
+        _tiling = fill == BackgroundFill.Tile && BackgroundService.DetectKind(path) == BackgroundKind.Image;
+
+        if (_tiling) return;
+
+        var stretch = fill switch
+        {
+            BackgroundFill.Fit => Stretch.Uniform,
+            BackgroundFill.Fill => Stretch.Fill,
+            _ => Stretch.UniformToFill
+        };
+
+        ImgBackground.Stretch = stretch;
+        VidBackground.Stretch = stretch;
+    }
+
+    /// <summary>静态图片平铺：用带 TileMode 的 ImageBrush 铺在 Rectangle 上。</summary>
+    private void ShowTiled(string path)
+    {
+        var image = LoadFrozen(path);
+
+        // 平铺单元按原图比例缩到不超过 480 DIP，免得一张 4K 图平铺出来跟单张没区别
+        var longest = Math.Max(image.PixelWidth, image.PixelHeight);
+        var scale = longest > 0 ? Math.Min(1.0, 480.0 / longest) : 1.0;
+
+        var brush = new ImageBrush(image)
+        {
+            TileMode = TileMode.Tile,
+            ViewportUnits = BrushMappingMode.Absolute,
+            Viewport = new Rect(0, 0, Math.Max(1, image.PixelWidth * scale), Math.Max(1, image.PixelHeight * scale)),
+            Stretch = Stretch.Fill,
+            AlignmentX = AlignmentX.Left,
+            AlignmentY = AlignmentY.Top
+        };
+        brush.Freeze();
+
+        RecBackground.Fill = brush;
+        RecBackground.Visibility = Visibility.Visible;
+    }
+
+    // ————— 轮播 —————
+
+    /// <summary>按设置重建轮播队列；清单没变时不打断当前进度。</summary>
+    private void ArrangeRotation(BackgroundSettings background)
+    {
+        var playlist = background.RotateEnabled
+            ? background.Playlist.Where(name => BackgroundService.ResolveExistingFile(name) is not null).ToList()
+            : [];
+
+        var key = string.Join("|", playlist);
+
+        if (!string.Equals(key, _rotationKey, StringComparison.Ordinal))
+        {
+            _rotationKey = key;
+            _rotationQueue = playlist;
+
+            // 当前背景就在清单里时从它开始，免得一进来就跳走
+            var current = background.FileName;
+            var found = current is null
+                ? -1
+                : _rotationQueue.FindIndex(name => string.Equals(name, current, StringComparison.OrdinalIgnoreCase));
+
+            _rotationIndex = found >= 0 ? found : 0;
+        }
+
+        RestartRotateTimer(background);
+    }
+
+    private void RestartRotateTimer(BackgroundSettings background)
+    {
+        _rotateTimer.Stop();
+
+        if (_paused || !background.RotateEnabled || _rotationQueue.Count <= 1) return;
+
+        _rotateTimer.Interval = TimeSpan.FromSeconds(background.RotateSeconds);
+        _rotateTimer.Start();
+    }
+
+    private void OnRotateTick(object? sender, EventArgs e)
+    {
+        _rotateTimer.Stop();
+
+        if (_paused || _rotationQueue.Count == 0) return;
+
+        var background = SettingsStore.Current.Background;
+
+        _rotationIndex = background.RotateShuffle
+            ? NextShuffledIndex()
+            : (_rotationIndex + 1) % _rotationQueue.Count;
+
+        // 走 ApplyFromSettings 而不是直接 Apply：当前页有独立背景时它继续生效
+        ApplyFromSettings(_pageOverride);
+    }
+
+    /// <summary>随机挑一张不等于当前的，避免连续两次同一张。</summary>
+    private int NextShuffledIndex()
+    {
+        if (_rotationQueue.Count <= 1) return 0;
+
+        int next;
+        do { next = _random.Next(_rotationQueue.Count); } while (next == _rotationIndex);
+
+        return next;
     }
 
     /// <summary>应用模糊与暗化。返回实际生效的模糊半径。</summary>
@@ -160,6 +352,10 @@ public partial class BackgroundLayer : UserControl
 
         if (paused) _gifTimer.Stop();
         else ScheduleNextGifFrame();
+
+        // 最小化时停掉轮播，恢复时按设置重新排期
+        if (paused) _rotateTimer.Stop();
+        else RestartRotateTimer(SettingsStore.Current.Background);
     }
 
     // ————— 动图 —————
@@ -369,6 +565,10 @@ public partial class BackgroundLayer : UserControl
 
         ImgBackground.Source = null;
         ImgBackground.Visibility = Visibility.Collapsed;
+
+        RecBackground.Fill = null;
+        RecBackground.Visibility = Visibility.Collapsed;
+        _tiling = false;
 
         try { VidBackground.Stop(); }
         catch { /* 没加载过媒体时 Stop 可能抛异常，忽略 */ }

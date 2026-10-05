@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using HMOL.App.Animation;
@@ -15,6 +16,7 @@ using HMOL.App.Pages;
 using HMOL.App.Services;
 using HMOL.App.Theme;
 using HMOL.Core.App;
+using HMOL.Core.Appearance;
 using HMOL.Core.Instances;
 using HMOL.Core.Layout;
 using HMOL.Core.Logging;
@@ -39,6 +41,9 @@ public partial class MainWindow : Window
 
     /// <summary>设置页的分类项，下标与 <c>Tag</c> 里的分类序号一一对应。</summary>
     private readonly NavItem[] _setupCategories;
+
+    /// <summary>设置分组项（个性化 / 更新与下载 / 联机 / 其他），按下标与 <see cref="SetupGroupCategories"/> 对齐。</summary>
+    private readonly NavItem[] _setupGroups;
 
     /// <summary>联机页的分类项（组网 / 大厅 / 对端 / 引擎日志），下标与 <c>Tag</c> 一一对应。</summary>
     private readonly NavItem[] _mpCategories;
@@ -75,21 +80,31 @@ public partial class MainWindow : Window
         _ready = true;
 
         // 设置分类项按 Tag 顺序抓成表：切分类时按下标同步选中态，不必写一堆 if
+        // 顺序 = 侧栏里的排列（分组标题不参与）：个性化 → 更新与下载 → 联机 → 其他
         _setupCategories =
         [
             SetupCatAppearance,
-            SetupCatNickname,
-            SetupCatWeatherCity,
-            SetupCatSites,
+            SetupCatHome,
             SetupCatBackground,
             SetupCatMusic,
             SetupCatLayout,
-            SetupCatHome,
+            SetupCatSites,
+            SetupCatWeatherCity,
             SetupCatExtensions,
+            SetupCatUpdate,
+            SetupCatNickname,
+            SetupCatLook,
             SetupCatAutoStart,
             SetupCatGamePath,
-            SetupCatUpdate,
             SetupCatAbout,
+        ];
+
+        _setupGroups =
+        [
+            SetupGroupPersonal,
+            SetupGroupUpdate,
+            SetupGroupMultiplayer,
+            SetupGroupOther,
         ];
 
         // 联机分类项按 Tag 顺序抓成表，理由与设置分类栏相同
@@ -111,6 +126,9 @@ public partial class MainWindow : Window
         // 透明度与界面缩放：设置已由 App 启动时载入，这里直接落地
         ApplyAppearance();
 
+        // 自定义窗口标题与图标
+        ApplyCustomization();
+
         PanBack.SizeChanged += (_, e) => RectForm.Rect = new Rect(0, 0, e.NewSize.Width, e.NewSize.Height);
 
         Loaded += (_, _) =>
@@ -120,6 +138,9 @@ public partial class MainWindow : Window
 
             // 主题变了要重铺一次：压暗层取的是主题里的窗口底色，得跟着主题走
             ThemeService.ThemeChanged += ApplyBackground;
+
+            // 启动音效：等窗口出来再播，避免和启动时的布局抖动叠在一起
+            CustomizationService.PlaySound(SettingsStore.Current.StartupSoundFile);
 
             // 首次运行：等界面稳定后再判定并弹向导
             QueueFirstRunWizard();
@@ -190,8 +211,44 @@ public partial class MainWindow : Window
     {
         _exitRequested = true;
         Close();
+
+        // 配了关闭音效就留一点时间让它播出来，否则直接退出
+        if (CustomizationService.PlaySound(SettingsStore.Current.ShutdownSoundFile))
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                Application.Current.Shutdown();
+            };
+            timer.Start();
+            return;
+        }
+
         Application.Current.Shutdown();
     }
+
+    /// <summary>按设置应用自定义窗口标题与图标（设置页改完直接调这里，不用重启）。</summary>
+    internal void ApplyCustomization()
+    {
+        var settings = SettingsStore.Current;
+
+        var title = string.IsNullOrWhiteSpace(settings.WindowTitle) ? AppInfo.Name : settings.WindowTitle!;
+
+        Title = title;
+        LabTitleAppName.Text = title;
+
+        var icon = CustomizationService.LoadIcon(settings.WindowIconFile) ?? DefaultIcon;
+
+        Icon = icon;
+        ImgTitleIcon.Source = icon;
+    }
+
+    /// <summary>内置图标：没配自定义图标、或自定义图标读不出来时回退到它。</summary>
+    private static ImageSource? _defaultIcon;
+
+    private static ImageSource DefaultIcon
+        => _defaultIcon ??= new BitmapImage(new Uri("pack://application:,,,/HMOL;component/Assets/AppIcon.ico"));
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -210,12 +267,47 @@ public partial class MainWindow : Window
         Log.Info("主窗口已收起到系统托盘（要退出请用托盘菜单）");
     }
 
-    /// <summary>按设置重铺整窗背景。设置页改完直接调这里，不用重启。</summary>
+    /// <summary>页面编号 → 每页独立背景用的标识。</summary>
+    internal static string PageKey(int page) => page switch
+    {
+        NavPages.Instances => "instances",
+        NavPages.Packages => "packages",
+        NavPages.Multiplayer => "multiplayer",
+        NavPages.Download => "download",
+        NavPages.Log => "log",
+        NavPages.Settings => "settings",
+        _ => "home"
+    };
+
+    /// <summary>按设置重铺整窗背景（含轮播编排与当前页的独立背景）。设置页改完直接调这里，不用重启。</summary>
     internal void ApplyBackground()
     {
-        var background = SettingsStore.Current.Background;
+        var page = _currentPage < 0 ? NavPages.Home : _currentPage;
+        var key = PageKey(page);
 
-        BackgroundView.Apply(background.FileName, background.BlurRadius, background.DimPercent, background.FadeMs);
+        string? over = null;
+
+        if (SettingsStore.Current.Background.PageOverrides.TryGetValue(key, out var configured)
+            && BackgroundService.ResolveExistingFile(configured) is not null)
+        {
+            over = configured;
+        }
+
+        BackgroundView.ApplyFromSettings(over);
+    }
+
+    /// <summary>鼠标视差：把光标在主窗口里的归一化位置（−1..1）交给背景层。</summary>
+    private void OnRootMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!SettingsStore.Current.Background.Parallax) return;
+
+        if (ActualWidth <= 0 || ActualHeight <= 0) return;
+
+        var position = e.GetPosition(this);
+
+        BackgroundView.SetParallax(
+            position.X / ActualWidth * 2 - 1,
+            position.Y / ActualHeight * 2 - 1);
     }
 
     /// <summary>
@@ -382,9 +474,16 @@ public partial class MainWindow : Window
         if (page == NavPages.Settings && from >= 0) _pageBeforeSettings = from;
         if (page == NavPages.Multiplayer && from >= 0) _pageBeforeMultiplayer = from;
 
+        // 每次进设置页都从「分组列表」开始，不直接落到上次的分类
+        if (page == NavPages.Settings && from != NavPages.Settings) _setupLevel = 0;
+
         _currentPage = page;
         SyncNavSelection(page);
         ApplySidebarMode(page);
+
+        // 每个页面可以有自己的背景（设置 → 主页背景 → 每页独立背景）
+        ApplyBackground();
+
         Log.Info($"切换到页面 {page}");
 
         target.Visibility = Visibility.Visible;
@@ -438,23 +537,70 @@ public partial class MainWindow : Window
         _suppressNavCheck = false;
     }
 
-    // ————— 设置页的分类侧栏 —————
+    // ————— 设置页的分类侧栏（两级：分组 → 分类） —————
+
+    /// <summary>每一组包含哪些分类（下标与侧栏 Tag 一致）：个性化 / 更新与下载 / 联机 / 其他。</summary>
+    private static readonly int[][] SetupGroupCategories =
+    [
+        [0, 1, 2, 3, 4, 5, 6, 7, 10],
+        [8],
+        [9],
+        [11, 12, 13]
+    ];
+
+    /// <summary>侧栏当前停在哪一层：0 = 分组列表，1 = 某一组的分类列表。</summary>
+    private int _setupLevel;
+
+    /// <summary>当前展开的分组下标。</summary>
+    private int _setupGroup;
+
+    private bool _suppressSetupGroup;
+
+    /// <summary>分类归到哪一组。</summary>
+    private static int GroupOfCategory(int category) => category switch
+    {
+        <= 7 => 0,
+        8 => 1,
+        9 => 2,
+        10 => 0,
+        _ => 3
+    };
 
     /// <summary>
     /// 在设置页 / 联机页用各自的分类栏顶替主导航栏，切到别的页面再换回来。
-    /// 只切三个 StackPanel 自己的 Visibility，主导航项各自的显隐（<see cref="ApplyLayout"/> 设的）不受影响。
+    /// 设置页分两级：先只列四个分组，点进某组才显示该组的分类。
     /// </summary>
     private void ApplySidebarMode(int page)
     {
         var inSetup = page == NavPages.Settings;
         var inMultiplayer = page == NavPages.Multiplayer;
 
-        PanSetupNav.Visibility = inSetup ? Visibility.Visible : Visibility.Collapsed;
-        PanMultiplayerNav.Visibility = inMultiplayer ? Visibility.Visible : Visibility.Collapsed;
-        PanSidebarNav.Visibility = inSetup || inMultiplayer ? Visibility.Collapsed : Visibility.Visible;
+        ShowSidebarPanel(PanSetupGroups, inSetup && _setupLevel == 0);
+        ShowSidebarPanel(PanSetupNav, inSetup && _setupLevel == 1);
+        ShowSidebarPanel(PanMultiplayerNav, inMultiplayer);
+        ShowSidebarPanel(PanSidebarNav, !inSetup && !inMultiplayer);
 
-        if (inSetup) SelectSetupCategory(_setupCategory);
-        else if (inMultiplayer) SelectMultiplayerCategory(_mpCategory);
+        if (!inSetup) return;
+
+        SyncSetupGroupSelection();
+        SyncSetupCategorySelection();
+
+        // 内容区永远只留一张卡片可见：停在分组层时也保留上次那张，
+        // 否则 14 张卡会叠着全部显示（又长又卡，这就是之前那个显示问题）。
+        (GetPage(NavPages.Settings) as PageSettings)?.SwitchCategory(_setupCategory);
+    }
+
+    /// <summary>切侧栏面板的显隐；从折叠变可见时淡入一下，别硬闪。</summary>
+    private static void ShowSidebarPanel(UIElement panel, bool visible)
+    {
+        var appeared = visible && panel.Visibility != Visibility.Visible;
+
+        panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!appeared) return;
+
+        panel.Opacity = 0;
+        AnimationEngine.Start($"sidebar:{panel.GetHashCode()}", 0, 1, 150, Ease.OutFluent, value => panel.Opacity = value);
     }
 
     private void OnSetupCategoryChecked(object sender, RoutedEventArgs e)
@@ -466,7 +612,25 @@ public partial class MainWindow : Window
         SelectSetupCategory(index);
     }
 
-    /// <summary>侧栏「返回」：回到进设置页之前停留的那个页面。</summary>
+    private void OnSetupGroupChecked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || _suppressSetupGroup) return;
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+        if (!int.TryParse(tag, out var group)) return;
+
+        EnterSetupGroup(group, null);
+    }
+
+    /// <summary>分类列表里的「返回」：退回分组列表，不离开设置页。</summary>
+    private void OnSetupCategoryBackClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is NavItem item) item.IsChecked = false;
+
+        _setupLevel = 0;
+        ApplySidebarMode(NavPages.Settings);
+    }
+
+    /// <summary>分组列表里的「返回」：离开设置页，回到进来之前停留的那一页。</summary>
     private void OnSetupBackClick(object sender, RoutedEventArgs e)
     {
         if (sender is NavItem item) item.IsChecked = false;
@@ -474,20 +638,66 @@ public partial class MainWindow : Window
         SwitchToPage(_pageBeforeSettings);
     }
 
-    /// <summary>切到某个分类：同步侧栏选中态，再让设置页换上对应的卡片。</summary>
-    internal void SelectSetupCategory(int index)
+    /// <summary>展开某一组并选中它的某个分类（<paramref name="category"/> 为 null 时选该组第一个）。</summary>
+    private void EnterSetupGroup(int group, int? category)
     {
-        if (index < 0 || index >= _setupCategories.Length) index = 0;
-        _setupCategory = index;
+        if (group < 0 || group >= SetupGroupCategories.Length) group = 0;
 
-        // 程序化改选中态同样会触发 Checked，这里挡掉避免回环
+        _setupGroup = group;
+        _setupLevel = 1;
+
+        var categories = SetupGroupCategories[group];
+        var index = category ?? (categories.Contains(_setupCategory) ? _setupCategory : categories[0]);
+
+        ApplySetupCategoryFilter();
+        ApplySidebarMode(NavPages.Settings);
+
+        SelectSetupCategory(index);
+    }
+
+    /// <summary>只留当前分组里的分类项，其余折叠。</summary>
+    private void ApplySetupCategoryFilter()
+    {
+        var visible = SetupGroupCategories[_setupGroup];
+
+        for (var i = 0; i < _setupCategories.Length; i++)
+            _setupCategories[i].Visibility = visible.Contains(i) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void SyncSetupGroupSelection()
+    {
+        _suppressSetupGroup = true;
+
+        for (var i = 0; i < _setupGroups.Length; i++)
+            _setupGroups[i].IsChecked = i == _setupGroup;
+
+        _suppressSetupGroup = false;
+    }
+
+    private void SyncSetupCategorySelection()
+    {
         _suppressSetupCategory = true;
 
         for (var i = 0; i < _setupCategories.Length; i++)
-            _setupCategories[i].IsChecked = i == index;
+            _setupCategories[i].IsChecked = i == _setupCategory;
 
         _suppressSetupCategory = false;
+    }
 
+    /// <summary>切到某个分类：必要时先展开它所属的分组，再同步选中态并换卡片。</summary>
+    internal void SelectSetupCategory(int index)
+    {
+        if (index < 0 || index >= _setupCategories.Length) index = 0;
+
+        if (_setupLevel != 1 || GroupOfCategory(index) != _setupGroup)
+        {
+            EnterSetupGroup(GroupOfCategory(index), index);
+            return;
+        }
+
+        _setupCategory = index;
+
+        SyncSetupCategorySelection();
         (GetPage(NavPages.Settings) as PageSettings)?.SwitchCategory(index);
     }
 

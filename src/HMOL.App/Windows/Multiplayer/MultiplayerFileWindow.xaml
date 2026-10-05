@@ -7,7 +7,7 @@
         MinWidth="560"
         MinHeight="480"
         Background="{DynamicResource Surface.Window}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         ShowInTaskbar="False"
@@ -30,7 +30,7 @@
             <Border Grid.Row="0"
                     Padding="12,8"
                     Background="{DynamicResource Status.WarnSoft}"
-                    CornerRadius="{StaticResource Radius.Item}">
+                    CornerRadius="{DynamicResource Radius.Item}">
                 <TextBlock FontSize="11.5"
                            Foreground="{DynamicResource Status.Warn}"
                            TextWrapping="Wrap"

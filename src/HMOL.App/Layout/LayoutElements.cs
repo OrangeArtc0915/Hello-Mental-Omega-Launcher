@@ -68,28 +68,44 @@ public static class LayoutElements
 }
 
 /// <summary>
-/// 可自由定位的主页元素清单。主页就这几块内容，各自对应 <c>PageHome</c> 里的一个控件：
-/// 方案里给了坐标的元素会被摘出流式布局绝对定位，没给坐标的照常走流式布局。
-/// 主页元素不支持隐藏（藏掉启动入口就找不回来了），也不参与侧栏排序。
+/// 可自由定位的主页元素清单。主页上的每一块都在这里登记，各自对应 <c>PageHome</c> 里的一个控件：
+/// 方案里给了坐标的元素会被摘出流式布局、整页自由定位（拖动 + 缩放），没给坐标的照常走流式布局。
+/// 启动入口（当前实例卡 / 无实例引导卡）不允许隐藏，免得把「启动游戏」藏没了找不回来。
 /// </summary>
 public static class HomeLayoutElements
 {
     public const string GroupHome = "主页";
 
-    /// <summary>主页自由定位的宿主容器名（<c>PageHome</c> 里的舞台栅格）。</summary>
+    /// <summary>主页自由定位的宿主容器名（<c>PageHome</c> 里的整页内容栅格）。</summary>
     public const string StageName = "PanHomeStage";
 
     public static IReadOnlyList<LayoutElementInfo> All { get; } =
     [
+        new("home_banner", "欢迎横幅", "lucide/flag", GroupHome, "CardBanner", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(0, 0, 100, 13)),
         // 启动按钮长在「当前实例」卡片里（卡片还带标题、状态、路径），整块搬动才不会把卡片掏空
         new("home_current", "当前实例卡片", "lucide/play", GroupHome, "CardCurrent", StageName,
-            CanHide: false, DefaultRect: new HomeDefaultRect(2, 4, 58, 60)),
+            CanHide: false, DefaultRect: new HomeDefaultRect(2, 16, 56, 50)),
         new("home_switch", "切换实例卡片", "lucide/layers", GroupHome, "CardSwitch", StageName,
-            CanHide: false, DefaultRect: new HomeDefaultRect(64, 4, 34, 60)),
+            CanHide: false, DefaultRect: new HomeDefaultRect(62, 16, 36, 50)),
         new("home_empty", "无实例引导卡片", "lucide/triangle-alert", GroupHome, "CardEmpty", StageName,
-            CanHide: false, DefaultRect: new HomeDefaultRect(28, 18, 44, 48)),
+            CanHide: false, DefaultRect: new HomeDefaultRect(28, 22, 44, 40)),
         new("home_note", "底部提示条", "lucide/info", GroupHome, "CardNote", StageName,
-            CanHide: false, DefaultRect: new HomeDefaultRect(2, 70, 96, 16)),
+            CanHide: true, DefaultRect: new HomeDefaultRect(2, 68, 96, 9)),
+        new("home_calendar", "日历小组件", "lucide/grid-2x2", GroupHome, "CardCalendar", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(2, 78, 31, 20)),
+        new("home_weather", "天气小组件", "lucide/earth", GroupHome, "CardWeather", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(35, 78, 30, 20)),
+        new("home_sites", "常用网站小组件", "lucide/link-2", GroupHome, "CardSites", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(67, 78, 31, 20)),
+        new("home_extensions", "扩展小组件区", "lucide/puzzle", GroupHome, "PanExtensionWidgets", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(2, 92, 96, 8)),
+        new("home_clock", "时钟小组件", "lucide/scroll-text", GroupHome, "CardClock", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(2, 78, 31, 20)),
+        new("home_memo", "便签小组件", "lucide/book-marked", GroupHome, "CardMemo", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(35, 78, 30, 20)),
+        new("home_music", "音乐控制小组件", "lucide/music", GroupHome, "CardMusicWidget", StageName,
+            CanHide: true, DefaultRect: new HomeDefaultRect(67, 78, 31, 20)),
     ];
 
     public static IReadOnlyList<string> Ids { get; } = All.Select(info => info.Id).ToArray();

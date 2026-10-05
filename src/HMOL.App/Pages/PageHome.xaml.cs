@@ -235,6 +235,9 @@ public partial class PageHome : LauncherPage
     /// <summary>正在生效的方案。舞台尺寸变化时按它重算像素坐标。</summary>
     private LayoutScheme? _scheme;
 
+    /// <summary>时钟小组件的走秒定时器。</summary>
+    private readonly DispatcherTimer _clockTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+
     public PageHome()
     {
         InitializeComponent();
@@ -243,6 +246,8 @@ public partial class PageHome : LauncherPage
         BuildWeekdayHeader();
         RefreshCalendar();
         RefreshSites();
+
+        _clockTimer.Tick += (_, _) => RefreshClock();
 
         // 窗口缩放时百分比坐标要重算一次，不然会停在旧尺寸上
         PanHomeStage.SizeChanged += (_, _) => RefreshFreeRects();
@@ -259,6 +264,8 @@ public partial class PageHome : LauncherPage
         RefreshCalendar();
         RefreshSites();
 
+        _clockTimer.Start();
+
         // 日期与站点都用不着动画，只有天气要联网；命中 30 分钟缓存时这一步不发请求。
         // 天气块被隐藏时整段跳过，省一次没必要的请求（下次进主页时若已重新显示再补上）。
         if (SettingsStore.Current.HomeWidgets.Weather) _ = RefreshWeatherAsync();
@@ -270,7 +277,11 @@ public partial class PageHome : LauncherPage
     }
 
     /// <summary>离开页面：把带 home: 前缀的动画（含呼吸循环）全部停掉，并把状态落到终态。</summary>
-    public override void OnLeave() => StopHomeAnimations();
+    public override void OnLeave()
+    {
+        _clockTimer.Stop();
+        StopHomeAnimations();
+    }
 
     private void StopHomeAnimations()
     {
@@ -316,6 +327,9 @@ public partial class PageHome : LauncherPage
     {
         _scheme = scheme;
 
+        // 旧方案的坐标以「舞台区」为基准，先按实测高度换算到整页基准（只做一次）
+        var migrated = scheme is not null && MigrateScheme(scheme);
+
         foreach (var info in HomeLayoutElements.All)
         {
             if (HomeElement(info.Id) is not { } element) continue;
@@ -325,6 +339,54 @@ public partial class PageHome : LauncherPage
             if (item is { HasBounds: true }) PlaceFree(info.Id, element, item);
             else RestoreFlow(info.Id, element);
         }
+
+        // 位置与显隐都可能变了，重算一次可见性（自由定位的小组件还要顺手收掉流式里的空列）
+        Refresh();
+
+        if (migrated) LayoutStore.Save(scheme!);
+    }
+
+    /// <summary>
+    /// 把 v1 方案（坐标基准是「舞台区」）换算到 v2（整页内容区）：只改 Y 与 Height，X / Width 的基准没变。
+    /// 量不到高度（页面还没排版）就本次不转、等下次，绝不把方案改坏。
+    /// </summary>
+    private bool MigrateScheme(LayoutScheme scheme)
+    {
+        if (scheme.Version >= LayoutScheme.CurrentVersion) return false;
+
+        var contentHeight = PanHomeStage.ActualHeight;
+        if (contentHeight <= 0) return false;
+
+        var bannerHeight = CardBanner.ActualHeight;
+        var widgetsHeight = GrdWidgets.ActualHeight;
+
+        // 旧舞台区：横幅之下（原先还带 10px 上边距）、小组件之上（同样留 10px）
+        var stageTop = bannerHeight + 10;
+        var stageHeight = Math.Max(1, contentHeight - stageTop - widgetsHeight - 10);
+
+        var converted = 0;
+
+        foreach (var item in scheme.Items)
+        {
+            if (!item.HasBounds) continue;
+
+            var top = stageTop + item.YPercent!.Value / 100 * stageHeight;
+            var height = item.HeightPercent!.Value / 100 * stageHeight;
+
+            item.YPercent = Math.Round(Math.Clamp(top / contentHeight * 100, 0, 100), 1);
+            item.HeightPercent = Math.Round(Math.Clamp(height / contentHeight * 100, LayoutItem.MinSizePercent, 100), 1);
+            item.ClampBounds();
+
+            converted++;
+        }
+
+        scheme.Version = LayoutScheme.CurrentVersion;
+
+        // 没有带坐标的项就只是换个版本号，不必落盘
+        if (converted == 0) return false;
+
+        Log.Info($"布局方案「{scheme.Name}」的坐标基准已升级为整页（换算 {converted} 项）");
+        return true;
     }
 
     /// <summary>记住 XAML 里的流式位置（行 / 列 / 跨行跨列 / 外边距）。</summary>
@@ -333,8 +395,10 @@ public partial class PageHome : LauncherPage
         foreach (var info in HomeLayoutElements.All)
         {
             if (HomeElement(info.Id) is not { } element) continue;
+            if (element.Parent is not Panel parent) continue;
 
             _flowSlots[info.Id] = new FlowSlot(
+                parent,
                 Grid.GetRow(element),
                 Grid.GetColumn(element),
                 Grid.GetRowSpan(element),
@@ -344,11 +408,18 @@ public partial class PageHome : LauncherPage
     }
 
     /// <summary>
-    /// 摘出流式布局：让元素占满整个舞台栅格、左上对齐，再用 Margin 顶到目标位置，等价于绝对定位。
-    /// 元素始终是舞台的直接子元素，不搬动可视树，控件状态（启动按钮、实例列表）不受影响。
+    /// 摘出流式布局：把元素搬进舞台、占满整格、左上对齐，再用 Margin 顶到目标位置，等价于绝对定位。
+    /// 横幅与小组件原本在别的行 / 栅格里，必须搬到舞台才能整页自由定位；搬的是同一个控件实例，
+    /// 状态（启动按钮、实例列表、日历）都跟着走，不会重建。
     /// </summary>
     private void PlaceFree(string id, FrameworkElement element, LayoutItem item)
     {
+        if (!ReferenceEquals(element.Parent, PanHomeStage))
+        {
+            (element.Parent as Panel)?.Children.Remove(element);
+            PanHomeStage.Children.Add(element);
+        }
+
         Grid.SetRow(element, 0);
         Grid.SetColumn(element, 0);
         Grid.SetRowSpan(element, Math.Max(1, PanHomeStage.RowDefinitions.Count));
@@ -369,6 +440,12 @@ public partial class PageHome : LauncherPage
         _freeIds.Remove(id);
 
         if (!_flowSlots.TryGetValue(id, out var slot)) return;
+
+        if (!ReferenceEquals(element.Parent, slot.Parent))
+        {
+            (element.Parent as Panel)?.Children.Remove(element);
+            slot.Parent.Children.Add(element);
+        }
 
         Grid.SetRow(element, slot.Row);
         Grid.SetColumn(element, slot.Column);
@@ -423,8 +500,8 @@ public partial class PageHome : LauncherPage
     private FrameworkElement? HomeElement(string id)
         => HomeLayoutElements.Find(id) is { } info ? FindName(info.ControlName) as FrameworkElement : null;
 
-    /// <summary>一个主页元素在流式布局里的位置。</summary>
-    private readonly record struct FlowSlot(int Row, int Column, int RowSpan, int ColumnSpan, Thickness Margin);
+    /// <summary>一个主页元素在流式布局里的位置（含原来的父容器，供自由定位后还原）。</summary>
+    private readonly record struct FlowSlot(Panel Parent, int Row, int Column, int RowSpan, int ColumnSpan, Thickness Margin);
 
     // ————— 动效 —————
 
@@ -600,6 +677,7 @@ public partial class PageHome : LauncherPage
         _subscribed = true;
         InstanceStore.Changed += OnStoreChanged;
         GameSessionHub.StateChanged += OnSessionChanged;
+        BgmPlayer.StateChanged += OnBgmStateChanged;
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -609,9 +687,13 @@ public partial class PageHome : LauncherPage
         _subscribed = false;
         InstanceStore.Changed -= OnStoreChanged;
         GameSessionHub.StateChanged -= OnSessionChanged;
+        BgmPlayer.StateChanged -= OnBgmStateChanged;
 
+        _clockTimer.Stop();
         StopHomeAnimations();
     }
+
+    private void OnBgmStateChanged() => RunOnUi(RefreshMusicWidget);
 
     /// <summary>事件可能来自后台线程（如导入实例、游戏退出），统一切回 UI 线程。</summary>
     private void OnStoreChanged() => RunOnUi(Refresh);
@@ -629,27 +711,128 @@ public partial class PageHome : LauncherPage
     /// <summary>主页是否处于「简洁模式」（只留右下角一个启动入口）。</summary>
     private static bool IsSimpleMode() => SettingsStore.Current.HomeMode == HomeMode.Simple;
 
-    private void Refresh()
+    /// <summary>方案里该元素是否显示；没有方案或方案里没记录时默认显示。</summary>
+    private bool LayoutVisible(string id)
+        => _scheme?.Find(id) is not { } item || item.Visible;
+
+    /// <summary>
+    /// 重算所有主页区块的显隐。三个来源叠加：简洁模式、有没有实例 /「主页小组件」开关、布局方案里的显隐。
+    /// 自由定位的小组件已从流式行里搬走，所以还要顺手收掉它留下的空列。
+    /// </summary>
+    private void ApplyVisibility()
     {
         var simple = IsSimpleMode();
 
-        // 模式决定整块内容的显隐：简洁模式收起横幅、小组件与舞台卡，只留右下角浮层
-        CardBanner.Visibility = simple ? Visibility.Collapsed : Visibility.Visible;
-        GrdWidgets.Visibility = simple ? Visibility.Collapsed : Visibility.Visible;
-        PanSimple.Visibility = simple ? Visibility.Visible : Visibility.Collapsed;
+        CardBanner.Visibility = Vis(!simple && LayoutVisible("home_banner"));
+        GrdWidgets.Visibility = Vis(!simple);
+        PanSimple.Visibility = Vis(simple);
+
+        var hasInstance = InstanceManager.All.Count > 0;
+
+        CardEmpty.Visibility = Vis(!simple && !hasInstance && LayoutVisible("home_empty"));
+        CardCurrent.Visibility = Vis(!simple && hasInstance && LayoutVisible("home_current"));
+        CardSwitch.Visibility = Vis(!simple && hasInstance && LayoutVisible("home_switch"));
+        CardNote.Visibility = Vis(!simple && hasInstance && LayoutVisible("home_note"));
 
         ApplyWidgetVisibility();
+        ApplyExtraWidgetVisibility(simple);
 
+        static Visibility Vis(bool show) => show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>附加小组件（时钟 / 便签 / 快捷启动 / 音乐控制）：设置里打开、方案没隐藏、非简洁模式才显示。</summary>
+    private void ApplyExtraWidgetVisibility(bool simple)
+    {
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        CardClock.Visibility = Vis(!simple && extras.Clock && LayoutVisible("home_clock"));
+        CardMemo.Visibility = Vis(!simple && extras.Memo && LayoutVisible("home_memo"));
+        CardMusicWidget.Visibility = Vis(!simple && extras.Music && LayoutVisible("home_music"));
+
+        static Visibility Vis(bool show) => show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ————— 附加小组件 —————
+
+    /// <summary>刷新时钟 / 便签 / 快捷启动 / 音乐控制的内容。</summary>
+    private void RefreshExtraWidgets()
+    {
+        if (LabClockTime is null) return;
+
+        var extras = SettingsStore.Current.ExtraWidgets;
+
+        RefreshClock();
+
+        LabMemoTitle.Text = string.IsNullOrWhiteSpace(extras.MemoTitle) ? "便签" : extras.MemoTitle;
+        LabMemoText.Text = string.IsNullOrWhiteSpace(extras.MemoText)
+            ? "便签是空的，去「设置 → 主页设置」里写点什么吧。"
+            : extras.MemoText;
+
+        RefreshMusicWidget();
+    }
+
+    private void RefreshClock()
+    {
+        if (LabClockTime is null) return;
+
+        var extras = SettingsStore.Current.ExtraWidgets;
+        var now = DateTime.Now;
+
+        LabClockTime.Text = extras.Clock24Hour ? now.ToString("HH:mm:ss") : now.ToString("hh:mm:ss");
+        LabClockDate.Text = extras.ClockShowDate ? now.ToString("yyyy 年 M 月 d 日 dddd") : string.Empty;
+    }
+
+    private void RefreshMusicWidget()
+    {
+        if (LabMusicTrack is null) return;
+
+        var hasPlaylist = SettingsStore.Current.Bgm.Playlist.Count > 0;
+
+        BtnMusicPrev.IsEnabled = hasPlaylist;
+        BtnMusicNext.IsEnabled = hasPlaylist;
+        BtnMusicToggle.IsEnabled = hasPlaylist;
+
+        if (!hasPlaylist)
+        {
+            LabMusicTrack.Text = "还没有歌";
+            LabMusicHint.Text = "在「设置 → 背景音乐」里添加曲目。";
+        }
+        else
+        {
+            LabMusicTrack.Text = BgmPlayer.CurrentTrackName;
+            LabMusicHint.Text = BgmPlayer.IsPlaying ? "正在播放" : "已暂停";
+        }
+
+        BtnMusicToggle.Icon = BgmPlayer.IsPlaying ? "lucide/square" : "lucide/play";
+    }
+
+    private void OnMusicPrevClick(object sender, RoutedEventArgs e)
+    {
+        BgmPlayer.Previous();
+        RefreshMusicWidget();
+    }
+
+    private void OnMusicToggleClick(object sender, RoutedEventArgs e)
+    {
+        BgmPlayer.TogglePlayPause();
+        RefreshMusicWidget();
+    }
+
+    private void OnMusicNextClick(object sender, RoutedEventArgs e)
+    {
+        BgmPlayer.Next();
+        RefreshMusicWidget();
+    }
+
+    private void Refresh()
+    {
         if (CardCurrent is null) return;
+
+        ApplyVisibility();
+        RefreshExtraWidgets();
 
         var instances = InstanceManager.All;
         var hasInstance = instances.Count > 0;
-
-        // 自由定位只换位置，显示与否仍按「有没有实例」判断；简洁模式下舞台卡一律收起
-        CardEmpty.Visibility = !simple && !hasInstance ? Visibility.Visible : Visibility.Collapsed;
-        CardCurrent.Visibility = !simple && hasInstance ? Visibility.Visible : Visibility.Collapsed;
-        CardSwitch.Visibility = !simple && hasInstance ? Visibility.Visible : Visibility.Collapsed;
-        CardNote.Visibility = !simple && hasInstance ? Visibility.Visible : Visibility.Collapsed;
 
         RefreshBanner();
 
@@ -672,26 +855,35 @@ public partial class PageHome : LauncherPage
     }
 
     /// <summary>
-    /// 按设置显示 / 隐藏三块小组件。不能只把卡片 Collapsed——它占的等宽列也得一起收，
-    /// 否则那一条会留下等宽的空白，看起来像排版坏了。列间的 12px 间距同理，只在相邻两块都显示时才留。
+    /// 三块小组件：自由定位的按方案显示（它已经不占流式列了），仍在流式里的跟随「主页小组件」开关。
+    /// 不能只把卡片 Collapsed——它占的等宽列也得一起收，否则那一条会留下等宽的空白。
+    /// 列间的 12px 间距同理，只在相邻两块都还在流式里时留。
     /// </summary>
     private void ApplyWidgetVisibility()
     {
+        var simple = IsSimpleMode();
         var widgets = SettingsStore.Current.HomeWidgets;
-        var showCalendar = widgets.Calendar;
-        var showWeather = widgets.Weather;
-        var showSites = widgets.Sites;
 
-        CardCalendar.Visibility = Vis(showCalendar);
-        CardWeather.Visibility = Vis(showWeather);
-        CardSites.Visibility = Vis(showSites);
+        var freeCalendar = _freeIds.Contains("home_calendar");
+        var freeWeather = _freeIds.Contains("home_weather");
+        var freeSites = _freeIds.Contains("home_sites");
 
-        ColWidgetCalendar.Width = Star(showCalendar, 1.1);
-        ColWidgetWeather.Width = Star(showWeather, 1.05);
-        ColWidgetSites.Width = Star(showSites, 0.95);
+        // 还在流式里的才占列；自由定位的已经搬去舞台，列宽一律收成 0
+        var flowCalendar = !freeCalendar && widgets.Calendar;
+        var flowWeather = !freeWeather && widgets.Weather;
+        var flowSites = !freeSites && widgets.Sites;
 
-        ColWidgetGap1.Width = new GridLength(showCalendar && showWeather ? 12 : 0);
-        ColWidgetGap2.Width = new GridLength(showWeather && showSites ? 12 : 0);
+        // 自由定位的按方案显隐，仍在流式里的跟随「主页小组件」开关；简洁模式下整页只剩浮层
+        CardCalendar.Visibility = Vis(!simple && (freeCalendar ? LayoutVisible("home_calendar") : flowCalendar));
+        CardWeather.Visibility = Vis(!simple && (freeWeather ? LayoutVisible("home_weather") : flowWeather));
+        CardSites.Visibility = Vis(!simple && (freeSites ? LayoutVisible("home_sites") : flowSites));
+
+        ColWidgetCalendar.Width = Star(flowCalendar, 1.1);
+        ColWidgetWeather.Width = Star(flowWeather, 1.05);
+        ColWidgetSites.Width = Star(flowSites, 0.95);
+
+        ColWidgetGap1.Width = new GridLength(flowCalendar && flowWeather ? 12 : 0);
+        ColWidgetGap2.Width = new GridLength(flowWeather && flowSites ? 12 : 0);
 
         static Visibility Vis(bool show) => show ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1204,7 +1396,9 @@ public partial class PageHome : LauncherPage
 
         _extensionCards.Clear();
         PanExtensionWidgets.ItemsSource = rows;
-        PanExtensionWidgets.Visibility = Visibility.Visible;
+        PanExtensionWidgets.Visibility = LayoutVisible("home_extensions") && !IsSimpleMode()
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     /// <summary>

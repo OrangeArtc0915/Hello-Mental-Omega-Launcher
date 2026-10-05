@@ -5,7 +5,7 @@
         Width="560"
         Height="470"
         Background="{DynamicResource Surface.Window}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         ShowInTaskbar="False"

@@ -41,19 +41,34 @@
                   Margin="0,16,0,12"
                   HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto">
-        <Grid Margin="24,0,24,0"
-              MinHeight="{Binding ViewportHeight, ElementName=ScrollHome}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" MinHeight="150" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <!--
+        主页内容区：所有区块都是 PanHomeStage 的直接子元素 —— 既可按下面的行列走流式布局，
+        也可被布局方案「摘出来」自由定位（见 PageHome.xaml.cs 的 PlaceFree / RestoreFlow）。
+        横跨整页的坐标基准就是这一块，所以拖动缩放是「整页级」的。
+    -->
+    <Grid x:Name="PanHomeStage"
+          Margin="24,0,24,0"
+          MinHeight="{Binding ViewportHeight, ElementName=ScrollHome}"
+          ClipToBounds="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="150" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.5*" />
+            <ColumnDefinition Width="14" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
 
-            <!-- ① 欢迎横幅 -->
-            <c:SurfaceCard x:Name="CardBanner"
-                           Grid.Row="0"
-                           Padding="0"
-                           HasHoverEffect="False">
+        <!-- ① 欢迎横幅 -->
+        <c:SurfaceCard x:Name="CardBanner"
+                       Grid.Row="0"
+                       Grid.ColumnSpan="3"
+                       Padding="0"
+                       HasHoverEffect="False">
                 <Grid Height="84">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -69,7 +84,7 @@
                             VerticalAlignment="Center"
                             Background="{DynamicResource Accent.Faint}"
                             ClipToBounds="True"
-                            CornerRadius="{StaticResource Radius.Card}">
+                            CornerRadius="{DynamicResource Radius.Card}">
                         <Image Width="58"
                                Height="58"
                                Source="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
@@ -90,7 +105,7 @@
                                     Padding="8,2"
                                     VerticalAlignment="Center"
                                     Background="{DynamicResource Accent.Faint}"
-                                    CornerRadius="{StaticResource Radius.Pill}">
+                                    CornerRadius="{DynamicResource Radius.Pill}">
                                 <TextBlock FontSize="10.5"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource Accent.Base}"
@@ -116,7 +131,7 @@
                             Margin="0,0,18,0"
                             VerticalAlignment="Center"
                             ClipToBounds="True"
-                            CornerRadius="{StaticResource Radius.Item}"
+                            CornerRadius="{DynamicResource Radius.Item}"
                             SnapsToDevicePixels="True">
                         <Grid>
                             <Border Background="{DynamicResource Brush.CardCover}" Opacity="0.16" />
@@ -148,7 +163,7 @@
 
                             <Border BorderBrush="{DynamicResource Accent.Soft}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Item}"
+                                    CornerRadius="{DynamicResource Radius.Item}"
                                     IsHitTestVisible="False" />
                         </Grid>
                     </Border>
@@ -161,7 +176,7 @@
                 三块永远排在一行且不会被裁切。扩展卡用等分栅格（每行 3 张）跟着同一套宽度走，
                 窄窗口下与上面三块一起等比收缩、自动换到下一行。
             -->
-            <Grid x:Name="GrdWidgets" Grid.Row="2" Margin="0,10,0,0">
+            <Grid x:Name="GrdWidgets" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="ColWidgetCalendar" Width="1.1*" />
                     <ColumnDefinition x:Name="ColWidgetGap1" Width="12" />
@@ -415,7 +430,7 @@
                                         <!-- 悬停只改底色（样式触发），不给行加动画，省得离开页面还要逐个收尾 -->
                                         <Border Margin="0,0,0,5"
                                                 Padding="8,6"
-                                                CornerRadius="{StaticResource Radius.Item}"
+                                                CornerRadius="{DynamicResource Radius.Item}"
                                                 Cursor="Hand"
                                                 MouseLeftButtonUp="OnSiteClick"
                                                 Tag="{Binding Url}"
@@ -624,7 +639,7 @@
                                             Margin="0,8,0,0"
                                             Padding="8,5"
                                             Background="{DynamicResource Surface.Sunken}"
-                                            CornerRadius="{StaticResource Radius.Item}"
+                                            CornerRadius="{DynamicResource Radius.Item}"
                                             ToolTip="{Binding Link}"
                                             Visibility="{Binding HasLink, Converter={StaticResource BoolToVis}}">
                                         <Grid>
@@ -656,29 +671,179 @@
             </Grid>
 
             <!--
-                ② 主页舞台：流式布局与自由定位共用一个栅格。
-                四个主页控件都是这里的直接子元素，布局方案里给了百分比坐标的会改成
-                「铺满整格的左上对齐 + Margin + 显式宽高」，于是等价于绝对定位（见 PageHome.xaml.cs）。
-                没给坐标的元素保持下面的行列设置，照常走流式布局。
+                ③-4 附加小组件：时钟 / 便签 / 音乐控制。默认都关闭，设置里打开后才出现；
+                与其它区块一样可以由布局方案自由定位、缩放与隐藏（关掉的整卡 Collapsed，不占位）。
             -->
-            <Grid x:Name="PanHomeStage"
-                  Grid.Row="1"
-                  Margin="0,10,0,0"
-                  ClipToBounds="True">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+            <Grid x:Name="GrdExtras" Grid.Row="4" Grid.ColumnSpan="3" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.5*" />
-                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="1*" />
+                    <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="1*" />
                 </Grid.ColumnDefinitions>
 
+                <!-- 时钟 -->
+                <c:SurfaceCard x:Name="CardClock"
+                               Grid.Column="0"
+                               MinHeight="150"
+                               Padding="0"
+                               HasHoverEffect="False"
+                               Visibility="Collapsed">
+                    <Grid Margin="14,12,14,12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <svg:SvgIcon Grid.Column="0"
+                                         Width="14"
+                                         Height="14"
+                                         VerticalAlignment="Center"
+                                         Icon="lucide/scroll-text"
+                                         IconBrush="{DynamicResource Accent.Base}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource WidgetTitle}" Text="时钟" />
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="LabClockTime"
+                                       FontSize="30"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource Accent.Base}" />
+                            <TextBlock x:Name="LabClockDate"
+                                       Margin="0,4,0,0"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Tertiary}" />
+                        </StackPanel>
+                    </Grid>
+                </c:SurfaceCard>
+
+                <!-- 便签 -->
+                <c:SurfaceCard x:Name="CardMemo"
+                               Grid.Column="2"
+                               MinHeight="150"
+                               Padding="0"
+                               HasHoverEffect="False"
+                               Visibility="Collapsed">
+                    <Grid Margin="14,12,14,12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <svg:SvgIcon Grid.Column="0"
+                                         Width="14"
+                                         Height="14"
+                                         VerticalAlignment="Center"
+                                         Icon="lucide/book-marked"
+                                         IconBrush="{DynamicResource Accent.Base}" />
+                            <TextBlock x:Name="LabMemoTitle"
+                                       Grid.Column="1"
+                                       Style="{StaticResource WidgetTitle}"
+                                       Text="便签"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1"
+                                      Margin="0,8,0,0"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="LabMemoText"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Grid>
+                </c:SurfaceCard>
+
+                <!-- 音乐控制 -->
+                <c:SurfaceCard x:Name="CardMusicWidget"
+                               Grid.Column="4"
+                               MinHeight="150"
+                               Padding="0"
+                               HasHoverEffect="False"
+                               Visibility="Collapsed">
+                    <Grid Margin="14,12,14,12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <svg:SvgIcon Grid.Column="0"
+                                         Width="14"
+                                         Height="14"
+                                         VerticalAlignment="Center"
+                                         Icon="lucide/music"
+                                         IconBrush="{DynamicResource Accent.Base}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource WidgetTitle}" Text="背景音乐" />
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="LabMusicTrack"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Primary}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="LabMusicHint"
+                                       Margin="0,4,0,0"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource Text.Tertiary}"
+                                       TextWrapping="Wrap" />
+
+                            <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                                <c:RoundIconButton x:Name="BtnMusicPrev"
+                                                   Width="32"
+                                                   Height="32"
+                                                   Icon="lucide/arrow-left"
+                                                   IconSize="14"
+                                                   Tone="Plain"
+                                                   ToolTip="上一首"
+                                                   Click="OnMusicPrevClick" />
+                                <c:RoundIconButton x:Name="BtnMusicToggle"
+                                                   Width="32"
+                                                   Height="32"
+                                                   Margin="6,0,0,0"
+                                                   Icon="lucide/play"
+                                                   IconSize="14"
+                                                   Tone="Plain"
+                                                   ToolTip="播放 / 暂停"
+                                                   Click="OnMusicToggleClick" />
+                                <c:RoundIconButton x:Name="BtnMusicNext"
+                                                   Width="32"
+                                                   Height="32"
+                                                   Margin="6,0,0,0"
+                                                   Icon="lucide/arrow-right"
+                                                   IconSize="14"
+                                                   Tone="Plain"
+                                                   ToolTip="下一首"
+                                                   Click="OnMusicNextClick" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </c:SurfaceCard>
+            </Grid>
+
+            <!--
+                ② 主页舞台：卡片直接放在 PanHomeStage 里，既可走流式布局，也可按方案自由定位。
+            -->
+
                 <!-- 没有实例：引导去实例页（悬停时轻微上浮，与另外三张卡一致） -->
                 <c:SurfaceCard x:Name="CardEmpty"
-                               Grid.Row="0"
-                               Grid.RowSpan="2"
+                               Grid.Row="1"
                                Grid.Column="0"
                                Grid.ColumnSpan="3"
                                MouseEnter="OnCardEnter"
@@ -689,7 +854,7 @@
                                 Height="54"
                                 HorizontalAlignment="Center"
                                 Background="{DynamicResource Accent.Faint}"
-                                CornerRadius="{StaticResource Radius.Card}">
+                                CornerRadius="{DynamicResource Radius.Card}">
                             <svg:SvgIcon Width="26"
                                          Height="26"
                                          HorizontalAlignment="Center"
@@ -731,7 +896,7 @@
 
                 <!-- 有实例：当前实例 + 启动按钮 -->
                 <c:SurfaceCard x:Name="CardCurrent"
-                               Grid.Row="0"
+                               Grid.Row="1"
                                Grid.Column="0"
                                Title="当前实例"
                                MouseEnter="OnCardEnter"
@@ -761,7 +926,7 @@
                                     Padding="8,3"
                                     VerticalAlignment="Center"
                                     Background="{DynamicResource Accent.Faint}"
-                                    CornerRadius="{StaticResource Radius.Pill}">
+                                    CornerRadius="{DynamicResource Radius.Pill}">
                                 <StackPanel Orientation="Horizontal">
                                     <!-- 状态点：就绪=绿、目录失效=红、游戏运行中=强调色（并缓慢呼吸） -->
                                     <Border x:Name="BorStateDot"
@@ -769,7 +934,7 @@
                                             Height="7"
                                             VerticalAlignment="Center"
                                             Background="{DynamicResource Status.Success}"
-                                            CornerRadius="{StaticResource Radius.Pill}" />
+                                            CornerRadius="{DynamicResource Radius.Pill}" />
                                     <TextBlock x:Name="LabState"
                                                Margin="6,0,0,0"
                                                VerticalAlignment="Center"
@@ -876,7 +1041,7 @@
 
                 <!-- 有实例：切换当前实例 -->
                 <c:SurfaceCard x:Name="CardSwitch"
-                               Grid.Row="0"
+                               Grid.Row="1"
                                Grid.Column="2"
                                Title="切换实例"
                                MouseEnter="OnCardEnter"
@@ -896,7 +1061,7 @@
                                         <!-- 悬停时底色变化（样式触发）+ 轻微右移（AnimationEngine 补间） -->
                                         <Border Margin="0,0,0,6"
                                                 Padding="9,8"
-                                                CornerRadius="{StaticResource Radius.Item}"
+                                                CornerRadius="{DynamicResource Radius.Item}"
                                                 Cursor="Hand"
                                                 MouseEnter="OnSwitchRowEnter"
                                                 MouseLeave="OnSwitchRowLeave"
@@ -931,7 +1096,7 @@
                                                         Height="24"
                                                         VerticalAlignment="Center"
                                                         Background="{DynamicResource Surface.Card}"
-                                                        CornerRadius="{StaticResource Radius.Small}">
+                                                        CornerRadius="{DynamicResource Radius.Small}">
                                                     <Grid>
                                                         <Image Width="16"
                                                                Height="16"
@@ -994,13 +1159,13 @@
 
                 <!-- 有实例：底部提示（保持克制，只做弱提示） -->
                 <Border x:Name="CardNote"
-                        Grid.Row="1"
+                        Grid.Row="2"
                         Grid.Column="0"
                         Grid.ColumnSpan="3"
                         Margin="0,10,0,0"
                         Padding="12,9"
                         Background="{DynamicResource Accent.Faint}"
-                        CornerRadius="{StaticResource Radius.Item}">
+                        CornerRadius="{DynamicResource Radius.Item}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -1023,21 +1188,22 @@
                                    Text="启动前请确认已安装所需的插件包；游戏输出会记录在「运行日志」页的「游戏日志」标签里。" />
                     </Grid>
                 </Border>
-            </Grid>
 
             <!--
                 简洁模式浮层：整页只留这一块——右下角一个「启动游戏」按钮，旁边一个小箭头
-                点开实例列表直接切换。放在内容栅格里（跨三行、右下对齐），因此不必改动页面结构；
+                点开实例列表直接切换。放在内容栅格里（跨四行、右下对齐），因此不必改动页面结构；
                 内容装得下时它正好贴着可视区右下角，其余区域全部留空，以便尽量露出背景图。
             -->
             <Border x:Name="PanSimple"
                     Grid.Row="0"
-                    Grid.RowSpan="3"
+                    Grid.RowSpan="5"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="3"
                     Padding="12,10"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Bottom"
                     Background="{DynamicResource Surface.PanelGlass}"
-                    CornerRadius="{StaticResource Radius.Card}"
+                    CornerRadius="{DynamicResource Radius.Card}"
                     Visibility="Collapsed">
                 <StackPanel>
                     <TextBlock x:Name="LabSimpleInstance"
@@ -1090,7 +1256,7 @@
                                     Background="{DynamicResource Surface.Card}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Card}">
+                                    CornerRadius="{DynamicResource Radius.Card}">
                                 <ScrollViewer MaxHeight="320"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto">
@@ -1099,7 +1265,7 @@
                                             <DataTemplate>
                                                 <Border Margin="0,0,0,4"
                                                         Padding="9,7"
-                                                        CornerRadius="{StaticResource Radius.Item}"
+                                                        CornerRadius="{DynamicResource Radius.Item}"
                                                         Cursor="Hand"
                                                         MouseLeftButtonUp="OnSimpleSwitchItemClick"
                                                         Tag="{Binding Instance}">

@@ -5,7 +5,7 @@
         Width="460"
         Height="430"
         Background="{DynamicResource Surface.Window}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Foreground="{DynamicResource Text.Primary}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         ShowInTaskbar="False"
@@ -32,7 +32,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtPort"
                          Background="Transparent"
                          BorderThickness="0"
@@ -51,7 +51,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtPool"
                          Background="Transparent"
                          BorderThickness="0"
@@ -64,7 +64,7 @@
                     Margin="0,12,0,0"
                     Padding="12,8"
                     Background="{DynamicResource Accent.Faint}"
-                    CornerRadius="{StaticResource Radius.Item}"
+                    CornerRadius="{DynamicResource Radius.Item}"
                     Visibility="Collapsed">
                 <TextBlock x:Name="LabAddress"
                            FontFamily="Consolas, Microsoft YaHei UI"

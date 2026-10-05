@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Surface.Window}"
         Foreground="{DynamicResource Text.Primary}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -27,7 +27,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtName"
                          VerticalContentAlignment="Center"
                          Background="Transparent"
@@ -55,7 +55,7 @@
                         Background="{DynamicResource Surface.Sunken}"
                         BorderBrush="{DynamicResource Border.Default}"
                         BorderThickness="1"
-                        CornerRadius="{StaticResource Radius.Button}">
+                        CornerRadius="{DynamicResource Radius.Button}">
                     <TextBox x:Name="TxtGameDir"
                              VerticalContentAlignment="Center"
                              Background="Transparent"
@@ -127,7 +127,7 @@
                         Background="{DynamicResource Surface.Sunken}"
                         BorderBrush="{DynamicResource Border.Default}"
                         BorderThickness="1"
-                        CornerRadius="{StaticResource Radius.Button}">
+                        CornerRadius="{DynamicResource Radius.Button}">
                     <TextBox x:Name="TxtExe"
                              VerticalContentAlignment="Center"
                              Background="Transparent"
@@ -155,7 +155,7 @@
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
-                    CornerRadius="{StaticResource Radius.Button}">
+                    CornerRadius="{DynamicResource Radius.Button}">
                 <TextBox x:Name="TxtNote"
                          VerticalContentAlignment="Center"
                          Background="Transparent"

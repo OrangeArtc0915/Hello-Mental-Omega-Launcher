@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using Microsoft.Win32;
 using HMOL.App.Controls;
 using HMOL.App.Layout;
 using HMOL.Core.Layout;
@@ -54,9 +55,13 @@ public sealed class HomeElementRow
         Id = info.Id;
         Icon = info.Icon;
         Name = string.IsNullOrWhiteSpace(item?.DisplayName) ? info.DisplayName : item!.DisplayName!;
-        Hint = item is { HasBounds: true }
-            ? $"自由 {item.XPercent:0.#},{item.YPercent:0.#} · {item.WidthPercent:0.#}×{item.HeightPercent:0.#}"
-            : "跟随流式";
+
+        // 隐藏的元素优先标明「已隐藏」，否则看不出它为什么在主页上不出现
+        Hint = item is { Visible: false }
+            ? "已隐藏"
+            : item is { HasBounds: true }
+                ? $"自由 {item.XPercent:0.#},{item.YPercent:0.#} · {item.WidthPercent:0.#}×{item.HeightPercent:0.#}"
+                : "跟随流式";
     }
 
     public string Id { get; }
@@ -255,6 +260,63 @@ public partial class LayoutEditorWindow : Window
         if (wasActive) ApplyToMainWindow();
 
         SetStatus("已删除方案。", warn: false);
+    }
+
+    /// <summary>把当前方案（含未保存的改动）导出成 JSON，方便备份或分享给朋友。</summary>
+    private void OnSchemeExportClick(object sender, RoutedEventArgs e)
+    {
+        var export = new LayoutScheme
+        {
+            Id = _target.Id,
+            Name = _target.Name,
+            Description = _target.Description,
+            Version = _target.Version,
+            Items = _items.Select(item => item.Clone()).ToList(),
+        };
+
+        foreach (var item in export.Items) item.ClampBounds();
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "导出布局方案",
+            Filter = "布局方案 (*.json)|*.json|所有文件 (*.*)|*.*",
+            FileName = $"{_target.Name}.json",
+        };
+
+        if (dialog.ShowDialog(this) != true) return;
+
+        if (LayoutStore.ExportTo(export, dialog.FileName, out var error))
+            SetStatus($"已导出方案「{_target.Name}」：{dialog.FileName}", warn: false);
+        else
+            SetStatus($"导出失败：{error}", warn: true);
+    }
+
+    /// <summary>从别人的 JSON 导入一套方案，导入后自动切过去。</summary>
+    private void OnSchemeImportClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "导入布局方案",
+            Filter = "布局方案 (*.json)|*.json|所有文件 (*.*)|*.*",
+        };
+
+        if (dialog.ShowDialog(this) != true) return;
+
+        if (_dirty && !ConfirmDiscard()) return;
+
+        var scheme = LayoutStore.ImportFrom(dialog.FileName, LayoutElements.Ids, out var error);
+
+        if (scheme is null)
+        {
+            SetStatus($"导入失败：{error}", warn: true);
+            return;
+        }
+
+        _target = scheme;
+        LoadTarget();
+        RefreshSchemeList();
+
+        SetStatus($"已导入方案「{scheme.Name}」，点「保存并应用」后生效。", warn: false);
     }
 
     private void OnSaveAsClick(object sender, RoutedEventArgs e)
@@ -532,9 +594,49 @@ public partial class LayoutEditorWindow : Window
     {
         if (BtnHomeCenter is null) return;
 
-        var selected = ListHome.SelectedItem is HomeElementRow;
+        var row = ListHome.SelectedItem as HomeElementRow;
+        var selected = row is not null;
+
         BtnHomeCenter.IsEnabled = selected;
         BtnHomeReset.IsEnabled = selected;
+
+        if (BtnHomeHide is null || BtnHomeShow is null) return;
+
+        var item = selected ? FindItem(row!.Id) : null;
+        var info = HomeLayoutElements.Find(row?.Id);
+
+        BtnHomeHide.IsEnabled = item is { Visible: true } && (info?.CanHide ?? false);
+        BtnHomeShow.IsEnabled = item is { Visible: false };
+    }
+
+    // ————— 主页控件的显隐 —————
+
+    private void OnHomeHideClick(object sender, RoutedEventArgs e)
+    {
+        var item = FindItem((ListHome.SelectedItem as HomeElementRow)?.Id);
+        var info = HomeLayoutElements.Find(item?.ElementId);
+
+        if (item is null || info is null || !item.Visible) return;
+
+        if (!info.CanHide)
+        {
+            SetStatus($"「{info.DisplayName}」是主页的启动入口，不能隐藏。", warn: true);
+            return;
+        }
+
+        item.Visible = false;
+        _dirty = true;
+        RefreshHomeTab(item.ElementId);
+    }
+
+    private void OnHomeShowClick(object sender, RoutedEventArgs e)
+    {
+        var item = FindItem((ListHome.SelectedItem as HomeElementRow)?.Id);
+        if (item is null || item.Visible) return;
+
+        item.Visible = true;
+        _dirty = true;
+        RefreshHomeTab(item.ElementId);
     }
 
     /// <summary>把选中控件的坐标写进状态栏：拖动时给个精确数值，便于微调。</summary>

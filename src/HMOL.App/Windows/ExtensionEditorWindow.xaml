@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Surface.Window}"
         Foreground="{DynamicResource Text.Primary}"
-        FontFamily="{StaticResource AppFont}"
+        FontFamily="{DynamicResource AppFont}"
         Icon="pack://application:,,,/HMOL;component/Assets/AppIcon.ico"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
@@ -54,7 +54,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtTitle"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"
@@ -92,7 +92,7 @@
                                 Background="{DynamicResource Surface.Sunken}"
                                 BorderBrush="{DynamicResource Border.Default}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius.Button}">
+                                CornerRadius="{DynamicResource Radius.Button}">
                             <TextBox x:Name="TxtIcon"
                                      VerticalContentAlignment="Center"
                                      Background="Transparent"
@@ -109,7 +109,7 @@
                                 Background="{DynamicResource Surface.Sunken}"
                                 BorderBrush="{DynamicResource Border.Default}"
                                 BorderThickness="1"
-                                CornerRadius="{StaticResource Radius.Button}">
+                                CornerRadius="{DynamicResource Radius.Button}">
                             <svg:SvgIcon x:Name="IcoPreview"
                                          Width="16"
                                          Height="16"
@@ -143,7 +143,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Button}">
+                                    CornerRadius="{DynamicResource Radius.Button}">
                                 <TextBox x:Name="TxtVersion"
                                          VerticalContentAlignment="Center"
                                          Background="Transparent"
@@ -164,7 +164,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Button}">
+                                    CornerRadius="{DynamicResource Radius.Button}">
                                 <TextBox x:Name="TxtAuthor"
                                          VerticalContentAlignment="Center"
                                          Background="Transparent"
@@ -187,7 +187,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtDescription"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"
@@ -208,7 +208,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtValue"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"
@@ -257,7 +257,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtDataUrl"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"
@@ -284,7 +284,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Button}">
+                                    CornerRadius="{DynamicResource Radius.Button}">
                                 <TextBox x:Name="TxtDataPath"
                                          VerticalContentAlignment="Center"
                                          Background="Transparent"
@@ -305,7 +305,7 @@
                                     Background="{DynamicResource Surface.Sunken}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Button}">
+                                    CornerRadius="{DynamicResource Radius.Button}">
                                 <TextBox x:Name="TxtRefresh"
                                          VerticalContentAlignment="Center"
                                          Background="Transparent"
@@ -333,7 +333,7 @@
                             Background="{DynamicResource Surface.Sunken}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}">
+                            CornerRadius="{DynamicResource Radius.Button}">
                         <TextBox x:Name="TxtLink"
                                  VerticalContentAlignment="Center"
                                  Background="Transparent"

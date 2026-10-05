@@ -15,7 +15,7 @@
         见 App.OnWindowInitialized。主窗口与联机 HUD 自带外壳，用 Style="{x:Null}" 排除。
     -->
     <Style x:Key="DialogWindow" TargetType="Window">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="UseLayoutRounding" Value="True" />
@@ -69,7 +69,7 @@
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="CloseFace"
                                             Background="{DynamicResource Common.Transparent}"
-                                            CornerRadius="{StaticResource Radius.Pill}">
+                                            CornerRadius="{DynamicResource Radius.Pill}">
                                         <svg:SvgIcon x:Name="CloseIcon"
                                                      Width="15"
                                                      Height="15"
@@ -96,7 +96,7 @@
     <!-- ===================== 悬停提示 ===================== -->
 
     <Style TargetType="ToolTip">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="Padding" Value="10,6" />
@@ -107,7 +107,7 @@
                     <Border Background="{DynamicResource Surface.Card}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Item}"
+                            CornerRadius="{DynamicResource Radius.Item}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <Border.Effect>
@@ -139,7 +139,7 @@
     </Style>
 
     <Style TargetType="MenuItem">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="Padding" Value="10,7" />
@@ -151,7 +151,7 @@
                             Margin="0,1"
                             Padding="{TemplateBinding Padding}"
                             Background="{DynamicResource Common.Transparent}"
-                            CornerRadius="{StaticResource Radius.Small}">
+                            CornerRadius="{DynamicResource Radius.Small}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -191,7 +191,7 @@
     </Style>
 
     <Style TargetType="ContextMenu">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="Padding" Value="5" />
@@ -202,7 +202,7 @@
                     <Border Background="{DynamicResource Surface.Card}"
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Item}"
+                            CornerRadius="{DynamicResource Radius.Item}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <Border.Effect>
@@ -222,7 +222,7 @@
     <!-- ===================== 下拉框 ===================== -->
 
     <Style TargetType="ComboBoxItem">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="Padding" Value="10,7" />
@@ -234,7 +234,7 @@
                             Margin="0,1"
                             Padding="{TemplateBinding Padding}"
                             Background="{DynamicResource Common.Transparent}"
-                            CornerRadius="{StaticResource Radius.Small}">
+                            CornerRadius="{DynamicResource Radius.Small}">
                         <ContentPresenter VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -255,7 +255,7 @@
         因此 MpCombo 这个只改颜色的旧样式已无意义，联机页已改为直接用全局样式。
     -->
     <Style TargetType="ComboBox">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
@@ -274,7 +274,7 @@
                                             Background="{DynamicResource Surface.Sunken}"
                                             BorderBrush="{DynamicResource Border.Default}"
                                             BorderThickness="1"
-                                            CornerRadius="{StaticResource Radius.Button}">
+                                            CornerRadius="{DynamicResource Radius.Button}">
                                         <svg:SvgIcon x:Name="Arrow"
                                                      Width="14"
                                                      Height="14"
@@ -319,7 +319,7 @@
                                     Background="{DynamicResource Surface.Card}"
                                     BorderBrush="{DynamicResource Border.Default}"
                                     BorderThickness="1"
-                                    CornerRadius="{StaticResource Radius.Item}">
+                                    CornerRadius="{DynamicResource Radius.Item}">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="18"
                                                       Direction="270"
@@ -347,7 +347,7 @@
 
     <!-- 不设置 Foreground：让文字颜色从父级继承，避免覆盖按钮内的浅色文字 -->
     <Style TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="13" />
     </Style>
 
@@ -507,7 +507,7 @@
     <!-- ===================== 卡片 ===================== -->
 
     <Style TargetType="{x:Type c:SurfaceCard}">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="Padding" Value="16" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -520,7 +520,7 @@
                             BorderBrush="{DynamicResource Border.Default}"
                             BorderThickness="1"
                             ClipToBounds="True"
-                            CornerRadius="{StaticResource Radius.Card}"
+                            CornerRadius="{DynamicResource Radius.Card}"
                             SnapsToDevicePixels="True">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="16"
@@ -560,7 +560,7 @@
     <!-- 内容页页头：左侧图标底色块 + 标题 18 粗 + 副标题 12 次要色，右侧 Content 里放本页操作按钮。
          尺寸与字号取自主页横幅那一套语言，五个内容页共用。 -->
     <Style TargetType="{x:Type c:PageHeader}">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
         <Setter Property="HorizontalContentAlignment" Value="Right" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -582,7 +582,7 @@
                                 Margin="0,0,12,0"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource Accent.Faint}"
-                                CornerRadius="{StaticResource Radius.Item}">
+                                CornerRadius="{DynamicResource Radius.Item}">
                             <svg:SvgIcon x:Name="IconElement"
                                          Width="19"
                                          Height="19"
@@ -619,7 +619,7 @@
     <!-- ===================== 文字按钮 ===================== -->
 
     <Style TargetType="{x:Type c:OutlineButton}">
-        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Padding" Value="14,8" />
         <Setter Property="Cursor" Value="Hand" />
@@ -633,7 +633,7 @@
                             Background="{DynamicResource Surface.Card}"
                             BorderBrush="{DynamicResource Border.Strong}"
                             BorderThickness="1"
-                            CornerRadius="{StaticResource Radius.Button}"
+                            CornerRadius="{DynamicResource Radius.Button}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -664,7 +664,7 @@
                 <ControlTemplate TargetType="{x:Type c:RoundIconButton}">
                     <Border x:Name="Hit"
                             Background="{DynamicResource Common.Transparent}"
-                            CornerRadius="{StaticResource Radius.Pill}">
+                            CornerRadius="{DynamicResource Radius.Pill}">
                         <svg:SvgIcon x:Name="IconElement"
                                      Width="{TemplateBinding IconSize}"
                                      Height="{TemplateBinding IconSize}"
@@ -696,7 +696,7 @@
                     <Border x:Name="Back"
                             Height="42"
                             Background="{DynamicResource Common.Transparent}"
-                            CornerRadius="{StaticResource Radius.Item}">
+                            CornerRadius="{DynamicResource Radius.Item}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="3" />

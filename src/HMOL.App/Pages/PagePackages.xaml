@@ -42,7 +42,7 @@
                     Margin="0,0,0,10"
                     Padding="12,10"
                     Background="{DynamicResource Accent.Faint}"
-                    CornerRadius="{StaticResource Radius.Item}"
+                    CornerRadius="{DynamicResource Radius.Item}"
                     Visibility="Collapsed">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -79,7 +79,7 @@
 
             <Border Padding="12,10"
                     Background="{DynamicResource Surface.Sunken}"
-                    CornerRadius="{StaticResource Radius.Item}">
+                    CornerRadius="{DynamicResource Radius.Item}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -92,7 +92,7 @@
                             Height="24"
                             VerticalAlignment="Top"
                             Background="{DynamicResource Surface.Card}"
-                            CornerRadius="{StaticResource Radius.Small}">
+                            CornerRadius="{DynamicResource Radius.Small}">
                         <svg:SvgIcon Width="13"
                                      Height="13"
                                      HorizontalAlignment="Center"
@@ -183,7 +183,7 @@
                                     <Border Margin="0,0,0,6"
                                             Padding="10,8"
                                             Background="{DynamicResource Surface.Sunken}"
-                                            CornerRadius="{StaticResource Radius.Item}">
+                                            CornerRadius="{DynamicResource Radius.Item}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -244,7 +244,7 @@
                                 Height="54"
                                 HorizontalAlignment="Center"
                                 Background="{DynamicResource Accent.Faint}"
-                                CornerRadius="{StaticResource Radius.Card}">
+                                CornerRadius="{DynamicResource Radius.Card}">
                             <svg:SvgIcon Width="26"
                                          Height="26"
                                          HorizontalAlignment="Center"
@@ -287,7 +287,7 @@
                                     <Border Margin="0,0,0,6"
                                             Padding="10,8"
                                             Background="{DynamicResource Surface.Sunken}"
-                                            CornerRadius="{StaticResource Radius.Item}">
+                                            CornerRadius="{DynamicResource Radius.Item}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -331,7 +331,7 @@
                                 Height="54"
                                 HorizontalAlignment="Center"
                                 Background="{DynamicResource Accent.Faint}"
-                                CornerRadius="{StaticResource Radius.Card}">
+                                CornerRadius="{DynamicResource Radius.Card}">
                             <svg:SvgIcon Width="26"
                                          Height="26"
                                          HorizontalAlignment="Center"

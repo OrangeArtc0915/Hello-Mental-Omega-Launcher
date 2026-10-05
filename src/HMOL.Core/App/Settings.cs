@@ -28,6 +28,22 @@ public enum HomeMode
     Simple = 1
 }
 
+/// <summary>背景填充方式。</summary>
+public enum BackgroundFill
+{
+    /// <summary>铺满并裁剪（默认，不变形）。</summary>
+    Cover = 0,
+
+    /// <summary>完整显示，可能留边。</summary>
+    Fit = 1,
+
+    /// <summary>拉伸铺满，可能变形。</summary>
+    Fill = 2,
+
+    /// <summary>平铺（只对静态图片有意义）。</summary>
+    Tile = 3
+}
+
 /// <summary>主页背景设置。素材文件会被复制进 Paths.Backgrounds，避免用户原图被移走后背景失效。</summary>
 public sealed class BackgroundSettings
 {
@@ -45,6 +61,36 @@ public sealed class BackgroundSettings
 
     /// <summary>背景素材是否来自导入的 Wallpaper Engine 壁纸包（仅用于界面提示）。</summary>
     public bool FromWallpaperPackage { get; set; }
+
+    /// <summary>轮播清单：素材目录下的文件名。为空时只显示 <see cref="FileName"/> 这一张。</summary>
+    public List<string> Playlist { get; set; } = [];
+
+    /// <summary>是否按间隔轮播 <see cref="Playlist"/>。</summary>
+    public bool RotateEnabled { get; set; }
+
+    /// <summary>轮播间隔（秒），夹在 10-3600。</summary>
+    public int RotateSeconds
+    {
+        get => _rotateSeconds;
+        set => _rotateSeconds = Math.Clamp(value, 10, 3600);
+    }
+
+    private int _rotateSeconds = 60;
+
+    /// <summary>轮播是否随机顺序（不重复，切到下一轮再重洗）。</summary>
+    public bool RotateShuffle { get; set; }
+
+    /// <summary>填充方式。</summary>
+    public BackgroundFill Fill { get; set; } = BackgroundFill.Cover;
+
+    /// <summary>鼠标视差：背景随光标轻微位移。</summary>
+    public bool Parallax { get; set; }
+
+    /// <summary>
+    /// 每页独立背景：页面标识（home / instances / packages / multiplayer / download / log / settings）
+    /// → 素材文件名。没配的页用 <see cref="FileName"/>（含轮播）。
+    /// </summary>
+    public Dictionary<string, string> PageOverrides { get; set; } = [];
 }
 
 /// <summary>主页小组件的显隐。默认三块都显示；旧配置文件里没有这个字段时按默认（全显示）处理。</summary>
@@ -58,6 +104,34 @@ public sealed class HomeWidgetSettings
 
     /// <summary>常用网站。</summary>
     public bool Sites { get; set; } = true;
+}
+
+/// <summary>
+/// 主页附加小组件（时钟 / 便签 / 快捷启动 / 音乐控制）的配置。默认全部关闭，用户在设置里打开后
+/// 才会出现在主页，并可像其它区块一样在布局编辑器里自由拖动、缩放与隐藏。
+/// </summary>
+public sealed class HomeExtraWidgetSettings
+{
+    /// <summary>时钟小组件。</summary>
+    public bool Clock { get; set; }
+
+    /// <summary>时钟用 24 小时制；false 为 12 小时制。</summary>
+    public bool Clock24Hour { get; set; } = true;
+
+    /// <summary>时钟下面是否显示日期。</summary>
+    public bool ClockShowDate { get; set; } = true;
+
+    /// <summary>便签小组件。</summary>
+    public bool Memo { get; set; }
+
+    /// <summary>便签标题。</summary>
+    public string MemoTitle { get; set; } = "便签";
+
+    /// <summary>便签正文（多行）。</summary>
+    public string MemoText { get; set; } = string.Empty;
+
+    /// <summary>音乐控制小组件（控制背景音乐）。</summary>
+    public bool Music { get; set; }
 }
 
 /// <summary>背景音乐设置。</summary>
@@ -102,8 +176,40 @@ public sealed class Settings
     /// <summary>主题：浅色 / 深色 / 跟随系统。</summary>
     public ThemeMode ThemeMode { get; set; } = ThemeMode.System;
 
-    /// <summary>强调色。</summary>
+    /// <summary>强调色预设。</summary>
     public AccentTheme Accent { get; set; } = AccentTheme.Default;
+
+    /// <summary>
+    /// 自定义强调色（<c>#RRGGBB</c>）。非空时优先于 <see cref="Accent"/> 预设，留空表示用预设色。
+    /// </summary>
+    public string CustomAccentColor { get; set; } = string.Empty;
+
+    /// <summary>界面字体名（系统已安装的字体）。留空表示用内置默认字体。</summary>
+    public string AppFontFamily { get; set; } = string.Empty;
+
+    /// <summary>界面动效总开关。关掉后所有过渡 / 淡入 / 呼吸效果都直接落到终态。</summary>
+    public bool AnimationsEnabled { get; set; } = true;
+
+    /// <summary>动效速度倍率（越大越快）：0.5 慢，1.0 标准，2.0 快。</summary>
+    public double AnimationSpeed
+    {
+        get => _animationSpeed;
+        set => _animationSpeed = double.IsFinite(value) ? Math.Clamp(value, 0.5, 2.0) : 1.0;
+    }
+
+    private double _animationSpeed = 1.0;
+
+    /// <summary>
+    /// 卡片 / 按钮等圆角的缩放倍率（0.5-1.6）：1.0 为默认圆角，调小更方正、调大更圆润。
+    /// 胶囊（1000）不跟着变，保持正圆端。
+    /// </summary>
+    public double CornerRadiusScale
+    {
+        get => _cornerRadiusScale;
+        set => _cornerRadiusScale = double.IsFinite(value) ? Math.Clamp(value, 0.5, 1.6) : 1.0;
+    }
+
+    private double _cornerRadiusScale = 1.0;
 
     /// <summary>最近一次使用的游戏实例 Id。为 null 表示还没选过实例。</summary>
     public string? LastInstanceId { get; set; }
@@ -147,6 +253,21 @@ public sealed class Settings
 
     /// <summary>主页小组件（日历 / 天气 / 常用网站）的显隐。</summary>
     public HomeWidgetSettings HomeWidgets { get; set; } = new();
+
+    /// <summary>主页附加小组件（时钟 / 便签 / 快捷启动 / 音乐控制）。</summary>
+    public HomeExtraWidgetSettings ExtraWidgets { get; set; } = new();
+
+    /// <summary>自定义窗口标题文字；留空表示用默认的应用名。</summary>
+    public string WindowTitle { get; set; } = string.Empty;
+
+    /// <summary>自定义窗口图标文件名（存在个性化素材目录）；留空表示用内置图标。</summary>
+    public string WindowIconFile { get; set; } = string.Empty;
+
+    /// <summary>启动音效文件名（存在个性化素材目录）；留空表示不播放。</summary>
+    public string StartupSoundFile { get; set; } = string.Empty;
+
+    /// <summary>关闭音效文件名（存在个性化素材目录）；留空表示不播放。</summary>
+    public string ShutdownSoundFile { get; set; } = string.Empty;
 
     /// <summary>当前启用的自定义布局方案 Id；为空表示使用默认布局。</summary>
     public string? ActiveLayoutSchemeId { get; set; }
