@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -34,6 +36,9 @@ public partial class App : Application
     private Mutex? _singleInstanceMutex;
     private TrayIcon? _tray;
     private ContextMenu? _trayMenu;
+
+    /// <summary>正在走「重置配置后重启」流程：退出时不要再把内存里的配置写回，否则刚清掉的坏配置又回来了。</summary>
+    private bool _repairing;
 
     public static Logger? Logger { get; private set; }
 
@@ -397,8 +402,85 @@ public partial class App : Application
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log.Fatal("界面线程未处理异常", e.Exception);
-        ChoiceWindow.Error(null, $"{AppInfo.Name} 遇到了一个问题", e.Exception.Message);
+
+        var choice = ChoiceWindow.Ask(null,
+            $"{AppInfo.Name} 遇到了一个问题",
+            e.Exception.Message,
+            "如果这个问题反复出现，可以点「修复」：把启动器配置重置为默认后自动重启（只动设置与布局方案，不碰实例、游戏与包）。",
+            DialogIcon.Error,
+            new ChoiceOption("知道了", "ok", ButtonTone.Solid),
+            new ChoiceOption("修复", "repair"));
+
+        if (choice == "repair") RepairAndRestart();
+
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// 「修复」：把可能致崩的配置挪到带时间戳的备份目录（不删，便于找回），再重启启动器。
+    /// 只动启动器自己的配置（<c>Settings.json</c> 与布局方案），不碰实例、游戏、包与背景素材。
+    /// </summary>
+    private void RepairAndRestart()
+    {
+        _repairing = true;
+
+        try
+        {
+            var vault = Path.Combine(Paths.Data, $"Reset-{DateTime.Now:yyyyMMdd-HHmmss}");
+            Directory.CreateDirectory(vault);
+
+            if (File.Exists(Paths.SettingsFile))
+                File.Move(Paths.SettingsFile, Path.Combine(vault, "Settings.json"));
+
+            if (Directory.Exists(Paths.Layouts))
+            {
+                foreach (var file in Directory.EnumerateFiles(Paths.Layouts, "*.json"))
+                    File.Move(file, Path.Combine(vault, Path.GetFileName(file)));
+            }
+
+            Log.Warn($"[修复] 已重置启动器配置，原文件备份到：{vault}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[修复] 重置配置失败", ex);
+        }
+
+        RestartSelf();
+    }
+
+    /// <summary>拉起一个新的启动器进程，然后结束当前进程。</summary>
+    private void RestartSelf()
+    {
+        // 先让出单实例互斥量，否则新进程会判定「已经在运行」直接退出
+        try { _singleInstanceMutex?.ReleaseMutex(); }
+        catch (Exception ex) { Log.Warn($"[修复] 释放单实例互斥量失败：{ex.Message}"); }
+
+        _singleInstanceMutex?.Dispose();
+        _singleInstanceMutex = null;
+
+        try
+        {
+            var exe = Environment.ProcessPath;
+
+            if (!string.IsNullOrEmpty(exe))
+            {
+                Process.Start(new ProcessStartInfo(exe)
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = Path.GetDirectoryName(exe)
+                });
+            }
+            else
+            {
+                Log.Warn("[修复] 取不到自身路径，无法自动重启，请手动打开启动器");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[修复] 重启启动器失败，请手动打开", ex);
+        }
+
+        Shutdown();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -416,7 +498,10 @@ public partial class App : Application
 
         // 先停背景音乐再落盘：停播会释放媒体文件句柄
         BgmPlayer.Shutdown();
-        SettingsStore.Save();
+
+        // 走「修复」流程时配置已被清走，别再把内存里的旧值写回去
+        if (!_repairing) SettingsStore.Save();
+
         ThemeService.Shutdown();
         Log.Info($"{AppInfo.Name} 退出");
         Logger?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));

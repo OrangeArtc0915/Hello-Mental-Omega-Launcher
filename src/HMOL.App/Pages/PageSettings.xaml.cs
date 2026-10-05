@@ -195,6 +195,13 @@ public partial class PageSettings : LauncherPage
     /// <summary>HUD 透明度滑块是否已经可以响应事件（构造收尾时才置位，理由同 <see cref="_appearanceReady"/>）。</summary>
     private bool _hudOpacityReady;
 
+    /// <summary>
+    /// 背景 / 音乐滑块是否已经可以响应事件。XAML 给 SldRotateInterval 设 Minimum=10 会把
+    /// 值从 0 夹到 10，从而在 InitializeComponent 里触发 ValueChanged，此时后面的标签
+    /// （如 LabRotateInterval）还没建好，必须等构造收尾才开始响应。
+    /// </summary>
+    private bool _sliderReady;
+
     private bool _suppressWeatherCityChanged;
 
     /// <summary>「检查启动器更新」正在进行时不允许重入。</summary>
@@ -254,6 +261,7 @@ public partial class PageSettings : LauncherPage
         // 构造收尾：此时滑块与标签都建好了，之后才允许响应 ValueChanged（构造期的夹值事件必须忽略）
         _appearanceReady = true;
         _hudOpacityReady = true;
+        _sliderReady = true;
 
         // 自动换曲、播放失败跳过等状态变化都要反映到界面
         BgmPlayer.StateChanged += OnBgmStateChanged;
@@ -1380,7 +1388,7 @@ public partial class PageSettings : LauncherPage
 
     private void OnBackgroundBlurChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_suppressSliderChanged) return;
+        if (!_sliderReady || _suppressSliderChanged) return;
 
         var radius = (int)Math.Round(e.NewValue);
         if (radius == SettingsStore.Current.Background.BlurRadius) return;
@@ -1394,7 +1402,7 @@ public partial class PageSettings : LauncherPage
 
     private void OnBackgroundDimChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_suppressSliderChanged) return;
+        if (!_sliderReady || _suppressSliderChanged) return;
 
         var dim = (int)Math.Round(e.NewValue);
         if (dim == SettingsStore.Current.Background.DimPercent) return;
@@ -1488,7 +1496,7 @@ public partial class PageSettings : LauncherPage
 
     private void OnRotateIntervalChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_suppressSliderChanged) return;
+        if (!_sliderReady || _suppressSliderChanged) return;
 
         var seconds = (int)Math.Round(e.NewValue);
         if (seconds == SettingsStore.Current.Background.RotateSeconds) return;
@@ -1754,7 +1762,7 @@ public partial class PageSettings : LauncherPage
 
     private void OnBgmVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_suppressSliderChanged) return;
+        if (!_sliderReady || _suppressSliderChanged) return;
 
         var volume = (int)Math.Round(e.NewValue);
         if (volume == SettingsStore.Current.Bgm.Volume) return;
