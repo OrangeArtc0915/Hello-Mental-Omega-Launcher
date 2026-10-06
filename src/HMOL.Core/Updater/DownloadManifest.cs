@@ -8,10 +8,16 @@ namespace HMOL.Core.Updater;
 /// 下载页文件里的一条：名字 + 一个或多个下载地址 + 可选说明。
 /// 多个地址表示分卷，下载时会按顺序合并成一个文件（如 EasyTier 的 4 个分卷）。
 /// </summary>
-public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, string Note)
+public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, string Note, string Homepage = "")
 {
-    /// <summary>首个地址，用于「打开链接」与推断文件名。</summary>
+    /// <summary>首个下载地址，用于「打开链接」与推断文件名；纯「官网」条目为空。</summary>
     public string PrimaryUrl => Urls.Count > 0 ? Urls[0] : string.Empty;
+
+    /// <summary>只给了官网地址、没有可下载文件的条目（如各类第三方运行库）。</summary>
+    public bool IsLinkOnly => Urls.Count == 0 && Homepage.Length > 0;
+
+    /// <summary>用于去重与「打开」的实际地址：优先下载地址，其次官网。</summary>
+    public string EffectiveUrl => Urls.Count > 0 ? Urls[0] : Homepage;
 }
 
 /// <summary>
@@ -22,11 +28,13 @@ public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, stri
 /// <code>
 /// { "items": [
 ///   { "name": "示例资源", "url": "https://example.com/a.zip", "note": "说明文字" },
-///   { "name": "分卷资源", "urls": ["...001", "...002"], "note": "下载后自动合并" }
+///   { "name": "分卷资源", "urls": ["...001", "...002"], "note": "下载后自动合并" },
+///   { "name": "第三方运行库", "homepage": "https://vendor.example.com/download", "note": "去官网下载" }
 /// ] }
 /// </code>
 /// 根节点直接用数组也支持；字段名兼容 <c>name / 名字 / 名称 / title</c>、
 /// <c>url / urls / 下载地址 / address / link / 地址</c>、<c>note / 说明 / 描述 / desc</c>。
+/// 只给 <c>homepage / 官网</c> 的条目表示「本启动器不托管该文件」，界面只显示一条可点击的官网地址。
 /// 目的是让下载页内容不改启动器就能更新：往这个文件里加条目即可。
 /// </para>
 ///
@@ -48,6 +56,7 @@ public static class DownloadManifest
     private static readonly string[] UrlKeys = ["url", "下载地址", "address", "link", "地址"];
     private static readonly string[] UrlArrayKeys = ["urls", "下载地址列表", "parts", "分卷"];
     private static readonly string[] NoteKeys = ["note", "说明", "描述", "desc"];
+    private static readonly string[] HomepageKeys = ["homepage", "官网", "官方网站", "官网地址", "site", "web", "主页"];
     private static readonly string[] ListKeys = ["items", "downloads", "list", "文件", "下载"];
 
     /// <summary>GitHub 的 raw 直链。</summary>
@@ -132,19 +141,23 @@ public static class DownloadManifest
                 if (element.ValueKind == JsonValueKind.String)
                 {
                     var only = element.GetString()?.Trim() ?? string.Empty;
-                    if (only.Length > 0) Add(result, only, [only], string.Empty);
+                    if (only.Length > 0) Add(result, only, [only], string.Empty, string.Empty);
                     continue;
                 }
 
                 if (element.ValueKind != JsonValueKind.Object) continue;
 
                 var urls = ReadUrls(element);
-                if (urls.Count == 0) continue;
+                var homepage = ReadString(element, HomepageKeys);
+
+                // 既没有可下载地址、也没有官网地址的条目直接跳过
+                if (urls.Count == 0 && homepage.Length == 0) continue;
 
                 var name = ReadString(element, NameKeys);
                 var note = ReadString(element, NoteKeys);
+                var display = name.Length > 0 ? name : (urls.Count > 0 ? urls[0] : homepage);
 
-                Add(result, name.Length > 0 ? name : urls[0], urls, note);
+                Add(result, display, urls, note, homepage);
             }
         }
         catch (JsonException ex)
@@ -155,12 +168,15 @@ public static class DownloadManifest
         return result;
     }
 
-    /// <summary>同一个（首个）链接只保留第一次出现。</summary>
-    private static void Add(List<ManifestEntry> result, string name, List<string> urls, string note)
+    /// <summary>同一个（首个）链接只保留第一次出现；纯官网条目按官网地址去重。</summary>
+    private static void Add(List<ManifestEntry> result, string name, List<string> urls, string note, string homepage)
     {
-        if (result.Any(item => string.Equals(item.PrimaryUrl, urls[0], StringComparison.OrdinalIgnoreCase))) return;
+        var key = urls.Count > 0 ? urls[0] : homepage;
+        if (key.Length == 0) return;
 
-        result.Add(new ManifestEntry(name, urls, note));
+        if (result.Any(item => string.Equals(item.EffectiveUrl, key, StringComparison.OrdinalIgnoreCase))) return;
+
+        result.Add(new ManifestEntry(name, urls, note, homepage));
     }
 
     /// <summary>读地址：优先 <c>urls</c> 数组，兼容单个 <c>url</c>；顺序去重。</summary>

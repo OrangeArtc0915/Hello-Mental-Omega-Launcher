@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using HMOL.App.Animation;
 using HMOL.App.Controls;
 using HMOL.App.Controls.Svg;
@@ -441,85 +442,177 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>把「下载页文件」的条目渲染成一行行「名称 + 打开链接 + 下载」。</summary>
+    /// <summary>把「下载页文件」的条目渲染成两处：可下载的逐行列出；纯官网条目收进默认收起的「运行库」分组。</summary>
     private void BuildManifestItems(IReadOnlyList<ManifestEntry> items)
     {
         PanManifestItems.Children.Clear();
+        PanRuntimeLinks.Children.Clear();
 
-        if (items.Count == 0)
+        var hosted = items.Where(item => !item.IsLinkOnly).ToList();
+        var links = items.Where(item => item.IsLinkOnly).ToList();
+
+        LabManifestHint.Text = hosted.Count > 0
+            ? $"共 {hosted.Count} 项可下载，来自 survive 分支的 download.json。"
+            : "下载列表暂无条目：在仓库 survive 分支的 download.json 里按 "
+              + "{\"name\":\"名称\",\"url\":\"下载地址\",\"note\":\"说明（可选）\"} 添加即可。";
+
+        foreach (var entry in hosted)
         {
-            LabManifestHint.Text = "下载列表暂无条目：在仓库 survive 分支的 download.json 里按 "
-                                   + "{\"name\":\"名称\",\"url\":\"下载地址\",\"note\":\"说明（可选）\"} 添加即可。";
+            PanManifestItems.Children.Add(BuildHostedRow(entry));
+        }
+
+        // 运行库这类第三方文件本启动器不托管，只列一条官网地址，收在默认收起的分组里
+        BtnToggleRuntimes.Visibility = links.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (links.Count == 0)
+        {
+            PanRuntimeLinks.Visibility = Visibility.Collapsed;
+            BtnToggleRuntimes.Content = "展开运行库（官网下载）";
             return;
         }
 
-        LabManifestHint.Text = $"共 {items.Count} 项，来自 survive 分支的 download.json。";
+        BtnToggleRuntimes.Content = PanRuntimeLinks.Visibility == Visibility.Visible
+            ? $"收起运行库（官网下载，{links.Count} 项）"
+            : $"展开运行库（官网下载，{links.Count} 项）";
 
-        foreach (var entry in items)
+        foreach (var entry in links)
         {
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, ToolTip = string.Join("\n", entry.Urls) };
-
-            var name = new TextBlock
-            {
-                Text = entry.Name,
-                FontSize = 12,
-                TextTrimming = TextTrimming.CharacterEllipsis
-            };
-            name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
-            text.Children.Add(name);
-
-            if (entry.Note.Length > 0)
-            {
-                var note = new TextBlock
-                {
-                    Text = entry.Note,
-                    FontSize = 11,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 3, 0, 0)
-                };
-                note.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
-                text.Children.Add(note);
-            }
-
-            var open = new OutlineButton
-            {
-                Content = "打开链接",
-                Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            open.Click += (_, _) => OpenManifestEntry(entry);
-
-            var download = new OutlineButton
-            {
-                Content = entry.Urls.Count > 1 ? $"下载（{entry.Urls.Count} 卷）" : "下载",
-                Tone = ButtonTone.Solid,
-                Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            download.Click += async (_, _) => await DownloadManifestEntryAsync(entry);
-
-            var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            Grid.SetColumn(text, 0);
-            Grid.SetColumn(open, 1);
-            Grid.SetColumn(download, 2);
-
-            row.Children.Add(text);
-            row.Children.Add(open);
-            row.Children.Add(download);
-
-            PanManifestItems.Children.Add(row);
+            PanRuntimeLinks.Children.Add(BuildLinkRow(entry));
         }
+    }
+
+    /// <summary>可下载条目的行：名称 + 说明 + 「打开链接」/「下载」。</summary>
+    private Grid BuildHostedRow(ManifestEntry entry)
+    {
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, ToolTip = string.Join("\n", entry.Urls) };
+
+        var name = new TextBlock
+        {
+            Text = entry.Name,
+            FontSize = 12,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
+        text.Children.Add(name);
+
+        if (entry.Note.Length > 0)
+        {
+            var note = new TextBlock
+            {
+                Text = entry.Note,
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 3, 0, 0)
+            };
+            note.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
+            text.Children.Add(note);
+        }
+
+        var open = new OutlineButton
+        {
+            Content = "打开链接",
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        open.Click += (_, _) => OpenManifestEntry(entry);
+
+        var download = new OutlineButton
+        {
+            Content = entry.Urls.Count > 1 ? $"下载（{entry.Urls.Count} 卷）" : "下载",
+            Tone = ButtonTone.Solid,
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        download.Click += async (_, _) => await DownloadManifestEntryAsync(entry);
+
+        var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        Grid.SetColumn(text, 0);
+        Grid.SetColumn(open, 1);
+        Grid.SetColumn(download, 2);
+
+        row.Children.Add(text);
+        row.Children.Add(open);
+        row.Children.Add(download);
+
+        return row;
+    }
+
+    /// <summary>纯官网条目的行：名称 + 说明 + 一条可点击的官网地址（点了用默认浏览器打开）。</summary>
+    private StackPanel BuildLinkRow(ManifestEntry entry)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+
+        var name = new TextBlock
+        {
+            Text = entry.Name,
+            FontSize = 12,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
+        panel.Children.Add(name);
+
+        if (entry.Note.Length > 0)
+        {
+            var note = new TextBlock
+            {
+                Text = entry.Note,
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 3, 0, 0)
+            };
+            note.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
+            panel.Children.Add(note);
+        }
+
+        var link = new TextBlock
+        {
+            Text = entry.Homepage,
+            FontSize = 11.5,
+            Margin = new Thickness(0, 4, 0, 0),
+            Cursor = Cursors.Hand,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            ToolTip = "点击用浏览器打开官网"
+        };
+        link.SetResourceReference(TextBlock.ForegroundProperty, "Accent.Base");
+        link.MouseLeftButtonUp += (_, _) => OpenManifestEntry(entry);
+        panel.Children.Add(link);
+
+        return panel;
+    }
+
+    /// <summary>展开 / 收起「组网与运行组件」列表（默认收起）。</summary>
+    private void OnToggleRuntimeClick(object sender, RoutedEventArgs e)
+    {
+        var expanded = PanRuntimeRows.Visibility != Visibility.Visible;
+
+        PanRuntimeRows.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        BtnToggleRuntime.Content = expanded ? "收起组件列表" : "展开组件列表";
+    }
+
+    /// <summary>展开 / 收起「运行库（官网下载）」（默认收起）。</summary>
+    private void OnToggleRuntimesClick(object sender, RoutedEventArgs e)
+    {
+        var expanded = PanRuntimeLinks.Visibility != Visibility.Visible;
+
+        PanRuntimeLinks.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+
+        var count = PanRuntimeLinks.Children.Count;
+        var suffix = count > 0 ? $"，{count} 项" : string.Empty;
+
+        BtnToggleRuntimes.Content = expanded
+            ? $"收起运行库（官网下载{suffix}）"
+            : $"展开运行库（官网下载{suffix}）";
     }
 
     private void OpenManifestEntry(ManifestEntry entry)
     {
         try
         {
-            ShellHelper.OpenUrl(entry.PrimaryUrl);
+            ShellHelper.OpenUrl(entry.EffectiveUrl);
         }
         catch (Exception ex)
         {

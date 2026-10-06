@@ -168,69 +168,76 @@
                     </StackPanel>
                 </c:SurfaceCard>
 
-                <!-- 组网与运行组件 -->
+                <!-- 组网与运行组件：默认收起，只留一个展开按钮 -->
                 <c:SurfaceCard Margin="0,14,0,0"
                                Title="组网与运行组件"
                                UseShadow="False"
                                HasHoverEffect="False">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource DlHint}"
-                                   Text="这些组件不再随启动器一起分发，用到时按需下载到启动器目录的 runtime\ 下。下载线路与更新共用（设置 → 更新线路）。" />
+                        <c:OutlineButton x:Name="BtnToggleRuntime"
+                                         HorizontalAlignment="Left"
+                                         Content="展开组件列表"
+                                         Click="OnToggleRuntimeClick" />
 
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="EasyTier 组网组件" />
-                            <TextBlock x:Name="LabRtEasyTier" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
-                            <c:OutlineButton x:Name="BtnRtEasyTier" Grid.Column="2" Tag="EasyTier" Content="下载" Click="OnRuntimeComponentDownloadClick" />
-                        </Grid>
+                        <StackPanel x:Name="PanRuntimeRows" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource DlHint}"
+                                       Text="这些组件不再随启动器一起分发，用到时按需下载到启动器目录的 runtime\ 下。下载线路与更新共用（设置 → 更新线路）。" />
 
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="n2n 组网组件" />
-                            <TextBlock x:Name="LabRtN2n" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
-                            <c:OutlineButton x:Name="BtnRtN2n" Grid.Column="2" Tag="N2n" Content="下载" Click="OnRuntimeComponentDownloadClick" />
-                        </Grid>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="EasyTier 组网组件" />
+                                <TextBlock x:Name="LabRtEasyTier" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                                <c:OutlineButton x:Name="BtnRtEasyTier" Grid.Column="2" Tag="EasyTier" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                            </Grid>
 
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="TAP 虚拟网卡驱动" />
-                            <TextBlock x:Name="LabRtTap" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
-                            <c:OutlineButton x:Name="BtnRtTap" Grid.Column="2" Tag="Tap" Content="下载" Click="OnRuntimeComponentDownloadClick" />
-                        </Grid>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="n2n 组网组件" />
+                                <TextBlock x:Name="LabRtN2n" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                                <c:OutlineButton x:Name="BtnRtN2n" Grid.Column="2" Tag="N2n" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                            </Grid>
 
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="WinIPBroadcast 广播转发" />
-                            <TextBlock x:Name="LabRtWinIpBroadcast" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
-                            <c:OutlineButton x:Name="BtnRtWinIpBroadcast" Grid.Column="2" Tag="WinIpBroadcast" Content="下载" Click="OnRuntimeComponentDownloadClick" />
-                        </Grid>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="TAP 虚拟网卡驱动" />
+                                <TextBlock x:Name="LabRtTap" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                                <c:OutlineButton x:Name="BtnRtTap" Grid.Column="2" Tag="Tap" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                            </Grid>
 
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="7-Zip 解压组件" />
-                            <TextBlock x:Name="LabRt7z" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
-                            <c:OutlineButton x:Name="BtnRt7z" Grid.Column="2" Tag="7z" Content="下载" Click="OnRuntimeComponentDownloadClick" />
-                        </Grid>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="WinIPBroadcast 广播转发" />
+                                <TextBlock x:Name="LabRtWinIpBroadcast" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                                <c:OutlineButton x:Name="BtnRtWinIpBroadcast" Grid.Column="2" Tag="WinIpBroadcast" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                            </Grid>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Style="{StaticResource DlLabel}" Text="7-Zip 解压组件" />
+                                <TextBlock x:Name="LabRt7z" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource DlHint}" />
+                                <c:OutlineButton x:Name="BtnRt7z" Grid.Column="2" Tag="7z" Content="下载" Click="OnRuntimeComponentDownloadClick" />
+                            </Grid>
+                        </StackPanel>
                     </StackPanel>
                 </c:SurfaceCard>
 
@@ -253,6 +260,18 @@
                                              Click="OnManifestRefreshClick" />
                         </Grid>
                         <StackPanel x:Name="PanManifestItems" Margin="0,10,0,0" />
+
+                        <!-- 运行库：本启动器不托管，只给官网地址，默认收起 -->
+                        <c:OutlineButton x:Name="BtnToggleRuntimes"
+                                         Margin="0,12,0,0"
+                                         HorizontalAlignment="Left"
+                                         Content="展开运行库（官网下载）"
+                                         Visibility="Collapsed"
+                                         Click="OnToggleRuntimesClick" />
+
+                        <StackPanel x:Name="PanRuntimeLinks"
+                                    Margin="0,10,0,0"
+                                    Visibility="Collapsed" />
                     </StackPanel>
                 </c:SurfaceCard>
 
