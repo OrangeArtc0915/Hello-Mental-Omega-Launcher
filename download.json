@@ -1,5 +1,5 @@
 {
-  "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名；url 是单个直链，urls 是多个直链（分卷，下载后自动按顺序合并）；note 是可选的说明文字。默认都指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
+  "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名；url 是单个直链，urls 是多个直链（分卷，下载后自动按顺序合并）；note 是可选的说明文字；只填 homepage（官网地址、不填 url/urls）的条目表示本启动器不托管该文件，界面只显示一条可点击的官网地址。可下载条目默认指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
   "items": [
     {
       "name": "MO 联机补丁（联机必需）",
@@ -37,59 +37,44 @@
       "note": "解压到 runtime\\7zip\\；缺失时 7z 压缩包会退回较慢的解压实现。"
     },
     {
-      "name": "DirectX 9.0c（June 2010 完整包）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/DirectX9c-Jun2010.zip",
-      "note": "解压后运行 DXSETUP.exe 安装；游戏提示缺 d3dx9_*.dll 时装它。"
-    },
-    {
-      "name": ".NET 桌面运行时 10.0.10（x64）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/windowsdesktop-runtime-10.0.10-win-x64.exe",
-      "note": "双击直接安装。"
-    },
-    {
-      "name": "Visual C++ 运行库 2019",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/VC_redist-2019.exe",
-      "note": "双击直接安装；游戏提示缺 msvcp140.dll / vcruntime140.dll 时装它。"
-    },
-    {
-      "name": "XNA Framework 4.0",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/XNA-Framework-4.0.msi",
-      "note": "双击直接安装。"
-    },
-    {
-      "name": ".NET Framework 4.0（Web 安装程序）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/NET-Framework-4.0-web.exe",
-      "note": "双击直接安装；需要联网下载组件。"
-    },
-    {
-      "name": ".NET Framework 4.8（Web 安装程序）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/NET-Framework-4.8-web.exe",
-      "note": "双击直接安装；需要联网下载组件。"
-    },
-    {
-      "name": "Visual Studio 2019 Community（Web 安装程序）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/VS-Community-2019-web.exe",
-      "note": "网页引导安装器，按需自取。"
-    },
-    {
-      "name": "Visual Studio 2019 Professional（Web 安装程序）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/VS-Professional-2019-web.exe",
-      "note": "网页引导安装器，按需自取。"
-    },
-    {
       "name": "红警系列黑屏补丁 · cnc-ddraw 7.1.0.0（推荐）",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-cnc-ddraw-7.1.0.0.zip",
       "note": "Win10 / Win11 黑屏或卡顿优先用它。解压后把 ddraw.dll、ddraw.ini、Shaders\\ 等放进游戏根目录，用 cnc-ddraw config.exe 调设置。"
     },
     {
-      "name": "红警系列黑屏补丁 · wined3d 方案",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-wined3d-fix.zip",
-      "note": "解压后把 ddraw.dll、libwine.dll、wined3d.dll 放进游戏根目录。与上面二选一。"
+      "name": "DirectX 9.0c（运行库）",
+      "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=35",
+      "note": "微软官方「DirectX 最终用户运行时」页面；游戏提示缺 d3dx9_*.dll 时装它。本启动器不托管该文件，请到官网下载。"
     },
     {
-      "name": "红警系列黑屏补丁 · 旧版 ddraw.dll（3 个版本）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-ddraw-legacy.zip",
-      "note": "含「作者要求加入的补丁」「其他补丁」「旧版」三个 ddraw.dll，按需取一个放进游戏根目录。"
+      "name": ".NET 桌面运行时（运行库）",
+      "homepage": "https://dotnet.microsoft.com/download/dotnet",
+      "note": "微软官方 .NET 下载页，按需选版本。本启动器不托管该文件，请到官网下载。"
+    },
+    {
+      "name": "Visual C++ 运行库（运行库）",
+      "homepage": "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
+      "note": "微软官方「最新受支持的 Visual C++ 下载」页；游戏提示缺 msvcp140.dll / vcruntime140.dll 时装它。本启动器不托管该文件，请到官网下载。"
+    },
+    {
+      "name": "XNA Framework 4.0（运行库）",
+      "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=20914",
+      "note": "微软官方下载页；部分红警相关工具需要它。本启动器不托管该文件，请到官网下载。"
+    },
+    {
+      "name": ".NET Framework 4.0（运行库）",
+      "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=17718",
+      "note": "微软官方下载页。本启动器不托管该文件，请到官网下载。"
+    },
+    {
+      "name": ".NET Framework 4.8（运行库）",
+      "homepage": "https://dotnet.microsoft.com/download/dotnet-framework/net48",
+      "note": "微软官方下载页。本启动器不托管该文件，请到官网下载。"
+    },
+    {
+      "name": "Visual Studio 2019（运行库）",
+      "homepage": "https://visualstudio.microsoft.com/vs/older-downloads/",
+      "note": "微软官方「早期版本下载」页，按需自取。本启动器不托管该文件，请到官网下载。"
     }
   ]
 }
