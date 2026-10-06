@@ -351,7 +351,7 @@ namespace MoLanRelay
         /// <summary>热键（在大厅或游戏内都生效，只要前台窗口是客户端或 gamemd）。</summary>
         const int VK_F4 = 0x73, VK_F5 = 0x74, VK_F6 = 0x75, VK_F7 = 0x76, VK_F8 = 0x77;
 
-        static bool shotKeyWasDown, clipKeyWasDown, statsKeyWasDown, randKeyWasDown;
+        static bool clipKeyWasDown, statsKeyWasDown;
 
         [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vKey);
         [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
@@ -413,15 +413,6 @@ namespace MoLanRelay
             bool front = false;
             try { front = OursInFront(); } catch { }
 
-            // F8：截图（前台是游戏本体时就截游戏）
-            try
-            {
-                bool k = front && KeyDown(VK_F8);
-                if (k && !shotKeyWasDown) CaptureAndSend(lobby);
-                shotKeyWasDown = k;
-            }
-            catch (Exception ex) { Log("shot 出错: " + ex.Message); }
-
             // F6：把剪贴板内容当聊天发出去（分享 IP:端口 用）
             try
             {
@@ -439,15 +430,6 @@ namespace MoLanRelay
                 statsKeyWasDown = k;
             }
             catch (Exception ex) { Log("体检报告出错: " + ex.Message); }
-
-            // F4：房主一键随机阵营/出生位置
-            try
-            {
-                bool k = front && KeyDown(VK_F4);
-                if (k && !randKeyWasDown) RandomizeAll(lobby);
-                randKeyWasDown = k;
-            }
-            catch (Exception ex) { Log("随机化出错: " + ex.Message); }
 
             try { HelloTick(lobby); } catch { }
 
@@ -638,63 +620,6 @@ namespace MoLanRelay
             return h.Length <= 8 ? h : h.Substring(0, 8);
         }
 
-        // ---- 开局前：随机阵营/位置（房主）----
-
-        /// <summary>F4（房主）：把所有人类玩家的阵营和出生位置随机一遍，然后广播出去。</summary>
-        static void RandomizeAll(object lobby)
-        {
-            if (!IsHostOf(lobby)) { Notice(lobby, "只有房主能随机阵营/位置", false); return; }
-
-            Array sides = GetMember(lobby, "ddPlayerSides") as Array;
-            Array starts = GetMember(lobby, "ddPlayerStarts") as Array;
-            IList players = GetMember(lobby, "Players") as IList;
-            if (sides == null || starts == null || players == null)
-            { Log("rand: 拿不到 ddPlayerSides / ddPlayerStarts / Players，放弃"); return; }
-
-            Random rnd = new Random();
-            int n = Math.Min(Math.Min(sides.Length, starts.Length), players.Count);
-            int done = 0;
-            for (int i = 0; i < n; i++)
-            {
-                if (!(players[i] is LANPlayerInfo)) continue;
-                bool s1 = SetRandomIndex(sides.GetValue(i), rnd);
-                SetRandomIndex(starts.GetValue(i), rnd);
-                if (s1) done++;
-            }
-
-            try
-            {
-                // 注意：CopyPlayerDataFromUI 是 WinForms 风格的事件处理器，签名是 (object, EventArgs)
-                MethodInfo cp = FindMethod(lobby.GetType(), "CopyPlayerDataFromUI", 2);
-                if (cp != null) cp.Invoke(lobby, new object[] { null, EventArgs.Empty });
-                else Log("rand: 找不到 CopyPlayerDataFromUI，改动可能没生效");
-                MethodInfo bp = FindMethod(lobby.GetType(), "BroadcastPlayerOptions", 0);
-                if (bp != null) bp.Invoke(lobby, null);
-            }
-            catch (Exception ex) { Log("rand: 应用改动失败: " + ex.Message); }
-
-            Log("rand: 已随机 " + done + " 名玩家的阵营/出生位置");
-            SendChat(lobby, "[随机] 已随机 " + done + " 名玩家的阵营与出生位置");
-        }
-
-        /// <summary>把某个下拉框随机选一项（按它自己的条目数取，不会越界）。</summary>
-        static bool SetRandomIndex(object dd, Random rnd)
-        {
-            try
-            {
-                if (dd == null) return false;
-                Type t = dd.GetType();
-                PropertyInfo pi = t.GetProperty("Items");
-                PropertyInfo ps = t.GetProperty("SelectedIndex");
-                if (pi == null || ps == null) return false;
-                IList il = pi.GetValue(dd, null) as IList;
-                if (il == null || il.Count <= 1) return false;
-                ps.SetValue(dd, rnd.Next(il.Count), null);
-                return true;
-            }
-            catch { return false; }
-        }
-
         /// <summary>弹一条本地通知（拿不到颜色就只写日志，绝不因为提示失败而中断功能）。</summary>
         static void Notice(object lobby, string text, bool good)
         {
@@ -728,13 +653,11 @@ namespace MoLanRelay
 
                 if (kind == "SHOT")
                 {
-                    byte[] data;
-                    try { data = Convert.FromBase64String(b64); } catch { return; }
+                    // 截图显示准备改成"聊天区内联"（像聊天软件那样），还没做。
+                    // 这里刻意只记日志、绝不弹窗口 —— 弹窗会抢走客户端焦点，
+                    // 客户端一失去激活就停止绘制（自定义鼠标也不画了），看起来就是"卡死+没鼠标"。
                     if (!mine)
-                    {
-                        Log("shot: 收到 " + (from.Length == 0 ? "?" : from) + " 的截图（" + data.Length + " 字节），显示中");
-                        ShowShot(from, data);
-                    }
+                        Log("shot: 收到 " + (from.Length == 0 ? "?" : from) + " 的截图（" + b64.Length + " 字符），当前版本不显示");
                 }
                 else if (kind == "VOICE")
                 {
@@ -831,7 +754,9 @@ namespace MoLanRelay
         const string PttKeyName = "F7";
         static bool pttWasDown;
 
-        static bool voiceInitTried, voiceOk, voiceBroken, micFailed;
+        static bool voiceInitTried;
+        // 这三个由后台初始化线程写、UI 线程读 —— 用 volatile 保证"数组准备好了"能被看见
+        static volatile bool voiceOk, voiceBroken, micFailed;
         static IntPtr hWaveIn = IntPtr.Zero, hWaveOut = IntPtr.Zero;
         static IntPtr[] micHdrs, spkHdrs;
         static IntPtr[] micBufs, spkBufs;
@@ -890,13 +815,28 @@ namespace MoLanRelay
             return f;
         }
 
-        /// <summary>第一次需要用到语音时才初始化。麦克风和扬声器分别对待：
-        /// 没麦克风也能听别人说话（反过来声卡打不开就整体停用）。</summary>
+        /// <summary>第一次需要用到语音时才初始化，并且放到后台线程 ——
+        /// 打开音频设备可能要上百毫秒，绝不能卡在客户端的 UI 线程上（那看起来就是"卡死"）。
+        /// 初始化没完成之前，本帧直接跳过语音。</summary>
         static bool EnsureVoice()
         {
             if (voiceOk) return true;
             if (voiceBroken || voiceInitTried) return false;
             voiceInitTried = true;
+            Thread t = new Thread(delegate()
+            {
+                try { InitVoice(); }
+                catch (Exception ex) { FailVoice(ex.Message); }
+            });
+            t.IsBackground = true;
+            t.Name = "MoRelay-VoiceInit";
+            t.Start();
+            return false;
+        }
+
+        /// <summary>真正打开采集/播放设备。麦克风和扬声器分开对待：没麦克风也能听别人说话。</summary>
+        static void InitVoice()
+        {
             try
             {
                 WAVEFORMATEX fmt = VoiceFormat();
@@ -932,7 +872,7 @@ namespace MoLanRelay
                 // ---- 扬声器（这个打不开才真的停用）----
                 IntPtr hout;
                 r = waveOutOpen(out hout, WAVE_MAPPER, ref fmt, IntPtr.Zero, IntPtr.Zero, CALLBACK_NULL);
-                if (r != 0) { FailVoice("扬声器打不开 code=" + r); return false; }
+                if (r != 0) { FailVoice("扬声器打不开 code=" + r); return; }
                 hWaveOut = hout;
 
                 spkHdrs = new IntPtr[SpkBufCount];
@@ -952,9 +892,8 @@ namespace MoLanRelay
                 voiceOk = true;
                 Log("voice: 语音已就绪（8kHz/16bit 单声道；按住 " + PttKeyName + " 说话）"
                     + (micFailed ? "  ※麦克风不可用，仅可收听" : ""));
-                return true;
             }
-            catch (Exception ex) { FailVoice(ex.Message); return false; }
+            catch (Exception ex) { FailVoice(ex.Message); }
         }
 
         static void FailVoice(string why)
@@ -1091,7 +1030,7 @@ namespace MoLanRelay
         static extern IntPtr GetForegroundWindow();
 
         /// <summary>截当前前台窗口（前台是我们的窗口或游戏时就截它，否则截客户端主窗口），
-        /// 缩到宽 640 以内再编码成 PNG。</summary>
+        /// 缩到宽 640 以内再编码成 PNG。（目前没有调用方 —— 等"聊天区内联显示"做完再接上）</summary>
         static byte[] CaptureWindow()
         {
             IntPtr h = IntPtr.Zero;
@@ -1120,41 +1059,6 @@ namespace MoLanRelay
                     return ms.ToArray();
                 }
             }
-        }
-
-        /// <summary>用一个独立线程（STA + 自己的消息循环）弹出缩略图窗口。</summary>
-        static void ShowShot(string from, byte[] png)
-        {
-            Thread t = new Thread(delegate()
-            {
-                try
-                {
-                    MemoryStream ms = new MemoryStream(png);
-                    Image img = Image.FromStream(ms);
-
-                    Form f = new Form();
-                    f.Text = (from.Length == 0 ? "有人" : from) + " 发来的截图  (双击图片关闭)";
-                    f.FormBorderStyle = FormBorderStyle.SizableToolWindow;
-                    f.StartPosition = FormStartPosition.CenterScreen;
-                    f.Size = new Size(700, 520);
-                    f.TopMost = true;
-                    f.BackColor = Color.Black;
-
-                    PictureBox pb = new PictureBox();
-                    pb.Dock = DockStyle.Fill;
-                    pb.SizeMode = PictureBoxSizeMode.Zoom;
-                    pb.Image = img;
-                    pb.BackColor = Color.Black;
-                    pb.DoubleClick += delegate(object s, EventArgs e) { try { f.Close(); } catch { } };
-                    f.Controls.Add(pb);
-
-                    Application.Run(f);
-                }
-                catch (Exception ex) { Log("shot 显示失败: " + ex.Message); }
-            });
-            t.SetApartmentState(ApartmentState.STA);
-            t.IsBackground = true;
-            t.Start();
         }
 
         /// <summary>房主侧：每一个对端的 LANPlayerInfo 都挂着 accept 出来的 TcpClient。

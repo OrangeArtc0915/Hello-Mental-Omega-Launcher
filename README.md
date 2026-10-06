@@ -25,7 +25,7 @@
 ## 2. 目录结构
 
 ```
-├─ README.md                ← 本文件（构建说明）
+├─ 构建说明.md / README.md  ← 本文件（压缩包里叫「构建说明.md」，仓库里叫「README.md」）
 ├─ 中继\
 │   └─ MoLanRelay.cs        ← 游戏内 UDP 中继（C#，编译成 DLL，不手写 IL）
 ├─ IL补丁工具\
@@ -169,7 +169,7 @@ dnlibpatch <in> <out> <mode>
 | `lobbyfix` | **补丁2 ⑤**：`LANGameLobby::HandleFileHashCommand` 补判空（修上游漏判空导致的崩溃） |
 | `kick` | **补丁2 ⑥**：`GameLobbyBase::KickPlayer` → `Relay.KickPlayer`（局域网踢人生效；在线大厅有自己的重写，不受影响） |
 | `mention` | **补丁2 ⑦**：`LANGameLobby::Player_HandleChatCommand` 里挂 `Relay.MentionColor`（@ 我 → 金色 + 提示音） |
-| `shot` | **补丁2 ⑧**：`LANGameLobby::Update` 挂 `Relay.Tick`（F4/F5/F6/F8 + F7 按住语音，全在这里轮询）；两个消息入口挂 `MO-CTRL` 识别（截图 / 语音 / 版本自检共用这条通道） |
+| `shot` | **补丁2 ⑧**：`LANGameLobby::Update` 挂 `Relay.Tick`（F5/F6 热键 + F7 按住语音都在这里轮询）；两个消息入口挂 `MO-CTRL` 识别（截图 / 语音 / 版本自检共用这条通道）。**截图显示已撤掉**（弹窗会抢走客户端焦点 → 客户端停止绘制 → 看起来卡死+没鼠标），待改成"聊天区内联显示"再放出来 |
 | `hashcheck` | **补丁2 ⑨**：`LANGameLobby::HandleFileHashCommand` 开头挂 `Relay.FileHashResult`（文件不一致时给明确提示） |
 | `patch` / `xna` | 早期方案，最终未使用（见 5.1 的说明） |
 | `checkstack` | 全模块栈自检 |
