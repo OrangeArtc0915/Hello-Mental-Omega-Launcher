@@ -47,7 +47,7 @@ if ([string]::IsNullOrEmpty($NotesDir))    { $NotesDir    = Join-Path $root '说
 if ([string]::IsNullOrEmpty($OutDir))      { $OutDir      = Join-Path $root '..\..\_build' }
 
 $ExeNames    = @('clientdx.exe', 'clientogl.exe', 'clientxna.exe')
-$PatchModes  = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'mention', 'shot')
+$PatchModes  = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'mention', 'shot', 'hashcheck')
 
 $p1   = Join-Path $OutDir '补丁1-中文输入'
 $p2   = Join-Path $OutDir '补丁2-联机'

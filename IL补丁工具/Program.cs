@@ -1434,6 +1434,46 @@ class Program
             }
         }
 
+        // ──────────────────────────────────────────────────────────────
+        // hashcheck：把"游戏文件是否一致"讲清楚
+        //   LANGameLobby::HandleFileHashCommand(sender, fileHash) 开头插一次调用，
+        //   把 (大厅, 发送者, 对方哈希) 交给 Relay.FileHashResult：
+        //   一致 → 只写日志；不一致 → 红字提示 + 聊天区广播（带双方哈希前 8 位 + 处理建议）。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "hashcheck")
+        {
+            var lglH = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglH == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+            var fhc = lglH.Methods.FirstOrDefault(m => m.Name == "HandleFileHashCommand");
+            if (fhc == null || !fhc.HasBody) { Console.WriteLine("SKIP: 找不到 HandleFileHashCommand"); return 0; }
+            if (fhc.MethodSig == null || fhc.MethodSig.Params.Count != 2) { Console.WriteLine("SKIP: 签名不是 (string,string)"); return 0; }
+
+            bool doneH = false;
+            foreach (var i in fhc.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "FileHashResult") { doneH = true; break; }
+            }
+            if (doneH) Console.WriteLine("  HandleFileHashCommand: 已改过，跳过");
+            else
+            {
+                var relayAsmH = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeH = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmH);
+                var fhCall = new MemberRefUser(mod, "FileHashResult",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object,
+                        mod.CorLibTypes.String, mod.CorLibTypes.String), relayTypeH);
+
+                var hins = fhc.Body.Instructions;
+                hins.Insert(0, Instruction.Create(OpCodes.Call, fhCall));
+                hins.Insert(0, Instruction.Create(OpCodes.Ldarg_2));
+                hins.Insert(0, Instruction.Create(OpCodes.Ldarg_1));
+                hins.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                if (fhc.Body.MaxStack < 8) fhc.Body.MaxStack = 8;
+                Console.WriteLine("  HandleFileHashCommand: 已挂 Relay.FileHashResult（文件一致性提示）");
+                CheckStack(fhc);
+            }
+        }
+
         if (mode == "checkstack")
         {
             foreach (var t in mod.GetTypes())

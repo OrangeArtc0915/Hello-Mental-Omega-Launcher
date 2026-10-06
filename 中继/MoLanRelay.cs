@@ -199,7 +199,7 @@ namespace MoLanRelay
                 MethodInfo am = FindMethod(lobby.GetType(), "AddNotice", 2);
                 if (am != null)
                 {
-                    object color = MakeColor();
+                    object color = MakeColor("Red");
                     if (color != null) am.Invoke(lobby, new object[] { text, color });
                 }
             }
@@ -234,8 +234,8 @@ namespace MoLanRelay
             return null;
         }
 
-        /// <summary>拿 Microsoft.Xna.Framework.Color.Red（拿不到就返回 null）。</summary>
-        static object MakeColor()
+        /// <summary>拿 Microsoft.Xna.Framework.Color 的某个静态颜色（拿不到就返回 null）。</summary>
+        static object MakeColor(string name)
         {
             try
             {
@@ -243,7 +243,7 @@ namespace MoLanRelay
                 {
                     Type ct = a.GetType("Microsoft.Xna.Framework.Color");
                     if (ct == null) continue;
-                    PropertyInfo p = ct.GetProperty("Red", BindingFlags.Public | BindingFlags.Static);
+                    PropertyInfo p = ct.GetProperty(name, BindingFlags.Public | BindingFlags.Static);
                     if (p != null) return p.GetValue(null, null);
                 }
             }
@@ -335,34 +335,347 @@ namespace MoLanRelay
         public const string CtrlTag = "MO-CTRL";
         const string CtrlSep = "\u0001";
 
-        /// <summary>日志/控制帧用的热键：在局域网大厅里按 F8 截图。</summary>
-        static readonly Microsoft.Xna.Framework.Input.Keys ShotKey = Microsoft.Xna.Framework.Input.Keys.F8;
-        static bool shotKeyWasDown;
+        /// <summary>热键（在大厅或游戏内都生效，只要前台窗口是客户端或 gamemd）。</summary>
+        const int VK_F4 = 0x73, VK_F5 = 0x74, VK_F6 = 0x75, VK_F7 = 0x76, VK_F8 = 0x77;
+
+        static bool shotKeyWasDown, clipKeyWasDown, statsKeyWasDown, randKeyWasDown;
+
+        [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vKey);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+
+        static bool KeyDown(int vk)
+        {
+            try { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
+            catch { return false; }
+        }
+
+        /// <summary>前台窗口是不是"我们的"：客户端自己，或者游戏本体 gamemd。
+        /// 加这个判断是为了避免在别的程序里按 F8 也把截图发到游戏房间。</summary>
+        static bool OursInFront()
+        {
+            try
+            {
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero) return false;
+                uint pid;
+                GetWindowThreadProcessId(fg, out pid);
+                if (pid == 0) return false;
+                if (pid == (uint)System.Diagnostics.Process.GetCurrentProcess().Id) return true;
+                try
+                {
+                    string nm = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
+                    return string.Equals(nm, "gamemd", StringComparison.OrdinalIgnoreCase);
+                }
+                catch { }
+            }
+            catch { }
+            return false;
+        }
 
         public static bool IsCtrlMessage(string message)
         {
             return message != null && message.StartsWith(CtrlTag + CtrlSep, StringComparison.Ordinal);
         }
 
-        /// <summary>由 LANGameLobby::Update 的补丁每帧调用 —— 轮询热键/语音。</summary>
+        /// <summary>由 LANGameLobby::Update 的补丁每帧调用 —— 热键轮询 / 版本自检 / 语音。</summary>
         public static void Tick(object lobby, object gameTime)
+        {
+            bool front = false;
+            try { front = OursInFront(); } catch { }
+
+            // F8：截图（前台是游戏本体时就截游戏）
+            try
+            {
+                bool k = front && KeyDown(VK_F8);
+                if (k && !shotKeyWasDown) CaptureAndSend(lobby);
+                shotKeyWasDown = k;
+            }
+            catch (Exception ex) { Log("shot 出错: " + ex.Message); }
+
+            // F6：把剪贴板内容当聊天发出去（分享 IP:端口 用）
+            try
+            {
+                bool k = front && KeyDown(VK_F6);
+                if (k && !clipKeyWasDown) ShareClipboard(lobby);
+                clipKeyWasDown = k;
+            }
+            catch (Exception ex) { Log("分享剪贴板出错: " + ex.Message); }
+
+            // F5：把"大厅 + 中继"体检报告发到聊天区
+            try
+            {
+                bool k = front && KeyDown(VK_F5);
+                if (k && !statsKeyWasDown) ShareReport(lobby);
+                statsKeyWasDown = k;
+            }
+            catch (Exception ex) { Log("体检报告出错: " + ex.Message); }
+
+            // F4：房主一键随机阵营/出生位置
+            try
+            {
+                bool k = front && KeyDown(VK_F4);
+                if (k && !randKeyWasDown) RandomizeAll(lobby);
+                randKeyWasDown = k;
+            }
+            catch (Exception ex) { Log("随机化出错: " + ex.Message); }
+
+            try { HelloTick(lobby); } catch { }
+
+            try { VoiceTick(lobby, front); }
+            catch (Exception ex) { Log("voice tick error: " + ex.Message); }
+        }
+
+        // ==================================================================
+        // 实用三件套：分享地址(F6) / 体检报告(F5) / 中继版本自检
+        // ==================================================================
+
+        /// <summary>把一条文本当聊天发出去（走大厅自己的发送逻辑，客机会经房主广播）。</summary>
+        static void SendChat(object lobby, string text)
         {
             try
             {
-                bool down = false;
-                try { down = Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(ShotKey); }
-                catch { }
-                if (down && !shotKeyWasDown)
+                if (string.IsNullOrEmpty(text)) return;
+                // 控制字符会破坏大厅的 \u0001 / \u0002 分帧
+                text = text.Replace('\u0001', ' ').Replace('\u0002', ' ')
+                           .Replace('\r', ' ').Replace('\n', ' ').Trim();
+                if (text.Length > 700) text = text.Substring(0, 700) + "…";
+                MethodInfo sm = FindMethod(lobby.GetType(), "SendChatMessage", 1);
+                if (sm == null) { Log("找不到 SendChatMessage，消息发不出去"); return; }
+                sm.Invoke(lobby, new object[] { text });
+            }
+            catch (Exception ex) { Log("SendChat 出错: " + ex.Message); }
+        }
+
+        /// <summary>F6：把剪贴板内容当聊天发出去 —— HMOL 复制出来的 IP:端口 直接就能发到房间里。</summary>
+        static void ShareClipboard(object lobby)
+        {
+            string txt = "";
+            try { txt = Clipboard.GetText(); } catch { }
+            txt = (txt ?? "").Trim();
+            if (txt.Length == 0) { Notice(lobby, "剪贴板是空的，没东西可发", false); return; }
+            Log("clip: 把剪贴板内容（" + txt.Length + " 字符）当聊天发出去");
+            SendChat(lobby, txt);
+        }
+
+        /// <summary>F5：大厅 + 中继的体检报告，直接发到聊天区（省得再去翻 MoLanRelay.log）。</summary>
+        static void ShareReport(object lobby)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("[体检] 中继 v").Append(Version);
+            try
+            {
+                sb.Append(" 身份=").Append(IsHostOf(lobby) ? "房主" : "客机");
+                IList players = GetMember(lobby, "Players") as IList;
+                if (players != null)
                 {
-                    try { CaptureAndSend(lobby); }
-                    catch (Exception ex) { Log("shot: 截图失败: " + ex.Message); }
+                    StringBuilder names = new StringBuilder();
+                    foreach (object o in players)
+                    {
+                        LANPlayerInfo lp = o as LANPlayerInfo;
+                        if (lp == null) continue;
+                        string n = Clean(lp.Name);
+                        if (n.Length == 0) continue;
+                        if (names.Length > 0) names.Append('/');
+                        names.Append(n);
+                    }
+                    sb.Append(" 玩家=").Append(names.Length == 0 ? "(无)" : names.ToString());
                 }
-                shotKeyWasDown = down;
             }
             catch { }
+            sb.Append(" | ").Append(StatsLine());
+            Log("report: " + sb);
+            SendChat(lobby, sb.ToString());
+        }
 
-            try { VoiceTick(lobby); }
-            catch (Exception ex) { Log("voice tick error: " + ex.Message); }
+        /// <summary>中继计数摘要（统计线程和 F5 报告共用一份，避免两处描述不一致）。</summary>
+        static string StatsLine()
+        {
+            long ti = 0, to = 0;
+            StringBuilder per = new StringBuilder();
+            lock (peers)
+            {
+                foreach (Peer p in peers)
+                {
+                    ti += p.PacketsIn; to += p.PacketsOut;
+                    if (p.PacketsIn != 0 || p.PacketsOut != 0)
+                        per.Append(p.Name).Append("(收").Append(p.PacketsIn).Append("/注").Append(p.PacketsOut).Append(") ");
+                }
+            }
+            return "中继:本机游戏发出的包=" + ti + " 已注入=" + to
+                 + " 已发出帧=" + totalSent + " 已转发帧=" + totalFwd + " 已收到帧=" + totalRecv
+                 + (totalSendFail > 0 ? " 发送失败=" + totalSendFail : "")
+                 + (per.Length > 0 ? " | 分对端: " + per.ToString().TrimEnd() : "");
+        }
+
+        // ---- 中继版本自检 ----
+
+        const string HelloKind = "HELLO";
+        static DateTime lastHello = DateTime.MinValue;
+        static readonly HashSet<string> warnedVersion = new HashSet<string>();
+
+        /// <summary>周期性（15 秒）把自己的中继版本广播出去；帧很小，忽略不计。</summary>
+        static void HelloTick(object lobby)
+        {
+            if (lobby == null) return;
+            if ((DateTime.Now - lastHello).TotalSeconds < 15) return;
+            IList players = GetMember(lobby, "Players") as IList;
+            if (players == null || players.Count < 2) return;
+            lastHello = DateTime.Now;
+
+            string me = Clean(MyPlayerName());
+            string frame = CtrlTag + CtrlSep + HelloKind + CtrlSep + me + CtrlSep
+                         + Convert.ToBase64String(Encoding.UTF8.GetBytes(Version + "\n" + me));
+            try
+            {
+                if (IsHostOf(lobby))
+                {
+                    foreach (object o in players)
+                    {
+                        LANPlayerInfo lp = o as LANPlayerInfo;
+                        if (lp == null || lp.TcpClient == null) continue;
+                        if (SameName(Clean(lp.Name), me)) continue;
+                        SendLocked(lp, frame);
+                    }
+                }
+                else
+                {
+                    MethodInfo sm = FindMethod(lobby.GetType(), "SendMessageToHost", 1);
+                    if (sm != null) sm.Invoke(lobby, new object[] { frame });
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>收到别人的版本自检帧：不一致就红字 + 聊天区各来一条（同一台只提醒一次）。</summary>
+        static void OnHello(object lobby, string from, string b64)
+        {
+            string ver = "";
+            try
+            {
+                string payload = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                string[] p = payload.Split('\n');
+                if (p.Length > 0) ver = p[0].Trim();
+            }
+            catch { return; }
+            if (ver.Length == 0) return;
+
+            if (ver == Version)
+            {
+                lock (warnedVersion) { warnedVersion.Remove(from); }   // 一致了就清掉，允许以后再报
+                return;
+            }
+
+            bool first;
+            lock (warnedVersion) { first = warnedVersion.Add(from + "|" + ver); }
+            if (!first) return;
+
+            string msg = "⚠ " + (from.Length == 0 ? "对方" : from) + " 的中继版本是 v" + ver + "，我的是 v" + Version
+                       + " —— 版本不一致会导致联机卡住/不读条，请双方用同一份补丁包！";
+            Log("hello: " + msg);
+            Notice(lobby, msg, false);
+            SendChat(lobby, msg);
+        }
+
+        // ---- 游戏文件一致性 ----
+
+        /// <summary>由 LANGameLobby::HandleFileHashCommand 的补丁调用（房主侧）。</summary>
+        public static void FileHashResult(object lobby, string sender, string theirHash)
+        {
+            try
+            {
+                string who = Clean(sender);
+                if (SameName(who, MyPlayerName())) return;          // 自己那份不用报
+
+                string mine = Clean(GetMember(lobby, "localFileHash") as string);
+                string theirs = Clean(theirHash);
+                bool same = mine.Length > 0 && theirs.Length > 0 &&
+                            string.Equals(mine, theirs, StringComparison.OrdinalIgnoreCase);
+                if (same) { Log("filehash: " + who + " 游戏文件校验通过"); return; }   // 通过就不刷屏
+
+                string msg = "⚠ 游戏文件不一致：" + (who.Length == 0 ? "对方" : who) + " 的文件和你的不一样"
+                           + "（他 " + Short(mine.Length > 0 ? theirs : theirs) + " / 你 " + Short(mine) + "）"
+                           + " —— 联机很可能卡住或崩溃，请核对双方 MO 版本与补丁是否完全一致！";
+                Log("filehash: " + msg);
+                Notice(lobby, msg, false);
+                SendChat(lobby, msg);
+            }
+            catch (Exception ex) { Log("filehash 检查出错: " + ex.Message); }
+        }
+
+        static string Short(string h)
+        {
+            if (string.IsNullOrEmpty(h)) return "空";
+            return h.Length <= 8 ? h : h.Substring(0, 8);
+        }
+
+        // ---- 开局前：随机阵营/位置（房主）----
+
+        /// <summary>F4（房主）：把所有人类玩家的阵营和出生位置随机一遍，然后广播出去。</summary>
+        static void RandomizeAll(object lobby)
+        {
+            if (!IsHostOf(lobby)) { Notice(lobby, "只有房主能随机阵营/位置", false); return; }
+
+            Array sides = GetMember(lobby, "ddPlayerSides") as Array;
+            Array starts = GetMember(lobby, "ddPlayerStarts") as Array;
+            IList players = GetMember(lobby, "Players") as IList;
+            if (sides == null || starts == null || players == null)
+            { Log("rand: 拿不到 ddPlayerSides / ddPlayerStarts / Players，放弃"); return; }
+
+            Random rnd = new Random();
+            int n = Math.Min(Math.Min(sides.Length, starts.Length), players.Count);
+            int done = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (!(players[i] is LANPlayerInfo)) continue;
+                bool s1 = SetRandomIndex(sides.GetValue(i), rnd);
+                SetRandomIndex(starts.GetValue(i), rnd);
+                if (s1) done++;
+            }
+
+            try
+            {
+                MethodInfo cp = FindMethod(lobby.GetType(), "CopyPlayerDataFromUI", 0);
+                if (cp != null) cp.Invoke(lobby, null);
+                MethodInfo bp = FindMethod(lobby.GetType(), "BroadcastPlayerOptions", 0);
+                if (bp != null) bp.Invoke(lobby, null);
+            }
+            catch (Exception ex) { Log("rand: 应用改动失败: " + ex.Message); }
+
+            Log("rand: 已随机 " + done + " 名玩家的阵营/出生位置");
+            SendChat(lobby, "[随机] 已随机 " + done + " 名玩家的阵营与出生位置");
+        }
+
+        /// <summary>把某个下拉框随机选一项（按它自己的条目数取，不会越界）。</summary>
+        static bool SetRandomIndex(object dd, Random rnd)
+        {
+            try
+            {
+                if (dd == null) return false;
+                Type t = dd.GetType();
+                PropertyInfo pi = t.GetProperty("Items");
+                PropertyInfo ps = t.GetProperty("SelectedIndex");
+                if (pi == null || ps == null) return false;
+                IList il = pi.GetValue(dd, null) as IList;
+                if (il == null || il.Count <= 1) return false;
+                ps.SetValue(dd, rnd.Next(il.Count), null);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>弹一条本地通知（拿不到颜色就只写日志，绝不因为提示失败而中断功能）。</summary>
+        static void Notice(object lobby, string text, bool good)
+        {
+            try
+            {
+                Log("notice: " + text);
+                MethodInfo am = FindMethod(lobby.GetType(), "AddNotice", 2);
+                if (am == null) return;
+                object color = MakeColor(good ? "LimeGreen" : "Red");
+                if (color == null) return;
+                am.Invoke(lobby, new object[] { text, color });
+            }
+            catch { }
         }
 
         /// <summary>由 HandleClientMessage / HandleMessageFromServer 的补丁调用。</summary>
@@ -394,6 +707,10 @@ namespace MoLanRelay
                 else if (kind == "VOICE")
                 {
                     if (!mine) QueueVoicePlayback(b64);
+                }
+                else if (kind == HelloKind)
+                {
+                    if (!mine) OnHello(lobby, from, b64);
                 }
                 else return;
 
@@ -479,7 +796,7 @@ namespace MoLanRelay
         const int MicBufCount = 4;
         const int SpkBufCount = 8;
 
-        static readonly Microsoft.Xna.Framework.Input.Keys PttKey = Microsoft.Xna.Framework.Input.Keys.F7;
+        const string PttKeyName = "F7";
         static bool pttWasDown;
 
         static bool voiceInitTried, voiceOk, voiceBroken, micFailed;
@@ -601,7 +918,7 @@ namespace MoLanRelay
                 }
 
                 voiceOk = true;
-                Log("voice: 语音已就绪（8kHz/16bit 单声道；按住 " + PttKey + " 说话）"
+                Log("voice: 语音已就绪（8kHz/16bit 单声道；按住 " + PttKeyName + " 说话）"
                     + (micFailed ? "  ※麦克风不可用，仅可收听" : ""));
                 return true;
             }
@@ -614,12 +931,10 @@ namespace MoLanRelay
             Log("voice: 已停用（" + why + "）");
         }
 
-        /// <summary>每帧调用：PTT 状态 + 收麦克风 + 填充播放缓冲。</summary>
-        static void VoiceTick(object lobby)
+        /// <summary>每帧调用：PTT 状态 + 收麦克风 + 填充播放缓冲。front = 前台是我们的窗口/游戏。</summary>
+        static void VoiceTick(object lobby, bool front)
         {
-            bool ptt = false;
-            try { ptt = Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(PttKey); }
-            catch { }
+            bool ptt = front && KeyDown(VK_F7);
 
             if (ptt && !EnsureVoice()) { pttWasDown = ptt; return; }
 
@@ -627,7 +942,7 @@ namespace MoLanRelay
             {
                 if (ptt && !pttWasDown)
                     Log(micFailed ? "voice: 按下了说话键，但这台机器没有可用麦克风"
-                                  : "voice: 开始说话（" + PttKey + " 按住中）");
+                                  : "voice: 开始说话（" + PttKeyName + " 按住中）");
                 if (!micFailed) { try { PumpMic(lobby, ptt); } catch (Exception ex) { FailVoice("采集出错: " + ex.Message); } }
                 try { PumpSpeaker(); } catch (Exception ex) { FailVoice("播放出错: " + ex.Message); }
             }
@@ -743,12 +1058,14 @@ namespace MoLanRelay
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         static extern IntPtr GetForegroundWindow();
 
-        /// <summary>截当前进程的主窗口（客户端窗口），缩到宽 640 以内再编码成 PNG。</summary>
+        /// <summary>截当前前台窗口（前台是我们的窗口或游戏时就截它，否则截客户端主窗口），
+        /// 缩到宽 640 以内再编码成 PNG。</summary>
         static byte[] CaptureWindow()
         {
             IntPtr h = IntPtr.Zero;
-            try { h = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle; }
-            catch { }
+            // 前台是"我们的"（客户端自己或 gamemd）→ 截前台窗口：游戏里按 F8 截到的就是游戏画面
+            if (OursInFront()) { try { h = GetForegroundWindow(); } catch { } }
+            if (h == IntPtr.Zero) { try { h = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle; } catch { } }
             if (h == IntPtr.Zero) { try { h = GetForegroundWindow(); } catch { } }
             if (h == IntPtr.Zero) return null;
 
@@ -1037,22 +1354,10 @@ namespace MoLanRelay
                 try
                 {
                     long ti = 0, to = 0;
-                    StringBuilder per = new StringBuilder();
-                    lock (peers)
-                    {
-                        foreach (Peer p in peers)
-                        {
-                            ti += p.PacketsIn; to += p.PacketsOut;
-                            if (p.PacketsIn != 0 || p.PacketsOut != 0)
-                                per.Append(p.Name).Append("(收").Append(p.PacketsIn).Append("/注").Append(p.PacketsOut).Append(") ");
-                        }
-                    }
+                    lock (peers) { foreach (Peer p in peers) { ti += p.PacketsIn; to += p.PacketsOut; } }
                     if (ti != lastIn || to != lastOut || totalSent != lastSent || totalRecv != lastRecv || totalSendFail != lastFail)
                     {
-                        Log("stats: 本机游戏发出的包=" + ti + " 已注入本机游戏=" + to
-                            + " 已发出帧=" + totalSent + " 已转发帧=" + totalFwd + " 已收到帧=" + totalRecv
-                            + (totalSendFail > 0 ? " 发送失败=" + totalSendFail : "")
-                            + (per.Length > 0 ? " | 分对端: " + per.ToString().TrimEnd() : ""));
+                        Log("stats: " + StatsLine());
                         lastIn = ti; lastOut = to; lastSent = totalSent; lastRecv = totalRecv; lastFail = totalSendFail;
                     }
                 }
