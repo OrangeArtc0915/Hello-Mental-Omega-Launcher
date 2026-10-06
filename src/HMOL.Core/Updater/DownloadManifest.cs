@@ -8,7 +8,15 @@ namespace HMOL.Core.Updater;
 /// 下载页文件里的一条：名字 + 一个或多个下载地址 + 可选说明。
 /// 多个地址表示分卷，下载时会按顺序合并成一个文件（如 EasyTier 的 4 个分卷）。
 /// </summary>
-public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, string Note, string Homepage = "")
+public sealed record ManifestEntry(
+    string Name,
+    IReadOnlyList<string> Urls,
+    string Note,
+    string Homepage = "",
+    string Target = "",
+    string Group = "",
+    string Folder = "",
+    string Marker = "")
 {
     /// <summary>首个下载地址，用于「打开链接」与推断文件名；纯「官网」条目为空。</summary>
     public string PrimaryUrl => Urls.Count > 0 ? Urls[0] : string.Empty;
@@ -18,6 +26,15 @@ public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, stri
 
     /// <summary>用于去重与「打开」的实际地址：优先下载地址，其次官网。</summary>
     public string EffectiveUrl => Urls.Count > 0 ? Urls[0] : Homepage;
+
+    /// <summary>下载完存进「插件」包目录（可在包管理里安装）。</summary>
+    public bool IsPluginTarget => string.Equals(Target, DownloadManifest.TargetPlugin, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>下载完让用户选实例、解压到其游戏目录，并打开包内的 exe。</summary>
+    public bool IsInstanceTarget => string.Equals(Target, DownloadManifest.TargetInstance, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>下载完解压到 exe 旁的 runtime\&lt;文件夹&gt;\（组网组件这类）。</summary>
+    public bool IsRuntimeTarget => string.Equals(Target, DownloadManifest.TargetRuntime, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>
@@ -35,6 +52,11 @@ public sealed record ManifestEntry(string Name, IReadOnlyList<string> Urls, stri
 /// 根节点直接用数组也支持；字段名兼容 <c>name / 名字 / 名称 / title</c>、
 /// <c>url / urls / 下载地址 / address / link / 地址</c>、<c>note / 说明 / 描述 / desc</c>。
 /// 只给 <c>homepage / 官网</c> 的条目表示「本启动器不托管该文件」，界面只显示一条可点击的官网地址。
+/// <c>target</c> 可指定下载后的去向：<c>plugin</c> = 存进「插件」包目录（可在包管理里安装）；
+/// <c>instance</c> = 让用户选一个实例、解压到其游戏目录并打开包内的 exe；
+/// <c>runtime</c> = 解压到 exe 旁的 <c>runtime\&lt;folder&gt;\</c>，用 <c>marker</c> 文件判断装没装；
+/// 不填则存到下载目录。
+/// <c>group</c> 指定条目属于哪一组，下载页按它自动分组、生成可折叠区块（不填则按 target 归类）。
 /// 目的是让下载页内容不改启动器就能更新：往这个文件里加条目即可。
 /// </para>
 ///
@@ -50,6 +72,15 @@ public static class DownloadManifest
     /// <summary>下载页文件名。</summary>
     public const string FileName = "download.json";
 
+    /// <summary>条目去向：直接下载到「插件」包目录（可在包管理 → 插件里安装）。</summary>
+    public const string TargetPlugin = "plugin";
+
+    /// <summary>条目去向：下载后选一个实例，解压到其游戏目录，并打开包内的 exe（如黑屏补丁）。</summary>
+    public const string TargetInstance = "instance";
+
+    /// <summary>条目去向：解压到 exe 旁的 <c>runtime\&lt;folder&gt;\</c>，按 marker 文件判断是否已安装。</summary>
+    public const string TargetRuntime = "runtime";
+
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     private static readonly string[] NameKeys = ["name", "名字", "名称", "title"];
@@ -57,6 +88,10 @@ public static class DownloadManifest
     private static readonly string[] UrlArrayKeys = ["urls", "下载地址列表", "parts", "分卷"];
     private static readonly string[] NoteKeys = ["note", "说明", "描述", "desc"];
     private static readonly string[] HomepageKeys = ["homepage", "官网", "官方网站", "官网地址", "site", "web", "主页"];
+    private static readonly string[] TargetKeys = ["target", "目标", "去向", "放置"];
+    private static readonly string[] GroupKeys = ["group", "分组", "分类", "类别"];
+    private static readonly string[] FolderKeys = ["folder", "目录", "文件夹"];
+    private static readonly string[] MarkerKeys = ["marker", "标志", "标记", "标志文件"];
     private static readonly string[] ListKeys = ["items", "downloads", "list", "文件", "下载"];
 
     /// <summary>GitHub 的 raw 直链。</summary>
@@ -141,7 +176,7 @@ public static class DownloadManifest
                 if (element.ValueKind == JsonValueKind.String)
                 {
                     var only = element.GetString()?.Trim() ?? string.Empty;
-                    if (only.Length > 0) Add(result, only, [only], string.Empty, string.Empty);
+                    if (only.Length > 0) Add(result, new ManifestEntry(only, [only], string.Empty));
                     continue;
                 }
 
@@ -154,10 +189,16 @@ public static class DownloadManifest
                 if (urls.Count == 0 && homepage.Length == 0) continue;
 
                 var name = ReadString(element, NameKeys);
-                var note = ReadString(element, NoteKeys);
-                var display = name.Length > 0 ? name : (urls.Count > 0 ? urls[0] : homepage);
 
-                Add(result, display, urls, note, homepage);
+                Add(result, new ManifestEntry(
+                    name.Length > 0 ? name : (urls.Count > 0 ? urls[0] : homepage),
+                    urls,
+                    ReadString(element, NoteKeys),
+                    homepage,
+                    ReadString(element, TargetKeys).ToLowerInvariant(),
+                    ReadString(element, GroupKeys),
+                    ReadString(element, FolderKeys),
+                    ReadString(element, MarkerKeys)));
             }
         }
         catch (JsonException ex)
@@ -169,14 +210,13 @@ public static class DownloadManifest
     }
 
     /// <summary>同一个（首个）链接只保留第一次出现；纯官网条目按官网地址去重。</summary>
-    private static void Add(List<ManifestEntry> result, string name, List<string> urls, string note, string homepage)
+    private static void Add(List<ManifestEntry> result, ManifestEntry entry)
     {
-        var key = urls.Count > 0 ? urls[0] : homepage;
-        if (key.Length == 0) return;
+        if (entry.EffectiveUrl.Length == 0) return;
 
-        if (result.Any(item => string.Equals(item.EffectiveUrl, key, StringComparison.OrdinalIgnoreCase))) return;
+        if (result.Any(item => string.Equals(item.EffectiveUrl, entry.EffectiveUrl, StringComparison.OrdinalIgnoreCase))) return;
 
-        result.Add(new ManifestEntry(name, urls, note, homepage));
+        result.Add(entry);
     }
 
     /// <summary>读地址：优先 <c>urls</c> 数组，兼容单个 <c>url</c>；顺序去重。</summary>

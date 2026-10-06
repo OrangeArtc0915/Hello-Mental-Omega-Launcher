@@ -1598,21 +1598,18 @@ public partial class PageMultiplayer : LauncherPage
         }
     }
 
-    // ————— 联机补丁状态（下载与安装已挪到顶层「下载」页） —————
+    // ————— 组网组件状态（下载在顶层「下载」页） —————
 
     /// <summary>
-    /// 未安装联机补丁时禁用其余子视图（组网 / 大厅 / 对端 / 日志）；
-    /// 缺补丁或缺当前方案的组网组件时，提示到顶层「下载」页补齐。
+    /// 缺当前方案所需的组网组件时提示到「下载」页补齐。页面本身不再用补丁当「门锁」：
+    /// 联机功能默认可用，缺组件时连接前会提示并现场下载。
     /// </summary>
     private void RefreshRequiredFilesUi()
     {
-        var instance = InstanceManager.Current;
-        var installed = MultiplayerRequiredFiles.IsPatchInstalled(instance);
+        PanContent.IsEnabled = true;
+        PanContent.Opacity = 1;
 
-        PanContent.IsEnabled = installed;
-        PanContent.Opacity = installed ? 1 : 0.6;
-
-        var hint = BuildRequiredHint(instance, installed);
+        var hint = BuildRequiredHint();
 
         if (hint is null)
         {
@@ -1626,13 +1623,10 @@ public partial class PageMultiplayer : LauncherPage
         ShowNotice(hint, isError: true);
     }
 
-    /// <summary>缺什么就提示什么：优先补丁，其次当前方案所需的组网组件（樱花方案不需要）。</summary>
-    private string? BuildRequiredHint(GameInstance? instance, bool patchInstalled)
+    /// <summary>缺什么提示什么：当前方案所需的组网组件（樱花方案不需要）。</summary>
+    private string? BuildRequiredHint()
     {
-        if (instance is null) return null;
-
-        if (!patchInstalled) return "当前实例未安装联机补丁，请先到左侧「下载」页下载并安装。";
-
+        if (InstanceManager.Current is null) return null;
         if (_sakuraPlan) return null;
 
         var missing = RuntimeComponents.MissingFor(_kind);
@@ -1643,7 +1637,7 @@ public partial class PageMultiplayer : LauncherPage
     }
 
     /// <summary>
-    /// 第一次进联机页且补丁没装时弹一次引导，引导去「下载」页。只提示一次（记录在联机配置里）。
+    /// 第一次进联机页时弹一次引导，引导去「下载」页取组网组件与樱花 Frp 引擎。只提示一次。
     /// </summary>
     private void MaybePromptRequiredFiles()
     {
@@ -1651,13 +1645,9 @@ public partial class PageMultiplayer : LauncherPage
 
         MultiplayerSettingsStore.Update(settings => settings.RequiredFilesPrompted = true);
 
-        var instance = InstanceManager.Current;
-        if (MultiplayerRequiredFiles.IsPatchInstalled(instance)) return;
-
-        var choice = ChoiceWindow.Ask(OwnerWindow, "需要联机必要文件",
-            "第一次使用联机功能，需要先下载联机必要文件：运行库（组网组件 / 7-Zip）+ 樱花 Frp 引擎 + MO 联机补丁。",
-            "这些都在左侧「下载」页统一下载；补丁会解压到当前实例的游戏根目录。\n" +
-            "未安装补丁前，联机页的「组网 / 大厅 / 对端」等功能不可用。",
+        var choice = ChoiceWindow.Ask(OwnerWindow, "需要组网组件",
+            "联机需要组网组件（EasyTier / n2n / TAP 等），按方案下载到启动器目录的 runtime\\ 下；用樱花 Frp 方案还需要 frpc 引擎（连接时自动下载）。",
+            "这些都在左侧「下载」页按需下载；缺组件时连接前也会提示并现场下载。",
             new ChoiceOption("前往下载", "go", ButtonTone.Solid),
             new ChoiceOption("稍后", "later"));
 

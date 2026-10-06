@@ -69,7 +69,7 @@ internal static class RequiredFilesFlow
         var choice = ChoiceWindow.Ask(owner, "下载 7-Zip 组件",
             "启动器需要一个解压组件（7-Zip，约 1 MB），当前没有检测到。",
             "它对大多数操作不是必需的：zip / tar / gz 走内置解压；只有 7z 压缩包会退回较慢的实现。\n" +
-            "现在下载会放到启动器目录的 runtime\\7zip\\，之后也能在「联机 → 联机补丁」页重新下载。",
+            "现在下载会放到启动器目录的 runtime\\7zip\\，之后也能在左侧「下载」页重新下载。",
             new ChoiceOption("立即下载", "ok", ButtonTone.Solid),
             new ChoiceOption("跳过", "skip"));
 
@@ -93,7 +93,7 @@ internal static class RequiredFilesFlow
             ActivityLog.Write(LogSource.App, message, ok ? ActivityLevel.Info : ActivityLevel.Warn);
 
             if (!ok) ChoiceWindow.Warn(owner, "下载 7-Zip 组件失败",
-                $"{message}\n\n不影响单机与 zip / tar 解压；稍后可在「联机 → 联机补丁」页重试。");
+                $"{message}\n\n不影响单机与 zip / tar 解压；稍后可在左侧「下载」页重试。");
 
             return ok;
         }

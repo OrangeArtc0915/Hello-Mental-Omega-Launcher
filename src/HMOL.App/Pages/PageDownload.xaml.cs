@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -13,17 +14,19 @@ using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Packages;
 using HMOL.Core.Updater;
 
 namespace HMOL.App.Pages;
 
 /// <summary>
-/// 下载页：运行库（组网组件 / 7-Zip / 樱花 Frp 引擎）与 MO 联机补丁的下载入口。
+/// 下载页：按仓库 survive 分支的 download.json 自动生成分组与条目（组网组件 / 补丁 / 运行库官网入口…）。
+/// 页面不预置任何条目：加 / 改 / 删条目、调整分组或地址都只改那份配置，不必发新版本。
 ///
 /// <para>
-/// 只提供运行库与启动器补丁，不提供任何游戏资源。补丁会解压到当前实例的游戏根目录，
-/// 安装方式与插件包一致；组网组件与 7-Zip 解压回 exe 旁的 <c>runtime\</c>。
-/// 不放进包管理列表：这些是运行依赖，不是用户可挑选的插件包。
+/// 每条的去向由配置里的 target 决定：runtime（解压回 exe 旁的 <c>runtime\</c>）、plugin（放进「插件」包）、
+/// instance（选实例解压到游戏目录并打开包内 exe）、不填则存到下载目录。
+/// 只提供运行库与补丁，不提供任何游戏资源。
 /// </para>
 /// </summary>
 public partial class PageDownload : LauncherPage
@@ -37,6 +40,12 @@ public partial class PageDownload : LauncherPage
     /// <summary>正在拉取「下载页文件」。</summary>
     private bool _manifestLoading;
 
+    /// <summary>最近一次拉到的条目。重新渲染分组时用它，不必再联网。</summary>
+    private IReadOnlyList<ManifestEntry> _entries = [];
+
+    /// <summary>展开着的分组名。重渲染时保持展开状态，不折回去。</summary>
+    private readonly HashSet<string> _expandedGroups = new(StringComparer.Ordinal);
+
     public PageDownload()
     {
         InitializeComponent();
@@ -44,7 +53,6 @@ public partial class PageDownload : LauncherPage
         _anim.Group(0, HeaderDownload);
         _anim.Group(80, BarNotice);
 
-        RefreshRequiredFilesUi();
         RefreshDownloadDirectory();
     }
 
@@ -52,7 +60,6 @@ public partial class PageDownload : LauncherPage
 
     public override void OnEnter()
     {
-        RefreshRequiredFilesUi();
         RefreshDownloadDirectory();
         _ = LoadManifestAsync();
         _anim.Play();
@@ -62,278 +69,6 @@ public partial class PageDownload : LauncherPage
 
     /// <summary>本页自己管入场动画（见 <see cref="PageAnimator"/>）。</summary>
     public override bool HandlesEnterAnimation => true;
-
-    // ————— 状态刷新 —————
-
-    /// <summary>刷新补丁状态与各运行组件状态。</summary>
-    private void RefreshRequiredFilesUi()
-    {
-        if (LabPatchStatus is null) return;
-
-        var instance = InstanceManager.Current;
-        var installed = MultiplayerRequiredFiles.IsPatchInstalled(instance);
-        var downloaded = MultiplayerRequiredFiles.HasPatch;
-        var frpcReady = MultiplayerRequiredFiles.IsFrpcReady;
-
-        if (instance is null)
-        {
-            LabPatchStatus.Text = "还没有选择游戏实例：可以先下载联机必要文件；安装到游戏目录需要先创建并选择一个实例。";
-            LabPatchDetail.Text = downloaded
-                ? "联机补丁已下载到本机。创建 / 选择游戏实例后，再回来点「安装联机补丁」。"
-                : $"将下载樱花 Frp 引擎、组网组件与 MO 联机补丁，线路：{UpdateSourceName()}。";
-        }
-        else if (installed)
-        {
-            LabPatchStatus.Text = $"当前实例已安装联机补丁（{instance.Name}），联机功能可用。";
-            LabPatchDetail.Text =
-                $"樱花 Frp 引擎：{(frpcReady ? "已就绪" : "未下载，点「下载联机必要文件」可补齐")}。补丁已解压到游戏根目录。";
-        }
-        else
-        {
-            LabPatchStatus.Text = $"当前实例未安装联机补丁（{instance.Name}）：联机功能已禁用，请先下载并安装。";
-            LabPatchDetail.Text = downloaded
-                ? "联机补丁已下载，点「安装联机补丁」解压到游戏根目录。"
-                : $"将下载樱花 Frp 引擎、组网组件与 MO 联机补丁，线路：{UpdateSourceName()}。补丁会解压到游戏根目录（与插件包安装方式一致）。";
-        }
-
-        // 下载不需要游戏实例；安装才需要
-        BtnDownloadRequired.IsEnabled = !_busy;
-        BtnInstallPatch.IsEnabled = !_busy && instance is not null && downloaded && !installed;
-        BtnDownloadRequired.Content = downloaded ? "重新下载联机必要文件" : "下载联机必要文件";
-
-        RefreshRuntimeRows();
-    }
-
-    /// <summary>刷新组网组件 / 7-Zip 组件每一行的状态与按钮。</summary>
-    private void RefreshRuntimeRows()
-    {
-        if (LabRtEasyTier is null) return;
-
-        UpdateRuntimeRow(RuntimeComponent.EasyTier, LabRtEasyTier, BtnRtEasyTier);
-        UpdateRuntimeRow(RuntimeComponent.N2n, LabRtN2n, BtnRtN2n);
-        UpdateRuntimeRow(RuntimeComponent.Tap, LabRtTap, BtnRtTap);
-        UpdateRuntimeRow(RuntimeComponent.WinIpBroadcast, LabRtWinIpBroadcast, BtnRtWinIpBroadcast);
-
-        var sevenZip = SevenZipComponent.IsInstalled;
-
-        LabRt7z.Text = sevenZip ? "已安装" : "未安装（7z 压缩包会退回较慢的解压实现）";
-        LabRt7z.SetResourceReference(TextBlock.ForegroundProperty, sevenZip ? "Status.Success" : "Text.Tertiary");
-
-        BtnRt7z.Content = sevenZip ? "重新下载" : "下载";
-        BtnRt7z.IsEnabled = !_busy;
-    }
-
-    private void UpdateRuntimeRow(RuntimeComponent component, TextBlock status, OutlineButton button)
-    {
-        var installed = RuntimeComponents.IsInstalled(component);
-
-        status.Text = installed ? "已安装" : "未安装";
-        status.SetResourceReference(TextBlock.ForegroundProperty, installed ? "Status.Success" : "Text.Tertiary");
-
-        button.Content = installed ? "重新下载" : "下载";
-        button.IsEnabled = !_busy;
-    }
-
-    /// <summary>当前下载线路的一句话说明（与设置页的「更新线路」共用同一个选项）。</summary>
-    private static string UpdateSourceName() => SettingsStore.Current.LauncherUpdateSource switch
-    {
-        LauncherUpdateSource.Gitee => "Gitee 优先，失败换 GitHub",
-        LauncherUpdateSource.GitHub => "GitHub 优先，失败换 Gitee",
-        _ => "自动（GitHub 优先，失败换 Gitee）"
-    };
-
-    // ————— 下载 / 安装 —————
-
-    private void OnDownloadRequiredClick(object sender, RoutedEventArgs e)
-        => _ = DownloadAndInstallRequiredAsync();
-
-    /// <summary>下载单个组件（组网组件或 7-Zip）。Tag 即组件标识。</summary>
-    private async void OnRuntimeComponentDownloadClick(object sender, RoutedEventArgs e)
-    {
-        if (_busy) return;
-        if (sender is not FrameworkElement { Tag: string tag }) return;
-
-        _busy = true;
-        RefreshRequiredFilesUi();
-
-        try
-        {
-            if (string.Equals(tag, "7z", StringComparison.OrdinalIgnoreCase))
-            {
-                await RequiredFilesFlow.DownloadSevenZipAsync(OwnerWindow);
-                return;
-            }
-
-            if (Enum.TryParse<RuntimeComponent>(tag, out var component))
-                await RequiredFilesFlow.EnsureRuntimeAsync(OwnerWindow, component, confirm: false);
-        }
-        finally
-        {
-            _busy = false;
-            RefreshRequiredFilesUi();
-        }
-    }
-
-    /// <summary>
-    /// 下载樱花 Frp 引擎、全部组网组件与联机补丁；有可用实例时顺带把补丁解压到游戏根目录。
-    /// 没有实例也能下载（只下载、不安装）。
-    /// </summary>
-    private async Task DownloadAndInstallRequiredAsync()
-    {
-        if (_busy) return;
-
-        var instance = InstanceManager.Current;
-        var canInstall = instance is not null
-                         && !string.IsNullOrWhiteSpace(instance.GameDir)
-                         && Directory.Exists(instance.GameDir);
-
-        _busy = true;
-        RefreshRequiredFilesUi();
-
-        var progress = ProgressWindow.Open(OwnerWindow, "联机必要文件", "正在准备…", canCancel: true);
-
-        var issues = new List<string>();
-        var patchError = string.Empty;
-        var downloaded = false;
-
-        try
-        {
-            // 1) 樱花 Frp 引擎
-            if (!MultiplayerRequiredFiles.IsFrpcReady)
-            {
-                progress.SetDetail("正在下载樱花 Frp 引擎…");
-
-                var frpc = await MultiplayerHub.SakuraFrpc.EnsureFrpcAsync(progress.Token);
-
-                if (!frpc.Ok) issues.Add($"樱花 Frp 引擎：{frpc.Message}");
-            }
-
-            // 2) 全部组网组件（runtime 不再随包分发）
-            foreach (var component in RuntimeComponents.All)
-            {
-                if (RuntimeComponents.IsInstalled(component)) continue;
-
-                progress.SetDetail($"正在下载 {RuntimeComponents.DisplayName(component)}…");
-
-                var (ok, message) = await RuntimeComponents.EnsureAsync(component,
-                    SettingsStore.Current.LauncherUpdateSource, progress.Progress, progress.Sample, progress.Token);
-
-                if (!ok) issues.Add($"{RuntimeComponents.DisplayName(component)}：{message}");
-            }
-
-            // 3) 联机补丁：先下载（已下载会跳过）
-            progress.SetDetail("正在下载 MO 联机补丁…");
-
-            var download = await MultiplayerRequiredFiles.EnsurePatchAsync(
-                SettingsStore.Current.LauncherUpdateSource, progress.Progress, progress.Token);
-
-            downloaded = download.Success;
-
-            if (!download.Success)
-            {
-                patchError = download.Message;
-            }
-            else if (canInstall && !MultiplayerRequiredFiles.IsPatchInstalled(instance))
-            {
-                // 4) 有可用实例才解压安装
-                progress.SetDetail("正在安装联机补丁到游戏目录…");
-
-                var (ok, message) = MultiplayerRequiredFiles.InstallPatch(instance, progress.Sample, progress.Token);
-                if (!ok) patchError = message;
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            patchError = "操作已取消";
-        }
-        catch (Exception ex)
-        {
-            Log.Error("下载联机必要文件失败", ex);
-            patchError = ex.Message;
-        }
-        finally
-        {
-            progress.Finish();
-            _busy = false;
-        }
-
-        RefreshRequiredFilesUi();
-
-        var extra = issues.Count == 0 ? string.Empty : $"（未就绪：{string.Join("；", issues)}）";
-
-        if (MultiplayerRequiredFiles.IsPatchInstalled(instance))
-        {
-            ShowNotice($"联机必要文件已就绪，联机功能已启用{extra}");
-        }
-        else if (downloaded && !canInstall)
-        {
-            ShowNotice($"联机必要文件已下载。创建并选择游戏实例后，可回来点「安装联机补丁」。{extra}");
-        }
-        else
-        {
-            ShowNotice($"联机补丁未安装：{patchError}", isError: true);
-        }
-    }
-
-    /// <summary>把已下载的补丁单独解压安装（重新安装 / 之前只下载没装时用）。</summary>
-    private async void OnInstallPatchClick(object sender, RoutedEventArgs e)
-    {
-        if (_busy) return;
-
-        var instance = InstanceManager.Current;
-
-        if (instance is null)
-        {
-            ShowNotice("请先在「游戏实例」页创建并选择一个游戏实例。", isError: true);
-            return;
-        }
-
-        if (!MultiplayerRequiredFiles.HasPatch)
-        {
-            ShowNotice("还没有下载联机补丁，请先点「下载联机必要文件」。", isError: true);
-            return;
-        }
-
-        if (MultiplayerRequiredFiles.IsPatchInstalled(instance))
-        {
-            ShowNotice("联机补丁已安装，无需重复安装。");
-            return;
-        }
-
-        var answer = ChoiceWindow.Confirm(OwnerWindow, "安装联机补丁",
-            $"将把联机补丁解压到当前实例的游戏根目录：\n{instance.GameDir}",
-            confirmText: "安装", cancelText: "取消");
-
-        if (!answer) return;
-
-        _busy = true;
-        RefreshRequiredFilesUi();
-
-        var progress = ProgressWindow.Open(OwnerWindow, "安装联机补丁", "正在解压到游戏目录…", canCancel: true);
-
-        try
-        {
-            var result = await Task.Run(
-                () => MultiplayerRequiredFiles.InstallPatch(instance, progress.Sample, progress.Token), progress.Token);
-
-            ShowNotice(result.Message, !result.Ok);
-        }
-        catch (OperationCanceledException)
-        {
-            ShowNotice("安装已取消。", isError: true);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("安装联机补丁失败", ex);
-            ShowNotice($"安装失败：{ex.Message}", isError: true);
-        }
-        finally
-        {
-            progress.Finish();
-            _busy = false;
-            RefreshRequiredFilesUi();
-        }
-    }
 
     // ————— 下载目录 —————
 
@@ -407,7 +142,7 @@ public partial class PageDownload : LauncherPage
 
     private void OnManifestRefreshClick(object sender, RoutedEventArgs e) => _ = LoadManifestAsync();
 
-    /// <summary>拉取并渲染「下载页文件」。失败只在卡片里提示，不打断页面。</summary>
+    /// <summary>拉取并渲染「下载页文件」。失败只在提示条里提示，不打断页面。</summary>
     private async Task LoadManifestAsync()
     {
         if (_manifestLoading) return;
@@ -422,17 +157,19 @@ public partial class PageDownload : LauncherPage
 
             if (error is not null)
             {
-                PanManifestItems.Children.Clear();
+                _entries = [];
+                PanGroups.Children.Clear();
                 LabManifestHint.Text = $"无法获取下载列表：{error}";
                 return;
             }
 
-            BuildManifestItems(items);
+            BuildGroups(items);
         }
         catch (Exception ex)
         {
             Log.Error("获取下载列表失败", ex);
-            PanManifestItems.Children.Clear();
+            _entries = [];
+            PanGroups.Children.Clear();
             LabManifestHint.Text = $"无法获取下载列表：{ex.Message}";
         }
         finally
@@ -442,116 +179,141 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>把「下载页文件」的条目渲染成两处：可下载的逐行列出；纯官网条目收进默认收起的「运行库」分组。</summary>
-    private void BuildManifestItems(IReadOnlyList<ManifestEntry> items)
+    /// <summary>按最近一次拉到的条目重渲染分组（安装状态变了时用，不必再联网）。</summary>
+    private void RebuildGroups()
     {
-        PanManifestItems.Children.Clear();
-        PanRuntimeLinks.Children.Clear();
+        if (_entries.Count > 0) BuildGroups(_entries);
+    }
 
-        var hosted = items.Where(item => !item.IsLinkOnly).ToList();
-        var links = items.Where(item => item.IsLinkOnly).ToList();
+    /// <summary>
+    /// 把条目按各自声明的 group 分组，每组渲染成一张默认收起的卡片。
+    /// 页面不预置任何条目：加 / 改 / 删条目、调整分组或地址都只改 download.json，不必发新版本。
+    /// </summary>
+    private void BuildGroups(IReadOnlyList<ManifestEntry> items)
+    {
+        _entries = items;
 
-        LabManifestHint.Text = hosted.Count > 0
-            ? $"共 {hosted.Count} 项可下载，来自 survive 分支的 download.json。"
-            : "下载列表暂无条目：在仓库 survive 分支的 download.json 里按 "
-              + "{\"name\":\"名称\",\"url\":\"下载地址\",\"note\":\"说明（可选）\"} 添加即可。";
+        // 运行时组件（target=runtime）单独在顶部「运行环境」区块里，不参与下面的分组列表
+        var runtimeItems = items.Where(entry => entry.IsRuntimeTarget).ToList();
+        var others = items.Where(entry => !entry.IsRuntimeTarget).ToList();
 
-        foreach (var entry in hosted)
+        BuildRuntimeSection(runtimeItems);
+
+        PanGroups.Children.Clear();
+
+        if (others.Count == 0)
         {
-            PanManifestItems.Children.Add(BuildHostedRow(entry));
-        }
-
-        // 运行库这类第三方文件本启动器不托管，只列一条官网地址，收在默认收起的分组里
-        BtnToggleRuntimes.Visibility = links.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-
-        if (links.Count == 0)
-        {
-            PanRuntimeLinks.Visibility = Visibility.Collapsed;
-            BtnToggleRuntimes.Content = "展开运行库（官网下载）";
+            LabManifestHint.Text = runtimeItems.Count > 0
+                ? "没有其它可下载条目。"
+                : "下载列表暂无条目：在仓库 survive 分支的 download.json 里加一条即可"
+                  + "（{\"group\":\"分组\",\"name\":\"名称\",\"url\":\"下载地址\"}）。";
             return;
         }
 
-        BtnToggleRuntimes.Content = PanRuntimeLinks.Visibility == Visibility.Visible
-            ? $"收起运行库（官网下载，{links.Count} 项）"
-            : $"展开运行库（官网下载，{links.Count} 项）";
+        LabManifestHint.Text = $"共 {others.Count} 项，来自 survive 分支的 download.json。";
 
-        foreach (var entry in links)
+        foreach (var group in others.GroupBy(GroupNameOf))
         {
-            PanRuntimeLinks.Children.Add(BuildLinkRow(entry));
+            PanGroups.Children.Add(BuildGroupCard(group.Key, group.ToList()));
         }
     }
 
-    /// <summary>可下载条目的行：名称 + 说明 + 「打开链接」/「下载」。</summary>
-    private Grid BuildHostedRow(ManifestEntry entry)
+    /// <summary>顶部「运行环境」区块：列出运行时组件与状态，并提供「一键补全」。</summary>
+    private void BuildRuntimeSection(IReadOnlyList<ManifestEntry> runtimeItems)
     {
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, ToolTip = string.Join("\n", entry.Urls) };
+        PanRuntimeItems.Children.Clear();
 
-        var name = new TextBlock
+        if (runtimeItems.Count == 0)
         {
-            Text = entry.Name,
-            FontSize = 12,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
-        text.Children.Add(name);
-
-        if (entry.Note.Length > 0)
-        {
-            var note = new TextBlock
-            {
-                Text = entry.Note,
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 3, 0, 0)
-            };
-            note.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
-            text.Children.Add(note);
+            CardRuntime.Visibility = Visibility.Collapsed;
+            return;
         }
 
-        var open = new OutlineButton
+        CardRuntime.Visibility = Visibility.Visible;
+
+        var missing = runtimeItems.Count(entry => !IsRuntimeInstalled(entry));
+
+        LabRuntimeHint.Text = missing == 0
+            ? $"共 {runtimeItems.Count} 个运行时组件，都已就绪。"
+            : $"共 {runtimeItems.Count} 个运行时组件，还缺 {missing} 个；点「一键补全」按需下载并安装。";
+
+        BtnCompleteRuntime.Content = missing == 0 ? "全部重装" : $"一键补全（{missing}）";
+        BtnCompleteRuntime.IsEnabled = !_busy;
+
+        for (var index = 0; index < runtimeItems.Count; index++)
         {
-            Content = "打开链接",
-            Margin = new Thickness(8, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        open.Click += (_, _) => OpenManifestEntry(entry);
-
-        var download = new OutlineButton
-        {
-            Content = entry.Urls.Count > 1 ? $"下载（{entry.Urls.Count} 卷）" : "下载",
-            Tone = ButtonTone.Solid,
-            Margin = new Thickness(8, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        download.Click += async (_, _) => await DownloadManifestEntryAsync(entry);
-
-        var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        Grid.SetColumn(text, 0);
-        Grid.SetColumn(open, 1);
-        Grid.SetColumn(download, 2);
-
-        row.Children.Add(text);
-        row.Children.Add(open);
-        row.Children.Add(download);
-
-        return row;
+            var row = BuildEntryRow(runtimeItems[index]);
+            row.Margin = new Thickness(0, index == 0 ? 0 : 10, 0, 0);
+            PanRuntimeItems.Children.Add(row);
+        }
     }
 
-    /// <summary>纯官网条目的行：名称 + 说明 + 一条可点击的官网地址（点了用默认浏览器打开）。</summary>
-    private StackPanel BuildLinkRow(ManifestEntry entry)
+    /// <summary>条目属于哪一组：优先用它自己声明的 group，没写就按 target 归类。</summary>
+    private static string GroupNameOf(ManifestEntry entry)
     {
-        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        if (!string.IsNullOrWhiteSpace(entry.Group)) return entry.Group.Trim();
 
-        var name = new TextBlock
+        if (entry.IsRuntimeTarget) return "组网与运行组件";
+        if (entry.IsInstanceTarget) return "游戏补丁";
+        if (entry.IsLinkOnly) return "运行库（官网下载）";
+        if (entry.IsPluginTarget) return "插件包";
+
+        return "其它下载";
+    }
+
+    /// <summary>一组 = 一张卡片：默认收起，点一下展开；展开状态在会话内保留。</summary>
+    private SurfaceCard BuildGroupCard(string title, IReadOnlyList<ManifestEntry> entries)
+    {
+        var expanded = _expandedGroups.Contains(title);
+        var rows = new StackPanel { Visibility = expanded ? Visibility.Visible : Visibility.Collapsed };
+
+        var toggle = new OutlineButton
         {
-            Text = entry.Name,
-            FontSize = 12,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Content = GroupToggleText(title, entries.Count, expanded)
         };
+
+        toggle.Click += (_, _) =>
+        {
+            var next = rows.Visibility != Visibility.Visible;
+
+            rows.Visibility = next ? Visibility.Visible : Visibility.Collapsed;
+            toggle.Content = GroupToggleText(title, entries.Count, next);
+
+            if (next) _expandedGroups.Add(title);
+            else _expandedGroups.Remove(title);
+        };
+
+        var panel = new StackPanel();
+        panel.Children.Add(toggle);
+        panel.Children.Add(rows);
+
+        for (var index = 0; index < entries.Count; index++)
+        {
+            var row = BuildEntryRow(entries[index]);
+            row.Margin = new Thickness(0, index == 0 ? 12 : 10, 0, 0);
+            rows.Children.Add(row);
+        }
+
+        return new SurfaceCard
+        {
+            Title = title,
+            UseShadow = false,
+            HasHoverEffect = false,
+            Margin = new Thickness(0, 12, 0, 0),
+            Content = panel
+        };
+    }
+
+    private static string GroupToggleText(string title, int count, bool expanded)
+        => expanded ? $"收起「{title}」（{count} 项）" : $"展开「{title}」（{count} 项）";
+
+    /// <summary>一条目一行：名称 + 说明 + 状态（runtime 组件）+ 下载 / 打开链接。</summary>
+    private FrameworkElement BuildEntryRow(ManifestEntry entry)
+    {
+        var panel = new StackPanel { ToolTip = entry.Urls.Count > 0 ? string.Join("\n", entry.Urls) : null };
+
+        var name = new TextBlock { Text = entry.Name, FontSize = 12.5, TextWrapping = TextWrapping.Wrap };
         name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
         panel.Children.Add(name);
 
@@ -568,44 +330,89 @@ public partial class PageDownload : LauncherPage
             panel.Children.Add(note);
         }
 
-        var link = new TextBlock
+        // 纯官网条目：不托管文件，只给一条可点击的官网地址
+        if (entry.IsLinkOnly)
         {
-            Text = entry.Homepage,
-            FontSize = 11.5,
-            Margin = new Thickness(0, 4, 0, 0),
-            Cursor = Cursors.Hand,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            ToolTip = "点击用浏览器打开官网"
-        };
-        link.SetResourceReference(TextBlock.ForegroundProperty, "Accent.Base");
-        link.MouseLeftButtonUp += (_, _) => OpenManifestEntry(entry);
-        panel.Children.Add(link);
+            var link = new TextBlock
+            {
+                Text = entry.Homepage,
+                FontSize = 11.5,
+                Margin = new Thickness(0, 4, 0, 0),
+                Cursor = Cursors.Hand,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = "点击用浏览器打开官网"
+            };
+            link.SetResourceReference(TextBlock.ForegroundProperty, "Accent.Base");
+            link.MouseLeftButtonUp += (_, _) => OpenManifestEntry(entry);
+            panel.Children.Add(link);
+
+            return panel;
+        }
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+
+        if (entry.IsRuntimeTarget)
+        {
+            var installed = IsRuntimeInstalled(entry);
+
+            var status = new TextBlock
+            {
+                Text = installed ? "已安装" : "未安装",
+                FontSize = 11.5,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            status.SetResourceReference(TextBlock.ForegroundProperty, installed ? "Status.Success" : "Text.Tertiary");
+
+            actions.Children.Add(status);
+        }
+
+        actions.Children.Add(BuildDownloadButton(entry));
+
+        if (entry.Urls.Count > 0)
+        {
+            var open = new OutlineButton
+            {
+                Content = "打开链接",
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            open.Click += (_, _) => OpenManifestEntry(entry);
+            actions.Children.Add(open);
+        }
+
+        panel.Children.Add(actions);
 
         return panel;
     }
 
-    /// <summary>展开 / 收起「组网与运行组件」列表（默认收起）。</summary>
-    private void OnToggleRuntimeClick(object sender, RoutedEventArgs e)
+    /// <summary>下载按钮：runtime 组件已装过时显示「重新下载」。</summary>
+    private OutlineButton BuildDownloadButton(ManifestEntry entry)
     {
-        var expanded = PanRuntimeRows.Visibility != Visibility.Visible;
+        var installed = entry.IsRuntimeTarget && IsRuntimeInstalled(entry);
 
-        PanRuntimeRows.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        BtnToggleRuntime.Content = expanded ? "收起组件列表" : "展开组件列表";
+        var button = new OutlineButton
+        {
+            Content = entry.Urls.Count > 1 ? $"下载（{entry.Urls.Count} 卷）" : installed ? "重新下载" : "下载",
+            Tone = ButtonTone.Solid,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        button.Click += async (_, _) => await DownloadManifestEntryAsync(entry);
+        return button;
     }
 
-    /// <summary>展开 / 收起「运行库（官网下载）」（默认收起）。</summary>
-    private void OnToggleRuntimesClick(object sender, RoutedEventArgs e)
+    /// <summary>runtime 类条目的安装目录：exe 旁 runtime\&lt;folder&gt;\。</summary>
+    private static string RuntimeInstallDirectory(ManifestEntry entry)
+        => Path.Combine(RuntimeLocator.RuntimeRoot, entry.Folder.Trim());
+
+    /// <summary>runtime 类条目装没装：看 marker 文件在不在。</summary>
+    private static bool IsRuntimeInstalled(ManifestEntry entry)
     {
-        var expanded = PanRuntimeLinks.Visibility != Visibility.Visible;
+        if (string.IsNullOrWhiteSpace(entry.Folder) || string.IsNullOrWhiteSpace(entry.Marker)) return false;
 
-        PanRuntimeLinks.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-
-        var count = PanRuntimeLinks.Children.Count;
-        var suffix = count > 0 ? $"，{count} 项" : string.Empty;
-
-        BtnToggleRuntimes.Content = expanded
-            ? $"收起运行库（官网下载{suffix}）"
-            : $"展开运行库（官网下载{suffix}）";
+        try { return File.Exists(Path.Combine(RuntimeInstallDirectory(entry), entry.Marker.Trim())); }
+        catch { return false; }
     }
 
     private void OpenManifestEntry(ManifestEntry entry)
@@ -620,14 +427,35 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>下载「下载页文件」里的条目到选定的下载目录；多分卷会按顺序合并成一个文件。</summary>
+    /// <summary>下载条目。按条目声明的去向分流：实例安装 / runtime 解压 / 插件包 / 下载目录。</summary>
     private async Task DownloadManifestEntryAsync(ManifestEntry entry)
     {
         if (_busy) return;
 
+        // 纯官网条目没有下载按钮，不该走到这里
+        if (entry.IsLinkOnly || entry.Urls.Count == 0) return;
+
+        // 「黑屏补丁」这类条目：下载后让用户选实例、装到其游戏目录并打开包内 exe
+        if (entry.IsInstanceTarget)
+        {
+            await DownloadAndInstallToInstanceAsync(entry);
+            return;
+        }
+
+        // 组网组件这类：解压到 exe 旁 runtime\<folder>\
+        if (entry.IsRuntimeTarget)
+        {
+            await DownloadRuntimeEntryAsync(entry);
+            return;
+        }
+
         _busy = true;
 
-        var directory = DownloadTargetDirectory();
+        // 「插件」类条目直接存进插件包目录，可在「包管理 → 插件」里安装
+        var directory = entry.IsPluginTarget
+            ? PackageTypes.DirectoryOf(PackageType.Plugin)
+            : DownloadTargetDirectory();
+
         var target = Path.Combine(directory, ManifestFileName(entry));
         var total = entry.Urls.Count;
         var progress = ProgressWindow.Open(OwnerWindow, "下载", $"正在下载 {entry.Name}…", canCancel: true);
@@ -641,7 +469,7 @@ public partial class PageDownload : LauncherPage
                 var single = await ResumableDownloader.DownloadAsync(
                     entry.PrimaryUrl, target, progress.Progress, progress.Token);
 
-                if (single.Success) ShowNotice($"已下载：{single.FilePath}");
+                if (single.Success) ShowNotice(DescribeManifestDownload(entry, single.FilePath ?? target));
                 else ShowNotice($"下载失败：{single.Message}", isError: true);
 
                 return;
@@ -684,7 +512,9 @@ public partial class PageDownload : LauncherPage
                 catch { /* 清不掉也无妨 */ }
             }
 
-            ShowNotice($"已下载并合并 {total} 个分卷：{target}");
+            ShowNotice(entry.IsPluginTarget
+                ? $"已放进插件包：{target}（{total} 个分卷已合并，可在「包管理 → 插件」里安装）"
+                : $"已下载并合并 {total} 个分卷：{target}");
         }
         catch (Exception ex)
         {
@@ -695,6 +525,317 @@ public partial class PageDownload : LauncherPage
         {
             progress.Finish();
             _busy = false;
+        }
+    }
+
+    /// <summary>下载并解压一个 runtime 组件到 exe 旁的 runtime\&lt;folder&gt;\，按 marker 复核是否装好。</summary>
+    private async Task DownloadRuntimeEntryAsync(ManifestEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.Folder) || string.IsNullOrWhiteSpace(entry.Marker))
+        {
+            ShowNotice($"{entry.Name} 的配置不完整（缺 folder 或 marker），无法自动安装。", isError: true);
+            return;
+        }
+
+        if (entry.Urls.Count > 1)
+        {
+            ShowNotice($"{entry.Name} 是多分卷条目，暂不支持自动安装，请点「打开链接」手动下载。", isError: true);
+            return;
+        }
+
+        _busy = true;
+        RebuildGroups();
+
+        var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
+        var progress = ProgressWindow.Open(OwnerWindow, "下载组件", $"正在下载 {entry.Name}…", canCancel: true);
+
+        try
+        {
+            var download = await ResumableDownloader.DownloadAsync(
+                entry.PrimaryUrl, archive, progress.Progress, progress.Token);
+
+            if (!download.Success)
+            {
+                ShowNotice($"下载失败：{download.Message}", isError: true);
+                return;
+            }
+
+            progress.SetDetail($"正在解压到 runtime\\{entry.Folder}\\…");
+
+            var directory = RuntimeInstallDirectory(entry);
+
+            var (ok, message) = await Task.Run(
+                () => RequiredAssetDownloader.ExtractInto(archive, directory, progress.Sample, progress.Token),
+                progress.Token);
+
+            if (!ok)
+            {
+                ShowNotice($"安装失败：{message}", isError: true);
+                return;
+            }
+
+            if (!IsRuntimeInstalled(entry))
+            {
+                ShowNotice($"{entry.Name} 解压完成，但没找到标志文件 {entry.Marker}，请确认压缩包内容。", isError: true);
+                return;
+            }
+
+            // 7-Zip 组件的定位结果有缓存，装完要让下一次查找重新找
+            if (string.Equals(entry.Folder.Trim(), "7zip", StringComparison.OrdinalIgnoreCase))
+                SevenZipTool.ResetCache();
+
+            ShowNotice($"{entry.Name} 已安装到 runtime\\{entry.Folder}\\。");
+        }
+        catch (OperationCanceledException)
+        {
+            ShowNotice("下载已取消。", isError: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"安装组件失败：{entry.Name}", ex);
+            ShowNotice($"安装失败：{ex.Message}", isError: true);
+        }
+        finally
+        {
+            progress.Finish();
+            _busy = false;
+            RebuildGroups();
+
+            try { if (File.Exists(archive)) File.Delete(archive); }
+            catch { /* 清不掉也无妨 */ }
+        }
+    }
+
+    private void OnCompleteRuntimeClick(object sender, RoutedEventArgs e) => _ = CompleteRuntimeAsync();
+
+    /// <summary>
+    /// 一键补全：把当前缺的运行时组件逐个下载并解压到 runtime\&lt;folder&gt;\，已装的跳过。
+    /// 组件清单与地址都由 download.json 决定，这里只照单执行。
+    /// </summary>
+    private async Task CompleteRuntimeAsync()
+    {
+        if (_busy) return;
+
+        var runtimeItems = _entries.Where(entry => entry.IsRuntimeTarget).ToList();
+        var pending = runtimeItems.Where(entry => !IsRuntimeInstalled(entry)).ToList();
+
+        if (pending.Count == 0)
+        {
+            ShowNotice("运行时组件都已就绪，无需补全。");
+            return;
+        }
+
+        _busy = true;
+        RebuildGroups();
+
+        var issues = new List<string>();
+        var installed = 0;
+        var progress = ProgressWindow.Open(OwnerWindow, "一键补全运行环境", "正在准备…", canCancel: true);
+
+        try
+        {
+            for (var index = 0; index < pending.Count; index++)
+            {
+                var entry = pending[index];
+
+                if (string.IsNullOrWhiteSpace(entry.Folder) || string.IsNullOrWhiteSpace(entry.Marker))
+                {
+                    issues.Add($"{entry.Name}：缺 folder 或 marker");
+                    continue;
+                }
+
+                if (entry.Urls.Count > 1)
+                {
+                    issues.Add($"{entry.Name}：多分卷条目暂不支持自动安装");
+                    continue;
+                }
+
+                progress.SetDetail($"正在下载 {entry.Name}（{index + 1}/{pending.Count}）…");
+
+                var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
+
+                var download = await ResumableDownloader.DownloadAsync(
+                    entry.PrimaryUrl, archive, progress.Progress, progress.Token);
+
+                if (!download.Success)
+                {
+                    issues.Add($"{entry.Name}：{download.Message}");
+                    continue;
+                }
+
+                progress.SetDetail($"正在解压 {entry.Name}…");
+
+                var (ok, message) = await Task.Run(
+                    () => RequiredAssetDownloader.ExtractInto(archive, RuntimeInstallDirectory(entry), progress.Sample, progress.Token),
+                    progress.Token);
+
+                try { if (File.Exists(archive)) File.Delete(archive); }
+                catch { /* 清不掉也无妨 */ }
+
+                if (!ok) { issues.Add($"{entry.Name}：{message}"); continue; }
+
+                if (!IsRuntimeInstalled(entry))
+                {
+                    issues.Add($"{entry.Name}：解压完成但没找到 {entry.Marker}");
+                    continue;
+                }
+
+                installed++;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            ShowNotice($"补全已取消（已完成 {installed} 个）。", isError: true);
+            return;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("一键补全运行环境失败", ex);
+            ShowNotice($"补全失败：{ex.Message}", isError: true);
+            return;
+        }
+        finally
+        {
+            progress.Finish();
+            _busy = false;
+            RebuildGroups();
+        }
+
+        // 7-Zip 组件的定位结果有缓存，补全后让下一次查找重新找
+        SevenZipTool.ResetCache();
+
+        if (issues.Count == 0) ShowNotice($"运行环境已补全（{installed} 个组件）。");
+        else ShowNotice($"补全完成：成功 {installed} 个，失败 {issues.Count} 个 —— {string.Join("；", issues)}", isError: true);
+    }
+
+    /// <summary>下载成功后的提示：进插件包的条目说明它能在「包管理 → 插件」里安装。</summary>
+    private static string DescribeManifestDownload(ManifestEntry entry, string path)
+        => entry.IsPluginTarget
+            ? $"已放进插件包：{path}（可在「包管理 → 插件」里安装）"
+            : $"已下载：{path}";
+
+    /// <summary>
+    /// 「黑屏补丁」这类条目：下载到缓存，让用户选一个游戏实例，把压缩包解压到它的游戏根目录，
+    /// 装完自动打开包内的 exe（如 cnc-ddraw 自带的 cnc-ddraw config.exe）。
+    /// </summary>
+    private async Task DownloadAndInstallToInstanceAsync(ManifestEntry entry)
+    {
+        var instances = InstanceStore.All;
+
+        if (instances.Count == 0)
+        {
+            ShowNotice("还没有游戏实例：请先在「游戏实例」页创建实例，再回来安装。", isError: true);
+            return;
+        }
+
+        if (entry.Urls.Count > 1)
+        {
+            ShowNotice($"{entry.Name} 是多分卷条目，暂不支持直接安装，请点「打开链接」手动下载。", isError: true);
+            return;
+        }
+
+        var items = instances
+            .Select(instance => new PickItem(instance.Id, instance.Name,
+                string.IsNullOrWhiteSpace(instance.GameDir) ? "（未设置游戏目录）" : instance.GameDir))
+            .ToList();
+
+        var picked = PickWindow.Pick(OwnerWindow, entry.Name, "选择要安装到哪个游戏实例：", items, PickMode.Single);
+
+        if (picked is null || picked.Count == 0) return;
+
+        var target = instances.FirstOrDefault(instance =>
+            string.Equals(instance.Id, picked[0], StringComparison.OrdinalIgnoreCase));
+
+        if (target is null) return;
+
+        if (string.IsNullOrWhiteSpace(target.GameDir) || !Directory.Exists(target.GameDir))
+        {
+            ShowNotice($"实例「{target.Name}」的游戏目录不可用：{target.GameDir}", isError: true);
+            return;
+        }
+
+        _busy = true;
+        RebuildGroups();
+
+        var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
+        var progress = ProgressWindow.Open(OwnerWindow, "安装到实例", $"正在下载 {entry.Name}…", canCancel: true);
+
+        try
+        {
+            var download = await ResumableDownloader.DownloadAsync(
+                entry.PrimaryUrl, archive, progress.Progress, progress.Token);
+
+            if (!download.Success)
+            {
+                ShowNotice($"下载失败：{download.Message}", isError: true);
+                return;
+            }
+
+            progress.SetDetail($"正在解压到「{target.Name}」的游戏目录…");
+
+            var (ok, message) = await Task.Run(
+                () => RequiredAssetDownloader.ExtractInto(archive, target.GameDir, progress.Sample, progress.Token),
+                progress.Token);
+
+            if (!ok)
+            {
+                ShowNotice($"安装失败：{message}", isError: true);
+                return;
+            }
+
+            ShowNotice($"{entry.Name} 已安装到「{target.Name}」，正在打开它自带的程序。");
+
+            LaunchArchiveExe(archive, target.GameDir);
+        }
+        catch (OperationCanceledException)
+        {
+            ShowNotice("安装已取消。", isError: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"安装到实例失败：{entry.Name}", ex);
+            ShowNotice($"安装失败：{ex.Message}", isError: true);
+        }
+        finally
+        {
+            progress.Finish();
+            _busy = false;
+            RebuildGroups();
+
+            try { if (File.Exists(archive)) File.Delete(archive); }
+            catch { /* 清不掉也无妨 */ }
+        }
+    }
+
+    /// <summary>装完打开压缩包里的 exe（补丁自带的程序，如 cnc-ddraw config.exe）。</summary>
+    private static void LaunchArchiveExe(string archivePath, string gameDirectory)
+    {
+        try
+        {
+            var relative = ArchiveExtractor.ListEntries(archivePath, maxCount: 1000)
+                .FirstOrDefault(name => name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+            if (relative is null) return;
+
+            var path = Path.Combine(gameDirectory, relative.Replace('/', Path.DirectorySeparatorChar));
+
+            if (!File.Exists(path))
+            {
+                Log.Warn($"补丁内的 exe 没找到：{path}");
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo(path)
+            {
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(path) ?? gameDirectory
+            });
+
+            Log.Info($"已打开补丁内的程序：{path}");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"打开补丁内的 exe 失败：{ex.Message}");
         }
     }
 

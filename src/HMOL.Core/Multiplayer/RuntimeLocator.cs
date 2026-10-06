@@ -22,7 +22,7 @@ namespace HMOL.Core.Multiplayer;
 public static class RuntimeLocator
 {
     /// <summary>runtime 目录整体缺失时给用户看的中文原因。</summary>
-    public const string MissingRuntimeMessage = "缺少组网组件，请到「联机 → 联机补丁」页下载";
+    public const string MissingRuntimeMessage = "缺少组网组件，请到左侧「下载」页下载";
 
     private static readonly string Root = ResolveBaseDirectory();
 

@@ -34,7 +34,7 @@ public enum RuntimeComponent
 /// </summary>
 public static class RuntimeComponents
 {
-    /// <summary>下载物存放目录（与联机补丁同一个文件夹，但不进包列表）。</summary>
+    /// <summary>下载物存放目录（按需下载的组件都先落这里，但不进包列表）。</summary>
     public static string DownloadDirectory => Path.Combine(Paths.Data, "MultiplayerRequired");
 
     /// <summary>全部组件（固定顺序，界面按这个顺序展示）。</summary>

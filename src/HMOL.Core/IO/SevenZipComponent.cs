@@ -10,7 +10,7 @@ namespace HMOL.Core.IO;
 /// 7-Zip 命令行组件（<c>runtime\7zip\7za.exe</c>）的下载与安装。
 ///
 /// <para>
-/// 它不属于联机补丁，是启动器自己的解压依赖：首次打开启动器时提示下载，
+/// 它是启动器自己的解压依赖：首次打开启动器时提示下载，
 /// 放回 exe 旁的 <c>runtime\7zip\</c>，与 <see cref="SevenZipTool"/> 的定位规则一致。
 /// 组件缺失时 7z 会退回 SharpCompress 慢速实现（zip / tar / gz 不受影响），所以下载可以跳过。
 /// </para>

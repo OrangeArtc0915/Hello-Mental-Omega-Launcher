@@ -128,7 +128,7 @@ public sealed class MultiplayerSettings
     public bool UseSakuraFrp { get; set; }
 
     /// <summary>
-    /// 是否已经提示过「第一次进联机页要下载联机必要文件」。只弹一次，之后靠联机页上的状态卡片引导。
+    /// 是否已经提示过「第一次进联机页要下载组网组件」。只弹一次，之后靠联机页上的提示条引导。
     /// </summary>
     public bool RequiredFilesPrompted { get; set; }
 }
