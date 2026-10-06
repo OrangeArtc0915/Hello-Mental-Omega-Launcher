@@ -67,8 +67,8 @@ foreach ($d in @($p1, $p2, $work)) {
     New-Item -ItemType Directory -Force -Path $d | Out-Null
 }
 
-# 组一个包里要带的文档清单（README / 许可 / 安装说明）
-$Docs = @('README.md', 'LICENSE', 'LICENSE-CnCNet-Client.md', '构建说明.md')
+# 组一个包里要带的文档清单（README / 许可 / 第三方组件 / 安装说明）
+$Docs = @('README.md', 'NOTICE.md', 'LICENSE', 'LICENSE-CnCNet-Client.md', '构建说明.md')
 
 # ------------------------------------------------------------------
 # 1) 编译 net48 版 IL 补丁工具（用户在没装 .NET 的机器上也能跑）
@@ -77,6 +77,9 @@ Write-Host '[1/6] 编译 IL 补丁工具（net48）...'
 if (!(Test-Path $DnlibNet45)) {
     throw ('找不到 dnlib 的 net45 目标: ' + $DnlibNet45 + '  （NuGet 缓存里应该有 net35/net45/net6.0/netstandard2.0）')
 }
+# dnlib 是 MIT：要求"版权声明和许可文本随所有副本一起提供"。
+# 除了写进 NOTICE.md，这里再把许可原文放到 dnlib.dll 旁边，做到"紧挨着二进制"。
+$DnlibLicense = Join-Path (Split-Path $DnlibNet45 -Parent) '..\..\LICENSE.txt'
 $toolsOut = Join-Path $OutDir '_tools48'
 New-Item -ItemType Directory -Force -Path $toolsOut | Out-Null
 $ca = @($Csc, '-noconfig', '-nostdlib+', '-target:exe', "-out:$toolsOut\dnlibpatch.exe",
@@ -86,6 +89,8 @@ $ca = @($Csc, '-noconfig', '-nostdlib+', '-target:exe', "-out:$toolsOut\dnlibpat
 & $DotNet @ca
 if ($LASTEXITCODE -ne 0) { throw '编译 IL 补丁工具失败' }
 Copy-Item $DnlibNet45 (Join-Path $toolsOut 'dnlib.dll') -Force
+if (Test-Path $DnlibLicense) { Copy-Item $DnlibLicense (Join-Path $toolsOut 'LICENSE-dnlib.txt') -Force }
+else { Write-Host '  注意：没找到 dnlib 的 LICENSE.txt，包里只会有 NOTICE.md 里的那份（内容相同）' }
 
 # ------------------------------------------------------------------
 # 2) 编译中继 MoLanRelay.dll
@@ -132,6 +137,8 @@ function Copy-Common([string]$Pkg) {
     $t = New-Item -ItemType Directory -Force -Path (Join-Path $Pkg 'tools')
     Copy-Item (Join-Path $toolsOut 'dnlibpatch.exe') $t -Force
     Copy-Item (Join-Path $toolsOut 'dnlib.dll')      $t -Force
+    # dnlib 的 MIT 许可原文，紧挨着 dnlib.dll 放一份
+    if (Test-Path (Join-Path $toolsOut 'LICENSE-dnlib.txt')) { Copy-Item (Join-Path $toolsOut 'LICENSE-dnlib.txt') $t -Force }
     Copy-Item (Join-Path $RootDir '脚本\就地安装.ps1') (Join-Path $t 'install.ps1') -Force
     Copy-Item (Join-Path $RootDir '脚本\就地还原.ps1') (Join-Path $t 'restore.ps1') -Force
     foreach ($f in $Docs) {

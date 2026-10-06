@@ -1,5 +1,5 @@
 ================================================================
- Mental Omega 补丁 2／联机（局域网修复 + 樱花 Frp 直连）
+ Mental Omega 补丁 2／联机（局域网修复 + 樱花 Frp 直连）（非官方，与 MO 开发组无关）
  适用版本：MO 客户端 2.6.10.3（Resources\clientdx.exe 那一套）
 ================================================================
 
@@ -12,8 +12,10 @@
    https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/tree/patch
  许可与归属说明见包里的 README.md / LICENSE / LICENSE-CnCNet-Client.md。
 
- 本包不含任何 exe/dll 成品 —— 被改的文件由包里的工具在你自己的机器上就地打补丁，
- 原文件会先自动备份，不会破坏你的客户端。
+ 本包不含任何 MO / CnCNet 客户端的 exe/dll 成品 —— 被改的文件由包里的工具
+ 在你自己的机器上就地打补丁，原文件会先自动备份，不会破坏你的客户端。
+ （包里出现的 exe/dll 只有本补丁自己的工具，以及 MIT 许可、可自由再分发的
+   dnlib.dll；第三方组件明细见包里的 NOTICE.md。）
 
 
 【这个包修什么】

@@ -45,6 +45,24 @@ function Find-GameRoot([string]$start) {
 
 Head ('MO 补丁 ' + $PatchSet + ' · 就地安装')
 
+# GPL-3.0 §5(a)：改别人的程序，必须给出**显著**的修改声明（改了哪个文件 + 日期）。
+# 这里在安装前先把声明打出来，用户不一定去看 README。
+Say ''
+Say '本补丁根据开源的 CnCNet 客户端（XNA CnCNet Client）修改而来，完全遵照其开源许可协议'
+Say '（GNU GPL-3.0-or-later）发布。'
+Say '本项目与 Mental Omega（MO）开发组、MO 客户端官方没有任何关联，不是官方补丁。'
+Say '源码（patch 分支）: https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/tree/patch'
+Say '许可与第三方组件: 见本包 README.md / NOTICE.md / LICENSE / LICENSE-CnCNet-Client.md'
+Say ''
+Say '修改日期: 2026-10-06'
+Say '将被修改的文件（都在 <游戏根>\Resources\ 下，改动前会自动备份）:'
+if ($PatchSet -eq '2') {
+    Say '  clientdx.exe / clientogl.exe / clientxna.exe'
+} else {
+    Say '  Binaries\Windows\MonoGame.Framework.dll'
+}
+Say ''
+
 Say ('工具目录: ' + $ToolsDir)
 
 $root = Find-GameRoot $GameRoot
