@@ -41,7 +41,7 @@ namespace MoLanRelay
         public const string Tag = "MO-RELAY";
         // 每次改动都改这个号：日志开头的 "MoLanRelay vX" 就是它。
         // 三台机器版本不一致会导致"有的能收不能发"这类诡异现象，先看这个号。
-        public const string Version = "2026-10-04.4";
+        public const string Version = "2026-10-06.3";
         const int MaxPeers = 8;
 
         class Peer
@@ -172,9 +172,17 @@ namespace MoLanRelay
                 try { BroadcastKickNotice(lobby, name); }
                 catch (Exception ex) { Log("kick: 通知广播失败（不影响踢出）: " + ex.Message); }
 
-                // 关连接 —— 后面所有善后都是现成机制
-                try { lp.TcpClient.Close(); }
-                catch (Exception ex) { Log("kick: 关闭 '" + name + "' 的连接失败: " + ex.Message); }
+                // 断开连接 —— 后面所有善后都是现成机制。
+                //
+                // 注意：这里绝对不能用 TcpClient.Close()！
+                // Close() 会把 socket 置为"已释放"，但这个玩家对象此刻**还在 Players 列表里**，
+                // 紧接着的任何大厅广播都会走到
+                //     LANGameLobby.BroadcastPlayerOptions → LANPlayerInfo.IPAddress → Socket.RemoteEndPoint
+                // 碰到已释放的 socket 就抛 ObjectDisposedException，直接把客户端搞崩。
+                // Shutdown 只做"优雅断开"（对端读到 EOF 会退回大厅、房主侧的断开逻辑会把它
+                // 从玩家列表移除并释放），socket 对象在此期间仍然可用。
+                try { lp.TcpClient.Client.Shutdown(SocketShutdown.Both); }
+                catch (Exception ex) { Log("kick: 断开 '" + name + "' 的连接失败: " + ex.Message); }
             }
             catch (Exception ex) { Log("kick error: " + ex.Message); }
         }
@@ -262,6 +270,10 @@ namespace MoLanRelay
             if (cachedMyName != null) return cachedMyName;
 
             string found = "";
+            string src = "";
+
+            // 1) ClientCore.ProgramConstants.PLAYERNAME —— 局域网握手用的就是它，
+            //    但主菜单赋值之前它还是默认值 "No name"，必须剔除，否则 @ 永远匹配不上。
             try
             {
                 Type t = Type.GetType("ClientCore.ProgramConstants, ClientCore");
@@ -275,14 +287,98 @@ namespace MoLanRelay
                 }
                 if (t != null)
                 {
-                    PropertyInfo p = t.GetProperty("PLAYERNAME", BindingFlags.Public | BindingFlags.Static);
-                    if (p != null) found = Clean(p.GetValue(null, null) as string);
+                    PropertyInfo p = t.GetProperty("PLAYERNAME", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    if (p != null)
+                    {
+                        string v = Clean(p.GetValue(null, null) as string);
+                        if (v.Length > 0 && !v.Equals("No name", StringComparison.OrdinalIgnoreCase))
+                        {
+                            found = v;
+                            src = "ProgramConstants.PLAYERNAME";
+                        }
+                    }
                 }
             }
             catch { }
 
-            if (found.Length > 0) { cachedMyName = found; return found; }
-            if (!warnedNoName) { warnedNoName = true; Log("拿不到自己的玩家名 —— 语音/截图里【跳过自己那份】的判断可能失效"); }
+            // 2) 兜底：读设置文件里的 [MultiPlayer] Handle（局域网里的显示名同源）
+            if (found.Length == 0)
+            {
+                try
+                {
+                    string v = ReadHandleFromSettings();
+                    if (v.Length > 0) { found = v; src = "设置文件 [MultiPlayer] Handle"; }
+                }
+                catch { }
+            }
+
+            if (found.Length > 0)
+            {
+                cachedMyName = found;
+                Log("@：自己的名字 = '" + found + "'（来源：" + src + "）");
+                return found;
+            }
+            if (!warnedNoName)
+            {
+                warnedNoName = true;
+                Log("@：拿不到自己的玩家名，@功能不会生效。"
+                  + "（大厅里你显示成什么名字，就把设置文件 [MultiPlayer] Handle 填成什么）");
+            }
+            return "";
+        }
+
+        /// <summary>兜底：从设置 ini 的 [MultiPlayer] Handle 读取自己的名字。
+        /// 纯文本逐行解析，避免依赖 INI 库的具体 API。</summary>
+        static string ReadHandleFromSettings()
+        {
+            string gamePath = SafeGetGamePath();
+            if (gamePath.Length == 0) return "";
+
+            string[] candidates = new string[] { "RA2MO.ini", "Settings.ini" };
+            foreach (string n in candidates)
+            {
+                try
+                {
+                    string f = Path.Combine(gamePath, n);
+                    if (!File.Exists(f)) continue;
+
+                    bool inMp = false;
+                    foreach (string raw in File.ReadAllLines(f))
+                    {
+                        string line = raw.Trim();
+                        if (line.Length == 0 || line[0] == ';') continue;
+                        if (line[0] == '[')
+                        {
+                            inMp = line.Equals("[MultiPlayer]", StringComparison.OrdinalIgnoreCase);
+                            continue;
+                        }
+                        if (!inMp) continue;
+
+                        int eq = line.IndexOf('=');
+                        if (eq <= 0) continue;
+                        if (line.Substring(0, eq).Trim().Equals("Handle", StringComparison.OrdinalIgnoreCase))
+                            return Clean(line.Substring(eq + 1));
+                    }
+                }
+                catch { }
+            }
+            return "";
+        }
+
+        /// <summary>取 ClientCore.ProgramConstants.GamePath（游戏根目录）。</summary>
+        static string SafeGetGamePath()
+        {
+            try
+            {
+                foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type t = a.GetType("ClientCore.ProgramConstants");
+                    if (t == null) continue;
+                    FieldInfo f = t.GetField("GamePath", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    if (f != null) return Clean(f.GetValue(null) as string);
+                }
+            }
+            catch { }
             return "";
         }
 
@@ -306,32 +402,139 @@ namespace MoLanRelay
             {
                 if (text == null) return original;
                 string me = MyPlayerName();
-                if (me.Length == 0) return original;
-                if (text.IndexOf("@" + me, StringComparison.OrdinalIgnoreCase) < 0) return original;
+                bool hasAt = text.IndexOf('@') >= 0;
 
-                if (!loggedMention)
+                if (me.Length == 0)
                 {
-                    loggedMention = true;
-                    Log("@：收到 @ 我的消息（'@" + me + "'），已高亮并放提示音");
+                    if (hasAt) Log("@：收到含 @ 的消息，但拿不到自己的名字 → 无法判断（消息：" + text + "）");
+                    return original;
                 }
-                PlayMessageSound(lobby);
-                return (object)new Microsoft.Xna.Framework.Color(255, 226, 90);   // 金色
+
+                if (text.IndexOf("@" + me, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    // 只在消息里真的有 @ 时记一条，避免刷屏
+                    if (hasAt) Log("@：消息含 @ 但不匹配我（我='" + me + "'，消息：" + text + "）");
+                    return original;
+                }
+
+                Log("@：命中！我='" + me + "'，消息：" + text + " → 高亮 + 提示音");
+                PlayMessageSound();
+                // 用青色而不是金色：局域网默认色号 5 就是 Goldenrod，金色高亮跟它几乎一样，
+                // 看上去就像"@没反应"。青色不在那 15 个色号里，一眼能认出来。
+                return (object)new Microsoft.Xna.Framework.Color(0, 255, 255);
             }
             catch (Exception ex) { Log("mention error: " + ex.Message); }
             return original;
         }
 
-        /// <summary>尽力而为：用大厅自带的"新消息"音效（MultiplayerGameLobby::sndMessageSound）。</summary>
-        static void PlayMessageSound(object lobby)
+        /// <summary>由 Player_HandleChatCommand 的补丁调用（插在 ChatMessage 构造之前）。
+        /// 消息正文 @ 到我时，在本机显示的这份文本最前面加一个"[@你]"标记。
+        /// 只改本机显示的字符串，发出去的内容一个字节都不动 —— 对端没装补丁也照样能收。
+        ///
+        /// 为什么光改颜色不够：局域网聊天默认色号是 5 = Goldenrod(218,165,32)，
+        /// 和"金色高亮"肉眼几乎分不出来，看起来就像"@没反应"。</summary>
+        public static string MentionText(string text, object lobby)
         {
             try
             {
-                object snd = GetMember(lobby, "sndMessageSound");
-                if (snd == null) return;
-                MethodInfo pm = snd.GetType().GetMethod("Play", Type.EmptyTypes);
-                if (pm != null) pm.Invoke(snd, null);
+                if (string.IsNullOrEmpty(text)) return text;
+                if (text.StartsWith("[@", StringComparison.Ordinal)) return text;   // 已经加过，别重复
+                string me = MyPlayerName();
+                if (me.Length == 0) return text;
+                if (text.IndexOf("@" + me, StringComparison.OrdinalIgnoreCase) < 0) return text;
+                Log("@：给消息正文加了 [@你] 标记 → " + text);
+                return "[@你] " + text;
             }
-            catch { }
+            catch { return text; }
+        }
+
+        // ------------------------------------------------------------------
+        // @ 提示音（自己生成的，不用客户端音效、不依赖系统声音方案、无版权问题）
+        //
+        // 做法：内存里现生成一段 16bit/22kHz 单声道的"叮—咚"（880Hz 0.09s → 1318Hz 0.16s，
+        //       头尾各 3ms 淡入淡出免爆音），包成 WAV 交给 System.Media.SoundPlayer 异步播。
+        //
+        // 为什么不用别的：
+        //   · 客户端音效（sndMessageSound / message.wav）——用户明确要求不要用；
+        //   · SystemSounds.*  ——跟随用户的声音方案，方案设成"无声"时就真的没声；
+        //   · Console.Beep    ——同步阻塞，且很多机器上根本不出声。
+        // 自己生成最可控：音量固定、时长固定、任何机器都一样。
+        // ------------------------------------------------------------------
+
+        static byte[] mentionWav;                    // 生成的 WAV（留静态引用，防止被 GC）
+        static System.Media.SoundPlayer mentionPlayer;
+        static DateTime lastMentionSound = DateTime.MinValue;
+
+        static void PlayMessageSound()
+        {
+            try
+            {
+                if ((DateTime.Now - lastMentionSound).TotalMilliseconds < 250) return;   // 防刷屏
+                lastMentionSound = DateTime.Now;
+
+                if (mentionPlayer == null)
+                {
+                    mentionWav = BuildMentionWav();
+                    mentionPlayer = new System.Media.SoundPlayer(new MemoryStream(mentionWav));
+                    mentionPlayer.Load();
+                    Log("提示音: 已生成自制提示音（" + mentionWav.Length + " 字节）");
+                }
+                mentionPlayer.Play();
+            }
+            catch (Exception ex) { Log("提示音出错: " + ex.Message); }
+        }
+
+        /// <summary>现搓一个提示音 WAV：880Hz 0.09s + 1318Hz 0.16s，头尾各 3ms 淡入淡出。</summary>
+        static byte[] BuildMentionWav()
+        {
+            const int rate = 22050;
+            const int amp = 9000;                    // 峰值，别太吵
+            const double fade = 0.003;
+            int n1 = (int)(rate * 0.09);
+            int n2 = (int)(rate * 0.16);
+            short[] pcm = new short[n1 + n2];
+
+            Tone(pcm, 0, n1, 880.0, rate, amp, fade);
+            Tone(pcm, n1, n2, 1318.5, rate, amp, fade);
+
+            using (MemoryStream ms = new MemoryStream())
+            {
+                BinaryWriter w = new BinaryWriter(ms);
+                int dataBytes = pcm.Length * 2;
+                w.Write(Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + dataBytes);
+                w.Write(Encoding.ASCII.GetBytes("WAVE"));
+                w.Write(Encoding.ASCII.GetBytes("fmt "));
+                w.Write(16);                          // fmt 块长度
+                w.Write((short)1);                    // PCM
+                w.Write((short)1);                    // 单声道
+                w.Write(rate);
+                w.Write(rate * 2);                    // 字节率 = 采样率 × 声道 × 位深/8
+                w.Write((short)2);                    // 块对齐
+                w.Write((short)16);                   // 位深
+                w.Write(Encoding.ASCII.GetBytes("data"));
+                w.Write(dataBytes);
+                foreach (short s in pcm) w.Write(s);
+                w.Flush();
+                return ms.ToArray();
+            }
+        }
+
+        /// <summary>往 buf 的 [offset, offset+count) 写一段正弦音，头尾 fade 秒内做淡入淡出。</summary>
+        static void Tone(short[] buf, int offset, int count, double freq, int rate, int amp, double fade)
+        {
+            int fadeN = (int)(fade * rate);
+            for (int i = 0; i < count; i++)
+            {
+                double env = 1.0;
+                if (fadeN > 0)
+                {
+                    if (i < fadeN) env = (double)i / fadeN;
+                    int tail = count - 1 - i;
+                    if (tail < fadeN) env = Math.Min(env, (double)tail / fadeN);
+                }
+                buf[offset + i] = (short)(Math.Sin(2.0 * Math.PI * freq * i / rate) * env * amp);
+            }
         }
 
         // ------------------------------------------------------------------
@@ -407,11 +610,134 @@ namespace MoLanRelay
             return message != null && message.StartsWith(CtrlTag + CtrlSep, StringComparison.Ordinal);
         }
 
+        // ------------------------------------------------------------------
+        // 聊天框 Tab 补全（局域网大厅）
+        //
+        // 这套客户端本来就**没有** @ 补全：聊天框只挂了 EnterPressed，
+        // Tab(9) 在 XNATextBox::Keyboard_OnKeyPressed 的 switch 里直接落到 ret，什么都不做。
+        //
+        // 这里不去改 Rampastring.XNAUI.dll（它是公共库，动它影响面太大），
+        // 改成在 LANGameLobby::Update 每帧轮询 VK_TAB，并且要求
+        // 「聊天框正被选中 + 光标处正在写 @名字」两个条件同时成立才动手，
+        // 所以其它控件用 Tab 完全不受影响。
+        // ------------------------------------------------------------------
+
+        const int VK_TAB = 0x09;
+        static bool tabKeyWasDown;
+
+        static void TabTick(object lobby, bool front)
+        {
+            bool down = front && KeyDown(VK_TAB);
+            if (down && !tabKeyWasDown) TryCompleteMention(lobby);
+            tabKeyWasDown = down;
+        }
+
+        static void TryCompleteMention(object lobby)
+        {
+            object tb = GetMember(lobby, "tbChatInput");
+            if (tb == null) return;
+
+            // 只有聊天框处于"被选中"状态才响应（否则 Tab 是别的控件在用）
+            object wm = GetMember(tb, "WindowManager");
+            object sel = wm == null ? null : GetMember(wm, "SelectedControl");
+            if (sel == null || !object.ReferenceEquals(sel, tb)) return;
+
+            string text = GetMember(tb, "Text") as string;
+            if (string.IsNullOrEmpty(text)) return;
+
+            int at = text.LastIndexOf('@');
+            if (at < 0) return;
+
+            // @ 前面必须是行首或空白，避免把邮箱地址之类的东西当成 @
+            if (at > 0 && !char.IsWhiteSpace(text[at - 1])) return;
+
+            string partial = text.Substring(at + 1);
+            if (partial.IndexOf(' ') >= 0) return;      // @ 后面已经有空格 → 名字打完了，不用补
+
+            List<string> names = CollectNames(lobby, partial);
+            if (names.Count == 0)
+            {
+                Log("@补全：没有匹配 '" + partial + "' 的玩家");
+                return;
+            }
+
+            string pick = names[0];
+            string newText = text.Substring(0, at + 1) + pick;
+
+            SetMember(tb, "Text", newText);
+            SetMember(tb, "InputPosition", newText.Length);
+            SetMember(tb, "TextEndPosition", newText.Length);
+
+            Log("@补全：'" + partial + "' → '" + pick + "'（候选：" + string.Join("/", names.ToArray()) + "）");
+        }
+
+        /// <summary>按前缀收集候选名字：大厅玩家表 + 自己（局域网里自己不一定在表里）。</summary>
+        static List<string> CollectNames(object lobby, string prefix)
+        {
+            List<string> found = new List<string>();
+
+            IList ps = GetMember(lobby, "Players") as IList;
+            if (ps != null)
+            {
+                foreach (object p in ps)
+                {
+                    string n = Clean(GetMember(p, "Name") as string);
+                    if (n.Length == 0) continue;
+                    if (prefix.Length > 0 && n.IndexOf(prefix, StringComparison.OrdinalIgnoreCase) != 0) continue;
+                    if (!HasName(found, n)) found.Add(n);
+                }
+            }
+
+            string me = MyPlayerName();
+            if (me.Length > 0
+                && (prefix.Length == 0 || me.IndexOf(prefix, StringComparison.OrdinalIgnoreCase) == 0)
+                && !HasName(found, me))
+                found.Add(me);
+
+            return found;
+        }
+
+        static bool HasName(List<string> list, string name)
+        {
+            foreach (string s in list) if (SameName(s, name)) return true;
+            return false;
+        }
+
+        /// <summary>反射写字段或属性（含基类）。只用于聊天框这种我们已经核对过的控件。</summary>
+        static void SetMember(object o, string name, object value)
+        {
+            if (o == null) return;
+            Type t = o.GetType();
+            while (t != null)
+            {
+                FieldInfo f = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (f != null) { f.SetValue(o, value); return; }
+                PropertyInfo p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (p != null && p.CanWrite) { p.SetValue(o, value, null); return; }
+                t = t.BaseType;
+            }
+        }
+
+        /// <summary>
+        /// 「回到加新功能之前」总开关。
+        /// false = 关闭 @功能、截图、语音、踢人、F4~F8 快捷键、中继版本自检（这些都需要 exe 侧对应的 IL 补丁配合）。
+        /// 改回 true 即可恢复；注意 exe 侧也要用带对应模式的流水线重新打补丁。
+        /// 中继本身的收发/转发不受此开关影响。
+        /// </summary>
+        internal static readonly bool FeaturesEnabled = false;
+
         /// <summary>由 LANGameLobby::Update 的补丁每帧调用 —— 热键轮询 / 版本自检 / 语音。</summary>
         public static void Tick(object lobby, object gameTime)
         {
             bool front = false;
             try { front = OursInFront(); } catch { }
+
+            // Tab 补全：本轮新加的功能，不受 FeaturesEnabled 总开关影响
+            // （那个开关管的是"回到加新功能之前"那批：截图/语音/F5/F6/版本自检）
+            try { TabTick(lobby, front); }
+            catch (Exception ex) { Log("tab tick error: " + ex.Message); }
+
+            if (!FeaturesEnabled) return;
 
             // F6：把剪贴板内容当聊天发出去（分享 IP:端口 用）
             try
@@ -1542,9 +1868,27 @@ namespace MoLanRelay
         // 否则 "register host client" 这行永远看不到，就无法判断客机有没有拿到房主连接。
         static readonly List<string> pendingLog = new List<string>();
 
+        /// <summary>logPath 还没设置时，用游戏根目录兜底一个日志路径。</summary>
+        static void ResolveFallbackLogPath()
+        {
+            if (!string.IsNullOrEmpty(logPath)) return;
+            string gp = SafeGetGamePath();
+            if (gp.Length == 0) return;
+            logPath = Path.Combine(gp, "MoLanRelay.log");
+            Log("== 大厅阶段日志（尚未开局；路径由 GamePath 兜底）==");
+        }
+
         static void Log(string line)
         {
             string stamp = DateTime.Now.ToString("HH:mm:ss.fff") + " [MoLanRelay] " + line;
+
+            // 大厅阶段 Relay.Start 还没跑（logPath 为空），但诊断最需要这时的日志
+            // （@功能、踢人都在大厅里发生）。用 GamePath 兜底算一个路径，直接写盘。
+            if (string.IsNullOrEmpty(logPath))
+            {
+                try { ResolveFallbackLogPath(); } catch { }
+            }
+
             if (string.IsNullOrEmpty(logPath))
             {
                 lock (pendingLog) { if (pendingLog.Count < 500) pendingLog.Add(stamp); }

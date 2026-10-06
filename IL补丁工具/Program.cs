@@ -1353,8 +1353,84 @@ class Program
                 Console.WriteLine("  Player_HandleChatCommand: 已挂 @ 高亮 + 提示音（7 条）");
             }
 
+            // (b) 正文标记：在 `newobj ChatMessage(string, Color, DateTime, string)` 之前插入
+            //     Relay.MentionText(正文, this) —— 栈上此刻已经是 [..., DateTime, 正文]，
+            //     所以只要再压一个 this 当参数，返回值直接替换掉那个正文。
+            //     加到正文最前面的是"[@你] "，对端发过来的原串不动。
+            var relayAsmMT = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeMT = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmMT);
+            var mentionTextCall = new MemberRefUser(mod, "MentionText",
+                MethodSig.CreateStatic(mod.CorLibTypes.String, mod.CorLibTypes.String, mod.CorLibTypes.Object), relayTypeMT);
+
+            bool doneMT = false;
+            foreach (var i in mins)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "MentionText" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneMT = true; break; }
+            }
+            if (doneMT) Console.WriteLine("  正文标记: 已改过，跳过");
+            else
+            {
+                Instruction ctorMT = null;
+                for (int i = 0; i < mins.Count; i++)
+                {
+                    var im = mins[i].Operand as IMethod;
+                    if (im != null && im.Name == ".ctor" && im.DeclaringType != null
+                        && (string)im.DeclaringType.Name == "ChatMessage"
+                        && im.MethodSig != null && im.MethodSig.Params.Count == 4)
+                    { ctorMT = mins[i]; break; }
+                }
+                if (ctorMT == null) Console.WriteLine("  SKIP: 找不到 ChatMessage 的 4 参数构造");
+                else
+                {
+                    int ciMT = mins.IndexOf(ctorMT);
+                    mins.Insert(ciMT, Instruction.Create(OpCodes.Ldarg_0));              // this（大厅）
+                    mins.Insert(ciMT + 1, Instruction.Create(OpCodes.Call, mentionTextCall));
+                    if (phc.Body.MaxStack < 16) phc.Body.MaxStack = 16;
+                    Console.WriteLine("  正文标记: 已挂 [@你]（2 条）");
+                }
+            }
+
             Console.WriteLine("--- 栈自检 ---");
             CheckStack(phc);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // tab：聊天框 Tab 补全（局域网大厅）
+        //   LANGameLobby::Update 开头插 Relay.Tick(this, gameTime)，
+        //   中继里每帧轮询 VK_TAB，只在「聊天框被选中 + 正在写 @名字」时才补全。
+        //   （shot 模式里对 Update 有同一处插入，两边都做了"已插过就跳过"的检测。）
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "tab")
+        {
+            var lglT = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglT == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+            var updT = lglT.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (updT == null || !updT.HasBody) { Console.WriteLine("SKIP: 找不到 LANGameLobby::Update"); return 0; }
+
+            bool doneT = false;
+            foreach (var i in updT.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "Tick" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneT = true; break; }
+            }
+            if (doneT) Console.WriteLine("  Update: 已改过，跳过");
+            else
+            {
+                var relayAsmT = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeT = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmT);
+                var tickCallT = new MemberRefUser(mod, "Tick",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Object), relayTypeT);
+                var uinsT = updT.Body.Instructions;
+                uinsT.Insert(0, Instruction.Create(OpCodes.Call, tickCallT));
+                uinsT.Insert(0, Instruction.Create(OpCodes.Ldarg_1));
+                uinsT.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                if (updT.Body.MaxStack < 8) updT.Body.MaxStack = 8;
+                Console.WriteLine("  Update: 已挂 Relay.Tick（Tab 补全轮询）");
+            }
+            CheckStack(updT);
         }
 
         // ──────────────────────────────────────────────────────────────

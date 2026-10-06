@@ -1,19 +1,38 @@
 ================================================================
  Mental Omega 补丁 1／中文输入
- 适用版本：MO 客户端 2.6.10.3（Resources\clientxna.exe 那一套）
+ 适用版本：MO 客户端 2.6.10.3（Resources\clientdx.exe 那一套）
 ================================================================
+
+ 本补丁根据开源的 CnCNet 客户端修改而来，完全遵照其开源许可协议
+ （GNU GPL-3.0-or-later）发布。
+ 本项目与 Mental Omega（MO）开发组、MO 客户端官方没有任何关联，
+ 不是官方补丁，未获得其授权、认可或支持。
+
+ 源码（patch 分支）：
+   https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/tree/patch
+ 许可与归属说明见包里的 README.md / LICENSE / LICENSE-CnCNet-Client.md。
+
 
 【这个包修什么】
  1. 客户端打不了中文（只能 Ctrl+V 粘贴，键盘敲不进去）
  2. 候选框位置跑偏 —— 现在会贴着你正在打字的那个输入框（不是鼠标位置）
  3. 打「你好」发出去变成「你好你好」（重复上屏）
 
+ 本包不含任何 exe/dll —— 被改的文件由包里的工具在你自己的机器上就地打补丁，
+ 原文件会先自动备份，不会破坏你的客户端。
+
 
 【怎么安装】
  1. 先把客户端和游戏完全关掉（任务管理器确认 clientdx.exe 已消失）。
- 2. 把本压缩包里的 "Resources" 文件夹，直接覆盖到游戏根目录
-    （含 MentalOmegaClient.exe 的那个目录），提示时选「替换全部文件」。
- 3. "原版备份" 和本说明放着别删。
+ 2. 把本压缩包解压到任意位置。
+ 3. 双击包里的「安装.bat」，按提示走完。
+    它会自动找游戏根目录（含 MentalOmegaClient.exe 的那层）；
+    找不到就把游戏根目录文件夹拖进窗口再回车。
+ 4. 想回到原版：双击「还原.bat」。
+
+ 安装时会自动把你机器上的原文件备份到：
+      <游戏根目录>\_MO补丁备份\
+ 这个备份只在你本机，请不要连同补丁包一起发给别人。
 
 
 【改了哪个文件】
@@ -34,6 +53,7 @@
     · 本包：MonoGame.Framework.dll
     · 联机包：clientdx.exe / clientogl.exe / clientxna.exe + MoLanRelay.dll
  可以只装一个，也可以两个都装（两个都装就是原来的全量包）。
+ 两个包的备份都放在同一个 _MO补丁备份\ 里，互不影响。
 
 
 【怎么确认生效】
@@ -43,15 +63,10 @@
     · 发「你好」只出现一次
 
 
-【怎么还原】
- 把 原版备份\Resources\Binaries\Windows\MonoGame.Framework.dll
- 覆盖回 游戏根目录\Resources\Binaries\Windows\ 即可。
-
-
 【注意事项】
  · 本包只作用于 Resources\Binaries\Windows\ 这一套二进制，也就是
    clientdx.exe（MO 默认渲染器）用的那套。
    如果你在客户端选项里换成了 OpenGL / XNA 渲染器，加载的是另外一套 MonoGame
    （里面根本没有 WinFormsGameForm 这个窗口类），本包的改法对它不适用。
- · 如果客户端自带的更新器之后把 Resources 里的文件重新下载覆盖了，
-   重新把本包覆盖一次即可。
+ · 安装脚本会检查客户端/游戏是否在运行；在运行会直接拒绝，不会写坏文件。
+ · 中途任何一步失败，脚本会自动回滚到打补丁之前的样子。
