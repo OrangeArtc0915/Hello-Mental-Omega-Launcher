@@ -47,7 +47,7 @@ if ([string]::IsNullOrEmpty($NotesDir))    { $NotesDir    = Join-Path $root '说
 if ([string]::IsNullOrEmpty($OutDir))      { $OutDir      = Join-Path $root '..\..\_build' }
 
 $ExeNames    = @('clientdx.exe', 'clientogl.exe', 'clientxna.exe')
-$PatchModes  = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix')
+$PatchModes  = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'mention', 'shot')
 
 $p1   = Join-Path $OutDir '补丁1-中文输入'
 $p2   = Join-Path $OutDir '补丁2-联机'
@@ -77,6 +77,7 @@ function Invoke-Patch([string]$In, [string]$Out, [string]$Mode) {
 Write-Host '[2/5] 编译中继 MoLanRelay.dll ...'
 $relayDll = Join-Path $work 'MoLanRelay.dll'
 $refs = @((Join-Path $FxDir 'mscorlib.dll'), (Join-Path $FxDir 'System.dll'), (Join-Path $FxDir 'System.Core.dll'),
+          (Join-Path $FxDir 'System.Drawing.dll'), (Join-Path $FxDir 'System.Windows.Forms.dll'),
           (Join-Path $OriginalExeDir 'clientxna.exe'))
 $refs += (Get-ChildItem (Join-Path $RelayRefDir '*.dll') | ForEach-Object { $_.FullName })
 $ca = @($Csc, '-noconfig', '-nostdlib+', '-target:library', "-out:$relayDll", '-platform:anycpu', '-optimize+', '-deterministic+')

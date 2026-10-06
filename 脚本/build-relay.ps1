@@ -36,6 +36,8 @@ $refs = @(
     (Join-Path $FxDir 'mscorlib.dll'),
     (Join-Path $FxDir 'System.dll'),
     (Join-Path $FxDir 'System.Core.dll'),
+    (Join-Path $FxDir 'System.Drawing.dll'),
+    (Join-Path $FxDir 'System.Windows.Forms.dll'),
     $RefExe
 )
 $refs += (Get-ChildItem (Join-Path $RefExtra '*.dll') | ForEach-Object { $_.FullName })

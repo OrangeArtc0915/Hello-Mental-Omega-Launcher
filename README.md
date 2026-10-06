@@ -10,7 +10,7 @@
 | 补丁包 | 目标文件 | 工具模式 |
 |---|---|---|
 | **补丁1-中文输入** | `Resources\Binaries\Windows\MonoGame.Framework.dll` | `ime` |
-| **补丁2-联机** | `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` | `lanip` → `relay` → `relaysend` → `relayhost` → `lobbyfix` |
+| **补丁2-联机** | `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` | `lanip` → `relay` → `relaysend` → `relayhost` → `lobbyfix` → `kick` → `mention` → `shot` |
 | **补丁2-联机** | `Resources\MoLanRelay.dll` + `Resources\Binaries\MoLanRelay.dll` | 由 `中继\MoLanRelay.cs` 编译 |
 
 两组文件**完全不重叠**，所以两个包可以独立安装，也可以都装。
@@ -120,6 +120,7 @@ _build\补丁2-联机\...              以及  MO-补丁2-联机.zip
         │  ④ dnlibpatch <in> <out> relayhost   LANGameLobby / LANGameLoadingLobby 的 SetUp 注册 client；
         │                                      SendMessageToHost 改走 Relay.SendClientLocked
         │  ⑤ dnlibpatch <in> <out> lobbyfix    HandleFileHashCommand 补判空（修上游 NRE 崩溃）
+        │  ⑥ dnlibpatch <in> <out> kick        GameLobbyBase::KickPlayer 换成中继实现（局域网踢人生效）
         ▼
       clientdx.exe / clientogl.exe / clientxna.exe   ← 三个都与线上部署文件 SHA256 完全一致
 ```
@@ -166,6 +167,9 @@ dnlibpatch <in> <out> <mode>
 | `relaysend` | **补丁2 ③**：`LANPlayerInfo::SendMessage` → `Relay.SendLocked` |
 | `relayhost` | **补丁2 ④**：两个大厅类的 `SetUp` 注册 client，`SendMessageToHost` → `Relay.SendClientLocked` |
 | `lobbyfix` | **补丁2 ⑤**：`LANGameLobby::HandleFileHashCommand` 补判空（修上游漏判空导致的崩溃） |
+| `kick` | **补丁2 ⑥**：`GameLobbyBase::KickPlayer` → `Relay.KickPlayer`（局域网踢人生效；在线大厅有自己的重写，不受影响） |
+| `mention` | **补丁2 ⑦**：`LANGameLobby::Player_HandleChatCommand` 里挂 `Relay.MentionColor`（@ 我 → 金色 + 提示音） |
+| `shot` | **补丁2 ⑧**：`LANGameLobby::Update` 挂 `Relay.Tick`（F8 截图 / F7 按住语音，都在这里轮询）；两个消息入口挂 `MO-CTRL` 识别（截图与语音共用这条通道） |
 | `patch` / `xna` | 早期方案，最终未使用（见 5.1 的说明） |
 | `checkstack` | 全模块栈自检 |
 | `types` / `methods` / `refs` / `dumpm` / `pinvokes` | 只读的探查工具，用来定位类型/方法/指令/引用/P-Invoke |

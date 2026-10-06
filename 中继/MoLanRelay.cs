@@ -20,11 +20,16 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Windows.Forms;
 using DTAClient.Domain.Multiplayer.LAN;
 
 namespace MoLanRelay
@@ -108,6 +113,687 @@ namespace MoLanRelay
         {
             try { return typeof(Relay).Assembly.Location; }
             catch { return "?"; }
+        }
+
+        // ------------------------------------------------------------------
+        // 局域网踢人
+        //
+        // 背景：大厅里每个玩家格子那个"名字下拉框"选中第 2 项会调
+        //       GameLobbyBase::KickPlayer(int) —— 在线大厅重写了它（发 IRC 踢人消息），
+        //       局域网大厅没有重写，走的是基类的空实现，所以"点了没反应"。
+        //       我们只把基类的空实现换掉 → 只影响局域网，在线大厅有自己的重写、不受影响。
+        //
+        // 做法：直接关掉那个玩家的连接。
+        //       · 对方：读连接失败 → 自动退回局域网大厅
+        //       · 房主：触发已有的 ConnectionLost → 清理 + 移除玩家 + 广播玩家列表
+        //       也就是说"踢出去"之后的一系列善后全部复用现有机制，不用自己写。
+        // ------------------------------------------------------------------
+
+        /// <summary>由 GameLobbyBase::KickPlayer(int) 的补丁调用。lobby = 大厅实例。</summary>
+        public static void KickPlayer(object lobby, int index)
+        {
+            try
+            {
+                if (lobby == null) return;
+                if (index < 0) return;
+
+                IList players = GetMember(lobby, "Players") as IList;
+                if (players == null)
+                {
+                    Log("kick: 拿不到 Players，放弃");
+                    return;
+                }
+                if (index >= players.Count)
+                {
+                    Log("kick: 下标 " + index + " 越界（玩家数 " + players.Count + "）");
+                    return;
+                }
+
+                LANPlayerInfo lp = players[index] as LANPlayerInfo;
+                if (lp == null) { Log("kick: 第 " + index + " 个不是局域网玩家（可能是 AI），忽略"); return; }
+
+                string name = Clean(lp.Name);
+                if (name.Length == 0) { Log("kick: 第 " + index + " 个还没有名字，忽略"); return; }
+
+                // 只能踢"有连接"的玩家 —— 房主侧才成立；客机侧这些 TcpClient 都是 null，
+                // 所以客机那边点了也什么都不会发生（本来也只有房主能点）。
+                if (lp.TcpClient == null) { Log("kick: '" + name + "' 没有连接（自己不是房主？），忽略"); return; }
+
+                string me = MyPlayerName();
+                if (me.Length > 0 && SameName(name, me))
+                {
+                    Log("kick: 不能踢自己，忽略");
+                    return;
+                }
+
+                Log("kick: 踢出玩家 '" + name + "'（下标 " + index + "）");
+
+                // 先尽力通知（失败不影响踢人本身）
+                try { BroadcastKickNotice(lobby, name); }
+                catch (Exception ex) { Log("kick: 通知广播失败（不影响踢出）: " + ex.Message); }
+
+                // 关连接 —— 后面所有善后都是现成机制
+                try { lp.TcpClient.Close(); }
+                catch (Exception ex) { Log("kick: 关闭 '" + name + "' 的连接失败: " + ex.Message); }
+            }
+            catch (Exception ex) { Log("kick error: " + ex.Message); }
+        }
+
+        /// <summary>尽力而为：给大家发一条"xx 已被主机踢出"的系统消息 + 房主自己弹一条提示。</summary>
+        static void BroadcastKickNotice(object lobby, string name)
+        {
+            string text = name + " 已被主机踢出房间";
+
+            // 1) 广播给所有客机（聊天区）
+            try
+            {
+                MethodInfo bm = FindMethod(lobby.GetType(), "BroadcastMessage", 1);
+                if (bm != null && bm.GetParameters()[0].ParameterType == typeof(string))
+                    bm.Invoke(lobby, new object[] { "GLCHAT System\u00010\u0001" + text });
+            }
+            catch { }
+
+            // 2) 房主自己也弹一条
+            try
+            {
+                MethodInfo am = FindMethod(lobby.GetType(), "AddNotice", 2);
+                if (am != null)
+                {
+                    object color = MakeColor();
+                    if (color != null) am.Invoke(lobby, new object[] { text, color });
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>在类型及其基类里找一个名字匹配、参数个数匹配的方法。</summary>
+        static MethodInfo FindMethod(Type t, string name, int paramCount)
+        {
+            while (t != null)
+            {
+                foreach (MethodInfo m in t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                    if (m.Name == name && m.GetParameters().Length == paramCount) return m;
+                t = t.BaseType;
+            }
+            return null;
+        }
+
+        /// <summary>反射读字段或属性（含基类）。</summary>
+        static object GetMember(object o, string name)
+        {
+            if (o == null) return null;
+            Type t = o.GetType();
+            while (t != null)
+            {
+                FieldInfo f = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (f != null) return f.GetValue(o);
+                PropertyInfo p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (p != null) return p.GetValue(o, null);
+                t = t.BaseType;
+            }
+            return null;
+        }
+
+        /// <summary>拿 Microsoft.Xna.Framework.Color.Red（拿不到就返回 null）。</summary>
+        static object MakeColor()
+        {
+            try
+            {
+                foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type ct = a.GetType("Microsoft.Xna.Framework.Color");
+                    if (ct == null) continue;
+                    PropertyInfo p = ct.GetProperty("Red", BindingFlags.Public | BindingFlags.Static);
+                    if (p != null) return p.GetValue(null, null);
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>自己的玩家名：优先用中继已知的，其次去 ClientCore.ProgramConstants.PLAYERNAME 取。</summary>
+        static string MyPlayerName()
+        {
+            if (!string.IsNullOrEmpty(selfName)) return selfName;
+            try
+            {
+                foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type t = a.GetType("ClientCore.ProgramConstants");
+                    if (t == null) continue;
+                    PropertyInfo p = t.GetProperty("PLAYERNAME", BindingFlags.Public | BindingFlags.Static);
+                    if (p != null)
+                    {
+                        string v = Clean(p.GetValue(null, null) as string);
+                        if (v.Length > 0) return v;
+                    }
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        // ------------------------------------------------------------------
+        // @功能（局域网大厅聊天）
+        //
+        // 挂在大厅聊天渲染的路上：LANGameLobby::Player_HandleChatCommand 里，
+        // 颜色算完之后插一次调用 —— 消息里含 "@我的名字" 就用高亮色 + 放提示音。
+        // 房主自己的发言也会走这里（经过自连接绕回来），所以两边行为一致。
+        // ------------------------------------------------------------------
+
+        static bool loggedMention;
+
+        /// <summary>由 Player_HandleChatCommand 的补丁调用。
+        /// 注意：参数/返回值故意用 object（装箱的 Color），避免 DLL 与 exe 之间
+        /// 对 MonoGame 的 Color 类型产生跨程序集签名依赖 —— 那种依赖一旦版本对不齐，
+        /// 会在第一次聊天（方法 JIT 时）直接抛 MissingMethodException 崩掉。</summary>
+        public static object MentionColor(object original, object lobby, string text)
+        {
+            try
+            {
+                if (text == null) return original;
+                string me = MyPlayerName();
+                if (me.Length == 0) return original;
+                if (text.IndexOf("@" + me, StringComparison.OrdinalIgnoreCase) < 0) return original;
+
+                if (!loggedMention)
+                {
+                    loggedMention = true;
+                    Log("@：收到 @ 我的消息（'@" + me + "'），已高亮并放提示音");
+                }
+                PlayMessageSound(lobby);
+                return (object)new Microsoft.Xna.Framework.Color(255, 226, 90);   // 金色
+            }
+            catch (Exception ex) { Log("mention error: " + ex.Message); }
+            return original;
+        }
+
+        /// <summary>尽力而为：用大厅自带的"新消息"音效（MultiplayerGameLobby::sndMessageSound）。</summary>
+        static void PlayMessageSound(object lobby)
+        {
+            try
+            {
+                object snd = GetMember(lobby, "sndMessageSound");
+                if (snd == null) return;
+                MethodInfo pm = snd.GetType().GetMethod("Play", Type.EmptyTypes);
+                if (pm != null) pm.Invoke(snd, null);
+            }
+            catch { }
+        }
+
+        // ------------------------------------------------------------------
+        // 截图 / 控制帧（局域网大厅）
+        //
+        // 帧格式（和大厅既有消息共用那条 TCP，\u0002 收尾）：
+        //     MO-CTRL \u0001 <kind> \u0001 <from> \u0001 <base64 payload>
+        // 目前 kind = SHOT（截图）。
+        //
+        // 流程：谁按热键谁发 → 客机发给房主 → 房主本地显示 + 原样广播给所有人。
+        //       帧里带着发送者名字，所以发送者自己收到时会跳过，不会重复弹。
+        // ------------------------------------------------------------------
+
+        public const string CtrlTag = "MO-CTRL";
+        const string CtrlSep = "\u0001";
+
+        /// <summary>日志/控制帧用的热键：在局域网大厅里按 F8 截图。</summary>
+        static readonly Microsoft.Xna.Framework.Input.Keys ShotKey = Microsoft.Xna.Framework.Input.Keys.F8;
+        static bool shotKeyWasDown;
+
+        public static bool IsCtrlMessage(string message)
+        {
+            return message != null && message.StartsWith(CtrlTag + CtrlSep, StringComparison.Ordinal);
+        }
+
+        /// <summary>由 LANGameLobby::Update 的补丁每帧调用 —— 轮询热键/语音。</summary>
+        public static void Tick(object lobby, object gameTime)
+        {
+            try
+            {
+                bool down = false;
+                try { down = Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(ShotKey); }
+                catch { }
+                if (down && !shotKeyWasDown)
+                {
+                    try { CaptureAndSend(lobby); }
+                    catch (Exception ex) { Log("shot: 截图失败: " + ex.Message); }
+                }
+                shotKeyWasDown = down;
+            }
+            catch { }
+
+            try { VoiceTick(lobby); }
+            catch (Exception ex) { Log("voice tick error: " + ex.Message); }
+        }
+
+        /// <summary>由 HandleClientMessage / HandleMessageFromServer 的补丁调用。</summary>
+        public static void OnCtrl(object lobby, string message)
+        {
+            try
+            {
+                string[] parts = message.Split('\u0001');
+                if (parts.Length < 4) return;
+                string kind = parts[1];
+                string from = Clean(parts[2]);
+
+                // base64 从第 4 段开始（base64 不含 \u0001，这里再切一次保险）
+                int idx = message.IndexOf('\u0001', CtrlTag.Length + CtrlSep.Length + kind.Length + 1 + parts[2].Length + 1);
+                string b64 = idx >= 0 ? message.Substring(idx + 1) : parts[3];
+
+                bool mine = from.Length > 0 && SameName(from, MyPlayerName());
+
+                if (kind == "SHOT")
+                {
+                    byte[] data;
+                    try { data = Convert.FromBase64String(b64); } catch { return; }
+                    if (!mine)
+                    {
+                        Log("shot: 收到 " + (from.Length == 0 ? "?" : from) + " 的截图（" + data.Length + " 字节），显示中");
+                        ShowShot(from, data);
+                    }
+                }
+                else if (kind == "VOICE")
+                {
+                    if (!mine) QueueVoicePlayback(b64);
+                }
+                else return;
+
+                // 房主负责转发给"其他人"（不回发给发送者，语音帧没必要浪费带宽）
+                if (IsHostOf(lobby)) ForwardToOthers(lobby, from, message);
+            }
+            catch (Exception ex) { Log("ctrl error: " + ex.Message); }
+        }
+
+        /// <summary>房主：把控制帧发给除 from 之外的所有人。</summary>
+        static void ForwardToOthers(object lobby, string from, string message)
+        {
+            try
+            {
+                IList players = GetMember(lobby, "Players") as IList;
+                if (players == null) return;
+                foreach (object o in players)
+                {
+                    LANPlayerInfo lp = o as LANPlayerInfo;
+                    if (lp == null) continue;
+                    string n = Clean(lp.Name);
+                    if (n.Length == 0) continue;
+                    if (from.Length > 0 && SameName(n, from)) continue;   // 不回发给发送者
+                    if (lp.TcpClient == null) continue;                   // 没连接的跳过
+                    SendLocked(lp, message);
+                }
+            }
+            catch (Exception ex) { Log("ctrl 转发失败: " + ex.Message); }
+        }
+
+        static bool IsHostOf(object lobby)
+        {
+            try
+            {
+                object v = GetMember(lobby, "IsHost");
+                if (v is bool) return (bool)v;
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>截当前客户端窗口 → 缩小 → 发出去。</summary>
+        static void CaptureAndSend(object lobby)
+        {
+            byte[] png = CaptureWindow();
+            if (png == null || png.Length == 0) { Log("shot: 没截到图"); return; }
+
+            string me = MyPlayerName();
+            string frame = CtrlTag + CtrlSep + "SHOT" + CtrlSep + Clean(me) + CtrlSep + Convert.ToBase64String(png);
+            Log("shot: 截图 " + png.Length + " 字节（发送者 " + (me.Length == 0 ? "?" : me) + "）");
+
+            try
+            {
+                if (IsHostOf(lobby))
+                {
+                    // 广播给所有人（自己那份由 OnCtrl 的 mine 判断跳过）
+                    MethodInfo bm = FindMethod(lobby.GetType(), "BroadcastMessage", 1);
+                    if (bm != null) bm.Invoke(lobby, new object[] { frame });
+                }
+                else
+                {
+                    MethodInfo sm = FindMethod(lobby.GetType(), "SendMessageToHost", 1);
+                    if (sm != null) sm.Invoke(lobby, new object[] { frame });
+                }
+            }
+            catch (Exception ex) { Log("shot: 发送失败: " + ex.Message); }
+        }
+
+        // ==================================================================
+        // 语音聊天（按住 F7 说话，仅局域网大厅）
+        //
+        // 刻意不用 winmm 的回调（CALLBACK_NULL + 只轮询）：
+        //   · 回调要往 native 传托管委托，写错就是访问违例 —— try/catch 兜不住，直接崩客户端
+        //   · 轮询版本只在 Tick（UI 线程）里读 WAVEHDR 的 dwFlags，逻辑完全可预期
+        //
+        // 格式：8kHz / 16bit / 单声道 PCM，每帧 100ms（1600 字节，base64 后约 2.1KB）
+        //       —— 局域网带宽压力很小（约 16KB/s）。要省流量以后可以换 μ-law。
+        // ==================================================================
+
+        const int VoiceRate = 8000;
+        const int VoiceFrameMs = 100;
+        const int VoiceFrameBytes = VoiceRate * 2 * VoiceFrameMs / 1000;   // 1600
+        const int MicBufCount = 4;
+        const int SpkBufCount = 8;
+
+        static readonly Microsoft.Xna.Framework.Input.Keys PttKey = Microsoft.Xna.Framework.Input.Keys.F7;
+        static bool pttWasDown;
+
+        static bool voiceInitTried, voiceOk, voiceBroken;
+        static IntPtr hWaveIn = IntPtr.Zero, hWaveOut = IntPtr.Zero;
+        static IntPtr[] micHdrs, spkHdrs;
+        static IntPtr[] micBufs, spkBufs;
+        static bool[] spkInUse;
+        static readonly Queue<byte[]> voicePlayQueue = new Queue<byte[]>();
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        struct WAVEFORMATEX
+        {
+            public short wFormatTag, nChannels;
+            public int nSamplesPerSec, nAvgBytesPerSec;
+            public short nBlockAlign, wBitsPerSample, cbSize;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct WAVEHDR
+        {
+            public IntPtr lpData;
+            public int dwBufferLength;
+            public int dwBytesRecorded;
+            public IntPtr dwUser;
+            public int dwFlags;
+            public int dwLoops;
+            public IntPtr lpNext;
+            public IntPtr reserved;
+        }
+
+        const int WAVE_MAPPER = -1;
+        const int CALLBACK_NULL = 0;
+        const int WAVE_FORMAT_PCM = 1;
+        const int WHDR_DONE = 1;
+
+        [DllImport("winmm.dll")] static extern int waveInOpen(out IntPtr h, int dev, ref WAVEFORMATEX fmt, IntPtr cb, IntPtr inst, int flags);
+        [DllImport("winmm.dll")] static extern int waveInPrepareHeader(IntPtr h, IntPtr hdr, int cb);
+        [DllImport("winmm.dll")] static extern int waveInAddBuffer(IntPtr h, IntPtr hdr, int cb);
+        [DllImport("winmm.dll")] static extern int waveInStart(IntPtr h);
+        [DllImport("winmm.dll")] static extern int waveInStop(IntPtr h);
+        [DllImport("winmm.dll")] static extern int waveInReset(IntPtr h);
+        [DllImport("winmm.dll")] static extern int waveInClose(IntPtr h);
+        [DllImport("winmm.dll")] static extern int waveOutOpen(out IntPtr h, int dev, ref WAVEFORMATEX fmt, IntPtr cb, IntPtr inst, int flags);
+        [DllImport("winmm.dll")] static extern int waveOutPrepareHeader(IntPtr h, IntPtr hdr, int cb);
+        [DllImport("winmm.dll")] static extern int waveOutWrite(IntPtr h, IntPtr hdr, int cb);
+        [DllImport("winmm.dll")] static extern int waveOutReset(IntPtr h);
+        [DllImport("winmm.dll")] static extern int waveOutClose(IntPtr h);
+
+        static WAVEFORMATEX VoiceFormat()
+        {
+            WAVEFORMATEX f = new WAVEFORMATEX();
+            f.wFormatTag = WAVE_FORMAT_PCM;
+            f.nChannels = 1;
+            f.nSamplesPerSec = VoiceRate;
+            f.nAvgBytesPerSec = VoiceRate * 2;
+            f.nBlockAlign = 2;
+            f.wBitsPerSample = 16;
+            f.cbSize = 0;
+            return f;
+        }
+
+        /// <summary>第一次按下说话键时才初始化；任何一步失败就永久停用语音，绝不反复折腾。</summary>
+        static bool EnsureVoice()
+        {
+            if (voiceOk) return true;
+            if (voiceBroken || voiceInitTried) return false;
+            voiceInitTried = true;
+            try
+            {
+                WAVEFORMATEX fmt = VoiceFormat();
+
+                IntPtr hin;
+                int r = waveInOpen(out hin, WAVE_MAPPER, ref fmt, IntPtr.Zero, IntPtr.Zero, CALLBACK_NULL);
+                if (r != 0) { FailVoice("waveInOpen 失败 code=" + r + "（没有麦克风？）"); return false; }
+                hWaveIn = hin;
+
+                micHdrs = new IntPtr[MicBufCount];
+                micBufs = new IntPtr[MicBufCount];
+                int hdrSize = Marshal.SizeOf(typeof(WAVEHDR));
+                for (int i = 0; i < MicBufCount; i++)
+                {
+                    micBufs[i] = Marshal.AllocHGlobal(VoiceFrameBytes);
+                    micHdrs[i] = Marshal.AllocHGlobal(hdrSize);
+                    WAVEHDR wh = new WAVEHDR();
+                    wh.lpData = micBufs[i];
+                    wh.dwBufferLength = VoiceFrameBytes;
+                    Marshal.StructureToPtr(wh, micHdrs[i], false);
+                    waveInPrepareHeader(hWaveIn, micHdrs[i], hdrSize);
+                    waveInAddBuffer(hWaveIn, micHdrs[i], hdrSize);
+                }
+                waveInStart(hWaveIn);
+
+                IntPtr hout;
+                r = waveOutOpen(out hout, WAVE_MAPPER, ref fmt, IntPtr.Zero, IntPtr.Zero, CALLBACK_NULL);
+                if (r != 0) { FailVoice("waveOutOpen 失败 code=" + r); return false; }
+                hWaveOut = hout;
+
+                spkHdrs = new IntPtr[SpkBufCount];
+                spkBufs = new IntPtr[SpkBufCount];
+                spkInUse = new bool[SpkBufCount];
+                for (int i = 0; i < SpkBufCount; i++)
+                {
+                    spkBufs[i] = Marshal.AllocHGlobal(VoiceFrameBytes);
+                    spkHdrs[i] = Marshal.AllocHGlobal(hdrSize);
+                    WAVEHDR wh = new WAVEHDR();
+                    wh.lpData = spkBufs[i];
+                    wh.dwBufferLength = VoiceFrameBytes;
+                    Marshal.StructureToPtr(wh, spkHdrs[i], false);
+                    waveOutPrepareHeader(hWaveOut, spkHdrs[i], hdrSize);
+                }
+
+                voiceOk = true;
+                Log("voice: 语音已就绪（8kHz/16bit 单声道，按住 " + PttKey + " 说话）");
+                return true;
+            }
+            catch (Exception ex) { FailVoice(ex.Message); return false; }
+        }
+
+        static void FailVoice(string why)
+        {
+            voiceBroken = true;
+            Log("voice: 已停用（" + why + "）");
+        }
+
+        /// <summary>每帧调用：PTT 状态 + 收麦克风 + 填充播放缓冲。</summary>
+        static void VoiceTick(object lobby)
+        {
+            bool ptt = false;
+            try { ptt = Microsoft.Xna.Framework.Input.Keyboard.GetState().IsKeyDown(PttKey); }
+            catch { }
+
+            if (ptt && !EnsureVoice()) { pttWasDown = ptt; return; }
+
+            if (voiceOk)
+            {
+                if (ptt && !pttWasDown) Log("voice: 开始说话（" + PttKey + " 按住中）");
+                try { PumpMic(lobby, ptt); } catch (Exception ex) { FailVoice("采集出错: " + ex.Message); }
+                try { PumpSpeaker(); } catch (Exception ex) { FailVoice("播放出错: " + ex.Message); }
+            }
+            pttWasDown = ptt;
+        }
+
+        /// <summary>轮询麦克风缓冲：填满的取出来（PTT 时发出去，否则丢弃），然后还回去。</summary>
+        static void PumpMic(object lobby, bool ptt)
+        {
+            int hdrSize = Marshal.SizeOf(typeof(WAVEHDR));
+            for (int i = 0; i < MicBufCount; i++)
+            {
+                WAVEHDR wh = (WAVEHDR)Marshal.PtrToStructure(micHdrs[i], typeof(WAVEHDR));
+                if ((wh.dwFlags & WHDR_DONE) == 0) continue;
+
+                int n = wh.dwBytesRecorded;
+                if (ptt && n > 0)
+                {
+                    byte[] pcm = new byte[n];
+                    Marshal.Copy(micBufs[i], pcm, 0, n);
+                    SendVoiceFrame(lobby, pcm);
+                }
+
+                // 复位并重新入队
+                wh.dwFlags = 0;
+                wh.dwBytesRecorded = 0;
+                wh.dwBufferLength = VoiceFrameBytes;
+                Marshal.StructureToPtr(wh, micHdrs[i], false);
+                waveInAddBuffer(hWaveIn, micHdrs[i], hdrSize);
+            }
+        }
+
+        static void SendVoiceFrame(object lobby, byte[] pcm)
+        {
+            string me = MyPlayerName();
+            string frame = CtrlTag + CtrlSep + "VOICE" + CtrlSep + Clean(me) + CtrlSep + Convert.ToBase64String(pcm);
+            try
+            {
+                if (IsHostOf(lobby))
+                {
+                    IList players = GetMember(lobby, "Players") as IList;
+                    if (players == null) return;
+                    foreach (object o in players)
+                    {
+                        LANPlayerInfo lp = o as LANPlayerInfo;
+                        if (lp == null || lp.TcpClient == null) continue;
+                        if (SameName(Clean(lp.Name), me)) continue;      // 不用发给自己
+                        SendLocked(lp, frame);
+                    }
+                }
+                else
+                {
+                    MethodInfo sm = FindMethod(lobby.GetType(), "SendMessageToHost", 1);
+                    if (sm != null) sm.Invoke(lobby, new object[] { frame });
+                }
+            }
+            catch (Exception ex) { Log("voice: 发送失败: " + ex.Message); }
+        }
+
+        /// <summary>解码收到的语音帧 → 塞进播放队列（丢太久没播的，避免延迟越积越大）。</summary>
+        static void QueueVoicePlayback(string b64)
+        {
+            try
+            {
+                if (!EnsureVoice()) return;
+                byte[] pcm;
+                try { pcm = Convert.FromBase64String(b64); } catch { return; }
+                if (pcm.Length == 0) return;
+                lock (voicePlayQueue)
+                {
+                    if (voicePlayQueue.Count > SpkBufCount) voicePlayQueue.Dequeue();   // 丢最旧的
+                    voicePlayQueue.Enqueue(pcm);
+                }
+            }
+            catch (Exception ex) { Log("voice: 收包失败: " + ex.Message); }
+        }
+
+        /// <summary>把播放队列喂给空闲的输出缓冲。</summary>
+        static void PumpSpeaker()
+        {
+            int hdrSize = Marshal.SizeOf(typeof(WAVEHDR));
+            for (int i = 0; i < SpkBufCount; i++)
+            {
+                WAVEHDR wh = (WAVEHDR)Marshal.PtrToStructure(spkHdrs[i], typeof(WAVEHDR));
+                bool free = spkInUse[i] ? ((wh.dwFlags & WHDR_DONE) != 0) : true;
+                if (!free) continue;
+
+                byte[] pcm = null;
+                lock (voicePlayQueue) { if (voicePlayQueue.Count > 0) pcm = voicePlayQueue.Dequeue(); }
+                if (pcm == null) continue;
+
+                int n = Math.Min(pcm.Length, VoiceFrameBytes);
+                Marshal.Copy(pcm, 0, spkBufs[i], n);
+
+                wh.lpData = spkBufs[i];
+                wh.dwBufferLength = n;
+                wh.dwFlags = 0;
+                wh.dwLoops = 0;
+                Marshal.StructureToPtr(wh, spkHdrs[i], false);
+                waveOutWrite(hWaveOut, spkHdrs[i], hdrSize);
+                spkInUse[i] = true;
+            }
+        }
+
+        // ---------- 截图用到的 Win32 ----------
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct RECT { public int Left, Top, Right, Bottom; }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool GetWindowRect(IntPtr hWnd, out RECT r);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern IntPtr GetForegroundWindow();
+
+        /// <summary>截当前进程的主窗口（客户端窗口），缩到宽 640 以内再编码成 PNG。</summary>
+        static byte[] CaptureWindow()
+        {
+            IntPtr h = IntPtr.Zero;
+            try { h = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle; }
+            catch { }
+            if (h == IntPtr.Zero) { try { h = GetForegroundWindow(); } catch { } }
+            if (h == IntPtr.Zero) return null;
+
+            RECT r;
+            if (!GetWindowRect(h, out r)) return null;
+            int w = r.Right - r.Left, hh = r.Bottom - r.Top;
+            if (w <= 0 || hh <= 0 || w > 20000 || hh > 20000) return null;
+
+            using (Bitmap full = new Bitmap(w, hh))
+            {
+                using (Graphics g = Graphics.FromImage(full))
+                    g.CopyFromScreen(r.Left, r.Top, 0, 0, new Size(w, hh));
+
+                int tw = Math.Min(w, 640);
+                int th = Math.Max(1, (int)(hh * (tw / (double)w)));
+                using (Bitmap small = new Bitmap(full, new Size(tw, th)))
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    small.Save(ms, ImageFormat.Png);
+                    return ms.ToArray();
+                }
+            }
+        }
+
+        /// <summary>用一个独立线程（STA + 自己的消息循环）弹出缩略图窗口。</summary>
+        static void ShowShot(string from, byte[] png)
+        {
+            Thread t = new Thread(delegate()
+            {
+                try
+                {
+                    MemoryStream ms = new MemoryStream(png);
+                    Image img = Image.FromStream(ms);
+
+                    Form f = new Form();
+                    f.Text = (from.Length == 0 ? "有人" : from) + " 发来的截图  (双击图片关闭)";
+                    f.FormBorderStyle = FormBorderStyle.SizableToolWindow;
+                    f.StartPosition = FormStartPosition.CenterScreen;
+                    f.Size = new Size(700, 520);
+                    f.TopMost = true;
+                    f.BackColor = Color.Black;
+
+                    PictureBox pb = new PictureBox();
+                    pb.Dock = DockStyle.Fill;
+                    pb.SizeMode = PictureBoxSizeMode.Zoom;
+                    pb.Image = img;
+                    pb.BackColor = Color.Black;
+                    pb.DoubleClick += delegate(object s, EventArgs e) { try { f.Close(); } catch { } };
+                    f.Controls.Add(pb);
+
+                    Application.Run(f);
+                }
+                catch (Exception ex) { Log("shot 显示失败: " + ex.Message); }
+            });
+            t.SetApartmentState(ApartmentState.STA);
+            t.IsBackground = true;
+            t.Start();
         }
 
         /// <summary>房主侧：每一个对端的 LANPlayerInfo 都挂着 accept 出来的 TcpClient。

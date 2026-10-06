@@ -1247,6 +1247,193 @@ class Program
             CheckStack(hfh);
         }
 
+        // ──────────────────────────────────────────────────────────────
+        // kick：让局域网大厅的「踢人」生效
+        //   GameLobbyBase::CopyPlayerDataFromUI 里，玩家名字下拉框选中第 2 项会调
+        //   GameLobbyBase::KickPlayer(int)。在线大厅(CnCNetGameLobby)重写了它，
+        //   局域网大厅没有 → 走基类的空实现 → 「点了没反应」。
+        //   只替换基类那个空实现，所以：局域网生效、在线大厅（有自己的重写）不受影响。
+        //   跨程序集访问不到 protected 成员，因此实现体放在 MoLanRelay.dll 里用反射做。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "kick")
+        {
+            var glbK = mod.GetTypes().FirstOrDefault(t => t.Name == "GameLobbyBase");
+            if (glbK == null) { Console.WriteLine("SKIP: 找不到 GameLobbyBase"); return 0; }
+            var kp = glbK.Methods.FirstOrDefault(m => m.Name == "KickPlayer");
+            if (kp == null || !kp.HasBody) { Console.WriteLine("SKIP: 找不到 GameLobbyBase::KickPlayer"); return 0; }
+            if (kp.MethodSig == null || kp.MethodSig.Params.Count != 1
+                || kp.MethodSig.Params[0].FullName != "System.Int32")
+            { Console.WriteLine("SKIP: KickPlayer 签名不是 (int)"); return 0; }
+
+            bool doneK = false;
+            foreach (var i in kp.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "KickPlayer" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneK = true; break; }
+            }
+            if (doneK) Console.WriteLine("  GameLobbyBase.KickPlayer: 已改过，跳过");
+            else
+            {
+                var relayAsmK = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeK = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmK);
+                // 参数用 object，避免引用 GameLobbyBase 这个类型
+                var kickCall = new MemberRefUser(mod, "KickPlayer",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Int32), relayTypeK);
+
+                kp.Body.ExceptionHandlers.Clear();
+                var kins = kp.Body.Instructions;
+                kins.Clear();
+                kins.Add(Instruction.Create(OpCodes.Ldarg_0));   // this（大厅实例，引用类型，无需装箱）
+                kins.Add(Instruction.Create(OpCodes.Ldarg_1));   // playerIndex
+                kins.Add(Instruction.Create(OpCodes.Call, kickCall));
+                kins.Add(Instruction.Create(OpCodes.Ret));
+                if (kp.Body.MaxStack < 8) kp.Body.MaxStack = 8;
+                Console.WriteLine("  GameLobbyBase.KickPlayer → Relay.KickPlayer（局域网踢人生效）");
+            }
+
+            Console.WriteLine("--- 栈自检 ---");
+            CheckStack(kp);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // mention：@功能（局域网大厅聊天）
+        //   LANGameLobby::Player_HandleChatCommand 里，颜色算完之后插一次调用：
+        //   消息含 "@我的名字" → 换成高亮色 + 播提示音。
+        //   插在 `callvirt LANColor::get_XNAColor()` 之后，那里栈上是
+        //   [lbChatMessages, playerName, Color]，我们补 (this, text) 两个参数再调用，
+        //   返回值直接替换掉 Color —— 后面的 ChatMessage 构造完全不用动。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "mention")
+        {
+            var lglM = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglM == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+            var phc = lglM.Methods.FirstOrDefault(m => m.Name == "Player_HandleChatCommand");
+            if (phc == null || !phc.HasBody) { Console.WriteLine("SKIP: 找不到 Player_HandleChatCommand"); return 0; }
+
+            var mins = phc.Body.Instructions;
+            bool doneM = false;
+            foreach (var i in mins)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "MentionColor" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneM = true; break; }
+            }
+            if (doneM) Console.WriteLine("  Player_HandleChatCommand: 已改过，跳过");
+            else
+            {
+                int atM = -1;
+                TypeSig colorSig = null;
+                for (int i = 0; i < mins.Count; i++)
+                {
+                    var im = mins[i].Operand as IMethod;
+                    if (im != null && im.Name == "get_XNAColor" && im.MethodSig != null)
+                    { atM = i + 1; colorSig = im.MethodSig.RetType; break; }
+                }
+                if (atM < 0 || colorSig == null) { Console.WriteLine("SKIP: 找不到 LANColor::get_XNAColor"); return 0; }
+                if (phc.Body.Variables.Count < 1) { Console.WriteLine("SKIP: 没有局部变量"); return 0; }
+
+                var relayAsmM = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeM = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmM);
+                // 参数全用 object/string —— 不让 DLL 与 exe 之间产生 MonoGame Color 的跨程序集签名依赖
+                var colorT = colorSig.ToTypeDefOrRef();
+                var mentionCall = new MemberRefUser(mod, "MentionColor",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Object, mod.CorLibTypes.Object,
+                        mod.CorLibTypes.Object, mod.CorLibTypes.String), relayTypeM);
+
+                var partsLoc = phc.Body.Variables[0];   // stloc.0 = data.Split(...) 的结果
+                mins.Insert(atM, Instruction.Create(OpCodes.Box, colorT));         // Color → object
+                mins.Insert(atM + 1, Instruction.Create(OpCodes.Ldarg_0));          // this（大厅实例）
+                mins.Insert(atM + 2, Instruction.Create(OpCodes.Ldloc, partsLoc));
+                mins.Insert(atM + 3, Instruction.CreateLdcI4(2));
+                mins.Insert(atM + 4, Instruction.Create(OpCodes.Ldelem_Ref));       // parts[2] = 消息正文
+                mins.Insert(atM + 5, Instruction.Create(OpCodes.Call, mentionCall));
+                mins.Insert(atM + 6, Instruction.Create(OpCodes.Unbox_Any, colorT)); // object → Color
+                if (phc.Body.MaxStack < 16) phc.Body.MaxStack = 16;
+                Console.WriteLine("  Player_HandleChatCommand: 已挂 @ 高亮 + 提示音（7 条）");
+            }
+
+            Console.WriteLine("--- 栈自检 ---");
+            CheckStack(phc);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // shot：截图（局域网大厅）
+        //   (a) LANGameLobby::Update 开头插 Relay.Tick(this, gameTime)
+        //       —— 每帧轮询 F8，按下就截当前客户端窗口并发出去
+        //   (b) HandleClientMessage / HandleMessageFromServer 开头插一段
+        //       MO-CTRL 控制帧识别 → Relay.OnCtrl（房主还会原样转发）
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "shot")
+        {
+            var lglS = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglS == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+
+            var relayAsmS = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeS = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmS);
+
+            // ---- (a) Update ----
+            var updS = lglS.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (updS == null || !updS.HasBody) Console.WriteLine("  SKIP: 找不到 Update");
+            else
+            {
+                bool doneS = false;
+                foreach (var i in updS.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "Tick" && im.DeclaringType != null
+                        && (string)im.DeclaringType.Name == "Relay") { doneS = true; break; }
+                }
+                if (doneS) Console.WriteLine("  Update: 已改过，跳过");
+                else
+                {
+                    var tickCall = new MemberRefUser(mod, "Tick",
+                        MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Object), relayTypeS);
+                    var uins = updS.Body.Instructions;
+                    uins.Insert(0, Instruction.Create(OpCodes.Call, tickCall));
+                    uins.Insert(0, Instruction.Create(OpCodes.Ldarg_1));
+                    uins.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                    if (updS.Body.MaxStack < 8) updS.Body.MaxStack = 8;
+                    Console.WriteLine("  Update: 已挂 Relay.Tick（F8 截图热键轮询）");
+                }
+                CheckStack(updS);
+            }
+
+            // ---- (b) 控制帧识别 ----
+            var isCtrlCall = new MemberRefUser(mod, "IsCtrlMessage",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.String), relayTypeS);
+            var onCtrlCall = new MemberRefUser(mod, "OnCtrl",
+                MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.String), relayTypeS);
+
+            foreach (string mnS in new string[] { "HandleClientMessage", "HandleMessageFromServer" })
+            {
+                var mS = lglS.Methods.FirstOrDefault(x => x.Name == mnS);
+                if (mS == null || !mS.HasBody) { Console.WriteLine("  SKIP: 找不到 " + mnS); continue; }
+                bool doneS2 = false;
+                foreach (var i in mS.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "IsCtrlMessage") { doneS2 = true; break; }
+                }
+                if (doneS2) { Console.WriteLine("  " + mnS + ": 已改过，跳过"); continue; }
+
+                var skipLbl = Instruction.Create(OpCodes.Nop);
+                var seqS = new System.Collections.Generic.List<Instruction>();
+                seqS.Add(Instruction.Create(OpCodes.Ldarg_1));            // data
+                seqS.Add(Instruction.Create(OpCodes.Call, isCtrlCall));
+                seqS.Add(Instruction.Create(OpCodes.Brfalse, skipLbl));
+                seqS.Add(Instruction.Create(OpCodes.Ldarg_0));            // this
+                seqS.Add(Instruction.Create(OpCodes.Ldarg_1));            // data
+                seqS.Add(Instruction.Create(OpCodes.Call, onCtrlCall));
+                seqS.Add(skipLbl);
+                var sins = mS.Body.Instructions;
+                for (int k = 0; k < seqS.Count; k++) sins.Insert(k, seqS[k]);
+                if (mS.Body.MaxStack < 16) mS.Body.MaxStack = 16;
+                Console.WriteLine("  " + mnS + ": 已挂 MO-CTRL 识别（" + seqS.Count + " 条）");
+                CheckStack(mS);
+            }
+        }
+
         if (mode == "checkstack")
         {
             foreach (var t in mod.GetTypes())
