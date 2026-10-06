@@ -482,7 +482,7 @@ namespace MoLanRelay
         static readonly Microsoft.Xna.Framework.Input.Keys PttKey = Microsoft.Xna.Framework.Input.Keys.F7;
         static bool pttWasDown;
 
-        static bool voiceInitTried, voiceOk, voiceBroken;
+        static bool voiceInitTried, voiceOk, voiceBroken, micFailed;
         static IntPtr hWaveIn = IntPtr.Zero, hWaveOut = IntPtr.Zero;
         static IntPtr[] micHdrs, spkHdrs;
         static IntPtr[] micBufs, spkBufs;
@@ -541,7 +541,8 @@ namespace MoLanRelay
             return f;
         }
 
-        /// <summary>第一次按下说话键时才初始化；任何一步失败就永久停用语音，绝不反复折腾。</summary>
+        /// <summary>第一次需要用到语音时才初始化。麦克风和扬声器分别对待：
+        /// 没麦克风也能听别人说话（反过来声卡打不开就整体停用）。</summary>
         static bool EnsureVoice()
         {
             if (voiceOk) return true;
@@ -550,31 +551,39 @@ namespace MoLanRelay
             try
             {
                 WAVEFORMATEX fmt = VoiceFormat();
+                int hdrSize = Marshal.SizeOf(typeof(WAVEHDR));
 
+                // ---- 麦克风（拿不到就只做"能听不能说"）----
                 IntPtr hin;
                 int r = waveInOpen(out hin, WAVE_MAPPER, ref fmt, IntPtr.Zero, IntPtr.Zero, CALLBACK_NULL);
-                if (r != 0) { FailVoice("waveInOpen 失败 code=" + r + "（没有麦克风？）"); return false; }
-                hWaveIn = hin;
-
-                micHdrs = new IntPtr[MicBufCount];
-                micBufs = new IntPtr[MicBufCount];
-                int hdrSize = Marshal.SizeOf(typeof(WAVEHDR));
-                for (int i = 0; i < MicBufCount; i++)
+                if (r != 0)
                 {
-                    micBufs[i] = Marshal.AllocHGlobal(VoiceFrameBytes);
-                    micHdrs[i] = Marshal.AllocHGlobal(hdrSize);
-                    WAVEHDR wh = new WAVEHDR();
-                    wh.lpData = micBufs[i];
-                    wh.dwBufferLength = VoiceFrameBytes;
-                    Marshal.StructureToPtr(wh, micHdrs[i], false);
-                    waveInPrepareHeader(hWaveIn, micHdrs[i], hdrSize);
-                    waveInAddBuffer(hWaveIn, micHdrs[i], hdrSize);
+                    micFailed = true;
+                    Log("voice: 麦克风打不开 code=" + r + " —— 只能听别人说，自己说不了（不影响其他功能）");
                 }
-                waveInStart(hWaveIn);
+                else
+                {
+                    hWaveIn = hin;
+                    micHdrs = new IntPtr[MicBufCount];
+                    micBufs = new IntPtr[MicBufCount];
+                    for (int i = 0; i < MicBufCount; i++)
+                    {
+                        micBufs[i] = Marshal.AllocHGlobal(VoiceFrameBytes);
+                        micHdrs[i] = Marshal.AllocHGlobal(hdrSize);
+                        WAVEHDR wh = new WAVEHDR();
+                        wh.lpData = micBufs[i];
+                        wh.dwBufferLength = VoiceFrameBytes;
+                        Marshal.StructureToPtr(wh, micHdrs[i], false);
+                        waveInPrepareHeader(hWaveIn, micHdrs[i], hdrSize);
+                        waveInAddBuffer(hWaveIn, micHdrs[i], hdrSize);
+                    }
+                    waveInStart(hWaveIn);
+                }
 
+                // ---- 扬声器（这个打不开才真的停用）----
                 IntPtr hout;
                 r = waveOutOpen(out hout, WAVE_MAPPER, ref fmt, IntPtr.Zero, IntPtr.Zero, CALLBACK_NULL);
-                if (r != 0) { FailVoice("waveOutOpen 失败 code=" + r); return false; }
+                if (r != 0) { FailVoice("扬声器打不开 code=" + r); return false; }
                 hWaveOut = hout;
 
                 spkHdrs = new IntPtr[SpkBufCount];
@@ -592,7 +601,8 @@ namespace MoLanRelay
                 }
 
                 voiceOk = true;
-                Log("voice: 语音已就绪（8kHz/16bit 单声道，按住 " + PttKey + " 说话）");
+                Log("voice: 语音已就绪（8kHz/16bit 单声道；按住 " + PttKey + " 说话）"
+                    + (micFailed ? "  ※麦克风不可用，仅可收听" : ""));
                 return true;
             }
             catch (Exception ex) { FailVoice(ex.Message); return false; }
@@ -615,8 +625,10 @@ namespace MoLanRelay
 
             if (voiceOk)
             {
-                if (ptt && !pttWasDown) Log("voice: 开始说话（" + PttKey + " 按住中）");
-                try { PumpMic(lobby, ptt); } catch (Exception ex) { FailVoice("采集出错: " + ex.Message); }
+                if (ptt && !pttWasDown)
+                    Log(micFailed ? "voice: 按下了说话键，但这台机器没有可用麦克风"
+                                  : "voice: 开始说话（" + PttKey + " 按住中）");
+                if (!micFailed) { try { PumpMic(lobby, ptt); } catch (Exception ex) { FailVoice("采集出错: " + ex.Message); } }
                 try { PumpSpeaker(); } catch (Exception ex) { FailVoice("播放出错: " + ex.Message); }
             }
             pttWasDown = ptt;
