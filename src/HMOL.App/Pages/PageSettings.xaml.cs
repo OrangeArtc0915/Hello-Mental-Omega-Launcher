@@ -255,8 +255,8 @@ public partial class PageSettings : LauncherPage
         RefreshExtensions();
         RefreshUpdate();
 
-        // 兜底：先显示第一张卡，避免任何路径下出现「所有卡片都可见」
-        SwitchCategory(0);
+        // 兜底：先只显示设置主页，避免任何路径下出现「所有卡片都可见」
+        ShowHome();
 
         // 构造收尾：此时滑块与标签都建好了，之后才允许响应 ValueChanged（构造期的夹值事件必须忽略）
         _appearanceReady = true;
@@ -334,43 +334,61 @@ public partial class PageSettings : LauncherPage
     {
         if (index < 0 || index >= CategoryCount) index = 0;
 
-        SurfaceCard[] cards =
-        [
-            CardAppearance,
-            CardHome,
-            CardBackground,
-            CardMusic,
-            CardLayout,
-            CardSites,
-            CardWeatherCity,
-            CardExtensions,
-            CardUpdate,
-            CardNickname,
-            CardLook,
-            CardAutoStart,
-            CardGamePath,
-            CardAbout,
-        ];
+        ShowOnly(Categories[index], index);
+    }
 
-        for (var i = 0; i < cards.Length; i++)
+    /// <summary>
+    /// 设置主页：窗口侧栏停在「分组列表」这一层时显示（进来的默认视图、以及从分类点「返回分类」时）。
+    /// 以前这一层会保留上次那张分类卡——它可能根本不属于当前分组，看着像跑错了地方。
+    /// </summary>
+    internal void ShowHome() => ShowOnly(CardSettingsHome, -1);
+
+    /// <summary>一格里只留一张卡：其余折叠，目标卡需要时播放淡入 + 上移。</summary>
+    private void ShowOnly(SurfaceCard card, int index)
+    {
+        foreach (var other in Categories)
         {
-            var card = cards[i];
-
-            if (i != index)
-            {
-                card.Visibility = Visibility.Collapsed;
-                continue;
-            }
-
-            var alreadyShown = card.Visibility == Visibility.Visible;
-            card.Visibility = Visibility.Visible;
-
-            // 已经显示着的那张（同分类重复调用）不重放动画
-            if (!alreadyShown) PlayCardEnter(card, i);
+            if (!ReferenceEquals(other, card)) other.Visibility = Visibility.Collapsed;
         }
+
+        if (!ReferenceEquals(CardSettingsHome, card)) CardSettingsHome.Visibility = Visibility.Collapsed;
+
+        var alreadyShown = card.Visibility == Visibility.Visible;
+        card.Visibility = Visibility.Visible;
+
+        // 已经显示着的那张（同分类重复调用）不重放动画
+        if (!alreadyShown) PlayCardEnter(card, index);
 
         // 换分类后回到顶部，否则会停在上一个分类的滚动位置
         ScrollCategory.ScrollToTop();
+    }
+
+    /// <summary>设置分类卡片，下标与窗口侧栏的分类序号一一对应。</summary>
+    private SurfaceCard[] Categories =>
+    [
+        CardAppearance,
+        CardHome,
+        CardBackground,
+        CardMusic,
+        CardLayout,
+        CardSites,
+        CardWeatherCity,
+        CardExtensions,
+        CardUpdate,
+        CardNickname,
+        CardLook,
+        CardAutoStart,
+        CardGamePath,
+        CardAbout,
+    ];
+
+    /// <summary>设置主页里的快捷入口：跳到对应分类（展开分组与选中态交给窗口）。</summary>
+    private void OnSettingsHomeJumpClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag }) return;
+        if (!int.TryParse(tag, out var index)) return;
+
+        (Window.GetWindow(this) as MainWindow)?.SelectSetupCategory(index);
     }
 
     /// <summary>换分类时给内容一点淡入 + 轻微上移，切换不至于太生硬。</summary>

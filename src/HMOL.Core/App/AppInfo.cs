@@ -7,8 +7,8 @@ namespace HMOL.Core.App;
 public static class AppInfo
 {
     public const string Name = "Hello Mental Omega Launcher";
-    public const string Version = "1.5.9";
-    public const string VersionDisplay = "v1.5.9";
+    public const string Version = "1.5.10";
+    public const string VersionDisplay = "v1.5.10";
     public const string Author = "mmm";
 
     /// <summary>许可声明摘要：本项目为专有软件，保留所有权利（许可证正文见仓库根 LICENSE）。</summary>

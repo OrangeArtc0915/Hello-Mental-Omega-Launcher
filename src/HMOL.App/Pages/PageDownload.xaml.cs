@@ -246,6 +246,25 @@ public partial class PageDownload : LauncherPage
             row.Margin = new Thickness(0, index == 0 ? 0 : 10, 0, 0);
             PanRuntimeItems.Children.Add(row);
         }
+
+        UpdateRuntimeToggleText(PanRuntimeItems.Visibility == Visibility.Visible);
+    }
+
+    private void OnToggleRuntimeClick(object sender, RoutedEventArgs e)
+    {
+        var expanded = PanRuntimeItems.Visibility != Visibility.Visible;
+
+        PanRuntimeItems.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        UpdateRuntimeToggleText(expanded);
+    }
+
+    /// <summary>折叠按钮的文案跟着展开状态与条数走。</summary>
+    private void UpdateRuntimeToggleText(bool expanded)
+    {
+        var count = PanRuntimeItems.Children.Count;
+        var suffix = count > 0 ? $"（{count} 项）" : string.Empty;
+
+        BtnToggleRuntime.Content = expanded ? $"收起组件列表{suffix}" : $"展开组件列表{suffix}";
     }
 
     /// <summary>条目属于哪一组：优先用它自己声明的 group，没写就按 target 归类。</summary>

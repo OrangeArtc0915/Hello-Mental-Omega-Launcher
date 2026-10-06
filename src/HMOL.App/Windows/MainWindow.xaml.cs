@@ -585,9 +585,12 @@ public partial class MainWindow : Window
         SyncSetupGroupSelection();
         SyncSetupCategorySelection();
 
-        // 内容区永远只留一张卡片可见：停在分组层时也保留上次那张，
+        // 内容区永远只留一张卡可见：停在分组层时显示「设置」小主页（小贴士 + 常用入口），
         // 否则 14 张卡会叠着全部显示（又长又卡，这就是之前那个显示问题）。
-        (GetPage(NavPages.Settings) as PageSettings)?.SwitchCategory(_setupCategory);
+        var settings = GetPage(NavPages.Settings) as PageSettings;
+
+        if (_setupLevel == 0) settings?.ShowHome();
+        else settings?.SwitchCategory(_setupCategory);
     }
 
     /// <summary>切侧栏面板的显隐；从折叠变可见时淡入一下，别硬闪。</summary>

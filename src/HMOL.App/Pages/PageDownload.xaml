@@ -161,7 +161,13 @@
                                              Tone="Solid"
                                              Click="OnCompleteRuntimeClick" />
                         </Grid>
-                        <StackPanel x:Name="PanRuntimeItems" Margin="0,10,0,0" />
+                        <c:OutlineButton x:Name="BtnToggleRuntime"
+                                         Margin="0,10,0,0"
+                                         HorizontalAlignment="Left"
+                                         Content="展开组件列表"
+                                         Click="OnToggleRuntimeClick" />
+
+                        <StackPanel x:Name="PanRuntimeItems" Margin="0,10,0,0" Visibility="Collapsed" />
                     </StackPanel>
                 </c:SurfaceCard>
 

@@ -105,6 +105,44 @@
                 折叠的卡片不参与布局，所以各卡片上留的 14px 间距只对当前显示的那张生效。
             -->
             <Grid>
+            <!-- 设置主页：停在「分组列表」这一层时显示，别让内容区空着 -->
+            <c:SurfaceCard x:Name="CardSettingsHome" Margin="0,14,0,0" Title="设置" UseShadow="False" HasHoverEffect="False">
+                <StackPanel>
+                    <TextBlock FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               TextWrapping="Wrap"
+                               Text="左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他），点进去再看该类下的具体设置项。" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="改动会立即生效并自动保存，不需要点「应用」；配置文件在 Data\Settings.json。" />
+
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="小贴士" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="· 换主题色 / 字体 / 圆角 / 动效：个性化 →「外观」&#10;· 换主页壁纸、轮播、每页不同背景：个性化 →「主页背景」&#10;· 把主页摆成自己喜欢的样子：个性化 →「界面布局」→ 布局编辑器&#10;· 拼音昵称、游戏 HUD、樱花 Frp 面板：联机设置&#10;· 更新线路、下载加速、下载目录：更新和下载设置" />
+
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="常用入口" />
+                    <WrapPanel Margin="0,8,0,0">
+                        <c:OutlineButton Content="外观与主题" Tag="0" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="主页设置" Margin="8,0,0,0" Tag="1" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="主页背景" Margin="8,0,0,0" Tag="2" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="界面布局" Margin="8,0,0,0" Tag="4" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="联机设置" Margin="8,0,0,0" Tag="9" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="程序更新" Margin="8,0,0,0" Tag="8" Click="OnSettingsHomeJumpClick" />
+                    </WrapPanel>
+                </StackPanel>
+            </c:SurfaceCard>
+
             <!-- 外观 -->
             <c:SurfaceCard x:Name="CardAppearance" Margin="0,14,0,0" Title="外观">
                 <StackPanel>
