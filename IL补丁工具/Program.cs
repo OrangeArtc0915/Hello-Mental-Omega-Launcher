@@ -1187,6 +1187,66 @@ class Program
             if (!any) { Console.WriteLine("SKIP: 没找到任何大厅类型"); return 0; }
         }
 
+        // ──────────────────────────────────────────────────────────────
+        // lobbyfix：修上游局域网大厅的一个漏判空（原版就有，不是我们引入的）
+        //   LANGameLobby::HandleFileHashCommand 里：
+        //       PlayerInfo pInfo = Players.Find(p => p.Name == sender);
+        //       pInfo.Verified = true;            // ← 找不到人就 NRE → 客户端崩溃
+        //   触发条件：发送者的连接还活着，但它已经不在 Players 里
+        //   （典型场景：退出大厅重新建房后，旧连接残留，之后又收到一条旧消息）。
+        //   上游在线大厅（CnCNetGameLobby）同一处写的是 if (pInfo != null)，
+        //   只有局域网大厅漏了 —— 这里补上同样的判断。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "lobbyfix")
+        {
+            var lglF = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglF == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+            var hfh = lglF.Methods.FirstOrDefault(m => m.Name == "HandleFileHashCommand");
+            if (hfh == null || !hfh.HasBody) { Console.WriteLine("SKIP: 找不到 HandleFileHashCommand"); return 0; }
+
+            var fins = hfh.Body.Instructions;
+            bool doneF = false;
+            for (int i = 0; i + 3 < fins.Count; i++)
+            {
+                var c0 = fins[i].OpCode.Code;
+                var c1 = fins[i + 1].OpCode.Code;
+                if (c0 == dnlib.DotNet.Emit.Code.Dup &&
+                    (c1 == dnlib.DotNet.Emit.Code.Brtrue || c1 == dnlib.DotNet.Emit.Code.Brtrue_S) &&
+                    fins[i + 2].OpCode.Code == dnlib.DotNet.Emit.Code.Pop &&
+                    fins[i + 3].OpCode.Code == dnlib.DotNet.Emit.Code.Ret)
+                { doneF = true; break; }
+            }
+            if (doneF) { Console.WriteLine("  HandleFileHashCommand: 已补过，跳过"); }
+            else
+            {
+                // 找 List<PlayerInfo>::Find(Predicate) 的调用，插在它后面
+                int atF = -1;
+                for (int i = 0; i < fins.Count; i++)
+                {
+                    var im = fins[i].Operand as IMethod;
+                    if (im != null && im.Name == "Find" && im.DeclaringType != null
+                        && (string)im.DeclaringType.Name == "List`1")
+                    { atF = i + 1; break; }
+                }
+                if (atF < 0) { Console.WriteLine("SKIP: 找不到 Find 调用"); return 0; }
+
+                // 栈：Find 之后是 [pInfo]
+                //   dup; brtrue LOK; pop; ret;  LOK:
+                //   → null 就直接返回，非 null 落回原逻辑
+                var lokF = Instruction.Create(OpCodes.Nop);
+                fins.Insert(atF, Instruction.Create(OpCodes.Dup));
+                fins.Insert(atF + 1, Instruction.Create(OpCodes.Brtrue, lokF));
+                fins.Insert(atF + 2, Instruction.Create(OpCodes.Pop));
+                fins.Insert(atF + 3, Instruction.Create(OpCodes.Ret));
+                fins.Insert(atF + 4, lokF);
+                if (hfh.Body.MaxStack < 8) hfh.Body.MaxStack = 8;
+                Console.WriteLine("  HandleFileHashCommand: 已补判空（4 条 + 跳转目标）");
+            }
+
+            Console.WriteLine("--- 栈自检 ---");
+            CheckStack(hfh);
+        }
+
         if (mode == "checkstack")
         {
             foreach (var t in mod.GetTypes())

@@ -1,0 +1,57 @@
+================================================================
+ Mental Omega 补丁 1／中文输入
+ 适用版本：MO 客户端 2.6.10.3（Resources\clientxna.exe 那一套）
+================================================================
+
+【这个包修什么】
+ 1. 客户端打不了中文（只能 Ctrl+V 粘贴，键盘敲不进去）
+ 2. 候选框位置跑偏 —— 现在会贴着你正在打字的那个输入框（不是鼠标位置）
+ 3. 打「你好」发出去变成「你好你好」（重复上屏）
+
+
+【怎么安装】
+ 1. 先把客户端和游戏完全关掉（任务管理器确认 clientdx.exe 已消失）。
+ 2. 把本压缩包里的 "Resources" 文件夹，直接覆盖到游戏根目录
+    （含 MentalOmegaClient.exe 的那个目录），提示时选「替换全部文件」。
+ 3. "原版备份" 和本说明放着别删。
+
+
+【改了哪个文件】
+ 只有这一个：
+    Resources\Binaries\Windows\MonoGame.Framework.dll
+
+ 具体改了三处：
+    · 给游戏窗口补上 IME 上下文
+      （根因：WinForms 不会给「没有子控件的窗口」创建 IME 上下文，
+        所以系统输入法根本不知道这个窗口能输入中文）
+    · 用 1×1 的 caret 把「输入位置」告诉输入法
+      （微软拼音这类 TSF 输入法只认光标矩形，所以候选框能贴到输入框旁边）
+    · 补上 KeyPressEventArgs.Handled，避免同一个字被上屏两次
+
+
+【和「补丁 2／联机」的关系】
+ 完全独立、互不冲突 —— 两个包改的文件没有一个是重叠的：
+    · 本包：MonoGame.Framework.dll
+    · 联机包：clientdx.exe / clientogl.exe / clientxna.exe + MoLanRelay.dll
+ 可以只装一个，也可以两个都装（两个都装就是原来的全量包）。
+
+
+【怎么确认生效】
+ 进游戏或大厅，点聊天输入框 -> 切换到中文输入法：
+    · 能直接用键盘打中文（不用粘贴）
+    · 候选框出现在输入框旁边
+    · 发「你好」只出现一次
+
+
+【怎么还原】
+ 把 原版备份\Resources\Binaries\Windows\MonoGame.Framework.dll
+ 覆盖回 游戏根目录\Resources\Binaries\Windows\ 即可。
+
+
+【注意事项】
+ · 本包只作用于 Resources\Binaries\Windows\ 这一套二进制，也就是
+   clientdx.exe（MO 默认渲染器）用的那套。
+   如果你在客户端选项里换成了 OpenGL / XNA 渲染器，加载的是另外一套 MonoGame
+   （里面根本没有 WinFormsGameForm 这个窗口类），本包的改法对它不适用。
+ · 如果客户端自带的更新器之后把 Resources 里的文件重新下载覆盖了，
+   重新把本包覆盖一次即可。

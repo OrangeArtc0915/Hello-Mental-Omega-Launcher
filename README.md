@@ -1,6 +1,6 @@
 # MO 客户端补丁 · 源码与构建说明
 
-适用客户端：Mental Omega 的 CnCNet 客户端 **2.6.10.3**。
+适用客户端：Mental Omega 的 CnCNet 客户端 **2.6.10.3**（`Resources\clientdx.exe` 那一套）。
 本目录是把「两个补丁包」从原版文件重新构建出来的全部源码、脚本和步骤。
 
 ---
@@ -10,7 +10,7 @@
 | 补丁包 | 目标文件 | 工具模式 |
 |---|---|---|
 | **补丁1-中文输入** | `Resources\Binaries\Windows\MonoGame.Framework.dll` | `ime` |
-| **补丁2-联机** | `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` | `lanip` → `relay` → `relaysend` → `relayhost` |
+| **补丁2-联机** | `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` | `lanip` → `relay` → `relaysend` → `relayhost` → `lobbyfix` |
 | **补丁2-联机** | `Resources\MoLanRelay.dll` + `Resources\Binaries\MoLanRelay.dll` | 由 `中继\MoLanRelay.cs` 编译 |
 
 两组文件**完全不重叠**，所以两个包可以独立安装，也可以都装。
@@ -25,8 +25,7 @@
 ## 2. 目录结构
 
 ```
-MO-补丁源码\
-├─ 构建说明.md              ← 本文件
+├─ README.md                ← 本文件（构建说明）
 ├─ 中继\
 │   └─ MoLanRelay.cs        ← 游戏内 UDP 中继（C#，编译成 DLL，不手写 IL）
 ├─ IL补丁工具\
@@ -119,7 +118,9 @@ _build\补丁2-联机\...              以及  MO-补丁2-联机.zip
         │  ② dnlibpatch <in> <out> relay       spawn.ini 的 [OtherN] Ip/Port 改写 + 拉起中继；识别 MO-RELAY 帧
         │  ③ dnlibpatch <in> <out> relaysend   LANPlayerInfo::SendMessage 改走 Relay.SendLocked（共用写锁）
         │  ④ dnlibpatch <in> <out> relayhost   LANGameLobby / LANGameLoadingLobby 的 SetUp 注册 client；
-        ▼                                      SendMessageToHost 改走 Relay.SendClientLocked
+        │                                      SendMessageToHost 改走 Relay.SendClientLocked
+        │  ⑤ dnlibpatch <in> <out> lobbyfix    HandleFileHashCommand 补判空（修上游 NRE 崩溃）
+        ▼
       clientdx.exe / clientogl.exe / clientxna.exe   ← 三个都与线上部署文件 SHA256 完全一致
 ```
 
@@ -164,6 +165,7 @@ dnlibpatch <in> <out> <mode>
 | `relay` | **补丁2 ②**：`WriteSpawnIni` 改写 `[OtherN] Ip/Port` 并拉起中继；两处消息入口识别 `MO-RELAY` |
 | `relaysend` | **补丁2 ③**：`LANPlayerInfo::SendMessage` → `Relay.SendLocked` |
 | `relayhost` | **补丁2 ④**：两个大厅类的 `SetUp` 注册 client，`SendMessageToHost` → `Relay.SendClientLocked` |
+| `lobbyfix` | **补丁2 ⑤**：`LANGameLobby::HandleFileHashCommand` 补判空（修上游漏判空导致的崩溃） |
 | `patch` / `xna` | 早期方案，最终未使用（见 5.1 的说明） |
 | `checkstack` | 全模块栈自检 |
 | `types` / `methods` / `refs` / `dumpm` / `pinvokes` | 只读的探查工具，用来定位类型/方法/指令/引用/P-Invoke |
@@ -214,3 +216,13 @@ C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe `
     ```
     **多人联机出问题，先比对几台机器这一行**——版本不一致会出现「某台能收不能发」这类诡异现象。
 13. **PowerShell 脚本里的中文必须带 UTF-8 BOM**，否则 PowerShell 5.1 会按 GBK 读，中文变乱码、脚本语法都报错。
+
+**上游 Bug（不是我们引入的，但顺手修了）**
+
+14. `LANGameLobby::HandleFileHashCommand` 里
+    `PlayerInfo pInfo = Players.Find(p => p.Name == sender); pInfo.Verified = true;`
+    **没有判空**。只要发送者的连接还活着、但它已经不在 `Players` 里
+    （典型场景：退出大厅重新建房后旧连接残留，之后又收到一条旧消息），
+    就会 `未将对象引用设置到对象的实例。` → 整个客户端 KABOOOOOOM。
+    在线大厅 `CnCNetGameLobby` 同一处写的是 `if (pInfo != null)`，只有局域网这份漏了 ——
+    这就是 `lobbyfix` 模式存在的原因（原版 exe 里同样没有判空，可以拿原版验证）。
