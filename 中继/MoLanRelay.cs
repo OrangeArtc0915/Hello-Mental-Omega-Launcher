@@ -634,8 +634,10 @@ namespace MoLanRelay
 
             try
             {
-                MethodInfo cp = FindMethod(lobby.GetType(), "CopyPlayerDataFromUI", 0);
-                if (cp != null) cp.Invoke(lobby, null);
+                // 注意：CopyPlayerDataFromUI 是 WinForms 风格的事件处理器，签名是 (object, EventArgs)
+                MethodInfo cp = FindMethod(lobby.GetType(), "CopyPlayerDataFromUI", 2);
+                if (cp != null) cp.Invoke(lobby, new object[] { null, EventArgs.Empty });
+                else Log("rand: 找不到 CopyPlayerDataFromUI，改动可能没生效");
                 MethodInfo bp = FindMethod(lobby.GetType(), "BroadcastPlayerOptions", 0);
                 if (bp != null) bp.Invoke(lobby, null);
             }
