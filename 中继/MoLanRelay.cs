@@ -251,25 +251,38 @@ namespace MoLanRelay
             return null;
         }
 
-        /// <summary>自己的玩家名：优先用中继已知的，其次去 ClientCore.ProgramConstants.PLAYERNAME 取。</summary>
+        static string cachedMyName;
+        static bool warnedNoName;
+
+        /// <summary>自己的玩家名：优先用中继已知的（Start 之后），其次从 ClientCore.ProgramConstants 取一次并缓存。
+        /// 语音每秒会调好几次，所以绝不能在每次调用里遍历程序集。</summary>
         static string MyPlayerName()
         {
             if (!string.IsNullOrEmpty(selfName)) return selfName;
+            if (cachedMyName != null) return cachedMyName;
+
+            string found = "";
             try
             {
-                foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                Type t = Type.GetType("ClientCore.ProgramConstants, ClientCore");
+                if (t == null)
                 {
-                    Type t = a.GetType("ClientCore.ProgramConstants");
-                    if (t == null) continue;
-                    PropertyInfo p = t.GetProperty("PLAYERNAME", BindingFlags.Public | BindingFlags.Static);
-                    if (p != null)
+                    foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
                     {
-                        string v = Clean(p.GetValue(null, null) as string);
-                        if (v.Length > 0) return v;
+                        t = a.GetType("ClientCore.ProgramConstants");
+                        if (t != null) break;
                     }
+                }
+                if (t != null)
+                {
+                    PropertyInfo p = t.GetProperty("PLAYERNAME", BindingFlags.Public | BindingFlags.Static);
+                    if (p != null) found = Clean(p.GetValue(null, null) as string);
                 }
             }
             catch { }
+
+            if (found.Length > 0) { cachedMyName = found; return found; }
+            if (!warnedNoName) { warnedNoName = true; Log("拿不到自己的玩家名 —— 语音/截图里【跳过自己那份】的判断可能失效"); }
             return "";
         }
 
@@ -349,8 +362,13 @@ namespace MoLanRelay
             catch { return false; }
         }
 
+        static int selfPid;                      // 本进程 PID（查一次就够）
+        static int gamePid;                      // gamemd.exe 的 PID（缓存，5 秒刷一次）
+        static DateTime lastPidScan = DateTime.MinValue;
+
         /// <summary>前台窗口是不是"我们的"：客户端自己，或者游戏本体 gamemd。
-        /// 加这个判断是为了避免在别的程序里按 F8 也把截图发到游戏房间。</summary>
+        /// 加这个判断是为了避免在别的程序里按 F8 也把截图发到游戏房间。
+        /// 注意：这里每帧都会被调用，所以绝不能每帧去 Process.GetProcessById（那会不停地开进程句柄）。</summary>
         static bool OursInFront()
         {
             try
@@ -360,13 +378,25 @@ namespace MoLanRelay
                 uint pid;
                 GetWindowThreadProcessId(fg, out pid);
                 if (pid == 0) return false;
-                if (pid == (uint)System.Diagnostics.Process.GetCurrentProcess().Id) return true;
-                try
+
+                if (selfPid == 0)
                 {
-                    string nm = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
-                    return string.Equals(nm, "gamemd", StringComparison.OrdinalIgnoreCase);
+                    try { selfPid = System.Diagnostics.Process.GetCurrentProcess().Id; } catch { }
                 }
-                catch { }
+                if (selfPid != 0 && pid == (uint)selfPid) return true;
+
+                if ((DateTime.Now - lastPidScan).TotalSeconds > 5)
+                {
+                    lastPidScan = DateTime.Now;
+                    try
+                    {
+                        System.Diagnostics.Process[] ps = System.Diagnostics.Process.GetProcessesByName("gamemd");
+                        gamePid = ps.Length > 0 ? ps[0].Id : 0;
+                        foreach (System.Diagnostics.Process p in ps) { try { p.Dispose(); } catch { } }
+                    }
+                    catch { }
+                }
+                return gamePid != 0 && pid == (uint)gamePid;
             }
             catch { }
             return false;
@@ -593,7 +623,7 @@ namespace MoLanRelay
                 if (same) { Log("filehash: " + who + " 游戏文件校验通过"); return; }   // 通过就不刷屏
 
                 string msg = "⚠ 游戏文件不一致：" + (who.Length == 0 ? "对方" : who) + " 的文件和你的不一样"
-                           + "（他 " + Short(mine.Length > 0 ? theirs : theirs) + " / 你 " + Short(mine) + "）"
+                           + "（他 " + Short(theirs) + " / 你 " + Short(mine) + "）"
                            + " —— 联机很可能卡住或崩溃，请核对双方 MO 版本与补丁是否完全一致！";
                 Log("filehash: " + msg);
                 Notice(lobby, msg, false);
