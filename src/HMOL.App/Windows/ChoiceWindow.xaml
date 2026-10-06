@@ -47,10 +47,11 @@
                 </StackPanel>
             </Grid>
 
-            <StackPanel x:Name="PanButtons"
-                        Margin="0,18,0,0"
-                        HorizontalAlignment="Right"
-                        Orientation="Horizontal" />
+            <!-- 按钮多了要能换行：更新确认框最多 4 个长按钮，放 StackPanel 里会横向溢出被裁掉 -->
+            <WrapPanel x:Name="PanButtons"
+                       Margin="0,18,0,0"
+                       HorizontalAlignment="Right"
+                       Orientation="Horizontal" />
         </StackPanel>
     </c:SurfaceCard>
 </Window>

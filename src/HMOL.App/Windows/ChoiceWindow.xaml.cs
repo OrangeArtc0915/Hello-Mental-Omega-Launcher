@@ -62,7 +62,10 @@ public partial class ChoiceWindow : Window
                 Padding = new Thickness(14, 7, 14, 7)
             };
 
-            if (PanButtons.Children.Count > 0) button.Margin = new Thickness(8, 0, 0, 0);
+            // WrapPanel 换行时行与行之间靠下边距留出间隙；最左边的按钮不要左间距
+            button.Margin = PanButtons.Children.Count > 0
+                ? new Thickness(8, 0, 0, 6)
+                : new Thickness(0, 0, 0, 6);
 
             button.Click += (_, _) =>
             {
