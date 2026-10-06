@@ -1,80 +1,94 @@
 {
-  "_readme": "HMOL 下载页文件：往 items 里加条目即可。name 是显示名；url 是单个直链，urls 是多个直链（分卷，下载后自动按顺序合并）；note 是可选的说明文字；只填 homepage（官网地址、不填 url/urls）的条目表示本启动器不托管该文件，界面只显示一条可点击的官网地址。可下载条目默认指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
+  "_readme": "HMOL 下载页文件：往 items 里加条目即可，不用改启动器。字段：name 显示名；url 单个直链、urls 多个直链（分卷，下载后自动按顺序合并）、homepage 只给官网地址（本启动器不托管该文件）；note 说明；group 分组名（下载页按它自动生成可折叠区块）；target 下载后的去向：runtime（解压到 exe 旁 runtime\\<folder>\\，用 marker 文件判断装没装）、plugin（存进「插件」包）、instance（选实例解压到游戏目录并打开包内 exe），不填则存到下载目录；folder / marker 供 runtime 用。默认都指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
   "items": [
-    {
-      "name": "MO 联机补丁（联机必需）",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/MO-online-patch.zip",
-      "note": "解压到游戏根目录即完成安装。正常请用上方「MO 联机补丁」卡片自动下载并安装。"
-    },
-    {
-      "name": "MO 中文输入补丁",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/MO-chinese-input-patch.zip",
-      "note": "解压到游戏根目录；修复 CNC 大厅不能输入中文。"
-    },
     {
       "name": "EasyTier 组网组件",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/easytier.zip",
-      "note": "解压到 runtime\\easytier\\。正常联机建议用上方「组网与运行组件」卡片自动安装。"
+      "target": "runtime",
+      "folder": "easytier",
+      "marker": "easytier-core.exe",
+      "note": "EasyTier 三层组网，免装虚拟网卡驱动。"
     },
     {
       "name": "n2n 组网组件",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/n2n.zip",
-      "note": "解压到 runtime\\n2n\\；n2n 方案需要它。"
+      "target": "runtime",
+      "folder": "n2n",
+      "marker": "edge.exe",
+      "note": "n2n 二层组网；还需要下面的 TAP 虚拟网卡驱动。"
     },
     {
       "name": "TAP 虚拟网卡驱动",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/tap.zip",
-      "note": "解压到 runtime\\tap\\；n2n 方案还需用它安装 TAP 虚拟网卡驱动。"
+      "target": "runtime",
+      "folder": "tap",
+      "marker": "tapinstall.exe",
+      "note": "n2n 方案用它安装 TAP 虚拟网卡驱动。"
     },
     {
       "name": "WinIPBroadcast 广播转发",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/winipbroadcast.zip",
-      "note": "解压到 runtime\\winipbroadcast\\；用于把局域网广播转发到虚拟网卡。"
+      "target": "runtime",
+      "folder": "winipbroadcast",
+      "marker": "WinIPBroadcast-1.6.exe",
+      "note": "把局域网广播转发到虚拟网卡。"
     },
     {
       "name": "7-Zip 解压组件",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/7zip.zip",
-      "note": "解压到 runtime\\7zip\\；缺失时 7z 压缩包会退回较慢的解压实现。"
+      "target": "runtime",
+      "folder": "7zip",
+      "marker": "7za.exe",
+      "note": "缺失时 7z 压缩包会退回较慢的解压实现。"
     },
     {
+      "group": "游戏补丁",
       "name": "红警系列黑屏补丁 · cnc-ddraw 7.1.0.0（推荐）",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/RA2-cnc-ddraw-7.1.0.0.zip",
-      "note": "Win10 / Win11 黑屏或卡顿优先用它。解压后把 ddraw.dll、ddraw.ini、Shaders\\ 等放进游戏根目录，用 cnc-ddraw config.exe 调设置。"
+      "target": "instance",
+      "note": "Win10 / Win11 黑屏或卡顿优先用它。点「下载」后会让你选装到哪个游戏实例，自动解压到该实例的游戏根目录（ddraw.dll / ddraw.ini / Shaders\\ 等），装完自动打开 cnc-ddraw config.exe 调设置。"
     },
     {
-      "name": "DirectX 9.0c（运行库）",
+      "group": "运行库（官网下载）",
+      "name": "DirectX 9.0c",
       "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=35",
-      "note": "微软官方「DirectX 最终用户运行时」页面；游戏提示缺 d3dx9_*.dll 时装它。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方「DirectX 最终用户运行时」页面；游戏提示缺 d3dx9_*.dll 时装它。"
     },
     {
-      "name": ".NET 桌面运行时（运行库）",
+      "group": "运行库（官网下载）",
+      "name": ".NET 桌面运行时",
       "homepage": "https://dotnet.microsoft.com/download/dotnet",
-      "note": "微软官方 .NET 下载页，按需选版本。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方 .NET 下载页，按需选版本。"
     },
     {
-      "name": "Visual C++ 运行库（运行库）",
+      "group": "运行库（官网下载）",
+      "name": "Visual C++ 运行库",
       "homepage": "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
-      "note": "微软官方「最新受支持的 Visual C++ 下载」页；游戏提示缺 msvcp140.dll / vcruntime140.dll 时装它。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方「最新受支持的 Visual C++ 下载」页；游戏提示缺 msvcp140.dll / vcruntime140.dll 时装它。"
     },
     {
-      "name": "XNA Framework 4.0（运行库）",
+      "group": "运行库（官网下载）",
+      "name": "XNA Framework 4.0",
       "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=20914",
-      "note": "微软官方下载页；部分红警相关工具需要它。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方下载页；部分红警相关工具需要它。"
     },
     {
-      "name": ".NET Framework 4.0（运行库）",
+      "group": "运行库（官网下载）",
+      "name": ".NET Framework 4.0",
       "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=17718",
-      "note": "微软官方下载页。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方下载页。"
     },
     {
-      "name": ".NET Framework 4.8（运行库）",
+      "group": "运行库（官网下载）",
+      "name": ".NET Framework 4.8",
       "homepage": "https://dotnet.microsoft.com/download/dotnet-framework/net48",
-      "note": "微软官方下载页。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方下载页。"
     },
     {
-      "name": "Visual Studio 2019（运行库）",
+      "group": "运行库（官网下载）",
+      "name": "Visual Studio 2019",
       "homepage": "https://visualstudio.microsoft.com/vs/older-downloads/",
-      "note": "微软官方「早期版本下载」页，按需自取。本启动器不托管该文件，请到官网下载。"
+      "note": "微软官方「早期版本下载」页，按需自取。"
     }
   ]
 }
