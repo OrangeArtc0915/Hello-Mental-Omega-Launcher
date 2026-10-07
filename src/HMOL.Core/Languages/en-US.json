@@ -2533,6 +2533,14 @@
     "语言": "Language",
     "跟随系统语言已{0}": "Follow-system language {0}",
     "开启后每次启动都按系统时区与区域自动挑语言（中国时区判中文，其余看系统语言）。手动选过一次语言就会自动关掉它。": "When on, the interface language is picked from your system time zone and region at every launch (a Chinese time zone means Chinese; otherwise your system language is used). Picking a language by hand turns this off.",
-    "左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他 / 语言），点进去再看该类下的具体设置项。": "Pick a group on the left first (Personalization / Updates & Downloads / Multiplayer / Other / Language), then choose a specific setting inside it."
+    "左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他 / 语言），点进去再看该类下的具体设置项。": "Pick a group on the left first (Personalization / Updates & Downloads / Multiplayer / Other / Language), then choose a specific setting inside it.",
+    "内容规范：请勿包含受版权保护的音乐（如原版红警 2 / 尤里的复仇原声）。": "Content policy: do not include copyrighted music (for example the original Red Alert 2 / Yuri's Revenge soundtracks).",
+    "内容规范：请只放增量内容，不要打包整份 rulesmo.ini / artmo.ini 等 MO 原始文件。": "Content policy: ship incremental changes only - do not repackage the full rulesmo.ini / artmo.ini or other original Mental Omega files.",
+    "内容规范：请勿打包 MO 官方地图；自制地图分享不受影响。": "Content policy: do not repackage official Mental Omega maps; sharing your own maps is fine.",
+    "内容规范：请勿打包 MO 官方任务；自制任务分享不受影响。": "Content policy: do not repackage official Mental Omega missions; sharing your own missions is fine.",
+    "安装第三方包属于对游戏副本的自行改动，风险自担；通过本启动器安装的内容，MO 官方不提供支持。": "Installing third-party packages modifies your own copy of the game at your own risk; content installed through this launcher is not supported by the Mental Omega team.",
+    "非官方声明：本程序为玩家自制的第三方启动器，与《心灵终结》开发组 Mentalmeisters 无关联，也未获其授权或认证；本程序不提供游戏本体或官方补丁的下载。": "Unofficial notice: this is a third-party launcher made by players. It is not affiliated with Mentalmeisters, the Mental Omega development team, and is neither authorized nor endorsed by them. It does not offer downloads of the game itself or of official patches.",
+    "动图背景里没有可播放的帧，回退主题渐变": "The animated background has no playable frames; falling back to the theme gradient.",
+    "背景：动图 {0}（{1} 帧，画布 {2}×{3}）": "Background: animated image {0} ({1} frames, canvas {2}x{3})"
   }
 }

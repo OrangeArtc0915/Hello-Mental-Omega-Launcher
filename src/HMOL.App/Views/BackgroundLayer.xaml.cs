@@ -39,8 +39,30 @@ public partial class BackgroundLayer : UserControl
     /// <summary>图片的模糊效果。在代码里挂而不是写进 XAML：效果对象不适合用 x:Name 取。</summary>
     private readonly BlurEffect _blur = new() { Radius = 0, RenderingBias = RenderingBias.Performance };
 
-    private List<(BitmapSource Frame, TimeSpan Delay)> _gifFrames = [];
+    /// <summary>
+    /// GIF 的原始帧。GIF 里除首帧外的帧通常只存「本帧新画的那块矩形」+ 相对画布的偏移，
+    /// 而 WPF 的 <see cref="GifBitmapDecoder"/> **不会**帮你合成：把每帧直接当整图交给 Image，
+    /// 每帧会被各自拉伸铺满窗口，动起来就是「局部放大 + 乱跳」。
+    /// 所以这里保留原始像素，播放时按偏移叠到画布上再显示。
+    /// </summary>
+    private sealed record GifFrame(byte[] Pixels, int Stride, Int32Rect Rect, byte Disposal, TimeSpan Delay);
+
+    private List<GifFrame> _gifFrames = [];
     private int _gifIndex;
+
+    /// <summary>合成画布（BGRA、画布尺寸）；disposal=3 要还原的那一份；画布对应的位图。</summary>
+    private byte[]? _gifCanvas;
+    private byte[]? _gifSnapshot;
+    private WriteableBitmap? _gifBitmap;
+    private int _gifWidth;
+    private int _gifHeight;
+
+    /// <summary>画布上当前显示的是第几帧（−1 表示画布是空的）。</summary>
+    private int _gifShown = -1;
+
+    /// <summary>动图 / 视频这类异步素材的淡入时长：等第一帧真出来了再淡入，否则先闪一下空背景。</summary>
+    private int _pendingFadeMs;
+
     private int _loadVersion;
     private bool _paused;
     private bool _videoOpened;
@@ -144,6 +166,7 @@ public partial class BackgroundLayer : UserControl
 
         // 先归零：新画面出现之前不能让上一张背景闪一帧，淡入会把它推回 1
         PanRoot.Opacity = 0;
+        _pendingFadeMs = fadeMs;
 
         try
         {
@@ -186,6 +209,9 @@ public partial class BackgroundLayer : UserControl
             Reset();
             return;
         }
+
+        // 动图与视频要等解码出第一帧才有画面，那时候再淡入；否则会先闪一下空背景再蹦出画面
+        if (kind is BackgroundKind.Gif or BackgroundKind.Video) return;
 
         FadeIn(fadeMs);
     }
@@ -361,27 +387,44 @@ public partial class BackgroundLayer : UserControl
 
     // ————— 动图 —————
 
-    /// <summary>解码放后台线程：几十帧的图在主线程解会卡一下。</summary>
+    /// <summary>解码放后台线程：几十帧的图在主线程解会卡一下。合成放到显示时做，内存才不会被帧数放大。</summary>
     private async void LoadGif(string file)
     {
         var version = ++_loadVersion;
 
         try
         {
-            var frames = await Task.Run(() => DecodeGif(file));
+            var (frames, width, height) = await Task.Run(() => DecodeGif(file));
 
             // 期间用户可能又换了背景，丢弃过期结果
-            if (version != _loadVersion || frames.Count == 0) return;
+            if (version != _loadVersion) return;
+
+            if (frames.Count == 0 || width <= 0 || height <= 0)
+            {
+                Log.Warn(Loc.T("动图背景里没有可播放的帧，回退主题渐变"));
+                Reset();
+                return;
+            }
 
             _gifFrames = frames;
             _gifIndex = 0;
+            _gifWidth = width;
+            _gifHeight = height;
 
-            ImgBackground.Source = frames[0].Frame;
+            _gifCanvas = new byte[width * height * 4];
+            _gifSnapshot = null;
+            _gifShown = -1;
+            _gifBitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
+
+            ImgBackground.Source = _gifBitmap;
             ImgBackground.Visibility = Visibility.Visible;
 
-            ScheduleNextGifFrame();
+            ShowGifFrame(0);
 
-            Log.Info(Loc.F("背景：动图 {0}（{1} 帧）", Path.GetFileName(file), frames.Count));
+            ScheduleNextGifFrame();
+            FadeIn(_pendingFadeMs);
+
+            Log.Info(Loc.F("背景：动图 {0}（{1} 帧，画布 {2}×{3}）", Path.GetFileName(file), frames.Count, width, height));
         }
         catch (Exception ex)
         {
@@ -391,24 +434,90 @@ public partial class BackgroundLayer : UserControl
         }
     }
 
-    private static List<(BitmapSource Frame, TimeSpan Delay)> DecodeGif(string file)
+    /// <summary>
+    /// 解码并把每帧的原始像素取出来（BGRA）。画布尺寸取所有帧矩形的并集——
+    /// 首帧不一定是整张画布，按并集算才不会把最后一帧的右下角切掉。
+    /// </summary>
+    private static (List<GifFrame> Frames, int Width, int Height) DecodeGif(string file)
     {
         var decoder = new GifBitmapDecoder(
-            new Uri(file),
+            new Uri(Path.GetFullPath(file)),
             BitmapCreateOptions.PreservePixelFormat,
             BitmapCacheOption.OnLoad);
 
-        var frames = new List<(BitmapSource Frame, TimeSpan Delay)>();
+        var frames = new List<GifFrame>(decoder.Frames.Count);
+        var width = 0;
+        var height = 0;
 
         foreach (var frame in decoder.Frames)
         {
-            // 帧要冻结才能跨线程交给界面用
-            if (frame.CanFreeze) frame.Freeze();
+            var rect = ReadFrameRect(frame);
+            var pixels = CopyPixels(frame, out var stride);
 
-            frames.Add((frame, ReadFrameDelay(frame)));
+            frames.Add(new GifFrame(pixels, stride, rect, ReadDisposal(frame), ReadFrameDelay(frame)));
+
+            width = Math.Max(width, rect.X + rect.Width);
+            height = Math.Max(height, rect.Y + rect.Height);
         }
 
-        return frames;
+        return (frames, width, height);
+    }
+
+    /// <summary>取帧的 BGRA 像素（GIF 可能解成索引色 / Pbgra32，统一下再叠）。</summary>
+    private static byte[] CopyPixels(BitmapFrame frame, out int stride)
+    {
+        BitmapSource source = frame;
+
+        if (source.Format != PixelFormats.Bgra32)
+            source = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+
+        stride = source.PixelWidth * 4;
+
+        var pixels = new byte[stride * source.PixelHeight];
+        source.CopyPixels(pixels, stride, 0);
+
+        return pixels;
+    }
+
+    /// <summary>帧在画布里的位置与大小；元数据读不到就按「整帧铺在左上角」处理。</summary>
+    private static Int32Rect ReadFrameRect(BitmapFrame frame)
+    {
+        try
+        {
+            // ContainsQuery 在 BitmapMetadata 上，frame.Metadata 的静态类型是 ImageMetadata，得先转
+            if (frame.Metadata is BitmapMetadata metadata &&
+                metadata.ContainsQuery("/imgdesc/Left") && metadata.ContainsQuery("/imgdesc/Top") &&
+                metadata.ContainsQuery("/imgdesc/Width") && metadata.ContainsQuery("/imgdesc/Height"))
+            {
+                return new Int32Rect(
+                    Convert.ToInt32(metadata.GetQuery("/imgdesc/Left")),
+                    Convert.ToInt32(metadata.GetQuery("/imgdesc/Top")),
+                    Convert.ToInt32(metadata.GetQuery("/imgdesc/Width")),
+                    Convert.ToInt32(metadata.GetQuery("/imgdesc/Height")));
+            }
+        }
+        catch
+        {
+            // 读不到就按整帧处理，不为此报错
+        }
+
+        return new Int32Rect(0, 0, frame.PixelWidth, frame.PixelHeight);
+    }
+
+    /// <summary>帧的处置方式：0 / 1 保留、2 清回背景色、3 还原到画这帧之前。</summary>
+    private static byte ReadDisposal(BitmapFrame frame)
+    {
+        try
+        {
+            if (frame.Metadata is BitmapMetadata metadata && metadata.ContainsQuery("/grctlext/Disposal"))
+                return Convert.ToByte(metadata.GetQuery("/grctlext/Disposal"));
+        }
+        catch
+        {
+            // 同上：读不到就按「保留」处理
+        }
+
+        return 0;
     }
 
     private static TimeSpan ReadFrameDelay(BitmapFrame frame)
@@ -435,6 +544,118 @@ public partial class BackgroundLayer : UserControl
         return TimeSpan.FromMilliseconds(fallback);
     }
 
+    /// <summary>
+    /// 把第 <paramref name="index"/> 帧叠到画布上并显示。
+    /// 先按上一帧的处置方式整理画布（清掉 / 还原），再按偏移把这一帧的像素贴上去。
+    /// 合成只针对当前这一帧做，所以内存不会被帧数放大（大动图也不会把内存吃穿）。
+    /// </summary>
+    private void ShowGifFrame(int index)
+    {
+        if (_gifCanvas is null || _gifBitmap is null) return;
+        if (index < 0 || index >= _gifFrames.Count) return;
+
+        // 不是「接着上一帧往下走」（首帧、循环回到开头、跳帧）就把画布清零重来
+        if (index != _gifShown + 1 || _gifShown < 0)
+        {
+            Array.Clear(_gifCanvas);
+            _gifShown = -1;
+            _gifSnapshot = null;
+        }
+        else if (_gifShown >= 0)
+        {
+            ApplyDisposal(_gifFrames[_gifShown]);
+        }
+
+        var frame = _gifFrames[index];
+
+        // disposal=3 要求「下一帧」画之前还原到本帧之前的样子，先把此刻的画布存一份
+        _gifSnapshot = frame.Disposal == 3 ? (byte[])_gifCanvas.Clone() : null;
+
+        BlitGifFrame(frame);
+
+        _gifShown = index;
+    }
+
+    /// <summary>按上一帧的处置方式整理画布。</summary>
+    private void ApplyDisposal(GifFrame previous)
+    {
+        if (previous.Disposal == 2)
+        {
+            ClearGifRect(previous.Rect);
+            return;
+        }
+
+        if (previous.Disposal != 3 || _gifSnapshot is null || _gifCanvas is null) return;
+
+        // 只有这一帧画过的那块变过，还原它就等于还原整个画布
+        var stride = _gifWidth * 4;
+        var bytes = previous.Rect.Width * 4;
+
+        for (var y = 0; y < previous.Rect.Height; y++)
+        {
+            var offset = (previous.Rect.Y + y) * stride + previous.Rect.X * 4;
+            Buffer.BlockCopy(_gifSnapshot, offset, _gifCanvas, offset, bytes);
+        }
+
+        FlushGifRect(previous.Rect);
+    }
+
+    /// <summary>把一帧按偏移贴到画布上：帧里透明的地方保留画布原样（GIF 的增量帧正是靠这个）。</summary>
+    private void BlitGifFrame(GifFrame frame)
+    {
+        if (_gifCanvas is null) return;
+
+        var canvasStride = _gifWidth * 4;
+        var rect = frame.Rect;
+
+        for (var y = 0; y < rect.Height; y++)
+        {
+            var source = y * frame.Stride;
+            var target = (rect.Y + y) * canvasStride + rect.X * 4;
+
+            for (var x = 0; x < rect.Width; x++, source += 4, target += 4)
+            {
+                if (frame.Pixels[source + 3] == 0) continue;
+
+                _gifCanvas[target] = frame.Pixels[source];
+                _gifCanvas[target + 1] = frame.Pixels[source + 1];
+                _gifCanvas[target + 2] = frame.Pixels[source + 2];
+                _gifCanvas[target + 3] = frame.Pixels[source + 3];
+            }
+        }
+
+        FlushGifRect(rect);
+    }
+
+    /// <summary>
+    /// 把画布上一块区域推给位图（只上传这一块，不用整张画布重传）。
+    /// 注意：WritePixels 自己会 Lock / Unlock 并标记脏区，之后<b>不能</b>再调 AddDirtyRect
+    /// （会抛「Cannot call this method while the image is unlocked」）。
+    /// </summary>
+    private void FlushGifRect(Int32Rect rect)
+    {
+        if (_gifCanvas is null || _gifBitmap is null) return;
+        if (rect.Width <= 0 || rect.Height <= 0) return;
+
+        _gifBitmap.WritePixels(rect, _gifCanvas, _gifWidth * 4, rect.X, rect.Y);
+    }
+
+    /// <summary>把画布上一块区域清成透明（disposal=2）。</summary>
+    private void ClearGifRect(Int32Rect rect)
+    {
+        if (_gifCanvas is null) return;
+        if (rect.Width <= 0 || rect.Height <= 0) return;
+
+        var stride = _gifWidth * 4;
+        var bytes = rect.Width * 4;
+        var zero = new byte[bytes];
+
+        for (var y = 0; y < rect.Height; y++)
+            Buffer.BlockCopy(zero, 0, _gifCanvas, (rect.Y + y) * stride + rect.X * 4, bytes);
+
+        FlushGifRect(rect);
+    }
+
     private void ScheduleNextGifFrame()
     {
         if (_paused || _gifFrames.Count <= 1) return;
@@ -450,7 +671,7 @@ public partial class BackgroundLayer : UserControl
         if (_paused || _gifFrames.Count == 0) return;
 
         _gifIndex = (_gifIndex + 1) % _gifFrames.Count;
-        ImgBackground.Source = _gifFrames[_gifIndex].Frame;
+        ShowGifFrame(_gifIndex);
 
         ScheduleNextGifFrame();
     }
@@ -486,6 +707,9 @@ public partial class BackgroundLayer : UserControl
             VidBackground.Position = TimeSpan.Zero;
 
             if (!_paused) VidBackground.Play();
+
+            // 画面真出来了才淡入，免得先闪一下空背景
+            FadeIn(_pendingFadeMs);
         }
         catch (Exception ex)
         {
@@ -512,6 +736,9 @@ public partial class BackgroundLayer : UserControl
 
         // 视频没了就别再压暗，否则会留下一层灰
         OverlayDim.Opacity = 0;
+
+        // 整层还等着淡入，这里得把它推回可见，否则会一直停在透明
+        FadeIn(_pendingFadeMs);
     }
 
     private void OnVideoEnded(object sender, RoutedEventArgs e)
@@ -560,6 +787,12 @@ public partial class BackgroundLayer : UserControl
         _loadVersion++;
         _gifFrames = [];
         _gifIndex = 0;
+        _gifCanvas = null;
+        _gifSnapshot = null;
+        _gifBitmap = null;
+        _gifWidth = 0;
+        _gifHeight = 0;
+        _gifShown = -1;
         _gifTimer.Stop();
         _videoOpened = false;
         _appliedPath = null;

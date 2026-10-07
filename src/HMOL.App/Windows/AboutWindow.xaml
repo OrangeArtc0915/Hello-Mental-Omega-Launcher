@@ -80,6 +80,13 @@
                                Text="{x:Static core:AppInfo.License}" />
                 </Grid>
 
+                <!-- 非官方声明：与《心灵终结》官方（Mentalmeisters）无关联 -->
+                <TextBlock Margin="0,10,0,0"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource Text.Tertiary}"
+                           TextWrapping="Wrap"
+                           Text="{loc:T '非官方声明：本程序为玩家自制的第三方启动器，与《心灵终结》开发组 Mentalmeisters 无关联，也未获其授权或认证；本程序不提供游戏本体或官方补丁的下载。'}" />
+
                 <!-- 官网（GitHub Pages） -->
                 <Grid Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>

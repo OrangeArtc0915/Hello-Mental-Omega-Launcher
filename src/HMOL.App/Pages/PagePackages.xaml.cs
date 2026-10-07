@@ -162,11 +162,29 @@ public partial class PagePackages : LauncherPage
             _tabs[i].Tone = i == clamped ? ButtonTone.Solid : ButtonTone.Outline;
 
         var spec = PackageTypes.Of(_type);
-        LabTypeHint.Text = Loc.F("包目录：{0}\n允许的扩展名：{1}", PackageTypes.DirectoryOf(_type), string.Join(Loc.T("、"), spec.Extensions));
+        LabTypeHint.Text = Loc.F("包目录：{0}\n允许的扩展名：{1}", PackageTypes.DirectoryOf(_type), string.Join(Loc.T("、"), spec.Extensions))
+                           + "\n" + TypePolicyHint(_type);
 
         UpdateInstanceStrip();
         _ = RefreshAsync();
     }
+
+    /// <summary>
+    /// 各类包的内容规范：只做文字提示，不扫描包内文件（对应 MO 官方许可里
+    /// 「不要打包或再分发 MO 原始资产、不要含受版权保护的音乐」这两条口径）。
+    /// 属性而非静态字段：随界面语言变化。
+    /// </summary>
+    private static string TypePolicyHint(PackageType type) => type switch
+    {
+        PackageType.Plugin => Loc.T("内容规范：请勿包含受版权保护的音乐（如原版红警 2 / 尤里的复仇原声）。"),
+        PackageType.Ini => Loc.T("内容规范：请只放增量内容，不要打包整份 rulesmo.ini / artmo.ini 等 MO 原始文件。"),
+        PackageType.Map => Loc.T("内容规范：请勿打包 MO 官方地图；自制地图分享不受影响。"),
+        _ => Loc.T("内容规范：请勿打包 MO 官方任务；自制任务分享不受影响。")
+    };
+
+    /// <summary>安装确认里的免责声明。属性而非常量：随界面语言变化。</summary>
+    private static string InstallDisclaimer
+        => Loc.T("安装第三方包属于对游戏副本的自行改动，风险自担；通过本启动器安装的内容，MO 官方不提供支持。");
 
     private void UpdateInstanceStrip()
     {
@@ -381,7 +399,8 @@ public partial class PagePackages : LauncherPage
             if (conflicts.Count == 0)
             {
                 var choice = ChoiceWindow.Ask(owner, Loc.T("目标已存在"), message,
-                    Loc.F("目标目录已存在：\n{0}\n\n未检测到文件级冲突，替换会先移走原目录再铺入新内容。", target.TargetDirectory),
+                    Loc.F("目标目录已存在：\n{0}\n\n未检测到文件级冲突，替换会先移走原目录再铺入新内容。", target.TargetDirectory)
+                    + "\n\n" + InstallDisclaimer,
                     new ChoiceOption(Loc.T("替换"), "overwrite", ButtonTone.Danger),
                     new ChoiceOption(Loc.T("取消"), "cancel"));
 
@@ -395,7 +414,8 @@ public partial class PagePackages : LauncherPage
                 var detail = $"{sample}\n\n" +
                              Loc.T("• 覆盖全部：用新包覆盖目标目录中的冲突文件\n") +
                              Loc.T("• 跳过已有：保留目标目录中的现有文件，只装入新文件\n") +
-                             Loc.T("• 取消：中止本次安装");
+                             Loc.T("• 取消：中止本次安装") +
+                             "\n\n" + InstallDisclaimer;
 
                 var choice = ChoiceWindow.Ask(owner, Loc.T("检测到文件冲突"),
                     Loc.F("{0}\n\n与目标目录有 {1} 处文件冲突（最多统计 50 条）：", message, conflicts.Count),
@@ -412,7 +432,7 @@ public partial class PagePackages : LauncherPage
         else
         {
             var choice = ChoiceWindow.Ask(owner, Loc.T("确认安装"), message,
-                Loc.T("同名文件会先备份为 .bak-<时间戳>，安装过程可取消。"),
+                Loc.T("同名文件会先备份为 .bak-<时间戳>，安装过程可取消。") + "\n\n" + InstallDisclaimer,
                 new ChoiceOption(Loc.T("安装"), "install", ButtonTone.Solid),
                 new ChoiceOption(Loc.T("取消"), "cancel"));
 

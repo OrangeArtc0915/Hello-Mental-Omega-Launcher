@@ -9,8 +9,8 @@ namespace HMOL.Core.App;
 public static class AppInfo
 {
     public const string Name = "Hello Mental Omega Launcher";
-    public const string Version = "1.5.11";
-    public const string VersionDisplay = "v1.5.11";
+    public const string Version = "1.5.12";
+    public const string VersionDisplay = "v1.5.12";
     public const string Author = "mmm";
 
     /// <summary>许可声明摘要：PolyForm Noncommercial 1.0.0，免费非商业使用（许可证正文见仓库根 LICENSE）。</summary>
