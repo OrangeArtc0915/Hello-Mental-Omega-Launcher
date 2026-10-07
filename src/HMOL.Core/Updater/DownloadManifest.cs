@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Updater;
 
@@ -83,6 +84,7 @@ public static class DownloadManifest
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
+    // 字段别名是 manifest 的数据契约（用户/维护者可写中文键），不随界面语言变化
     private static readonly string[] NameKeys = ["name", "名字", "名称", "title"];
     private static readonly string[] UrlKeys = ["url", "下载地址", "address", "link", "地址"];
     private static readonly string[] UrlArrayKeys = ["urls", "下载地址列表", "parts", "分卷"];
@@ -127,14 +129,14 @@ public static class DownloadManifest
                 if (!response.IsSuccessStatusCode)
                 {
                     errors.Add($"{name}：HTTP {(int)response.StatusCode}");
-                    Log.Warn($"从 {name} 获取下载页文件失败：HTTP {(int)response.StatusCode}");
+                    Log.Warn(Loc.F("从 {0} 获取下载页文件失败：HTTP {1}", name, (int)response.StatusCode));
                     continue;
                 }
 
                 var text = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
                 var items = Parse(text);
 
-                Log.Info($"已获取下载页文件（{name}）：{items.Count} 条");
+                Log.Info(Loc.F("已获取下载页文件（{0}）：{1} 条", name, items.Count));
                 return (items, null);
             }
             catch (OperationCanceledException)
@@ -144,11 +146,11 @@ public static class DownloadManifest
             catch (Exception ex)
             {
                 errors.Add($"{name}：{ex.Message}");
-                Log.Warn($"从 {name} 获取下载页文件失败：{ex.Message}");
+                Log.Warn(Loc.F("从 {0} 获取下载页文件失败：{1}", name, ex.Message));
             }
         }
 
-        return ([], "两个线路都获取失败：" + string.Join("；", errors));
+        return ([], Loc.T("两个线路都获取失败：") + string.Join("；", errors));
     }
 
     /// <summary>解析下载页文件 JSON。纯函数，便于自检与离线核对。</summary>
@@ -203,7 +205,7 @@ public static class DownloadManifest
         }
         catch (JsonException ex)
         {
-            Log.Warn($"下载页文件解析失败：{ex.Message}");
+            Log.Warn(Loc.F("下载页文件解析失败：{0}", ex.Message));
         }
 
         return result;

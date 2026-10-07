@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Security;
 
@@ -101,8 +102,8 @@ public static class DebuggerDetector
         {
             // 读 PEB.BeingDebugged：调试器附加后为 1
             return IsDebuggerPresent()
-                ? new DebuggerCheck(method, true, true, "当前进程已被调试")
-                : new DebuggerCheck(method, false, true, "未命中");
+                ? new DebuggerCheck(method, true, true, Loc.T("当前进程已被调试"))
+                : new DebuggerCheck(method, false, true, Loc.T("未命中"));
         }
         catch (Exception ex)
         {
@@ -116,11 +117,11 @@ public static class DebuggerDetector
         try
         {
             var ok = CheckRemoteDebuggerPresent(GetCurrentProcess(), out var flag);
-            if (!ok) return new DebuggerCheck(method, false, false, "调用失败");
+            if (!ok) return new DebuggerCheck(method, false, false, Loc.T("调用失败"));
 
             return flag
-                ? new DebuggerCheck(method, true, true, "已被远程 / 内核调试器附加")
-                : new DebuggerCheck(method, false, true, "未命中");
+                ? new DebuggerCheck(method, true, true, Loc.T("已被远程 / 内核调试器附加"))
+                : new DebuggerCheck(method, false, true, Loc.T("未命中"));
         }
         catch (Exception ex)
         {
@@ -139,8 +140,8 @@ public static class DebuggerDetector
 
             var value = IntPtr.Size == 8 ? BitConverter.ToInt64(buffer, 0) : BitConverter.ToInt32(buffer, 0);
             return value != 0
-                ? new DebuggerCheck(method, true, true, $"调试端口 = {value}")
-                : new DebuggerCheck(method, false, true, "未命中");
+                ? new DebuggerCheck(method, true, true, Loc.F("调试端口 = {0}", value))
+                : new DebuggerCheck(method, false, true, Loc.T("未命中"));
         }
         catch (Exception ex)
         {
@@ -156,15 +157,15 @@ public static class DebuggerDetector
             var buffer = new byte[IntPtr.Size];
             var status = NtQueryInformationProcess(GetCurrentProcess(), ClassDebugObjectHandle, buffer,
                 buffer.Length, out _);
-            if (status == StatusPortNotSet) return new DebuggerCheck(method, false, true, "未命中");
+            if (status == StatusPortNotSet) return new DebuggerCheck(method, false, true, Loc.T("未命中"));
             if (status != StatusSuccess) return new DebuggerCheck(method, false, false, $"NTSTATUS 0x{status:X8}");
 
             var handle = IntPtr.Size == 8 ? BitConverter.ToInt64(buffer, 0) : BitConverter.ToInt32(buffer, 0);
-            if (handle == 0) return new DebuggerCheck(method, false, true, "未命中");
+            if (handle == 0) return new DebuggerCheck(method, false, true, Loc.T("未命中"));
 
             // 命中的话内核会把一个真的调试对象句柄塞给我们，用完必须关掉
             CloseHandle(new IntPtr(handle));
-            return new DebuggerCheck(method, true, true, "存在调试对象句柄");
+            return new DebuggerCheck(method, true, true, Loc.T("存在调试对象句柄"));
         }
         catch (Exception ex)
         {
@@ -184,8 +185,8 @@ public static class DebuggerDetector
             // 约定（见 al-khaser）：返回 0 表示正在被调试，非 0 表示干净
             var flags = BitConverter.ToInt32(buffer, 0);
             return flags == 0
-                ? new DebuggerCheck(method, true, true, "标志位为 0")
-                : new DebuggerCheck(method, false, true, $"标志位 = {flags}");
+                ? new DebuggerCheck(method, true, true, Loc.T("标志位为 0"))
+                : new DebuggerCheck(method, false, true, Loc.F("标志位 = {0}", flags));
         }
         catch (Exception ex)
         {
@@ -203,7 +204,7 @@ public static class DebuggerDetector
             if (status != StatusSuccess) return new DebuggerCheck(method, false, false, $"NTSTATUS 0x{status:X8}");
 
             var parentId = (int)info.InheritedFromUniqueProcessId.ToInt64();
-            if (parentId <= 0) return new DebuggerCheck(method, false, false, "取不到父进程 ID");
+            if (parentId <= 0) return new DebuggerCheck(method, false, false, Loc.T("取不到父进程 ID"));
 
             // 非管理员读不了别的用户的进程（父进程提权过就会 Access Denied），这时如实记为"无法判定"
             using var parent = Process.GetProcessById(parentId);
@@ -211,10 +212,10 @@ public static class DebuggerDetector
             foreach (var suspect in SuspiciousParents)
             {
                 if (parentName.Contains(suspect, StringComparison.Ordinal))
-                    return new DebuggerCheck(method, true, true, $"父进程 {parent.ProcessName} 命中 {suspect}");
+                    return new DebuggerCheck(method, true, true, Loc.F("父进程 {0} 命中 {1}", parent.ProcessName, suspect));
             }
 
-            return new DebuggerCheck(method, false, true, $"父进程 {parent.ProcessName}");
+            return new DebuggerCheck(method, false, true, Loc.F("父进程 {0}", parent.ProcessName));
         }
         catch (Exception ex)
         {

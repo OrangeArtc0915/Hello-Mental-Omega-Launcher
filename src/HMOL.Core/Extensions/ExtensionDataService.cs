@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Extensions;
 
@@ -60,13 +61,13 @@ public static class ExtensionDataService
         if (fetched.Ok)
         {
             Store(info.Id, fetched.Value!);
-            Log.Info($"扩展「{info.Id}」数据源已更新：{fetched.Value}");
+            Log.Info(Loc.F("扩展「{0}」数据源已更新：{1}", info.Id, fetched.Value));
             return card with { Value = fetched.Value! };
         }
 
-        Log.Info($"扩展「{info.Id}」数据源不可用：{fetched.Error}（已降级为清单里的静态内容）");
+        Log.Info(Loc.F("扩展「{0}」数据源不可用：{1}（已降级为清单里的静态内容）", info.Id, fetched.Error));
 
-        return card with { Note = $"数据源暂时取不到（{fetched.Error}），当前显示的是清单中的静态内容。" };
+        return card with { Note = Loc.F("数据源暂时取不到（{0}），当前显示的是清单中的静态内容。", fetched.Error) };
     }
 
     /// <summary>
@@ -76,7 +77,7 @@ public static class ExtensionDataService
     private static (ExtensionCard Card, bool FromCache) Compose(ExtensionInfo info)
     {
         if (info.Manifest is not { } manifest)
-            return (new ExtensionCard { Error = info.Error ?? "扩展清单不可用" }, false);
+            return (new ExtensionCard { Error = info.Error ?? Loc.T("扩展清单不可用") }, false);
 
         var lines = (manifest.Lines ?? [])
             .Select(line => line.Display)
@@ -88,7 +89,7 @@ public static class ExtensionDataService
         if (manifest.DataSource is not { } source) return (card, false);
 
         if (!SettingsStore.Current.AllowExtensionNetwork)
-            return (card with { Note = "扩展联网已在设置里关闭，这里显示的是清单中的静态内容。" }, false);
+            return (card with { Note = Loc.T("扩展联网已在设置里关闭，这里显示的是清单中的静态内容。") }, false);
 
         return TryGetCached(info.Id, source, out var cached) ? (card with { Value = cached }, true) : (card, false);
     }
@@ -108,7 +109,7 @@ public static class ExtensionDataService
         var url = source.Url ?? string.Empty;
 
         // 双保险：清单在写入时已校验过，这里再拦一次，防止有人手工把网址改坏
-        if (!SiteLinkCatalog.IsHttpUrl(url)) return FetchResult.Failed("清单里的数据源网址不是有效的 http/https 地址");
+        if (!SiteLinkCatalog.IsHttpUrl(url)) return FetchResult.Failed(Loc.T("清单里的数据源网址不是有效的 http/https 地址"));
 
         try
         {
@@ -117,7 +118,7 @@ public static class ExtensionDataService
                 .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
-                return FetchResult.Failed($"接口返回 HTTP {(int)response.StatusCode}");
+                return FetchResult.Failed(Loc.F("接口返回 HTTP {0}", (int)response.StatusCode));
 
             await using var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
 
@@ -126,21 +127,21 @@ public static class ExtensionDataService
             if (!TrySelect(document.RootElement, source.Path, out var value, out var reason))
                 return FetchResult.Failed(reason);
 
-            if (value.Length == 0) return FetchResult.Failed("取到的值是空的");
+            if (value.Length == 0) return FetchResult.Failed(Loc.T("取到的值是空的"));
 
             return FetchResult.From(Trim(value));
         }
         catch (OperationCanceledException)
         {
-            return FetchResult.Failed("请求超时");
+            return FetchResult.Failed(Loc.T("请求超时"));
         }
         catch (HttpRequestException ex)
         {
-            return FetchResult.Failed($"连不上这个网址（{ex.Message}）");
+            return FetchResult.Failed(Loc.F("连不上这个网址（{0}）", ex.Message));
         }
         catch (JsonException)
         {
-            return FetchResult.Failed("返回的内容不是有效的 JSON");
+            return FetchResult.Failed(Loc.T("返回的内容不是有效的 JSON"));
         }
         catch (Exception ex)
         {
@@ -169,7 +170,7 @@ public static class ExtensionDataService
                     case JsonValueKind.Object:
                         if (!current.TryGetProperty(segment, out var property))
                         {
-                            reason = $"返回内容里找不到路径「{segment}」";
+                            reason = Loc.F("返回内容里找不到路径「{0}」", segment);
                             return false;
                         }
 
@@ -180,7 +181,7 @@ public static class ExtensionDataService
                         if (!int.TryParse(segment, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) ||
                             index < 0 || index >= current.GetArrayLength())
                         {
-                            reason = $"路径「{segment}」不是有效的数组下标";
+                            reason = Loc.F("路径「{0}」不是有效的数组下标", segment);
                             return false;
                         }
 
@@ -188,7 +189,7 @@ public static class ExtensionDataService
                         break;
 
                     default:
-                        reason = $"路径「{segment}」已经越过了可以继续深入的层级";
+                        reason = Loc.F("路径「{0}」已经越过了可以继续深入的层级", segment);
                         return false;
                 }
             }
@@ -205,19 +206,19 @@ public static class ExtensionDataService
                 return true;
 
             case JsonValueKind.True:
-                value = "是";
+                value = Loc.T("是");
                 return true;
 
             case JsonValueKind.False:
-                value = "否";
+                value = Loc.T("否");
                 return true;
 
             case JsonValueKind.Null:
-                reason = "取到的值是 null";
+                reason = Loc.T("取到的值是 null");
                 return false;
 
             default:
-                reason = "取到的值是一个对象或数组，无法直接显示成一行文字";
+                reason = Loc.T("取到的值是一个对象或数组，无法直接显示成一行文字");
                 return false;
         }
     }

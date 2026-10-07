@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -29,9 +30,9 @@ public partial class MultiplayerNodeSpeedWindow : Window
 
         _nodes = (kind == NetworkEngineKind.N2n ? NodeCatalog.N2nNodeValues() : NodeCatalog.EasyTierNodeValues()).ToList();
 
-        LabHint.Text = $"当前方案：{NetworkEngineFactory.DisplayName(kind)} · " + LabHint.Text;
+        LabHint.Text = Loc.F("当前方案：{0} · ", NetworkEngineFactory.DisplayName(kind)) + LabHint.Text;
 
-        foreach (var node in _nodes) _latency[node] = "测速中…";
+        foreach (var node in _nodes) _latency[node] = Loc.T("测速中…");
 
         Render();
 
@@ -75,9 +76,9 @@ public partial class MultiplayerNodeSpeedWindow : Window
 
         _running = true;
         BtnRetest.IsEnabled = false;
-        LabStatus.Text = "测速中…";
+        LabStatus.Text = Loc.T("测速中…");
 
-        foreach (var node in _nodes) _latency[node] = "测速中…";
+        foreach (var node in _nodes) _latency[node] = Loc.T("测速中…");
         Render();
 
         _ = MeasureAllAsync();
@@ -94,12 +95,12 @@ public partial class MultiplayerNodeSpeedWindow : Window
                 if (token.IsCancellationRequested) return;
 
                 var milliseconds = await MeasureAsync(node, token);
-                _latency[node] = milliseconds is null ? "不可达" : $"{milliseconds} ms";
+                _latency[node] = milliseconds is null ? Loc.T("不可达") : $"{milliseconds} ms";
 
                 await Dispatcher.InvokeAsync(Render);
             }
 
-            LabStatus.Text = $"测速完成：{_nodes.Count} 个节点";
+            LabStatus.Text = Loc.F("测速完成：{0} 个节点", _nodes.Count);
         }
         catch (OperationCanceledException)
         {
@@ -107,7 +108,7 @@ public partial class MultiplayerNodeSpeedWindow : Window
         }
         catch (Exception ex)
         {
-            LabStatus.Text = $"测速失败：{ex.Message}";
+            LabStatus.Text = Loc.F("测速失败：{0}", ex.Message);
         }
         finally
         {
@@ -142,7 +143,7 @@ public partial class MultiplayerNodeSpeedWindow : Window
         if (ListNodes.SelectedItem is not NodeSpeedRow row) return;
 
         _onPick(row.Node);
-        LabStatus.Text = $"已应用节点：{row.Node}";
+        LabStatus.Text = Loc.F("已应用节点：{0}", row.Node);
 
         Close();
     }

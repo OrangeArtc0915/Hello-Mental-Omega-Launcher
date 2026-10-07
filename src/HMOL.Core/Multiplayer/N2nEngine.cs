@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -81,9 +82,9 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
         var missing = RuntimeLocator.Verify((RuntimeLocator.N2nEdgeExe, "n2n edge.exe"));
         if (missing is not null) return Failure(missing);
 
-        if (IsRunning) return Failure($"{DisplayName} 引擎已在运行");
+        if (IsRunning) return Failure(Loc.F("{0} 引擎已在运行", DisplayName));
 
-        if (string.IsNullOrWhiteSpace(options.RoomName)) return Failure("房间名（小组名称）不能为空");
+        if (string.IsNullOrWhiteSpace(options.RoomName)) return Failure(Loc.T("房间名（小组名称）不能为空"));
 
         _options = options;
         ReorderNodes(options.Node);
@@ -93,7 +94,7 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
         {
             // n2n 必须有 TAP 虚拟网卡，缺驱动时直接给出可操作的中文原因
             var tapCount = await NetworkToolkit.TapCountAsync(cancellationToken).ConfigureAwait(false);
-            if (tapCount <= 0) return Failure("未检测到 TAP 虚拟网卡，请先在网络工具箱中安装 TAP 驱动（需要管理员权限）");
+            if (tapCount <= 0) return Failure(Loc.T("未检测到 TAP 虚拟网卡，请先在网络工具箱中安装 TAP 驱动（需要管理员权限）"));
 
             if (options.AddressMode == NetworkAddressMode.Manual)
             {
@@ -104,7 +105,7 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
             if (result.Ok) return result;
 
             // 自动（DHCP）拿不到虚拟 IP 时用手工地址兜底，这与旧版 _connect_worker 的行为一致
-            LogLine("自动获取虚拟 IP 失败，尝试手动 IP 兜底...");
+            LogLine(Loc.T("自动获取虚拟 IP 失败，尝试手动 IP 兜底..."));
             await StopAsync().ConfigureAwait(false);
 
             var fallbackIp = ResolveManualIp();
@@ -112,18 +113,18 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
 
             if (!second.Ok) return second;
 
-            LogLine($"已用手动 IP 兜底: {fallbackIp}");
-            LogLine("提示: 请让队友也选 n2n, 并把手动 IP 改成不同地址 (如 192.168.100.67)");
+            LogLine(Loc.F("已用手动 IP 兜底: {0}", fallbackIp));
+            LogLine(Loc.T("提示: 请让队友也选 n2n, 并把手动 IP 改成不同地址 (如 192.168.100.67)"));
 
             return second with
             {
-                Message = $"{second.Message}（已用手动 IP 兜底：{fallbackIp}，请让队友改用不同地址，如 192.168.100.67）"
+                Message = Loc.F("{0}（已用手动 IP 兜底：{1}，请让队友改用不同地址，如 192.168.100.67）", second.Message, fallbackIp)
             };
         }
         catch (OperationCanceledException)
         {
             await StopAsync().ConfigureAwait(false);
-            return Failure("启动已取消");
+            return Failure(Loc.T("启动已取消"));
         }
     }
 
@@ -138,8 +139,8 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
     {
         var node = CurrentNode();
 
-        LogLine($"启动 edge：节点={node} 房间={_options.RoomName} " +
-                $"IP模式={(string.IsNullOrEmpty(manualIp) ? "自动(DHCP)" : manualIp)}");
+        LogLine(Loc.F("启动 edge：节点={0} 房间={1} ", node, _options.RoomName) +
+                Loc.F("IP模式={0}", (string.IsNullOrEmpty(manualIp) ? Loc.T("自动(DHCP)") : manualIp)));
 
         var arguments = BuildArguments(node, manualIp);
         LogLine(arguments);
@@ -157,7 +158,7 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (HasExited(CurrentProcess)) return Failure("edge 进程提前退出");
+            if (HasExited(CurrentProcess)) return Failure(Loc.T("edge 进程提前退出"));
 
             foreach (var ip in await NetworkToolkit.TapIpsAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -165,21 +166,21 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
 
                 LocalIp = ip;
                 await NetworkToolkit.SetInterfaceMetricAsync(ip, 1, cancellationToken).ConfigureAwait(false);
-                LogLine($"edge 已就绪，虚拟IP={ip}");
-                return new EngineStartResult(true, $"连接成功，虚拟 IP：{ip}", ip);
+                LogLine(Loc.F("edge 已就绪，虚拟IP={0}", ip));
+                return new EngineStartResult(true, Loc.F("连接成功，虚拟 IP：{0}", ip), ip);
             }
 
             var elapsed = (int)watch.Elapsed.TotalSeconds;
             if (elapsed - lastProgress >= 15)
             {
                 lastProgress = elapsed;
-                progress?.Report($"正在等待 TAP 网卡分配虚拟 IP（{elapsed}s）...");
+                progress?.Report(Loc.F("正在等待 TAP 网卡分配虚拟 IP（{0}s）...", elapsed));
             }
 
             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
         }
 
-        return Failure("edge 启动超时，未获得虚拟 IP");
+        return Failure(Loc.T("edge 启动超时，未获得虚拟 IP"));
     }
 
     /// <summary>命令行参数与旧版 engine_n2n.py:136-145 逐条对齐。</summary>
@@ -201,7 +202,7 @@ public sealed class N2nEngine : EngineProcessBase, INetworkEngine
         var community = NodeCatalog.N2nCommunityFor(node);
         if (community is not null)
         {
-            LogLine($"节点 {node} 固定使用小组名「{community}」，房间名不参与 n2n 组网");
+            LogLine(Loc.F("节点 {0} 固定使用小组名「{1}」，房间名不参与 n2n 组网", node, community));
         }
 
         parts.AddRange(["-c", Quote(community ?? _options.RoomName)]);

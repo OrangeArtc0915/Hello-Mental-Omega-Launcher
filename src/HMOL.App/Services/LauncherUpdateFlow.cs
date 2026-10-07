@@ -5,6 +5,7 @@ using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Updater;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Services;
 
@@ -25,7 +26,7 @@ internal static class LauncherUpdateFlow
             SettingsStore.Save();
         }
 
-        Log.Info($"检查启动器更新：{result.Status}｜{result.Message}");
+        Log.Info(Loc.F("检查启动器更新：{0}｜{1}", result.Status, result.Message));
         return result;
     }
 
@@ -42,7 +43,7 @@ internal static class LauncherUpdateFlow
     {
         if (silenced)
         {
-            if (failureNote is not null) Log.Warn("上次更新失败的提示因静默模式未弹出");
+            if (failureNote is not null) Log.Warn(Loc.T("上次更新失败的提示因静默模式未弹出"));
             return;
         }
 
@@ -51,16 +52,16 @@ internal static class LauncherUpdateFlow
             // 刚才失败过，立刻再弹一次提示没意义
             if (failureNote is not null)
             {
-                ChoiceWindow.Ask(owner, "上次更新没有完成", failureNote,
-                    "本次启动已跳过自动检查更新。",
-                    new ChoiceOption("知道了", "ok", ButtonTone.Solid));
+                ChoiceWindow.Ask(owner, Loc.T("上次更新没有完成"), failureNote,
+                    Loc.T("本次启动已跳过自动检查更新。"),
+                    new ChoiceOption(Loc.T("知道了"), "ok", ButtonTone.Solid));
 
                 return;
             }
 
             var checkOnStartup = SettingsStore.Current.CheckUpdateOnStartup;
 
-            if (!checkOnStartup) Log.Info("启动时自动检查更新已关闭，本次只查有没有强制更新");
+            if (!checkOnStartup) Log.Info(Loc.T("启动时自动检查更新已关闭，本次只查有没有强制更新"));
 
             var result = await CheckAsync();
 
@@ -69,7 +70,7 @@ internal static class LauncherUpdateFlow
 
             if (!checkOnStartup && !SemVer.IsForcedUpdate(result.Update.Version, AppInfo.Version))
             {
-                Log.Info($"新版本 {result.Update.Version} 不是强制更新，而启动时检查已关闭，本次不提示");
+                Log.Info(Loc.F("新版本 {0} 不是强制更新，而启动时检查已关闭，本次不提示", result.Update.Version));
                 return;
             }
 
@@ -77,7 +78,7 @@ internal static class LauncherUpdateFlow
         }
         catch (Exception ex)
         {
-            Log.Warn($"启动时检查更新失败：{ex.Message}");
+            Log.Warn(Loc.F("启动时检查更新失败：{0}", ex.Message));
         }
     }
 
@@ -108,7 +109,7 @@ internal static class LauncherUpdateFlow
                     return;
                 }
 
-                var switchOption = new ChoiceOption($"换个线路（{SourceLabel(OtherSource())}）", "switch");
+                var switchOption = new ChoiceOption(Loc.F("换个线路（{0}）", SourceLabel(OtherSource())), "switch");
 
                 string? choice;
 
@@ -117,33 +118,33 @@ internal static class LauncherUpdateFlow
                     // 能自动更新时主推「现在更新」；不能的话只能引导去发布页。
                     // 强制更新同样允许换线路：某个源下不动时不该把人卡死在这里。
                     ChoiceOption[] options = canAutoInstall
-                        ? [new ChoiceOption($"现在更新到 v{info.Version}", "install", ButtonTone.Solid),
+                        ? [new ChoiceOption(Loc.F("现在更新到 v{0}", info.Version), "install", ButtonTone.Solid),
                            switchOption,
-                           new ChoiceOption("打开发布页", "page")]
-                        : [new ChoiceOption("打开发布页手动下载", "page", ButtonTone.Solid), switchOption];
+                           new ChoiceOption(Loc.T("打开发布页"), "page")]
+                        : [new ChoiceOption(Loc.T("打开发布页手动下载"), "page", ButtonTone.Solid), switchOption];
 
-                    choice = ChoiceWindow.Ask(owner, "必须更新",
-                        $"启动器有新版本 v{info.Version}，本次必须更新后才能继续使用（来自 {info.Source}）。",
-                        "这次更新跨了主版本或次版本，旧版本不再可用。\n" +
-                        "更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n" +
-                        "没有完成更新的话，启动器会直接退出。\n" +
-                        $"当前线路（{info.Source}）下不动的话，可以点「{switchOption.Text}」换一个源再试。",
+                    choice = ChoiceWindow.Ask(owner, Loc.T("必须更新"),
+                        Loc.F("启动器有新版本 v{0}，本次必须更新后才能继续使用（来自 {1}）。", info.Version, info.Source),
+                        Loc.T("这次更新跨了主版本或次版本，旧版本不再可用。\n") +
+                        Loc.T("更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n") +
+                        Loc.T("没有完成更新的话，启动器会直接退出。\n") +
+                        Loc.F("当前线路（{0}）下不动的话，可以点「{1}」换一个源再试。", info.Source, switchOption.Text),
                         options);
                 }
                 else
                 {
-                    choice = ChoiceWindow.Ask(owner, "发现新版本",
-                        $"启动器有新版本 v{info.Version}（来自 {info.Source}）。",
-                        "更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n" +
-                        "更新时程序会自动关闭，替换完成后重新打开。\n" +
-                        $"下载不了的话，可以点「{switchOption.Text}」换一个源再试。",
-                        new ChoiceOption($"现在更新到 v{info.Version}", "install", ButtonTone.Solid),
+                    choice = ChoiceWindow.Ask(owner, Loc.T("发现新版本"),
+                        Loc.F("启动器有新版本 v{0}（来自 {1}）。", info.Version, info.Source),
+                        Loc.T("更新只会替换启动器本身：设置、缓存和你的游戏文件都不会动。\n") +
+                        Loc.T("更新时程序会自动关闭，替换完成后重新打开。\n") +
+                        Loc.F("下载不了的话，可以点「{0}」换一个源再试。", switchOption.Text),
+                        new ChoiceOption(Loc.F("现在更新到 v{0}", info.Version), "install", ButtonTone.Solid),
                         switchOption,
-                        new ChoiceOption("稍后", "later"),
-                        new ChoiceOption("打开发布页", "page"));
+                        new ChoiceOption(Loc.T("稍后"), "later"),
+                        new ChoiceOption(Loc.T("打开发布页"), "page"));
                 }
 
-                Log.Info($"更新确认框返回 {choice ?? "<关闭>"}（{(forced ? "强制" : "可选")}更新，来自 {info.Source}）");
+                Log.Info(Loc.F("更新确认框返回 {0}（{1}更新，来自 {2}）", choice ?? Loc.T("<关闭>"), (forced ? Loc.T("强制") : Loc.T("可选")), info.Source));
 
                 if (choice == "switch")
                 {
@@ -153,14 +154,14 @@ internal static class LauncherUpdateFlow
                     SettingsStore.Current.LauncherUpdateSource = next;
                     SettingsStore.Save();
 
-                    Log.Info($"更新窗口切换线路：{current} → {next}，重新检查");
+                    Log.Info(Loc.F("更新窗口切换线路：{0} → {1}，重新检查", current, next));
 
                     var again = await CheckAsync();
 
                     if (again.Update is null)
                     {
-                        ChoiceWindow.Warn(owner, "换个线路没查到更新", again.Message,
-                            "可以到「设置 → 程序更新」里手动再换一次线路，或稍后再试。");
+                        ChoiceWindow.Warn(owner, Loc.T("换个线路没查到更新"), again.Message,
+                            Loc.T("可以到「设置 → 程序更新」里手动再换一次线路，或稍后再试。"));
 
                         // 强制更新换源后仍取不到：旧版本还是不能继续用
                         if (forced) ExitForForcedUpdate();
@@ -186,8 +187,8 @@ internal static class LauncherUpdateFlow
                     return;
                 }
 
-                var progress = ProgressWindow.Open(owner, "正在更新启动器",
-                    $"正在下载 v{info.Version}…", canCancel: true);
+                var progress = ProgressWindow.Open(owner, Loc.T("正在更新启动器"),
+                    Loc.F("正在下载 v{0}…", info.Version), canCancel: true);
 
                 UpdateInstallResult result;
 
@@ -197,22 +198,22 @@ internal static class LauncherUpdateFlow
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("下载启动器更新失败", ex);
-                    result = new UpdateInstallResult(false, $"更新失败：{ex.Message}");
+                    Log.Error(Loc.T("下载启动器更新失败"), ex);
+                    result = new UpdateInstallResult(false, Loc.F("更新失败：{0}", ex.Message));
                 }
                 finally
                 {
                     progress.Finish();
                 }
 
-                Log.Info($"更新结果：{(result.Success ? "已交棒给替换脚本" : "失败")}｜{result.Message}");
+                Log.Info(Loc.F("更新结果：{0}｜{1}", (result.Success ? Loc.T("已交棒给替换脚本") : Loc.T("失败")), result.Message));
 
                 if (!result.Success)
                 {
-                    var next = ChoiceWindow.Ask(owner, "更新没有完成", result.Message,
-                        "可以稍后再试，或到发布页手动下载最新版本覆盖原来的启动器。",
-                        new ChoiceOption("打开发布页", "page"),
-                        new ChoiceOption("知道了", "ok", ButtonTone.Solid));
+                    var next = ChoiceWindow.Ask(owner, Loc.T("更新没有完成"), result.Message,
+                        Loc.T("可以稍后再试，或到发布页手动下载最新版本覆盖原来的启动器。"),
+                        new ChoiceOption(Loc.T("打开发布页"), "page"),
+                        new ChoiceOption(Loc.T("知道了"), "ok", ButtonTone.Solid));
 
                     if (next == "page") ShellHelper.OpenUrl(info.ReleasePageUrl);
 
@@ -228,7 +229,7 @@ internal static class LauncherUpdateFlow
         }
         catch (Exception ex)
         {
-            Log.Error("更新流程异常", ex);
+            Log.Error(Loc.T("更新流程异常"), ex);
         }
     }
 
@@ -240,9 +241,9 @@ internal static class LauncherUpdateFlow
 
     private static string SourceLabel(LauncherUpdateSource source) => source switch
     {
-        LauncherUpdateSource.GitHub => "GitHub 优先",
-        LauncherUpdateSource.Gitee => "Gitee 优先",
-        _ => "自动"
+        LauncherUpdateSource.GitHub => Loc.T("GitHub 优先"),
+        LauncherUpdateSource.Gitee => Loc.T("Gitee 优先"),
+        _ => Loc.T("自动")
     };
 
     /// <summary>
@@ -251,7 +252,7 @@ internal static class LauncherUpdateFlow
     /// </summary>
     private static void ExitForForcedUpdate()
     {
-        Log.Warn("强制更新未完成，退出启动器");
+        Log.Warn(Loc.T("强制更新未完成，退出启动器"));
 
         Application.Current.Shutdown();
     }

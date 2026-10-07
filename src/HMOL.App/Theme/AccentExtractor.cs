@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Theme;
 
@@ -36,7 +37,7 @@ internal static class AccentExtractor
         }
         catch (Exception ex)
         {
-            Log.Warn($"从背景图取色失败：{ex.Message}");
+            Log.Warn(Loc.F("从背景图取色失败：{0}", ex.Message));
             return null;
         }
     }

@@ -8,6 +8,7 @@ using HMOL.Core.App;
 using HMOL.Core.Games;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Backup;
 
@@ -72,7 +73,7 @@ public static class BackupService
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            error = "备份名称不能为空";
+            error = Loc.T("备份名称不能为空");
             return false;
         }
 
@@ -80,26 +81,26 @@ public static class BackupService
 
         if (trimmed.Length == 0)
         {
-            error = "备份名称不能仅包含空白字符";
+            error = Loc.T("备份名称不能仅包含空白字符");
             return false;
         }
 
         if (ForbiddenNames.Contains(trimmed))
         {
-            error = $"备份名称「{trimmed}」为系统保留名称，禁止使用。\n" +
-                    "保留名称包括：MO / mo / Mo / mO / MO.mo.mO / 原版 / 原版游戏 / 原版游戏备份";
+            error = Loc.F("备份名称「{0}」为系统保留名称，禁止使用。\n", trimmed) +
+                    Loc.T("保留名称包括：MO / mo / Mo / mO / MO.mo.mO / 原版 / 原版游戏 / 原版游戏备份");
             return false;
         }
 
         if (trimmed.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || trimmed.Any(char.IsControl))
         {
-            error = "备份名称包含非法字符，请避免使用：< > : \" / \\ | ? * 以及控制字符";
+            error = Loc.T("备份名称包含非法字符，请避免使用：< > : \" / \\ | ? * 以及控制字符");
             return false;
         }
 
         if (trimmed.Length > 100)
         {
-            error = "备份名称过长（最大 100 字符）";
+            error = Loc.T("备份名称过长（最大 100 字符）");
             return false;
         }
 
@@ -118,7 +119,7 @@ public static class BackupService
         }
         catch (Exception ex)
         {
-            Log.Warn($"备份元数据解析失败：{file}（{ex.Message}）");
+            Log.Warn(Loc.F("备份元数据解析失败：{0}（{1}）", file, ex.Message));
             return null;
         }
     }
@@ -129,7 +130,7 @@ public static class BackupService
         var result = new List<BackupEntry>();
 
         if (Directory.Exists(OriginalBackupPath))
-            result.Add(BuildEntry(BackupKind.Original, "原版游戏", OriginalBackupPath));
+            result.Add(BuildEntry(BackupKind.Original, Loc.T("原版游戏"), OriginalBackupPath));
 
         try
         {
@@ -141,7 +142,7 @@ public static class BackupService
         }
         catch (Exception ex)
         {
-            Log.Error($"枚举用户备份失败：{UserBackupRoot}", ex);
+            Log.Error(Loc.F("枚举用户备份失败：{0}", UserBackupRoot), ex);
         }
 
         return result;
@@ -159,13 +160,13 @@ public static class BackupService
         if (!IsValidName(backupName, out var error)) return Fail(error);
 
         if (string.IsNullOrWhiteSpace(sourceDirectory) || !Directory.Exists(sourceDirectory))
-            return Fail($"源目录无效，无法备份：{sourceDirectory}");
+            return Fail(Loc.F("源目录无效，无法备份：{0}", sourceDirectory));
 
         var name = backupName.Trim();
         var target = PathOf(name);
 
         if (Directory.Exists(target) && !overwrite)
-            return Fail($"已存在同名备份：{target}");
+            return Fail(Loc.F("已存在同名备份：{0}", target));
 
         var staging = Path.Combine(BackupRoot, $"staging_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
 
@@ -179,19 +180,19 @@ public static class BackupService
             if (summary.Total == 0)
             {
                 TryDeleteDirectory(staging);
-                return Fail("实例中没有可备份的文件");
+                return Fail(Loc.T("实例中没有可备份的文件"));
             }
 
             if (summary.AllFailed)
             {
                 TryDeleteDirectory(staging);
-                return Fail($"备份失败：所有 {summary.Total} 个文件均无法复制");
+                return Fail(Loc.F("备份失败：所有 {0} 个文件均无法复制", summary.Total));
             }
 
             if (token.IsCancellationRequested)
             {
                 TryDeleteDirectory(staging);
-                return new BackupOutcome(false, true, "备份已取消", 0, 0, 0);
+                return new BackupOutcome(false, true, Loc.T("备份已取消"), 0, 0, 0);
             }
 
             // 完整性校验：文件数不能为 0；体积差异超过容差只记警告（源目录可能正在变化）
@@ -202,13 +203,13 @@ public static class BackupService
             if (fileCount == 0)
             {
                 TryDeleteDirectory(staging);
-                return Fail("备份完整性校验失败：备份目录为空");
+                return Fail(Loc.T("备份完整性校验失败：备份目录为空"));
             }
 
             var tolerance = Math.Max(1024, sourceSize / 1000);
             if (sourceSize > 0 && Math.Abs(sourceSize - backupSize) > tolerance)
             {
-                Log.Warn($"备份体积与源目录不一致：源 {sourceSize} 字节，备份 {backupSize} 字节");
+                Log.Warn(Loc.F("备份体积与源目录不一致：源 {0} 字节，备份 {1} 字节", sourceSize, backupSize));
             }
 
             WriteInfo(staging, new BackupInfo
@@ -231,23 +232,23 @@ public static class BackupService
             progress?.Report(new ProgressSample(1));
 
             var sizeText = FormatSize(backupSize);
-            var message = $"已备份到：\n{target}\n\n共 {summary.Total} 个文件，共 {sizeText}" +
-                          (summary.Failed > 0 ? $"\n（其中 {summary.Failed} 个文件复制失败）" : string.Empty);
+            var message = Loc.F("已备份到：\n{0}\n\n共 {1} 个文件，共 {2}", target, summary.Total, sizeText) +
+                          (summary.Failed > 0 ? Loc.F("\n（其中 {0} 个文件复制失败）", summary.Failed) : string.Empty);
 
-            Log.Info($"备份完成：{name}，{summary.Total} 个文件，{sizeText} → {target}");
+            Log.Info(Loc.F("备份完成：{0}，{1} 个文件，{2} → {3}", name, summary.Total, sizeText, target));
 
             return new BackupOutcome(true, false, message, summary.Total, summary.Failed, backupSize);
         }
         catch (OperationCanceledException)
         {
             TryDeleteDirectory(staging);
-            return new BackupOutcome(false, true, "备份已取消", 0, 0, 0);
+            return new BackupOutcome(false, true, Loc.T("备份已取消"), 0, 0, 0);
         }
         catch (Exception ex)
         {
             TryDeleteDirectory(staging);
-            Log.Error($"备份失败：{backupName}", ex);
-            return Fail($"备份失败：{ex.Message}");
+            Log.Error(Loc.F("备份失败：{0}", backupName), ex);
+            return Fail(Loc.F("备份失败：{0}", ex.Message));
         }
     }
 
@@ -259,17 +260,17 @@ public static class BackupService
         IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(sourceDirectory) || !Directory.Exists(sourceDirectory))
-            return Fail($"源目录不存在：{sourceDirectory}");
+            return Fail(Loc.F("源目录不存在：{0}", sourceDirectory));
 
         if (!GameLocator.IsMoDirectory(sourceDirectory))
         {
-            return Fail("所选目录不是有效的心灵终结游戏目录：\n" + sourceDirectory +
-                        "\n\n有效目录需满足：含 Mental_Omega 子目录，或目录/父目录内含 " +
-                        "MentalOmegaClient.exe 或 \"Mental Omega.exe\"。");
+            return Fail(Loc.T("所选目录不是有效的心灵终结游戏目录：\n") + sourceDirectory +
+                        Loc.T("\n\n有效目录需满足：含 Mental_Omega 子目录，或目录/父目录内含 ") +
+                        Loc.T("MentalOmegaClient.exe 或 \"Mental Omega.exe\"。"));
         }
 
         if (Directory.Exists(OriginalBackupPath) && !overwrite)
-            return Fail($"原版游戏备份已存在：{OriginalBackupPath}");
+            return Fail(Loc.F("原版游戏备份已存在：{0}", OriginalBackupPath));
 
         var staging = Path.Combine(BackupRoot, "staging_original");
         TryDeleteDirectory(staging);
@@ -284,28 +285,28 @@ public static class BackupService
             if (summary.Total == 0)
             {
                 TryDeleteDirectory(staging);
-                return Fail("所选目录没有可备份的文件");
+                return Fail(Loc.T("所选目录没有可备份的文件"));
             }
 
             if (summary.AllFailed)
             {
                 TryDeleteDirectory(staging);
-                return Fail($"备份失败：所有 {summary.Total} 个文件均无法复制");
+                return Fail(Loc.F("备份失败：所有 {0} 个文件均无法复制", summary.Total));
             }
 
             if (token.IsCancellationRequested)
             {
                 TryDeleteDirectory(staging);
-                return new BackupOutcome(false, true, "备份已取消", 0, 0, 0);
+                return new BackupOutcome(false, true, Loc.T("备份已取消"), 0, 0, 0);
             }
 
             if (summary.Failed > 0)
-                Log.Warn($"原版备份：有 {summary.Failed}/{summary.Total} 个文件复制失败");
+                Log.Warn(Loc.F("原版备份：有 {0}/{1} 个文件复制失败", summary.Failed, summary.Total));
 
             WriteInfo(staging, new BackupInfo
             {
                 Type = "original",
-                Name = "原版游戏",
+                Name = Loc.T("原版游戏"),
                 SourceInstanceId = "original",
                 SourcePath = sourceDirectory,
                 FileCount = summary.Total,
@@ -315,10 +316,10 @@ public static class BackupService
             Publish(staging, OriginalBackupPath);
             progress?.Report(new ProgressSample(1));
 
-            var message = $"原版游戏备份创建成功\n备份位置：{OriginalBackupPath}\n共 {summary.Total} 个文件" +
-                          (summary.Failed > 0 ? $"\n（其中 {summary.Failed} 个文件复制失败）" : string.Empty);
+            var message = Loc.F("原版游戏备份创建成功\n备份位置：{0}\n共 {1} 个文件", OriginalBackupPath, summary.Total) +
+                          (summary.Failed > 0 ? Loc.F("\n（其中 {0} 个文件复制失败）", summary.Failed) : string.Empty);
 
-            Log.Info($"原版备份完成：{summary.Total} 个文件 → {OriginalBackupPath}");
+            Log.Info(Loc.F("原版备份完成：{0} 个文件 → {1}", summary.Total, OriginalBackupPath));
 
             return new BackupOutcome(true, false, message, summary.Total, summary.Failed,
                 DirectoryCopier.GetSize(OriginalBackupPath));
@@ -326,13 +327,13 @@ public static class BackupService
         catch (OperationCanceledException)
         {
             TryDeleteDirectory(staging);
-            return new BackupOutcome(false, true, "备份已取消", 0, 0, 0);
+            return new BackupOutcome(false, true, Loc.T("备份已取消"), 0, 0, 0);
         }
         catch (Exception ex)
         {
             TryDeleteDirectory(staging);
-            Log.Error("原版备份失败", ex);
-            return Fail($"备份失败：{ex.Message}");
+            Log.Error(Loc.T("原版备份失败"), ex);
+            return Fail(Loc.F("备份失败：{0}", ex.Message));
         }
     }
 
@@ -344,13 +345,13 @@ public static class BackupService
         IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(backupDirectory) || !Directory.Exists(backupDirectory))
-            return Fail($"备份目录不存在：{backupDirectory}");
+            return Fail(Loc.F("备份目录不存在：{0}", backupDirectory));
 
         if (string.IsNullOrWhiteSpace(targetDirectory))
-            return Fail("目标目录为空");
+            return Fail(Loc.T("目标目录为空"));
 
         var target = PathGuard.NormalizeRoot(targetDirectory);
-        if (target.Length == 0) return Fail($"目标目录无法解析：{targetDirectory}");
+        if (target.Length == 0) return Fail(Loc.F("目标目录无法解析：{0}", targetDirectory));
 
         // 隔离区放目标同分区：跨盘时「把现有内容整体搬走」会退化成整目录复制
         var journal = new OperationJournal(Paths.ScratchFor(target));
@@ -364,7 +365,7 @@ public static class BackupService
                 token.ThrowIfCancellationRequested();
 
                 if (journal.MoveToQuarantine(entry) is null)
-                    throw new IOException($"无法移走目标目录现有内容：{entry}");
+                    throw new IOException(Loc.F("无法移走目标目录现有内容：{0}", entry));
             }
 
             // 元数据文件不是游戏文件，不还原进游戏目录
@@ -374,19 +375,19 @@ public static class BackupService
             if (summary.Total == 0)
             {
                 journal.Rollback();
-                return Fail("备份内容为空，未恢复任何文件");
+                return Fail(Loc.T("备份内容为空，未恢复任何文件"));
             }
 
             if (summary.AllFailed)
             {
                 journal.Rollback();
-                return Fail($"恢复失败：所有 {summary.Total} 个文件均无法复制");
+                return Fail(Loc.F("恢复失败：所有 {0} 个文件均无法复制", summary.Total));
             }
 
             if (token.IsCancellationRequested)
             {
                 journal.Rollback();
-                return new BackupOutcome(false, true, "恢复已取消，已回滚本次改动", 0, 0, 0);
+                return new BackupOutcome(false, true, Loc.T("恢复已取消，已回滚本次改动"), 0, 0, 0);
             }
 
             journal.Commit();
@@ -394,25 +395,25 @@ public static class BackupService
 
             var warning = GameLocator.IsMoDirectory(target)
                 ? string.Empty
-                : "\n\n⚠️ 恢复后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件是否完整。";
+                : Loc.T("\n\n⚠️ 恢复后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件是否完整。");
 
-            Log.Info($"恢复完成：{backupDirectory} → {target}，{summary.Total} 个文件，失败 {summary.Failed}");
+            Log.Info(Loc.F("恢复完成：{0} → {1}，{2} 个文件，失败 {3}", backupDirectory, target, summary.Total, summary.Failed));
 
             return new BackupOutcome(summary.Failed == 0, false,
-                $"恢复成功\n共 {summary.Total} 个文件" +
-                (summary.Failed > 0 ? $"\n（其中 {summary.Failed} 个文件复制失败）" : string.Empty) + warning,
+                Loc.F("恢复成功\n共 {0} 个文件", summary.Total) +
+                (summary.Failed > 0 ? Loc.F("\n（其中 {0} 个文件复制失败）", summary.Failed) : string.Empty) + warning,
                 summary.Total, summary.Failed, summary.BytesCopied);
         }
         catch (OperationCanceledException)
         {
             journal.Rollback();
-            return new BackupOutcome(false, true, "恢复已取消，已回滚本次改动", 0, 0, 0);
+            return new BackupOutcome(false, true, Loc.T("恢复已取消，已回滚本次改动"), 0, 0, 0);
         }
         catch (Exception ex)
         {
             journal.Rollback();
-            Log.Error($"恢复失败：{backupDirectory} → {target}", ex);
-            return Fail($"恢复失败：{ex.Message}");
+            Log.Error(Loc.F("恢复失败：{0} → {1}", backupDirectory, target), ex);
+            return Fail(Loc.F("恢复失败：{0}", ex.Message));
         }
     }
 
@@ -424,13 +425,13 @@ public static class BackupService
         CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(backupDirectory) || !Directory.Exists(backupDirectory))
-            return new BackupVerifyResult(0, 0, 0, "备份目录不存在");
+            return new BackupVerifyResult(0, 0, 0, Loc.T("备份目录不存在"));
 
         var files = DirectoryCopier.ListFiles(backupDirectory)
             .Where(relative => !string.Equals(relative, BackupInfoFileName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (files.Count == 0) return new BackupVerifyResult(0, 0, 0, "备份目录为空");
+        if (files.Count == 0) return new BackupVerifyResult(0, 0, 0, Loc.T("备份目录为空"));
 
         var sample = files.Count <= sampleSize
             ? files
@@ -460,7 +461,7 @@ public static class BackupService
             catch (Exception ex)
             {
                 mismatched++;
-                Log.Warn($"备份校验读取失败：{full}（{ex.Message}）");
+                Log.Warn(Loc.F("备份校验读取失败：{0}（{1}）", full, ex.Message));
             }
         }
 
@@ -529,7 +530,7 @@ public static class BackupService
         }
         catch (Exception ex)
         {
-            Log.Error($"写入备份元数据失败：{directory}", ex);
+            Log.Error(Loc.F("写入备份元数据失败：{0}", directory), ex);
         }
     }
 
@@ -549,13 +550,13 @@ public static class BackupService
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理临时目录失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("清理临时目录失败：{0}（{1}）", directory, ex.Message));
         }
     }
 
     private static BackupOutcome Fail(string message)
     {
-        Log.Warn($"备份操作失败：{message}");
+        Log.Warn(Loc.F("备份操作失败：{0}", message));
         return new BackupOutcome(false, false, message, 0, 0, 0);
     }
 }

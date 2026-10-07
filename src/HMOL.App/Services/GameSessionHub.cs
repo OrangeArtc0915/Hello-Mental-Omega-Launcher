@@ -1,6 +1,7 @@
 using HMOL.Core.Instances;
 using HMOL.Core.Launch;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Services;
 
@@ -28,7 +29,7 @@ internal static class GameSessionHub
 
         if (IsRunning)
         {
-            error = "游戏已经在运行中。";
+            error = Loc.T("游戏已经在运行中。");
             return false;
         }
 
@@ -47,7 +48,7 @@ internal static class GameSessionHub
         instance.LastLaunchedAt = DateTime.Now;
 
         if (InstanceStore.Save(instance))
-            Log.Info($"已记录实例「{instance.Name}」的启动时间：{instance.LastLaunchedAt:yyyy-MM-dd HH:mm:ss}");
+            Log.Info(Loc.F("已记录实例「{0}」的启动时间：{1:yyyy-MM-dd HH:mm:ss}", instance.Name, instance.LastLaunchedAt));
     }
 
     /// <summary>结束当前游戏进程（含子进程树）。进程退出后由会话自身收尾。</summary>
@@ -65,7 +66,7 @@ internal static class GameSessionHub
             if (ReferenceEquals(_session, session)) _session = null;
 
             ActivityLog.Write(LogSource.Game,
-                code is null ? "游戏进程已结束" : $"游戏进程已结束（退出码 {code}）");
+                code is null ? Loc.T("游戏进程已结束") : Loc.F("游戏进程已结束（退出码 {0}）", code));
 
             session.Dispose();
             StateChanged?.Invoke();

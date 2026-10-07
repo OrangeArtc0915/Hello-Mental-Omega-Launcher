@@ -1,4 +1,4 @@
-<Window x:Class="HMOL.App.Windows.Multiplayer.MultiplayerMoreWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.Multiplayer.MultiplayerMoreWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -13,17 +13,17 @@
         WindowStartupLocation="CenterOwner"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Padding="0" Title="更多设置" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" Title="{loc:T '更多设置'}" UseShadow="False">
         <StackPanel Margin="16,12,16,16">
             <TextBlock FontSize="12.5"
                        FontWeight="Bold"
                        Foreground="{DynamicResource Text.Primary}"
-                       Text="自定义节点" />
+                       Text="{loc:T '自定义节点'}" />
             <TextBlock Margin="0,4,0,0"
                        FontSize="11.5"
                        Foreground="{DynamicResource Text.Tertiary}"
                        TextWrapping="Wrap"
-                       Text="格式示例：n2n 填 1.2.3.4:9555；EasyTier 填 tcp://1.2.3.4:11010 或 udp://1.2.3.4:11010。" />
+                       Text="{loc:T '格式示例：n2n 填 1.2.3.4:9555；EasyTier 填 tcp://1.2.3.4:11010 或 udp://1.2.3.4:11010。'}" />
 
             <Border Height="32"
                     Margin="0,8,0,0"
@@ -51,9 +51,9 @@
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
 
             <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
-                <c:OutlineButton Content="添加" Tone="Solid" Click="OnAddNodeClick" />
+                <c:OutlineButton Content="{loc:T '添加'}" Tone="Solid" Click="OnAddNodeClick" />
                 <c:OutlineButton Margin="8,0,0,0"
-                                 Content="删除选中"
+                                 Content="{loc:T '删除选中'}"
                                  Tone="Danger"
                                  Click="OnRemoveNodeClick" />
             </StackPanel>
@@ -62,10 +62,10 @@
                        FontSize="12.5"
                        FontWeight="Bold"
                        Foreground="{DynamicResource Text.Primary}"
-                       Text="进程守护" />
+                       Text="{loc:T '进程守护'}" />
             <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                 <c:OutlineButton x:Name="BtnGuard"
-                                 Content="已开启"
+                                 Content="{loc:T '已开启'}"
                                  Click="OnGuardClick" />
                 <TextBlock x:Name="LabGuardHint"
                            Margin="10,0,0,0"
@@ -73,14 +73,14 @@
                            FontSize="11.5"
                            Foreground="{DynamicResource Text.Tertiary}"
                            TextWrapping="Wrap"
-                           Text="引擎异常退出时自动重启" />
+                           Text="{loc:T '引擎异常退出时自动重启'}" />
             </StackPanel>
 
             <TextBlock Margin="0,16,0,0"
                        FontSize="12.5"
                        FontWeight="Bold"
                        Foreground="{DynamicResource Text.Primary}"
-                       Text="开机自启" />
+                       Text="{loc:T '开机自启'}" />
             <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                 <c:OutlineButton x:Name="BtnAutoStart"
                                  Click="OnAutoStartClick" />
@@ -89,14 +89,14 @@
                            FontSize="11.5"
                            Foreground="{DynamicResource Text.Tertiary}"
                            TextWrapping="Wrap"
-                           Text="登录系统后自动启动" />
+                           Text="{loc:T '登录系统后自动启动'}" />
             </StackPanel>
             <TextBlock x:Name="LabAutoStartStatus"
                        Margin="0,6,0,0"
                        FontSize="11.5"
                        Foreground="{DynamicResource Text.Tertiary}"
                        TextWrapping="Wrap"
-                       Text="开启后只驻留系统托盘，不弹出主窗口。" />
+                       Text="{loc:T '开启后只驻留系统托盘，不弹出主窗口。'}" />
         </StackPanel>
     </c:SurfaceCard>
 </Window>

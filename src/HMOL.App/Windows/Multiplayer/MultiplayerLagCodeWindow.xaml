@@ -1,4 +1,4 @@
-<Window x:Class="HMOL.App.Windows.Multiplayer.MultiplayerLagCodeWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.Multiplayer.MultiplayerLagCodeWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -13,12 +13,12 @@
         WindowStartupLocation="CenterOwner"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Padding="0" Title="心灵终结 CNC 大厅延迟代码" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" Title="{loc:T '心灵终结 CNC 大厅延迟代码'}" UseShadow="False">
         <StackPanel Margin="16,12,16,16">
             <TextBlock FontSize="12"
                        Foreground="{DynamicResource Text.Secondary}"
                        TextWrapping="Wrap"
-                       Text="在游戏里的聊天框粘贴下面的指令可以调整网络帧发送频率（x 换成实际数字，数值越大发送越频繁）。" />
+                       Text="{loc:T '在游戏里的聊天框粘贴下面的指令可以调整网络帧发送频率（x 换成实际数字，数值越大发送越频繁）。'}" />
 
             <Border Height="36"
                     Margin="0,14,0,0"
@@ -41,7 +41,7 @@
             </Border>
 
             <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
-                <c:OutlineButton Content="复制指令" Tone="Solid" Click="OnCopyClick" />
+                <c:OutlineButton Content="{loc:T '复制指令'}" Tone="Solid" Click="OnCopyClick" />
                 <TextBlock x:Name="LabCopied"
                            Margin="10,0,0,0"
                            VerticalAlignment="Center"

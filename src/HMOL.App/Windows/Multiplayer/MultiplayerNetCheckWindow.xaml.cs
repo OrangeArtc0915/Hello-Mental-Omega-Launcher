@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -52,20 +53,20 @@ public partial class MultiplayerNetCheckWindow : Window
     private async Task RunNatAsync()
     {
         BtnNat.IsEnabled = false;
-        LabNat.Text = "正在请求 STUN 服务器…";
+        LabNat.Text = Loc.T("正在请求 STUN 服务器…");
 
         try
         {
             var type = await NetworkToolkit.NatTypeAsync(new Progress<string>(text => LabNat.Text = text), _cts.Token);
-            LabNat.Text = $"NAT 类型：{type}";
+            LabNat.Text = Loc.F("NAT 类型：{0}", type);
         }
         catch (OperationCanceledException)
         {
-            LabNat.Text = "检测已取消";
+            LabNat.Text = Loc.T("检测已取消");
         }
         catch (Exception ex)
         {
-            LabNat.Text = $"检测失败：{ex.Message}";
+            LabNat.Text = Loc.F("检测失败：{0}", ex.Message);
         }
         finally
         {

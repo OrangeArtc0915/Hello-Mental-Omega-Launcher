@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Controls.Svg;
 
@@ -102,7 +103,7 @@ internal static class SvgIconLoader
             var stream = Application.GetResourceStream(uri)?.Stream;
             if (stream is null)
             {
-                Log.Warn($"图标资源不存在：{icon}");
+                Log.Warn(Loc.F("图标资源不存在：{0}", icon));
                 return null;
             }
 
@@ -111,7 +112,7 @@ internal static class SvgIconLoader
         }
         catch (Exception ex)
         {
-            Log.Warn($"图标读取失败 {icon}：{ex.Message}");
+            Log.Warn(Loc.F("图标读取失败 {0}：{1}", icon, ex.Message));
             return null;
         }
 
@@ -121,7 +122,7 @@ internal static class SvgIconLoader
         }
         catch (Exception ex)
         {
-            Log.Warn($"图标解析失败 {icon}：{ex.Message}");
+            Log.Warn(Loc.F("图标解析失败 {0}：{1}", icon, ex.Message));
             return null;
         }
     }
@@ -174,7 +175,7 @@ internal static class SvgIconLoader
 
         if (group.Children.Count == 0)
         {
-            Log.Warn($"图标内没有可渲染的图形，可能是解析器不支持的写法：{icon}");
+            Log.Warn(Loc.F("图标内没有可渲染的图形，可能是解析器不支持的写法：{0}", icon));
             return null;
         }
 

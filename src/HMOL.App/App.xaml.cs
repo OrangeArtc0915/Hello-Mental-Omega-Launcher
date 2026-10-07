@@ -16,6 +16,7 @@ using HMOL.App.Windows;
 using HMOL.Core.App;
 using HMOL.Core.Extensions;
 using HMOL.Core.Instances;
+using HMOL.Core.Localization;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 using HMOL.Core.Packages;
@@ -68,12 +69,12 @@ public partial class App : Application
         if (ElevatedTasks.TryParse(e.Args, out var elevated))
         {
             InitializeLogging();
-            Log.Info($"以管理员身份执行提权任务：{elevated.Task}");
+            Log.Info(Loc.F("以管理员身份执行提权任务：{0}", elevated.Task));
 
             var code = 1;
 
             try { code = ElevatedTasks.RunAsync(elevated).GetAwaiter().GetResult(); }
-            catch (Exception ex) { Log.Error("提权任务执行失败", ex); }
+            catch (Exception ex) { Log.Error(Loc.T("提权任务执行失败"), ex); }
 
             Shutdown(code);
             return;
@@ -87,12 +88,12 @@ public partial class App : Application
         if (!createdNew)
         {
             InitializeLogging();
-            Log.Info("检测到已有实例在运行，本次启动已退出");
+            Log.Info(Loc.T("检测到已有实例在运行，本次启动已退出"));
 
             // 自启拉起时已经有实例了，安静退出即可，不弹窗打扰用户
             if (!autoStart)
             {
-                ChoiceWindow.Info(null, AppInfo.Name, $"{AppInfo.Name} 已经在运行了。");
+                ChoiceWindow.Info(null, AppInfo.Name, Loc.F("{0} 已经在运行了。", AppInfo.Name));
             }
 
             Shutdown();
@@ -100,6 +101,7 @@ public partial class App : Application
         }
 
         InitializeLogging();
+
         RunSecuritySelfCheck();
 
         // 上一次自动更新的收尾：清掉残留的 .new / .new.zip / .old，再把失败标记读走并翻译成中文。
@@ -121,7 +123,7 @@ public partial class App : Application
             return;
         }
 
-        Log.Info("门锁校验通过，继续启动");
+        Log.Info(Loc.T("门锁校验通过，继续启动"));
 
         ThemeService.Initialize(SettingsStore.Current.ThemeMode, SettingsStore.Current.Accent);
 
@@ -156,11 +158,11 @@ public partial class App : Application
         if (stayInTray)
         {
             // 这时先不初始化背景音乐，等用户真把主窗口叫出来再放（见 ShowMainWindow）
-            Log.Info("以开机自启方式启动，只驻留托盘，不显示主窗口");
+            Log.Info(Loc.T("以开机自启方式启动，只驻留托盘，不显示主窗口"));
         }
         else
         {
-            if (autoStart) Log.Warn("自启模式下系统托盘不可用，改为直接显示主窗口");
+            if (autoStart) Log.Warn(Loc.T("自启模式下系统托盘不可用，改为直接显示主窗口"));
 
             // 背景音乐：设置里开着就随程序启动自动播放。MediaPlayer 绑 UI 线程，所以在这里初始化
             BgmPlayer.Initialize();
@@ -194,23 +196,23 @@ public partial class App : Application
     /// </summary>
     private static void BlockOnSurviveGate(SurviveGate.GateVerdict verdict, bool talkative)
     {
-        var headline = verdict.Undetected ? "未能验证启动授权，已禁用启动" : SurviveGate.BlockedMessage;
+        var headline = verdict.Undetected ? Loc.T("未能验证启动授权，已禁用启动") : SurviveGate.BlockedMessage;
 
         var reason = verdict.Undetected
-            ? $"原因：{SurviveGate.SourcesText} 都读不到配置（断网 / 被墙 / 超时）"
+            ? Loc.F("原因：{0} 都读不到配置（断网 / 被墙 / 超时）", SurviveGate.SourcesText)
             : verdict.State!.Describe();
 
         var hint = verdict.Undetected
-            ? "请确认网络可用后重新打开；若一直如此，请联系域管理员。"
-            : "如果这与你的版本无关，请联系域管理员。";
+            ? Loc.T("请确认网络可用后重新打开；若一直如此，请联系域管理员。")
+            : Loc.T("如果这与你的版本无关，请联系域管理员。");
 
-        Log.Warn($"门锁拦截启动：{headline}（错误代码 {SurviveGate.ErrorCode}；{reason}）");
+        Log.Warn(Loc.F("门锁拦截启动：{0}（错误代码 {1}；{2}）", headline, SurviveGate.ErrorCode, reason));
 
         if (!talkative) return;
 
-        ChoiceWindow.Ask(null, "启动已暂停", headline,
-            $"错误代码：{SurviveGate.ErrorCode}\n{reason}\n\n{hint}",
-            new ChoiceOption("退出", "exit", ButtonTone.Danger));
+        ChoiceWindow.Ask(null, Loc.T("启动已暂停"), headline,
+            Loc.F("错误代码：{0}\n{1}\n\n{2}", SurviveGate.ErrorCode, reason, hint),
+            new ChoiceOption(Loc.T("退出"), "exit", ButtonTone.Danger));
     }
 
     // ————— 系统托盘 —————
@@ -228,7 +230,7 @@ public partial class App : Application
             if (!tray.IsAvailable)
             {
                 tray.Dispose();
-                Log.Warn("系统托盘不可用，主窗口关闭时直接退出");
+                Log.Warn(Loc.T("系统托盘不可用，主窗口关闭时直接退出"));
                 return;
             }
 
@@ -240,13 +242,16 @@ public partial class App : Application
             TrayAvailable = true;
 
             MultiplayerHub.StateChanged += OnMultiplayerStateChanged;
+
+            // 换语言后托盘菜单与悬浮提示也要跟着换：菜单项文案在构建时取一次，重建最省事（菜单很小）
+            Loc.Changed += OnLanguageChanged;
             UpdateTrayTooltip();
 
-            Log.Info("系统托盘已就绪");
+            Log.Info(Loc.T("系统托盘已就绪"));
         }
         catch (Exception ex)
         {
-            Log.Warn($"初始化系统托盘失败：{ex.Message}");
+            Log.Warn(Loc.F("初始化系统托盘失败：{0}", ex.Message));
             _tray = null;
             TrayAvailable = false;
         }
@@ -256,13 +261,13 @@ public partial class App : Application
     {
         var menu = new ContextMenu();
 
-        var show = new MenuItem { Header = "显示主窗口" };
+        var show = new MenuItem { Header = Loc.T("显示主窗口") };
         show.Click += (_, _) => ShowMainWindow(window);
 
-        var toggle = new MenuItem { Header = "连接联机" };
+        var toggle = new MenuItem { Header = Loc.T("连接联机") };
         toggle.Click += async (_, _) => await ToggleMultiplayerAsync(window);
 
-        var exit = new MenuItem { Header = "退出程序" };
+        var exit = new MenuItem { Header = Loc.T("退出程序") };
         exit.Click += (_, _) => window.RequestExit();
 
         menu.Items.Add(show);
@@ -273,8 +278,8 @@ public partial class App : Application
         // 每次弹出前刷新文案：反映连接状态，以及主窗口当前是不是还收着（自启驻留时没显示）
         menu.Opened += (_, _) =>
         {
-            show.Header = window.IsVisible ? "显示主窗口" : "显示主窗口（当前未显示）";
-            toggle.Header = MultiplayerHub.IsConnected || MultiplayerHub.IsBusy ? "断开联机" : "连接联机";
+            show.Header = window.IsVisible ? Loc.T("显示主窗口") : Loc.T("显示主窗口（当前未显示）");
+            toggle.Header = MultiplayerHub.IsConnected || MultiplayerHub.IsBusy ? Loc.T("断开联机") : Loc.T("连接联机");
         };
 
         return menu;
@@ -304,8 +309,8 @@ public partial class App : Application
         ShowMainWindow(window);
         window.SwitchToPage(NavPages.Multiplayer);
 
-        ChoiceWindow.Info(window, "连接联机",
-            "请在「联机」页里选好组网方案、节点与房间名，然后点「连接」。");
+        ChoiceWindow.Info(window, Loc.T("连接联机"),
+            Loc.T("请在「联机」页里选好组网方案、节点与房间名，然后点「连接」。"));
     }
 
     private void ShowTrayMenu(MainWindow window, Point devicePoint)
@@ -327,7 +332,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            Log.Warn($"弹出托盘菜单失败：{ex.Message}");
+            Log.Warn(Loc.F("弹出托盘菜单失败：{0}", ex.Message));
         }
     }
 
@@ -349,6 +354,13 @@ public partial class App : Application
 
     private void OnMultiplayerStateChanged() => UpdateTrayTooltip();
 
+    /// <summary>换语言：重建托盘菜单（菜单项文案是构建时取的，改不回去）并刷新悬浮提示。</summary>
+    private void OnLanguageChanged() => Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+    {
+        if (MainWindow is MainWindow window && _tray is not null) _trayMenu = BuildTrayMenu(window);
+        UpdateTrayTooltip();
+    }));
+
     private void UpdateTrayTooltip() => _tray?.SetTooltip($"{AppInfo.Name} · {MultiplayerHub.Summary}");
 
 
@@ -363,24 +375,24 @@ public partial class App : Application
         {
             var report = StartupSecurityCheck.Verify(strict: false);
 
-            foreach (var note in report.Notes) Log.Info($"[安全] {note}");
-            foreach (var issue in report.Issues) Log.Warn($"[安全] {issue}");
+            foreach (var note in report.Notes) Log.Info(Loc.F("[安全] {0}", note));
+            foreach (var issue in report.Issues) Log.Warn(Loc.F("[安全] {0}", issue));
 
             if (IntegrityChecker.SelfPath is { } selfPath)
             {
                 var hash = IntegrityChecker.SelfSha256();
-                Log.Info($"[安全] 程序文件：{selfPath}，大小：{IntegrityChecker.SelfSize():N0} 字节，" +
-                         $"SHA256：{(hash.Length == 0 ? "计算失败" : hash)}");
+                Log.Info(Loc.F("[安全] 程序文件：{0}，大小：{1:N0} 字节，", selfPath, IntegrityChecker.SelfSize()) +
+                         $"SHA256：{(hash.Length == 0 ? Loc.T("计算失败") : hash)}");
             }
             else
             {
-                Log.Warn("[安全] 取不到自身文件路径，跳过自身哈希");
+                Log.Warn(Loc.T("[安全] 取不到自身文件路径，跳过自身哈希"));
             }
         }
         catch (Exception ex)
         {
             // 自检本身出问题也不能拦住启动
-            Log.Warn($"[安全] 自检异常：{ex.Message}");
+            Log.Warn(Loc.F("[安全] 自检异常：{0}", ex.Message));
         }
     }
 
@@ -392,24 +404,30 @@ public partial class App : Application
         Logger = new Logger(Paths.Log, MaxLogFileSize, MaxLogFileCount, LogLevel.Debug);
         Log.Init(Logger);
 
+        // 界面语言：日志、门锁、实例与界面文案都要查表，必须紧跟日志就绪之后初始化
+        //（三个分支——提权任务 / 单实例退出 / 主流程——的日志都靠它按设置的语言输出）。
+        // 开着「跟随系统」时按系统时区与区域判定，关了或判不出来才用设置里记的语言；
+        // 之后在设置页切换走 Loc.SetLanguage，全界面即时生效。
+        Loc.Init(SettingsStore.Current.Language, SettingsStore.Current.AutoLanguage);
+
         // 实例列表与四类插件包目录：界面与包管理都依赖这两步，放在日志就绪之后，载入结果才能落盘
         InstanceStore.Load();
         PackageTypes.EnsureDirectories();
 
-        Log.Info($"{AppInfo.Name} 启动，数据目录：{Paths.Data}");
+        Log.Info(Loc.F("{0} 启动，数据目录：{1}", AppInfo.Name, Paths.Data));
     }
 
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Log.Fatal("界面线程未处理异常", e.Exception);
+        Log.Fatal(Loc.T("界面线程未处理异常"), e.Exception);
 
         var choice = ChoiceWindow.Ask(null,
-            $"{AppInfo.Name} 遇到了一个问题",
+            Loc.F("{0} 遇到了一个问题", AppInfo.Name),
             e.Exception.Message,
-            "如果这个问题反复出现，可以点「修复」：把启动器配置重置为默认后自动重启（只动设置与布局方案，不碰实例、游戏与包）。",
+            Loc.T("如果这个问题反复出现，可以点「修复」：把启动器配置重置为默认后自动重启（只动设置与布局方案，不碰实例、游戏与包）。"),
             DialogIcon.Error,
-            new ChoiceOption("知道了", "ok", ButtonTone.Solid),
-            new ChoiceOption("修复", "repair"));
+            new ChoiceOption(Loc.T("知道了"), "ok", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("修复"), "repair"));
 
         if (choice == "repair") RepairAndRestart();
 
@@ -438,11 +456,11 @@ public partial class App : Application
                     File.Move(file, Path.Combine(vault, Path.GetFileName(file)));
             }
 
-            Log.Warn($"[修复] 已重置启动器配置，原文件备份到：{vault}");
+            Log.Warn(Loc.F("[修复] 已重置启动器配置，原文件备份到：{0}", vault));
         }
         catch (Exception ex)
         {
-            Log.Error("[修复] 重置配置失败", ex);
+            Log.Error(Loc.T("[修复] 重置配置失败"), ex);
         }
 
         RestartSelf();
@@ -453,7 +471,7 @@ public partial class App : Application
     {
         // 先让出单实例互斥量，否则新进程会判定「已经在运行」直接退出
         try { _singleInstanceMutex?.ReleaseMutex(); }
-        catch (Exception ex) { Log.Warn($"[修复] 释放单实例互斥量失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("[修复] 释放单实例互斥量失败：{0}", ex.Message)); }
 
         _singleInstanceMutex?.Dispose();
         _singleInstanceMutex = null;
@@ -472,12 +490,12 @@ public partial class App : Application
             }
             else
             {
-                Log.Warn("[修复] 取不到自身路径，无法自动重启，请手动打开启动器");
+                Log.Warn(Loc.T("[修复] 取不到自身路径，无法自动重启，请手动打开启动器"));
             }
         }
         catch (Exception ex)
         {
-            Log.Error("[修复] 重启启动器失败，请手动打开", ex);
+            Log.Error(Loc.T("[修复] 重启启动器失败，请手动打开"), ex);
         }
 
         Shutdown();
@@ -490,7 +508,7 @@ public partial class App : Application
         MultiplayerHub.Shutdown();
 
         try { _tray?.Dispose(); }
-        catch (Exception ex) { Log.Warn($"释放系统托盘失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("释放系统托盘失败：{0}", ex.Message)); }
 
         _tray = null;
         _trayMenu = null;
@@ -503,7 +521,7 @@ public partial class App : Application
         if (!_repairing) SettingsStore.Save();
 
         ThemeService.Shutdown();
-        Log.Info($"{AppInfo.Name} 退出");
+        Log.Info(Loc.F("{0} 退出", AppInfo.Name));
         Logger?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);

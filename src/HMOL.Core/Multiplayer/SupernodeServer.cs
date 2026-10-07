@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -37,11 +38,11 @@ public sealed class SupernodeServer : EngineProcessBase
         var missing = RuntimeLocator.Verify((RuntimeLocator.N2nSupernodeExe, "n2n supernode.exe"));
         if (missing is not null) return new EngineStartResult(false, missing, null);
 
-        if (IsRunning) return new EngineStartResult(false, "supernode 已在运行", null);
+        if (IsRunning) return new EngineStartResult(false, Loc.T("supernode 已在运行"), null);
 
         var pool = BuildIpPool(_ipPool);
 
-        LogLine($"启动 supernode：端口={_port} 自动IP池={_ipPool}");
+        LogLine(Loc.F("启动 supernode：端口={0} 自动IP池={1}", _port, _ipPool));
 
         var arguments = $"-p {_port} -v";
 
@@ -57,7 +58,7 @@ public sealed class SupernodeServer : EngineProcessBase
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (HasExited(CurrentProcess)) return new EngineStartResult(false, "supernode 进程提前退出", null);
+            if (HasExited(CurrentProcess)) return new EngineStartResult(false, Loc.T("supernode 进程提前退出"), null);
 
             var reply = await N2nEngine
                 .QueryManagementAsync(MgmtPort, "*", TimeSpan.FromSeconds(1), cancellationToken)
@@ -65,14 +66,14 @@ public sealed class SupernodeServer : EngineProcessBase
 
             if (!string.IsNullOrEmpty(reply))
             {
-                LogLine("supernode 已就绪");
-                return new EngineStartResult(true, $"自建节点已启动，监听端口 {_port}", null);
+                LogLine(Loc.T("supernode 已就绪"));
+                return new EngineStartResult(true, Loc.F("自建节点已启动，监听端口 {0}", _port), null);
             }
 
             await Task.Delay(500, cancellationToken).ConfigureAwait(false);
         }
 
-        return new EngineStartResult(false, "supernode 启动超时", null);
+        return new EngineStartResult(false, Loc.T("supernode 启动超时"), null);
     }
 
     /// <summary>把 <c>192.168.100.0/24</c> 变成 <c>192.168.100.0-192.168.255.0/24</c>。</summary>

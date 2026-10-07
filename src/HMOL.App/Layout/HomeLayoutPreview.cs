@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using HMOL.App.Controls.Svg;
 using HMOL.Core.Layout;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Layout;
 
@@ -208,7 +209,7 @@ public sealed class HomeLayoutPreview : Grid
             box.Frame.Opacity = hidden ? 0.45 : 1;
 
             box.Title.SetResourceReference(TextBlock.ForegroundProperty, selected ? "Accent.Base" : "Text.Primary");
-            box.Subtitle.Text = hidden ? "已隐藏" : free ? "自由定位" : "流式";
+            box.Subtitle.Text = hidden ? Loc.T("已隐藏") : free ? Loc.T("自由定位") : Loc.T("流式");
 
             foreach (var handle in box.Handles.Values)
                 handle.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;

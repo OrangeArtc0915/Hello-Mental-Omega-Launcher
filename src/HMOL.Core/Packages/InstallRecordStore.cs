@@ -7,6 +7,7 @@ using HMOL.Core.App;
 using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Packages;
 
@@ -46,7 +47,7 @@ public static class InstallRecordStore
         var instance = InstanceStore.FindById(record.InstanceId);
         if (instance is null)
         {
-            Log.Warn($"保存安装记录失败：找不到实例 {record.InstanceId}");
+            Log.Warn(Loc.F("保存安装记录失败：找不到实例 {0}", record.InstanceId));
             return false;
         }
 
@@ -63,7 +64,7 @@ public static class InstallRecordStore
         }
         catch (Exception ex)
         {
-            Log.Error($"保存安装记录失败：{record.PackageName}", ex);
+            Log.Error(Loc.F("保存安装记录失败：{0}", record.PackageName), ex);
             return false;
         }
     }
@@ -99,7 +100,7 @@ public static class InstallRecordStore
                     var record = ReadFrom(file);
                     if (record is null)
                     {
-                        Log.Warn($"安装记录解析失败，已跳过：{file}");
+                        Log.Warn(Loc.F("安装记录解析失败，已跳过：{0}", file));
                         continue;
                     }
 
@@ -108,7 +109,7 @@ public static class InstallRecordStore
             }
             catch (Exception ex)
             {
-                Log.Error($"列举安装记录失败：{directory}", ex);
+                Log.Error(Loc.F("列举安装记录失败：{0}", directory), ex);
             }
         }
 
@@ -133,7 +134,7 @@ public static class InstallRecordStore
             }
             catch (Exception ex)
             {
-                Log.Error($"删除安装记录失败：{path}", ex);
+                Log.Error(Loc.F("删除安装记录失败：{0}", path), ex);
             }
         }
 
@@ -152,7 +153,7 @@ public static class InstallRecordStore
         }
         catch (Exception ex)
         {
-            Log.Error($"清空安装记录失败：{root}", ex);
+            Log.Error(Loc.F("清空安装记录失败：{0}", root), ex);
             return false;
         }
     }
@@ -175,7 +176,7 @@ public static class InstallRecordStore
             }
             catch (Exception ex)
             {
-                Log.Warn($"记录文件快照失败：{full}（{ex.Message}）");
+                Log.Warn(Loc.F("记录文件快照失败：{0}（{1}）", full, ex.Message));
             }
         }
 

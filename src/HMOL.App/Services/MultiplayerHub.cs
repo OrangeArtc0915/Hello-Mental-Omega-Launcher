@@ -3,6 +3,7 @@ using HMOL.App.Windows;
 using HMOL.App.Windows.Multiplayer;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Services;
 
@@ -49,8 +50,8 @@ internal static class MultiplayerHub
             if (!session.IsConnected) return session.StatusText;
 
             return string.IsNullOrWhiteSpace(session.LocalIp)
-                ? "已连接"
-                : $"已连接 {session.LocalIp}";
+                ? Loc.T("已连接")
+                : Loc.F("已连接 {0}", session.LocalIp);
         }
     }
 
@@ -67,7 +68,7 @@ internal static class MultiplayerHub
     private static void OnSessionStateChanged()
     {
         try { StateChanged?.Invoke(); }
-        catch (Exception ex) { Log.Warn($"联机状态回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("联机状态回调异常：{0}", ex.Message)); }
 
         UpdateHud();
     }
@@ -132,7 +133,7 @@ internal static class MultiplayerHub
         }
         catch (Exception ex)
         {
-            Log.Warn($"刷新 HUD 透明度失败：{ex.Message}");
+            Log.Warn(Loc.F("刷新 HUD 透明度失败：{0}", ex.Message));
         }
     }
 
@@ -232,19 +233,19 @@ internal static class MultiplayerHub
             {
                 var owner = app.MainWindow is { IsLoaded: true } window ? window : null;
 
-                var message = $"队友 {(string.IsNullOrWhiteSpace(incoming.From) ? incoming.FromIp : incoming.From)} 想发送文件：\n\n" +
-                              $"文件：{incoming.Name}\n大小：{FileTransfer.FormatSize(incoming.Size)}\n\n是否接收？";
+                var message = Loc.F("队友 {0} 想发送文件：\n\n", (string.IsNullOrWhiteSpace(incoming.From) ? incoming.FromIp : incoming.From)) +
+                              Loc.F("文件：{0}\n大小：{1}\n\n是否接收？", incoming.Name, FileTransfer.FormatSize(incoming.Size));
 
-                var answer = ChoiceWindow.Confirm(owner, "收到文件传输请求", message,
-                    confirmText: "接收", cancelText: "拒收");
+                var answer = ChoiceWindow.Confirm(owner, Loc.T("收到文件传输请求"), message,
+                    confirmText: Loc.T("接收"), cancelText: Loc.T("拒收"));
 
                 if (!answer) return null;
 
                 var dialog = new Microsoft.Win32.SaveFileDialog
                 {
-                    Title = "保存文件到",
+                    Title = Loc.T("保存文件到"),
                     FileName = incoming.Name,
-                    Filter = "所有文件 (*.*)|*.*"
+                    Filter = Loc.T("所有文件 (*.*)|*.*")
                 };
 
                 var confirmed = owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner);
@@ -253,7 +254,7 @@ internal static class MultiplayerHub
         }
         catch (Exception ex)
         {
-            Log.Warn($"询问文件保存位置失败：{ex.Message}");
+            Log.Warn(Loc.F("询问文件保存位置失败：{0}", ex.Message));
             return null;
         }
     }
@@ -304,7 +305,7 @@ internal static class MultiplayerHub
         if (server is null) return;
 
         try { await server.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception ex) { Log.Warn($"停止自建节点失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("停止自建节点失败：{0}", ex.Message)); }
     }
 
     // ————— 樱花FRP 隧道（端口映射直连） —————
@@ -347,21 +348,21 @@ internal static class MultiplayerHub
         }
 
         try { hud?.Close(); }
-        catch (Exception ex) { Log.Warn($"关闭联机 HUD 失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("关闭联机 HUD 失败：{0}", ex.Message)); }
 
         try { sakura?.Dispose(); }
-        catch (Exception ex) { Log.Warn($"停止樱花FRP 隧道失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("停止樱花FRP 隧道失败：{0}", ex.Message)); }
 
         try { transfer?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); }
-        catch (Exception ex) { Log.Warn($"停止文件传输失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("停止文件传输失败：{0}", ex.Message)); }
 
         try { StopServerAsync().Wait(TimeSpan.FromSeconds(3)); }
-        catch (Exception ex) { Log.Warn($"停止自建节点失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("停止自建节点失败：{0}", ex.Message)); }
 
         if (session is null) return;
 
         // 放到线程池上等：会话内部的等待都走 ConfigureAwait(false)，在 UI 线程上阻塞等待容易被误判为死锁
         try { Task.Run(() => session.DisposeAsync().AsTask()).Wait(TimeSpan.FromSeconds(5)); }
-        catch (Exception ex) { Log.Warn($"释放联机会话失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("释放联机会话失败：{0}", ex.Message)); }
     }
 }

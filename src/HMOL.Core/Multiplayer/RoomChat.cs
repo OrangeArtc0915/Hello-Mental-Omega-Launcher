@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -205,7 +206,7 @@ public sealed class RoomChat : IAsyncDisposable
         _receiveTask = Task.Run(() => ReceiveLoopAsync(token));
         _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(token));
 
-        LogLine($"房间聊天已启动 (UDP {_port}, 渠道 {_channel}, {(IsOwner ? "房主" : "成员")})");
+        LogLine(Loc.F("房间聊天已启动 (UDP {0}, 渠道 {1}, {2})", _port, _channel, (IsOwner ? Loc.T("房主") : Loc.T("成员"))));
     }
 
     /// <summary>广播离线并停止收发。</summary>
@@ -221,7 +222,7 @@ public sealed class RoomChat : IAsyncDisposable
 
         // 先广播离线，再关套接字
         try { Broadcast(Payload("l"), skipUnknown: false); }
-        catch (Exception ex) { Log.Warn($"广播离线失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("广播离线失败：{0}", ex.Message)); }
 
         lock (_lock)
         {
@@ -314,7 +315,7 @@ public sealed class RoomChat : IAsyncDisposable
         if (limited)
         {
             try { SendRateLimited?.Invoke(); }
-            catch (Exception ex) { Log.Warn($"限速回调异常：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("限速回调异常：{0}", ex.Message)); }
 
             return ChatSendStatus.Limited;
         }
@@ -484,7 +485,7 @@ public sealed class RoomChat : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                Log.Warn($"房间聊天接收失败：{ex.Message}");
+                Log.Warn(Loc.F("房间聊天接收失败：{0}", ex.Message));
                 continue;
             }
 
@@ -494,7 +495,7 @@ public sealed class RoomChat : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                Log.Warn($"处理房间聊天报文失败：{ex.Message}");
+                Log.Warn(Loc.F("处理房间聊天报文失败：{0}", ex.Message));
             }
         }
     }
@@ -551,7 +552,7 @@ public sealed class RoomChat : IAsyncDisposable
                 if (isNew)
                 {
                     try { PeerAnnounced?.Invoke(ip, name); }
-                    catch (Exception ex) { Log.Warn($"对端回调异常：{ex.Message}"); }
+                    catch (Exception ex) { Log.Warn(Loc.F("对端回调异常：{0}", ex.Message)); }
                 }
 
                 break;
@@ -574,7 +575,7 @@ public sealed class RoomChat : IAsyncDisposable
 
                 var message = new ChatMessage(ip, name.Length > 0 ? name : ip, text, GetLong(root, "s", (long)now));
                 try { MessageReceived?.Invoke(message); }
-                catch (Exception ex) { Log.Warn($"消息回调异常：{ex.Message}"); }
+                catch (Exception ex) { Log.Warn(Loc.F("消息回调异常：{0}", ex.Message)); }
 
                 break;
 
@@ -605,7 +606,7 @@ public sealed class RoomChat : IAsyncDisposable
                 lock (_lock) { _rooms[ip] = room; }
 
                 try { RoomReceived?.Invoke(ip, room); }
-                catch (Exception ex) { Log.Warn($"房间回调异常：{ex.Message}"); }
+                catch (Exception ex) { Log.Warn(Loc.F("房间回调异常：{0}", ex.Message)); }
 
                 break;
         }
@@ -644,7 +645,7 @@ public sealed class RoomChat : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                Log.Warn($"房间聊天心跳失败：{ex.Message}");
+                Log.Warn(Loc.F("房间聊天心跳失败：{0}", ex.Message));
             }
 
             try { await Task.Delay(TimeSpan.FromSeconds(HeartbeatInterval), cancellationToken).ConfigureAwait(false); }
@@ -681,7 +682,7 @@ public sealed class RoomChat : IAsyncDisposable
             IsOwner = false;   // 被压制，降级为成员
 
             try { OwnerDemoted?.Invoke(ip); }
-            catch (Exception ex) { Log.Warn($"房主变更回调异常：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("房主变更回调异常：{0}", ex.Message)); }
         }
     }
 
@@ -702,7 +703,7 @@ public sealed class RoomChat : IAsyncDisposable
         }
 
         try { Kicked?.Invoke(target, name); }
-        catch (Exception ex) { Log.Warn($"踢出回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("踢出回调异常：{0}", ex.Message)); }
     }
 
     private void HandleUnkick(string ip, JsonElement message)
@@ -719,7 +720,7 @@ public sealed class RoomChat : IAsyncDisposable
         }
 
         try { Unkicked?.Invoke(target); }
-        catch (Exception ex) { Log.Warn($"拉回回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("拉回回调异常：{0}", ex.Message)); }
     }
 
     // ————— 基础收发 —————
@@ -737,7 +738,7 @@ public sealed class RoomChat : IAsyncDisposable
         catch (Exception ex)
         {
             // 送到日志而不是静默丢弃：对端地址不合法/网卡刚被移除时用户需要能看到原因
-            LogLine($"发送到 {ip}:{_port} 失败：{ex.Message}");
+            LogLine(Loc.F("发送到 {0}:{1} 失败：{2}", ip, _port, ex.Message));
         }
     }
 
@@ -805,7 +806,7 @@ public sealed class RoomChat : IAsyncDisposable
 
     private void LogLine(string message)
     {
-        try { _log?.Invoke($"[房间] {message}"); }
+        try { _log?.Invoke(Loc.F("[房间] {0}", message)); }
         catch { /* 日志回调异常不影响业务 */ }
     }
 

@@ -5,6 +5,7 @@ using HMOL.Core.App;
 using HMOL.Core.Logging;
 using NAudio.MediaFoundation;
 using NAudio.Wave;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Services;
 
@@ -46,13 +47,13 @@ internal static class CustomizationService
             var target = Path.Combine(Paths.Custom, name);
 
             File.Copy(sourcePath, target, overwrite: false);
-            Log.Info($"个性化素材已导入：{Path.GetFileName(sourcePath)} → {target}");
+            Log.Info(Loc.F("个性化素材已导入：{0} → {1}", Path.GetFileName(sourcePath), target));
 
             return name;
         }
         catch (Exception ex)
         {
-            Log.Error($"导入个性化素材失败：{sourcePath}", ex);
+            Log.Error(Loc.F("导入个性化素材失败：{0}", sourcePath), ex);
             return null;
         }
     }
@@ -66,11 +67,11 @@ internal static class CustomizationService
         try
         {
             File.Delete(path);
-            Log.Info($"个性化素材已删除：{Path.GetFileName(path)}");
+            Log.Info(Loc.F("个性化素材已删除：{0}", Path.GetFileName(path)));
         }
         catch (Exception ex)
         {
-            Log.Warn($"个性化素材删除失败（可能正被占用）：{ex.Message}");
+            Log.Warn(Loc.F("个性化素材删除失败（可能正被占用）：{0}", ex.Message));
         }
     }
 
@@ -96,7 +97,7 @@ internal static class CustomizationService
         }
         catch (Exception ex)
         {
-            Log.Warn($"自定义窗口图标加载失败，回退内置图标：{ex.Message}");
+            Log.Warn(Loc.F("自定义窗口图标加载失败，回退内置图标：{0}", ex.Message));
             return null;
         }
     }
@@ -125,7 +126,7 @@ internal static class CustomizationService
             }
             catch (Exception ex)
             {
-                Log.Warn($"音效播放失败：{ex.Message}");
+                Log.Warn(Loc.F("音效播放失败：{0}", ex.Message));
             }
         });
 

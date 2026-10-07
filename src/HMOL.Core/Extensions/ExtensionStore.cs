@@ -5,6 +5,7 @@ using System.Text.Unicode;
 using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Extensions;
 
@@ -86,7 +87,7 @@ public static class ExtensionStore
             if (!Directory.Exists(root))
             {
                 _all = list;
-                Log.Info($"扩展目录还不存在（{root}），本次没有扩展");
+                Log.Info(Loc.F("扩展目录还不存在（{0}），本次没有扩展", root));
                 return list;
             }
 
@@ -104,20 +105,20 @@ public static class ExtensionStore
         catch (Exception ex)
         {
             // 目录枚举失败也不能把启动拖下水
-            Log.Info($"扫描扩展目录失败（{root}）：{Describe(ex)}");
+            Log.Info(Loc.F("扫描扩展目录失败（{0}）：{1}", root, Describe(ex)));
             _all = list;
             return list;
         }
 
         _all = list;
 
-        Log.Info($"扩展：共发现 {list.Count} 个（启用 {list.Count(i => i.Status == ExtensionStatus.Enabled)}，" +
-                 $"停用 {list.Count(i => i.Status == ExtensionStatus.Disabled)}，" +
-                 $"加载失败 {list.Count(i => i.Status == ExtensionStatus.Failed)}）");
+        Log.Info(Loc.F("扩展：共发现 {0} 个（启用 {1}，", list.Count, list.Count(i => i.Status == ExtensionStatus.Enabled)) +
+                 Loc.F("停用 {0}，", list.Count(i => i.Status == ExtensionStatus.Disabled)) +
+                 Loc.F("加载失败 {0}）", list.Count(i => i.Status == ExtensionStatus.Failed)));
 
         // 具体原因走 DEBUG：设置页里已经用红字写明了，日志不必每次扫描都重复一遍
         foreach (var failed in list.Where(i => i.Status == ExtensionStatus.Failed))
-            Log.Debug($"扩展「{failed.Id}」已跳过：{failed.Error}");
+            Log.Debug(Loc.F("扩展「{0}」已跳过：{1}", failed.Id, failed.Error));
 
         return list;
     }
@@ -186,7 +187,7 @@ public static class ExtensionStore
         }
         catch (Exception ex)
         {
-            error = $"文件读不出来（{Describe(ex)}）";
+            error = Loc.F("文件读不出来（{0}）", Describe(ex));
             return null;
         }
 
@@ -196,7 +197,7 @@ public static class ExtensionStore
 
             if (manifest is null)
             {
-                error = "文件内容是空的";
+                error = Loc.T("文件内容是空的");
                 return null;
             }
 
@@ -206,15 +207,15 @@ public static class ExtensionStore
         {
             // 带上行列位置，用户能直接定位到写错的那一处
             var where = ex.LineNumber is { } line
-                ? $"（第 {line + 1} 行第 {(ex.BytePositionInLine ?? 0) + 1} 列）"
+                ? Loc.F("（第 {0} 行第 {1} 列）", line + 1, (ex.BytePositionInLine ?? 0) + 1)
                 : string.Empty;
 
-            error = $"不是有效的清单 JSON{where}：{DescribeJson(ex)}";
+            error = Loc.F("不是有效的清单 JSON{0}：{1}", where, DescribeJson(ex));
             return null;
         }
         catch (Exception ex)
         {
-            error = $"解析清单失败：{Describe(ex)}";
+            error = Loc.F("解析清单失败：{0}", Describe(ex));
             return null;
         }
     }
@@ -231,7 +232,7 @@ public static class ExtensionStore
         if (tail > 0) message = message[..tail].TrimEnd('.', ' ');
 
         return message.Contains("could not be converted", StringComparison.Ordinal)
-            ? "字段类型不对：这一处应该是文本（数字、true/false、数组要按字段表写成对应的写法）"
+            ? Loc.T("字段类型不对：这一处应该是文本（数字、true/false、数组要按字段表写成对应的写法）")
             : message;
     }
 
@@ -246,7 +247,7 @@ public static class ExtensionStore
 
         if (!File.Exists(file))
         {
-            error = "这个扩展的清单文件已经不在了（可能被手工删除），点「重新加载」刷新列表。";
+            error = Loc.T("这个扩展的清单文件已经不在了（可能被手工删除），点「重新加载」刷新列表。");
             return false;
         }
 
@@ -254,7 +255,7 @@ public static class ExtensionStore
 
         if (parsed is null)
         {
-            error = parseError ?? "清单内容无法解析";
+            error = parseError ?? Loc.T("清单内容无法解析");
             return false;
         }
 
@@ -289,12 +290,12 @@ public static class ExtensionStore
         }
         catch (Exception ex)
         {
-            error = $"保存失败：{Describe(ex)}";
-            Log.Info($"保存扩展「{id}」失败：{ex.Message}");
+            error = Loc.F("保存失败：{0}", Describe(ex));
+            Log.Info(Loc.F("保存扩展「{0}」失败：{1}", id, ex.Message));
             return false;
         }
 
-        Log.Info($"已保存扩展清单：{file}");
+        Log.Info(Loc.F("已保存扩展清单：{0}", file));
 
         if (reload) Reload();
         return true;
@@ -309,7 +310,7 @@ public static class ExtensionStore
 
         if (!TrySave(id, manifest, out error)) return false;
 
-        Log.Info($"扩展「{id}」已{(enabled ? "启用" : "停用")}");
+        Log.Info(Loc.F("扩展「{0}」已{1}", id, (enabled ? Loc.T("启用") : Loc.T("停用"))));
         return true;
     }
 
@@ -324,12 +325,12 @@ public static class ExtensionStore
         }
         catch (Exception ex)
         {
-            error = $"删除失败：{Describe(ex)}";
-            Log.Info($"删除扩展「{id}」失败：{ex.Message}");
+            error = Loc.F("删除失败：{0}", Describe(ex));
+            Log.Info(Loc.F("删除扩展「{0}」失败：{1}", id, ex.Message));
             return false;
         }
 
-        Log.Info($"已删除扩展清单：{file}");
+        Log.Info(Loc.F("已删除扩展清单：{0}", file));
 
         Reload();
         return true;
@@ -356,7 +357,7 @@ public static class ExtensionStore
 
         if (!PathGuard.TryResolve(RootDirectory, name + FileExtension, out file))
         {
-            error = "扩展名不合法：只能写在扩展目录里，不能包含路径分隔符或上跳片段";
+            error = Loc.T("扩展名不合法：只能写在扩展目录里，不能包含路径分隔符或上跳片段");
             return false;
         }
 
@@ -370,7 +371,7 @@ public static class ExtensionStore
         var root = RootDirectory;
 
         try { Directory.CreateDirectory(root); }
-        catch (Exception ex) { Log.Info($"创建扩展目录失败（{root}）：{ex.Message}"); }
+        catch (Exception ex) { Log.Info(Loc.F("创建扩展目录失败（{0}）：{1}", root, ex.Message)); }
 
         if (!Directory.Exists(root)) return false;
 

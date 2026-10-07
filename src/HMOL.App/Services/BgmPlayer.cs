@@ -5,6 +5,7 @@ using NAudio.CoreAudioApi;
 using NAudio.MediaFoundation;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Services;
 
@@ -118,12 +119,12 @@ internal static class BgmPlayer
         _initialized = true;
 
         try { MediaFoundationApi.Startup(); }
-        catch (Exception ex) { Log.Debug($"背景音乐：Media Foundation 初始化失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Debug(Loc.F("背景音乐：Media Foundation 初始化失败：{0}", ex.Message)); }
 
         ApplyVolume();
 
         if (Settings.Enabled) Play();
-        else Log.Info("背景音乐：设置里未启用，本次启动不播放");
+        else Log.Info(Loc.T("背景音乐：设置里未启用，本次启动不播放"));
     }
 
     /// <summary>退出时调用：停掉播放并释放文件句柄。</summary>
@@ -142,13 +143,13 @@ internal static class BgmPlayer
 
         if (!Settings.Enabled)
         {
-            Log.Debug("背景音乐：未启用，忽略播放请求");
+            Log.Debug(Loc.T("背景音乐：未启用，忽略播放请求"));
             return;
         }
 
         if (Settings.Playlist.Count == 0)
         {
-            Log.Info("背景音乐：播放列表为空，未播放");
+            Log.Info(Loc.T("背景音乐：播放列表为空，未播放"));
             return;
         }
 
@@ -162,7 +163,7 @@ internal static class BgmPlayer
         StopWatchdog();
 
         try { _output?.Pause(); }
-        catch (Exception ex) { Log.Warn($"背景音乐暂停失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("背景音乐暂停失败：{0}", ex.Message)); }
 
         NotifyStateChanged();
     }
@@ -181,7 +182,7 @@ internal static class BgmPlayer
             _playing = true;
 
             try { _output.Play(); }
-            catch (Exception ex) { Log.Warn($"背景音乐继续播放失败：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("背景音乐继续播放失败：{0}", ex.Message)); }
 
             StartWatchdog();
             NotifyStateChanged();
@@ -279,7 +280,7 @@ internal static class BgmPlayer
             if (list.Count == added) Settings.CurrentIndex = 0;
 
             SettingsStore.Save();
-            Log.Info($"背景音乐：新增 {added} 首曲目，当前共 {list.Count} 首");
+            Log.Info(Loc.F("背景音乐：新增 {0} 首曲目，当前共 {1} 首", added, list.Count));
         }
 
         NotifyStateChanged();
@@ -311,7 +312,7 @@ internal static class BgmPlayer
         }
 
         SettingsStore.Save();
-        Log.Info($"背景音乐：已移除曲目，剩余 {list.Count} 首");
+        Log.Info(Loc.F("背景音乐：已移除曲目，剩余 {0} 首", list.Count));
         NotifyStateChanged();
     }
 
@@ -327,7 +328,7 @@ internal static class BgmPlayer
 
         if (list.Count == 0 || !Settings.Enabled)
         {
-            Log.Debug(list.Count == 0 ? "背景音乐：播放列表为空，不播放" : "背景音乐：未启用，不播放");
+            Log.Debug(list.Count == 0 ? Loc.T("背景音乐：播放列表为空，不播放") : Loc.T("背景音乐：未启用，不播放"));
             StopPlayback();
             return;
         }
@@ -337,7 +338,7 @@ internal static class BgmPlayer
 
         if (!File.Exists(path) || !IsAudioFile(path))
         {
-            Log.Warn($"背景音乐：{Path.GetFileName(path)} 已不存在或不是支持的音频格式，已跳过");
+            Log.Warn(Loc.F("背景音乐：{0} 已不存在或不是支持的音频格式，已跳过", Path.GetFileName(path)));
             AdvanceOnFailure();
             return;
         }
@@ -356,7 +357,7 @@ internal static class BgmPlayer
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景音乐：{Path.GetFileName(path)} 解不开（{DescribeDecodeError(ex)}），已跳过");
+            Log.Warn(Loc.F("背景音乐：{0} 解不开（{1}），已跳过", Path.GetFileName(path), DescribeDecodeError(ex)));
             AdvanceOnFailure();
             return;
         }
@@ -370,7 +371,7 @@ internal static class BgmPlayer
         catch (Exception ex)
         {
             reader.Dispose();
-            Log.Warn($"背景音乐：音频输出设备不可用（{ex.Message}），本次不播放");
+            Log.Warn(Loc.F("背景音乐：音频输出设备不可用（{0}），本次不播放", ex.Message));
             StopPlayback();
             return;
         }
@@ -393,7 +394,7 @@ internal static class BgmPlayer
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景音乐播放失败：{ex.Message}");
+            Log.Warn(Loc.F("背景音乐播放失败：{0}", ex.Message));
             StopPlayback();
             return;
         }
@@ -402,7 +403,7 @@ internal static class BgmPlayer
         // 清零交给看门狗——只有位置真的在推进才算这一轮播放活着，否则会无限跳过。
         StartWatchdog();
 
-        Log.Info($"背景音乐：载入 {Path.GetFileName(path)}（{Settings.CurrentIndex + 1}/{list.Count}）");
+        Log.Info(Loc.F("背景音乐：载入 {0}（{1}/{2}）", Path.GetFileName(path), Settings.CurrentIndex + 1, list.Count));
         NotifyStateChanged();
     }
 
@@ -419,7 +420,7 @@ internal static class BgmPlayer
         }
         catch (Exception ex)
         {
-            Log.Debug($"背景音乐：WASAPI 输出不可用，改用 waveOut：{ex.Message}");
+            Log.Debug(Loc.F("背景音乐：WASAPI 输出不可用，改用 waveOut：{0}", ex.Message));
             try { wasapi?.Dispose(); } catch { /* 打不开的设备，释放失败无所谓 */ }
         }
 
@@ -444,14 +445,14 @@ internal static class BgmPlayer
 
         if (error is not null)
         {
-            Log.Warn($"背景音乐：{Path.GetFileName(_currentPath ?? string.Empty)} 播放中断" +
-                     $"（{DescribeDecodeError(error)}），尝试跳到下一首");
+            Log.Warn(Loc.F("背景音乐：{0} 播放中断", Path.GetFileName(_currentPath ?? string.Empty)) +
+                     Loc.F("（{0}），尝试跳到下一首", DescribeDecodeError(error)));
 
             AbandonCurrent();
             return;
         }
 
-        Log.Info($"背景音乐：{CurrentTrackName} 播放完毕");
+        Log.Info(Loc.F("背景音乐：{0} 播放完毕", CurrentTrackName));
         _failedStreak = 0;
 
         if (!MoveNext(auto: true)) return;
@@ -487,12 +488,12 @@ internal static class BgmPlayer
             }
             catch (Exception ex)
             {
-                Log.Warn($"背景音乐停止失败：{ex.Message}");
+                Log.Warn(Loc.F("背景音乐停止失败：{0}", ex.Message));
             }
         }
 
         try { _reader?.Dispose(); }
-        catch (Exception ex) { Log.Debug($"背景音乐：释放解码器时出错：{ex.Message}"); }
+        catch (Exception ex) { Log.Debug(Loc.F("背景音乐：释放解码器时出错：{0}", ex.Message)); }
 
         _reader = null;
     }
@@ -564,7 +565,7 @@ internal static class BgmPlayer
         if (Interlocked.Exchange(ref _watchdogBusy, 1) == 1) return;
 
         try { CheckStall(); }
-        catch (Exception ex) { Log.Warn($"背景音乐：播放停滞检查出错：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("背景音乐：播放停滞检查出错：{0}", ex.Message)); }
         finally { Interlocked.Exchange(ref _watchdogBusy, 0); }
     }
 
@@ -613,8 +614,8 @@ internal static class BgmPlayer
         // 判定与处理之间用户可能已经手动切过曲，这次停滞作废
         if (generation != _generation) return;
 
-        Log.Warn($"背景音乐：{stalledTrack} 播放停滞（位置 {StallTimeout.TotalSeconds:0.#} 秒未推进，" +
-                 $"输出{OutputStateText()}），已跳过");
+        Log.Warn(Loc.F("背景音乐：{0} 播放停滞（位置 {1:0.#} 秒未推进，", stalledTrack, StallTimeout.TotalSeconds) +
+                 Loc.F("输出{0}），已跳过", OutputStateText()));
 
         AbandonCurrent();
     }
@@ -651,8 +652,8 @@ internal static class BgmPlayer
     /// </summary>
     private static string OutputStateText()
     {
-        try { return _output?.PlaybackState.ToString() ?? "无输出设备"; }
-        catch { return "状态未知"; }
+        try { return _output?.PlaybackState.ToString() ?? Loc.T("无输出设备"); }
+        catch { return Loc.T("状态未知"); }
     }
 
     /// <summary>算下一首的下标。返回 false 表示列表已放完且未开循环，调用方不要再播。</summary>
@@ -686,7 +687,7 @@ internal static class BgmPlayer
             return true;
         }
 
-        Log.Info("背景音乐：列表已放完且未开启循环，停止播放");
+        Log.Info(Loc.T("背景音乐：列表已放完且未开启循环，停止播放"));
         StopPlayback();
         return false;
     }
@@ -698,7 +699,7 @@ internal static class BgmPlayer
 
         if (_failedStreak >= Math.Max(1, Settings.Playlist.Count))
         {
-            Log.Warn("背景音乐：列表里的曲目都没能播放，已停止");
+            Log.Warn(Loc.T("背景音乐：列表里的曲目都没能播放，已停止"));
             StopPlayback();
             return;
         }
@@ -721,7 +722,7 @@ internal static class BgmPlayer
     private static string DescribeDecodeError(Exception ex)
     {
         return (ex.HResult & unchecked((int)0xFFFF0000)) == unchecked((int)0xC00D0000)
-            ? $"系统缺少该格式的解码器，或文件已损坏（0x{ex.HResult:X8}）"
+            ? Loc.F("系统缺少该格式的解码器，或文件已损坏（0x{0:X8}）", ex.HResult)
             : ex.Message;
     }
 
@@ -751,7 +752,7 @@ internal static class BgmPlayer
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景音乐状态刷新失败：{ex.Message}");
+            Log.Warn(Loc.F("背景音乐状态刷新失败：{0}", ex.Message));
         }
     }
 }

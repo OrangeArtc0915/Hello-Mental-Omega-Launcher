@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -102,7 +103,7 @@ public sealed class FileTransfer : IAsyncDisposable
         catch (Exception ex)
         {
             cts.Dispose();
-            LogLine($"文件传输监听端口 {_port} 启动失败: {ex.Message}");
+            LogLine(Loc.F("文件传输监听端口 {0} 启动失败: {1}", _port, ex.Message));
             return false;
         }
 
@@ -113,7 +114,7 @@ public sealed class FileTransfer : IAsyncDisposable
         }
 
         _acceptTask = Task.Run(() => AcceptLoopAsync(cts.Token));
-        LogLine($"文件传输后台监听已启动 (TCP {_port})");
+        LogLine(Loc.F("文件传输后台监听已启动 (TCP {0})", _port));
         _ = TryOpenFirewallAsync();
 
         return true;
@@ -160,16 +161,16 @@ public sealed class FileTransfer : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(ip) || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            return new FileSendResult(false, "文件不存在");
+            return new FileSendResult(false, Loc.T("文件不存在"));
 
         var info = new FileInfo(path);
         var size = info.Length;
         var name = info.Name;
 
-        if (size <= 0) return new FileSendResult(false, "空文件无法发送");
+        if (size <= 0) return new FileSendResult(false, Loc.T("空文件无法发送"));
 
         if (size > _maxSize)
-            return new FileSendResult(false, $"文件超过 {_maxSize / 1048576}MB 上限, 请压缩后再试");
+            return new FileSendResult(false, Loc.F("文件超过 {0}MB 上限, 请压缩后再试", _maxSize / 1048576));
 
         using var client = new TcpClient();
 
@@ -182,11 +183,11 @@ public sealed class FileTransfer : IAsyncDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new FileSendResult(false, "已取消发送");
+            return new FileSendResult(false, Loc.T("已取消发送"));
         }
         catch (Exception ex)
         {
-            return new FileSendResult(false, $"无法连接 {ip}:{_port} ({ex.Message}), 请确认对方在线且防火墙已放行");
+            return new FileSendResult(false, Loc.F("无法连接 {0}:{1} ({2}), 请确认对方在线且防火墙已放行", ip, _port, ex.Message));
         }
 
         try
@@ -207,7 +208,7 @@ public sealed class FileTransfer : IAsyncDisposable
             await stream.WriteAsync(Encoding.UTF8.GetBytes(header + "\n"), cancellationToken).ConfigureAwait(false);
 
             var reply = await ReadLineAsync(stream, 64, cancellationToken, SendTimeoutSeconds).ConfigureAwait(false);
-            if (reply is null || reply.Trim() != "OK") return new FileSendResult(false, "对方拒绝了接收");
+            if (reply is null || reply.Trim() != "OK") return new FileSendResult(false, Loc.T("对方拒绝了接收"));
 
             var buffer = new byte[ChunkSize];
             long sent = 0;
@@ -228,15 +229,15 @@ public sealed class FileTransfer : IAsyncDisposable
                 }
             }
 
-            return new FileSendResult(true, $"发送完成: {name} ({FormatSize(size)})");
+            return new FileSendResult(true, Loc.F("发送完成: {0} ({1})", name, FormatSize(size)));
         }
         catch (OperationCanceledException)
         {
-            return new FileSendResult(false, "已取消发送");
+            return new FileSendResult(false, Loc.T("已取消发送"));
         }
         catch (Exception ex)
         {
-            return new FileSendResult(false, $"发送失败: {ex.Message}");
+            return new FileSendResult(false, Loc.F("发送失败: {0}", ex.Message));
         }
     }
 
@@ -304,7 +305,7 @@ public sealed class FileTransfer : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                LogLine($"文件传输监听异常: {ex.Message}");
+                LogLine(Loc.F("文件传输监听异常: {0}", ex.Message));
                 break;
             }
 
@@ -340,7 +341,7 @@ public sealed class FileTransfer : IAsyncDisposable
             if (size > _maxSize)
             {
                 await ReplyAsync(stream, "REJECT").ConfigureAwait(false);
-                LogLine($"拒绝接收 {name}: 超过 {_maxSize / 1048576}MB 上限");
+                LogLine(Loc.F("拒绝接收 {0}: 超过 {1}MB 上限", name, _maxSize / 1048576));
                 return;
             }
 
@@ -350,14 +351,14 @@ public sealed class FileTransfer : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                LogLine($"接收确认回调异常: {ex.Message}");
+                LogLine(Loc.F("接收确认回调异常: {0}", ex.Message));
                 savePath = null;
             }
 
             if (string.IsNullOrWhiteSpace(savePath))
             {
                 await ReplyAsync(stream, "REJECT").ConfigureAwait(false);
-                LogLine($"已拒绝来自 {(from.Length > 0 ? from : peerIp)} 的文件 {name}");
+                LogLine(Loc.F("已拒绝来自 {0} 的文件 {1}", (from.Length > 0 ? from : peerIp), name));
                 return;
             }
 
@@ -383,20 +384,20 @@ public sealed class FileTransfer : IAsyncDisposable
 
             if (received == size)
             {
-                LogLine($"已接收文件 {Path.GetFileName(target)} ({FormatSize(size)})");
+                LogLine(Loc.F("已接收文件 {0} ({1})", Path.GetFileName(target), FormatSize(size)));
 
                 try { FileReceived?.Invoke(target); }
-                catch (Exception ex) { Log.Warn($"接收完成回调异常：{ex.Message}"); }
+                catch (Exception ex) { Log.Warn(Loc.F("接收完成回调异常：{0}", ex.Message)); }
             }
             else
             {
                 TryDelete(target);
-                LogLine($"接收中断: {name} 仅收到 {received}/{size} 字节, 已删除");
+                LogLine(Loc.F("接收中断: {0} 仅收到 {1}/{2} 字节, 已删除", name, received, size));
             }
         }
         catch (Exception ex)
         {
-            LogLine($"接收失败: {ex.Message}");
+            LogLine(Loc.F("接收失败: {0}", ex.Message));
 
             // 中途异常（网络断开/磁盘错误/对方中断）残留的残缺文件一律清理
             if (!string.IsNullOrEmpty(savePath)) TryDelete(savePath);
@@ -473,11 +474,11 @@ public sealed class FileTransfer : IAsyncDisposable
     private async Task TryOpenFirewallAsync()
     {
         var result = await NetworkToolkit.SetFirewallRuleAsync(
-            "HMOL 文件传输",
+            Loc.T("HMOL 文件传输"),
             _port,
             CancellationToken.None).ConfigureAwait(false);
 
-        if (!result.Ok) LogLine($"自动放行防火墙未成功：{result.Message}");
+        if (!result.Ok) LogLine(Loc.F("自动放行防火墙未成功：{0}", result.Message));
     }
 
     private static string Truncate(string value, int maxLength)
@@ -491,15 +492,15 @@ public sealed class FileTransfer : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"删除残缺文件失败 {path}：{ex.Message}");
+            Log.Warn(Loc.F("删除残缺文件失败 {0}：{1}", path, ex.Message));
         }
     }
 
     private void LogLine(string message)
     {
-        Log.Info($"[文件传输] {message}");
+        Log.Info(Loc.F("[文件传输] {0}", message));
 
-        try { _log?.Invoke($"[文件传输] {message}"); }
+        try { _log?.Invoke(Loc.F("[文件传输] {0}", message)); }
         catch { /* 日志回调异常不影响业务 */ }
     }
 

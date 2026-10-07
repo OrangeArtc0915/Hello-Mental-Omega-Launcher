@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using HMOL.App.Pages;
 using HMOL.App.Windows;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App;
 
@@ -18,7 +19,7 @@ namespace HMOL.App;
 /// 加 <c>--capture-page &lt;页面&gt;</c>（home / instances / packages / multiplayer / log / settings，
 /// 也接受 0-5 的下标）可以截指定页面：先切到那一页再等动效收敛。不给就截主页（与原来一致）。
 /// 加 <c>--capture-setup &lt;分类&gt;</c> 则在设置页里再切到某个分类
-/// （0-13 下标，或 appearance / home / look / background 等名字），用来单独截某一类设置。
+/// （0-14 下标，或 appearance / home / look / language 等名字），用来单独截某一类设置。
 /// </summary>
 internal static class DebugCapture
 {
@@ -44,7 +45,8 @@ internal static class DebugCapture
         ["look"] = 10,
         ["autostart"] = 11,
         ["gamepath"] = 12,
-        ["about"] = 13
+        ["about"] = 13,
+        ["language"] = 14
     };
 
     /// <summary>读命令行里的 <c>--capture-home</c> 参数。没给或路径为空返回 false。</summary>
@@ -96,12 +98,12 @@ internal static class DebugCapture
     /// <summary>页面号 → 日志里可读的名字。</summary>
     private static string PageName(int page) => page switch
     {
-        NavPages.Instances => "游戏实例",
-        NavPages.Packages => "包管理",
-        NavPages.Multiplayer => "联机",
-        NavPages.Log => "运行日志",
-        NavPages.Settings => "设置",
-        _ => "主页"
+        NavPages.Instances => Loc.T("游戏实例"),
+        NavPages.Packages => Loc.T("包管理"),
+        NavPages.Multiplayer => Loc.T("联机"),
+        NavPages.Log => Loc.T("运行日志"),
+        NavPages.Settings => Loc.T("设置"),
+        _ => Loc.T("主页")
     };
 
     /// <summary>
@@ -119,7 +121,7 @@ internal static class DebugCapture
             if (int.TryParse(value, out var index)) return index;
             if (SetupCategories.TryGetValue(value, out var mapped)) return mapped;
 
-            Log.Warn($"无法识别的设置分类：{value}，本次按默认分类截。");
+            Log.Warn(Loc.F("无法识别的设置分类：{0}，本次按默认分类截。", value));
             return -1;
         }
 
@@ -168,9 +170,9 @@ internal static class DebugCapture
         // 设置页里再切到指定分类（例如 --capture-setup background 截「主页背景」那一类）
         if (setupCategory >= 0) window.SelectSetupCategory(setupCategory);
 
-        Log.Info($"自动截图：目标页面={PageName(page)}" +
-                 (setupCategory >= 0 ? $"，设置分类={setupCategory}" : string.Empty) +
-                 $"，输出={path}");
+        Log.Info(Loc.F("自动截图：目标页面={0}", PageName(page)) +
+                 (setupCategory >= 0 ? Loc.F("，设置分类={0}", setupCategory) : string.Empty) +
+                 Loc.F("，输出={0}", path));
 
         var timer = new DispatcherTimer
         {
@@ -198,7 +200,7 @@ internal static class DebugCapture
 
             if (width <= 0 || height <= 0)
             {
-                Log.Warn("自动截图跳过：主窗口还没量出尺寸");
+                Log.Warn(Loc.T("自动截图跳过：主窗口还没量出尺寸"));
                 return;
             }
 
@@ -213,11 +215,11 @@ internal static class DebugCapture
 
             using (var stream = File.Create(path)) encoder.Save(stream);
 
-            Log.Info($"自动截图完成：{path}（{width}×{height}）");
+            Log.Info(Loc.F("自动截图完成：{0}（{1}×{2}）", path, width, height));
         }
         catch (Exception ex)
         {
-            Log.Error($"自动截图失败：{path}", ex);
+            Log.Error(Loc.F("自动截图失败：{0}", path), ex);
         }
         finally
         {

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -140,7 +141,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         var preferred = CurrentNode();
         var preferredIndex = _nodes.IndexOf(preferred);
 
-        progress?.Report($"正在探测 {_nodes.Count} 个节点的连通性...");
+        progress?.Report(Loc.F("正在探测 {0} 个节点的连通性...", _nodes.Count));
 
         var probes = await Task
             .WhenAll(_nodes.Select(node => ProbeOneAsync(node, cancellationToken)))
@@ -165,7 +166,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         _nodes.AddRange(ordered);
         _nodeIndex = 0;
 
-        LogLine("节点探测：" + string.Join("、", ranked.Select(item => item.Probe switch
+        LogLine(Loc.T("节点探测：") + string.Join("、", ranked.Select(item => item.Probe switch
         {
             null => $"{item.Node}=未测出",
             < 0 => $"{item.Node}=连不上",
@@ -210,9 +211,9 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
 
         if (missing is not null) return Failure(missing);
 
-        if (IsRunning) return Failure($"{DisplayName} 引擎已在运行");
+        if (IsRunning) return Failure(Loc.F("{0} 引擎已在运行", DisplayName));
 
-        if (string.IsNullOrWhiteSpace(options.RoomName)) return Failure("房间名（小组名称）不能为空");
+        if (string.IsNullOrWhiteSpace(options.RoomName)) return Failure(Loc.T("房间名（小组名称）不能为空"));
 
         _options = options;
         ReorderNodes(options.Node);
@@ -222,7 +223,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         {
             // 旧实例残留会占住 RPC 端口与 TUN 网卡，先清理超过 2 分钟的本程序残留
             var cleaned = await CleanupStaleProcessesAsync(_instanceName, 120, cancellationToken).ConfigureAwait(false);
-            if (cleaned > 0) LogLine($"已清理 {cleaned} 个残留 easytier 进程");
+            if (cleaned > 0) LogLine(Loc.F("已清理 {0} 个残留 easytier 进程", cleaned));
 
             // 先探一遍节点，把明确连不上的排到后面（只排序、不丢节点）
             await ProbeNodesAsync(progress, cancellationToken).ConfigureAwait(false);
@@ -247,8 +248,8 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
 
                     var again = await CleanupStaleProcessesAsync(_instanceName, 120, cancellationToken).ConfigureAwait(false);
                     LogLine(again > 0
-                        ? $"检测到 {again} 个残留 easytier 进程，已清理后重试"
-                        : "检测到 RPC 端口被占用，更换端口后重试");
+                        ? Loc.F("检测到 {0} 个残留 easytier 进程，已清理后重试", again)
+                        : Loc.T("检测到 RPC 端口被占用，更换端口后重试"));
 
                     await StopAsync().ConfigureAwait(false);
                     await Task.Delay(500, cancellationToken).ConfigureAwait(false);
@@ -259,7 +260,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
                 {
                     await StopAsync().ConfigureAwait(false);
                     return tried >= MaxNodeAttempts && _nodes.Count > 1
-                        ? result with { Message = $"{result.Message}（已依次尝试 {tried} 个节点）" }
+                        ? result with { Message = Loc.F("{0}（已依次尝试 {1} 个节点）", result.Message, tried) }
                         : result;
                 }
 
@@ -270,7 +271,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
                 if (udp is not null && !_nodes.Contains(udp)) _nodes.Insert((_nodeIndex + 1) % _nodes.Count, udp);
 
                 _nodeIndex = (_nodeIndex + 1) % _nodes.Count;
-                LogLine($"节点 {old} 未在 {NodeReadySeconds:0} 秒内就绪，自动切换 {CurrentNode()} 重试（第 {tried + 1} 个节点）...");
+                LogLine(Loc.F("节点 {0} 未在 {1:0} 秒内就绪，自动切换 {2} 重试（第 {3} 个节点）...", old, NodeReadySeconds, CurrentNode(), tried + 1));
 
                 await StopAsync().ConfigureAwait(false);
                 await Task.Delay(500, cancellationToken).ConfigureAwait(false);
@@ -279,7 +280,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         catch (OperationCanceledException)
         {
             await StopAsync().ConfigureAwait(false);
-            return Failure("启动已取消");
+            return Failure(Loc.T("启动已取消"));
         }
     }
 
@@ -291,8 +292,8 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         var node = CurrentNode();
         var manual = NetworkEngineFactory.ResolveManualIp(_options);
 
-        LogLine($"启动 easytier-core：节点={node} 房间={_options.RoomName} " +
-                $"IP模式={(_options.AddressMode == NetworkAddressMode.Manual ? manual : "自动(DHCP)")}");
+        LogLine(Loc.F("启动 easytier-core：节点={0} 房间={1} ", node, _options.RoomName) +
+                Loc.F("IP模式={0}", (_options.AddressMode == NetworkAddressMode.Manual ? manual : Loc.T("自动(DHCP)"))));
 
         var arguments = BuildArguments(node, manual);
         LogLine(arguments);
@@ -310,7 +311,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (HasExited(CurrentProcess)) return Failure("easytier-core 进程提前退出");
+            if (HasExited(CurrentProcess)) return Failure(Loc.T("easytier-core 进程提前退出"));
 
             try
             {
@@ -323,8 +324,8 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
                     {
                         LocalIp = match.Groups[1].Value;
                         await NetworkToolkit.SetInterfaceMetricAsync(LocalIp, 1, cancellationToken).ConfigureAwait(false);
-                        LogLine($"easytier-core 已就绪，虚拟IP={LocalIp}");
-                        return new EngineStartResult(true, $"连接成功，虚拟 IP：{LocalIp}", LocalIp);
+                        LogLine(Loc.F("easytier-core 已就绪，虚拟IP={0}", LocalIp));
+                        return new EngineStartResult(true, Loc.F("连接成功，虚拟 IP：{0}", LocalIp), LocalIp);
                     }
                 }
             }
@@ -334,20 +335,20 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
             }
             catch (Exception ex)
             {
-                Log.Warn($"查询 easytier 节点信息失败：{ex.Message}");
+                Log.Warn(Loc.F("查询 easytier 节点信息失败：{0}", ex.Message));
             }
 
             var elapsed = (int)watch.Elapsed.TotalSeconds;
             if (elapsed - lastProgress >= 15)
             {
                 lastProgress = elapsed;
-                progress?.Report($"正在连接节点 {node}（已等待 {elapsed}s）...");
+                progress?.Report(Loc.F("正在连接节点 {0}（已等待 {1}s）...", node, elapsed));
             }
 
             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
         }
 
-        return Failure("easytier-core 启动超时，未获得虚拟 IP");
+        return Failure(Loc.T("easytier-core 启动超时，未获得虚拟 IP"));
     }
 
     /// <summary>命令行参数与旧版 engine_easytier.py:214-233 逐条对齐。</summary>
@@ -419,7 +420,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         }
         catch (Exception ex)
         {
-            Log.Warn($"查询 easytier 对端失败：{ex.Message}");
+            Log.Warn(Loc.F("查询 easytier 对端失败：{0}", ex.Message));
             return [];
         }
     }
@@ -445,7 +446,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         }
         catch (Exception ex)
         {
-            Log.Warn($"查询 easytier 节点信息失败：{ex.Message}");
+            Log.Warn(Loc.F("查询 easytier 节点信息失败：{0}", ex.Message));
             return new EngineNodeInfo(null, null, null, null);
         }
     }
@@ -536,7 +537,7 @@ public sealed class EasyTierEngine : EngineProcessBase, INetworkEngine
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理残留 easytier 进程失败：{ex.Message}");
+            Log.Warn(Loc.F("清理残留 easytier 进程失败：{0}", ex.Message));
             return 0;
         }
     }

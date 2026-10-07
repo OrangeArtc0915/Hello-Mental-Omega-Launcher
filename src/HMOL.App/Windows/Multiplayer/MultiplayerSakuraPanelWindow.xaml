@@ -1,4 +1,4 @@
-<Window x:Class="HMOL.App.Windows.Multiplayer.MultiplayerSakuraPanelWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.Multiplayer.MultiplayerSakuraPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -13,7 +13,7 @@
         WindowStartupLocation="CenterOwner"
         SnapsToDevicePixels="True">
 
-    <c:SurfaceCard x:Name="Card" Padding="0" Title="樱花FRP 面板" UseShadow="False">
+    <c:SurfaceCard x:Name="Card" Padding="0" Title="{loc:T '樱花FRP 面板'}" UseShadow="False">
         <Grid Margin="12,10,12,12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -31,7 +31,7 @@
                 <c:OutlineButton x:Name="BtnBack"
                                  Grid.Column="0"
                                  Padding="10,4"
-                                 Content="后退"
+                                 Content="{loc:T '后退'}"
                                  FontSize="12"
                                  IsEnabled="False"
                                  Click="OnBackClick" />
@@ -39,7 +39,7 @@
                                  Grid.Column="1"
                                  Margin="6,0,0,0"
                                  Padding="10,4"
-                                 Content="前进"
+                                 Content="{loc:T '前进'}"
                                  FontSize="12"
                                  IsEnabled="False"
                                  Click="OnForwardClick" />
@@ -47,7 +47,7 @@
                                  Grid.Column="2"
                                  Margin="6,0,0,0"
                                  Padding="10,4"
-                                 Content="刷新"
+                                 Content="{loc:T '刷新'}"
                                  FontSize="12"
                                  IsEnabled="False"
                                  Click="OnRefreshClick" />

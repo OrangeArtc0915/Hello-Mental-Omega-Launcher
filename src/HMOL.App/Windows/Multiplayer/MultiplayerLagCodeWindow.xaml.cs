@@ -1,5 +1,6 @@
 using System.Windows;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -18,12 +19,12 @@ public partial class MultiplayerLagCodeWindow : Window
         try
         {
             Clipboard.SetText(Command);
-            LabCopied.Text = "已复制到剪贴板";
+            LabCopied.Text = Loc.T("已复制到剪贴板");
         }
         catch (Exception ex)
         {
-            Log.Warn($"复制延迟指令失败：{ex.Message}");
-            LabCopied.Text = "复制失败，可手动选中复制";
+            Log.Warn(Loc.F("复制延迟指令失败：{0}", ex.Message));
+            LabCopied.Text = Loc.T("复制失败，可手动选中复制");
         }
     }
 }

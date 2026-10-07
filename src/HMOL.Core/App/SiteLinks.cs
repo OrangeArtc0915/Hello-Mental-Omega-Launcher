@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Serialization;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.App;
 
@@ -31,10 +32,10 @@ public static class SiteLinkCatalog
     /// </summary>
     public static List<SiteLinkSetting> Defaults() =>
     [
-        new() { Name = "本项目 GitHub", Url = AppInfo.GitHubUrl },
-        new() { Name = "本项目 Gitee", Url = AppInfo.GiteeUrl },
-        new() { Name = "心灵终结官网", Url = "https://mentalomega.com/" },
-        new() { Name = "官方 QQ 群", Url = AppInfo.QqGroupUrl }
+        new() { Name = Loc.T("本项目 GitHub"), Url = AppInfo.GitHubUrl },
+        new() { Name = Loc.T("本项目 Gitee"), Url = AppInfo.GiteeUrl },
+        new() { Name = Loc.T("心灵终结官网"), Url = "https://mentalomega.com/" },
+        new() { Name = Loc.T("官方 QQ 群"), Url = AppInfo.QqGroupUrl }
     ];
 
     /// <summary>

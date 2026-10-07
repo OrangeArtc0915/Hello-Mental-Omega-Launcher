@@ -1,9 +1,9 @@
-<Window x:Class="HMOL.App.Windows.AboutWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.AboutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
         xmlns:core="clr-namespace:HMOL.Core.App;assembly=HMOL.Core"
-        Title="关于"
+        Title="{loc:T '关于'}"
         Width="560"
         SizeToContent="Height"
         ResizeMode="NoResize"
@@ -22,7 +22,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <c:SurfaceCard Grid.Row="0" Title="关于">
+        <c:SurfaceCard Grid.Row="0" Title="{loc:T '关于'}">
             <StackPanel>
                 <!-- 软件名与版本：全部取自 AppInfo，界面里不写死 -->
                 <StackPanel Orientation="Horizontal">
@@ -56,14 +56,14 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="作者" />
+                               Text="{loc:T '作者'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
                                Text="{x:Static core:AppInfo.Author}" />
                 </Grid>
 
-                <!-- 许可声明：本项目为专有软件，许可证正文见仓库根 LICENSE -->
+                <!-- 许可声明：PolyForm Noncommercial 1.0.0，许可证正文见仓库根 LICENSE -->
                 <Grid Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" MinWidth="88" />
@@ -73,7 +73,7 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="许可" />
+                               Text="{loc:T '许可'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -90,7 +90,7 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="官网" />
+                               Text="{loc:T '官网'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -98,7 +98,7 @@
                                Foreground="{DynamicResource Accent.Base}"
                                Cursor="Hand"
                                Text="{x:Static core:AppInfo.WebsiteUrl}"
-                               ToolTip="在默认浏览器中打开项目官网"
+                               ToolTip="{loc:T '在默认浏览器中打开项目官网'}"
                                MouseLeftButtonUp="OnOpenWebsiteClick" />
                 </Grid>
 
@@ -112,7 +112,7 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="GitHub 仓库" />
+                               Text="{loc:T 'GitHub 仓库'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -134,7 +134,7 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="Gitee 仓库" />
+                               Text="{loc:T 'Gitee 仓库'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -156,7 +156,7 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="问题反馈" />
+                               Text="{loc:T '问题反馈'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -164,7 +164,7 @@
                                Foreground="{DynamicResource Accent.Base}"
                                Cursor="Hand"
                                Text="{x:Static core:AppInfo.GitHubIssuesUrl}"
-                               ToolTip="在默认浏览器中打开 GitHub Issues"
+                               ToolTip="{loc:T '在默认浏览器中打开 GitHub Issues'}"
                                MouseLeftButtonUp="OnOpenIssuesClick" />
                 </Grid>
 
@@ -180,7 +180,7 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="官方 QQ 群" />
+                               Text="{loc:T '官方 QQ 群'}" />
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -190,13 +190,13 @@
                     <c:OutlineButton Grid.Column="2"
                                      Padding="12,6"
                                      FontSize="12"
-                                     Content="复制群号"
+                                     Content="{loc:T '复制群号'}"
                                      Click="OnCopyGroupClick" />
                     <c:OutlineButton Grid.Column="3"
                                      Margin="8,0,0,0"
                                      Padding="12,6"
                                      FontSize="12"
-                                     Content="一键加群"
+                                     Content="{loc:T '一键加群'}"
                                      Tone="Solid"
                                      Click="OnJoinGroupClick" />
                 </Grid>
@@ -206,7 +206,7 @@
                            FontSize="11"
                            Foreground="{DynamicResource Text.Tertiary}"
                            TextWrapping="Wrap"
-                           Text="复制后可直接在 QQ 里搜索群号。" />
+                           Text="{loc:T '复制后可直接在 QQ 里搜索群号。'}" />
             </StackPanel>
         </c:SurfaceCard>
 
@@ -214,12 +214,12 @@
         <c:SurfaceCard x:Name="CardThanks"
                        Grid.Row="1"
                        Margin="0,12,0,0"
-                       Title="鸣谢">
+                       Title="{loc:T '鸣谢'}">
             <StackPanel>
                 <TextBlock FontSize="12"
                            Foreground="{DynamicResource Text.Secondary}"
                            TextWrapping="Wrap"
-                           Text="感谢每一位参与测试与反馈的朋友（排名不分先后）：" />
+                           Text="{loc:T '感谢每一位参与测试与反馈的朋友（排名不分先后）：'}" />
                 <WrapPanel x:Name="PanThanks" Margin="0,10,0,-8" />
             </StackPanel>
         </c:SurfaceCard>
@@ -230,7 +230,7 @@
                     Orientation="Horizontal">
             <c:OutlineButton Width="88"
                              Height="36"
-                             Content="关闭"
+                             Content="{loc:T '关闭'}"
                              Tone="Solid"
                              Click="OnCloseClick" />
         </StackPanel>

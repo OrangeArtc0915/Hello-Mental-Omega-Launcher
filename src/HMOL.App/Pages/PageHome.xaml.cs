@@ -17,6 +17,7 @@ using HMOL.Core.IO;
 using HMOL.Core.Layout;
 using HMOL.Core.Logging;
 using HMOL.Core.Weather;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Pages;
 
@@ -84,12 +85,12 @@ public sealed class ExtensionWidgetRow
         Animate = animate;
 
         Link = (info.Manifest?.Link ?? string.Empty).Trim();
-        LinkLabel = Link.Length == 0 ? string.Empty : $"点击打开 {HostOf(Link)}";
+        LinkLabel = Link.Length == 0 ? string.Empty : Loc.F("点击打开 {0}", HostOf(Link));
 
         if (card.Error is { Length: > 0 } error)
         {
             HasError = true;
-            ErrorText = $"此扩展暂时不可用：{error}";
+            ErrorText = Loc.F("此扩展暂时不可用：{0}", error);
             A11yName = $"{Title}：{ErrorText}";
             return;
         }
@@ -199,8 +200,8 @@ public partial class PageHome : LauncherPage
     /// <summary>运行中状态点的呼吸节奏（单向时长，往返一个周期约 1.8 秒）。</summary>
     private const double PulseMs = 900;
 
-    /// <summary>月历表头，周一为一周起点。</summary>
-    private static readonly string[] WeekdayShort = ["一", "二", "三", "四", "五", "六", "日"];
+    /// <summary>月历表头，周一为一周起点。属性而非静态字段：表头随界面语言变化。</summary>
+    private static string[] WeekdayShort => [Loc.T("一"), Loc.T("二"), Loc.T("三"), Loc.T("四"), Loc.T("五"), Loc.T("六"), Loc.T("日")];
 
     private bool _subscribed;
     private bool _launching;
@@ -385,7 +386,7 @@ public partial class PageHome : LauncherPage
         // 没有带坐标的项就只是换个版本号，不必落盘
         if (converted == 0) return false;
 
-        Log.Info($"布局方案「{scheme.Name}」的坐标基准已升级为整页（换算 {converted} 项）");
+        Log.Info(Loc.F("布局方案「{0}」的坐标基准已升级为整页（换算 {1} 项）", scheme.Name, converted));
         return true;
     }
 
@@ -763,9 +764,9 @@ public partial class PageHome : LauncherPage
 
         RefreshClock();
 
-        LabMemoTitle.Text = string.IsNullOrWhiteSpace(extras.MemoTitle) ? "便签" : extras.MemoTitle;
+        LabMemoTitle.Text = string.IsNullOrWhiteSpace(extras.MemoTitle) ? Loc.T("便签") : extras.MemoTitle;
         LabMemoText.Text = string.IsNullOrWhiteSpace(extras.MemoText)
-            ? "便签是空的，去「设置 → 主页设置」里写点什么吧。"
+            ? Loc.T("便签是空的，去「设置 → 主页设置」里写点什么吧。")
             : extras.MemoText;
 
         RefreshMusicWidget();
@@ -779,7 +780,7 @@ public partial class PageHome : LauncherPage
         var now = DateTime.Now;
 
         LabClockTime.Text = extras.Clock24Hour ? now.ToString("HH:mm:ss") : now.ToString("hh:mm:ss");
-        LabClockDate.Text = extras.ClockShowDate ? now.ToString("yyyy 年 M 月 d 日 dddd") : string.Empty;
+        LabClockDate.Text = extras.ClockShowDate ? now.ToString(Loc.T("yyyy 年 M 月 d 日 dddd")) : string.Empty;
     }
 
     private void RefreshMusicWidget()
@@ -794,13 +795,13 @@ public partial class PageHome : LauncherPage
 
         if (!hasPlaylist)
         {
-            LabMusicTrack.Text = "还没有歌";
-            LabMusicHint.Text = "在「设置 → 背景音乐」里添加曲目。";
+            LabMusicTrack.Text = Loc.T("还没有歌");
+            LabMusicHint.Text = Loc.T("在「设置 → 背景音乐」里添加曲目。");
         }
         else
         {
             LabMusicTrack.Text = BgmPlayer.CurrentTrackName;
-            LabMusicHint.Text = BgmPlayer.IsPlaying ? "正在播放" : "已暂停";
+            LabMusicHint.Text = BgmPlayer.IsPlaying ? Loc.T("正在播放") : Loc.T("已暂停");
         }
 
         BtnMusicToggle.Icon = BgmPlayer.IsPlaying ? "lucide/square" : "lucide/play";
@@ -840,7 +841,7 @@ public partial class PageHome : LauncherPage
         PanSimpleSwitch.ItemsSource = instances.Select(instance => new SwitchRowItem(instance)).ToList();
         LabSimpleInstance.Text = hasInstance
             ? InstanceManager.Current?.Name ?? string.Empty
-            : "还没有游戏实例";
+            : Loc.T("还没有游戏实例");
 
         if (!hasInstance)
         {
@@ -896,21 +897,21 @@ public partial class PageHome : LauncherPage
     {
         LabGreeting.Text = DateTime.Now.Hour switch
         {
-            >= 5 and < 12 => "早上好",
-            >= 12 and < 18 => "下午好",
-            >= 18 and < 23 => "晚上好",
-            _ => "夜深了"
+            >= 5 and < 12 => Loc.T("早上好"),
+            >= 12 and < 18 => Loc.T("下午好"),
+            >= 18 and < 23 => Loc.T("晚上好"),
+            _ => Loc.T("夜深了")
         };
 
         var instance = InstanceManager.Current;
 
         LabBannerStatus.Text = instance is null
-            ? "还没有游戏实例，先创建一个指向心灵终结游戏目录的实例吧。"
+            ? Loc.T("还没有游戏实例，先创建一个指向心灵终结游戏目录的实例吧。")
             : GameSessionHub.IsRunning
-                ? $"当前实例「{instance.Name}」正在运行中。"
+                ? Loc.F("当前实例「{0}」正在运行中。", instance.Name)
                 : instance.IsValid
-                    ? $"当前实例「{instance.Name}」已就绪，游戏目录可用。"
-                    : $"当前实例「{instance.Name}」的游戏目录不可用，请到「游戏实例」页检查路径。";
+                    ? Loc.F("当前实例「{0}」已就绪，游戏目录可用。", instance.Name)
+                    : Loc.F("当前实例「{0}」的游戏目录不可用，请到「游戏实例」页检查路径。", instance.Name);
     }
 
     private void RefreshCurrentInstance()
@@ -923,7 +924,7 @@ public partial class PageHome : LauncherPage
 
         // 简洁模式浮层上的实例名（目录失效时补一句，避免用户在简洁模式下看不出问题）
         if (LabSimpleInstance is not null)
-            LabSimpleInstance.Text = instance.IsValid ? instance.Name : $"{instance.Name}（目录不可用）";
+            LabSimpleInstance.Text = instance.IsValid ? instance.Name : Loc.F("{0}（目录不可用）", instance.Name);
 
         LabPath.Text = instance.GameDir;
         LabPath.ToolTip = instance.GameDir;
@@ -941,15 +942,15 @@ public partial class PageHome : LauncherPage
     /// <summary>上次启动时间。写在实例配置里（启动成功时落盘），重启程序后仍然留着。</summary>
     private static string FormatLastLaunch(GameInstance instance)
     {
-        if (instance.LastLaunchedAt is not { } at) return "上次启动：还没启动过";
+        if (instance.LastLaunchedAt is not { } at) return Loc.T("上次启动：还没启动过");
 
         var text = at.Date == DateTime.Today
-            ? $"今天 {at:HH:mm}"
+            ? Loc.F("今天 {0:HH:mm}", at)
             : at.Year == DateTime.Today.Year
                 ? at.ToString("MM-dd HH:mm")
                 : at.ToString("yyyy-MM-dd HH:mm");
 
-        return $"上次启动：{text}";
+        return Loc.F("上次启动：{0}", text);
     }
 
     /// <summary>按「是否运行中 / 目录是否有效」刷新状态胶囊、状态点、启动按钮与提示。</summary>
@@ -962,27 +963,27 @@ public partial class PageHome : LauncherPage
 
         if (running)
         {
-            SetState("运行中", "Status.Success", "Accent.Faint", "Accent.Base");
+            SetState(Loc.T("运行中"), "Status.Success", "Accent.Faint", "Accent.Base");
             StartPulse();
         }
         else
         {
             StopPulse();
 
-            if (instance is { IsValid: true }) SetState("就绪", "Accent.Base", "Accent.Faint", "Status.Success");
-            else SetState("目录不可用", "Status.Danger", "Status.DangerSoft", "Status.Danger");
+            if (instance is { IsValid: true }) SetState(Loc.T("就绪"), "Accent.Base", "Accent.Faint", "Status.Success");
+            else SetState(Loc.T("目录不可用"), "Status.Danger", "Status.DangerSoft", "Status.Danger");
         }
 
-        LabLaunch.Text = running ? "停止游戏" : "启动游戏";
+        LabLaunch.Text = running ? Loc.T("停止游戏") : Loc.T("启动游戏");
         IconLaunch.Icon = running ? "lucide/square" : "lucide/play";
         BtnLaunch.Tone = running ? ButtonTone.Danger : ButtonTone.Solid;
         BtnLaunch.IsEnabled = running || (instance is { IsValid: true } && !_launching);
 
         var hint = running
-            ? "游戏正在运行，修改插件包前建议先关闭游戏。"
+            ? Loc.T("游戏正在运行，修改插件包前建议先关闭游戏。")
             : instance is { IsValid: true, ExecutablePath: null }
-                ? "目录有效但未找到游戏主程序，启动会失败，请检查游戏文件是否完整。"
-                : instance is null ? "没有可启动的实例。" : string.Empty;
+                ? Loc.T("目录有效但未找到游戏主程序，启动会失败，请检查游戏文件是否完整。")
+                : instance is null ? Loc.T("没有可启动的实例。") : string.Empty;
 
         LabLaunchHint.Text = hint;
         LabLaunchHint.Visibility = string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
@@ -992,14 +993,14 @@ public partial class PageHome : LauncherPage
         {
             if (instance is null)
             {
-                LabSimpleLaunch.Text = "创建实例";
+                LabSimpleLaunch.Text = Loc.T("创建实例");
                 IconSimpleLaunch.Icon = "lucide/circle-plus";
                 BtnSimpleLaunch.Tone = ButtonTone.Solid;
                 BtnSimpleLaunch.IsEnabled = true;
             }
             else
             {
-                LabSimpleLaunch.Text = running ? "停止游戏" : "启动游戏";
+                LabSimpleLaunch.Text = running ? Loc.T("停止游戏") : Loc.T("启动游戏");
                 IconSimpleLaunch.Icon = running ? "lucide/square" : "lucide/play";
                 BtnSimpleLaunch.Tone = running ? ButtonTone.Danger : ButtonTone.Solid;
                 BtnSimpleLaunch.IsEnabled = running || (instance is { IsValid: true } && !_launching);
@@ -1082,7 +1083,7 @@ public partial class PageHome : LauncherPage
 
         // 无障碍名称：UIA 读得到「今天 / 具体哪一天」，无脚本也能确认高亮的是不是今天。
         // Border 本身没有 UIA 节点，名称要挂在里面的文字上才读得到。
-        var dayName = isToday ? $"今天 {date.Month} 月 {date.Day} 日" : date.Day.ToString();
+        var dayName = isToday ? Loc.F("今天 {0} 月 {1} 日", date.Month, date.Day) : date.Day.ToString();
         AutomationProperties.SetName(text, dayName);
         AutomationProperties.SetName(cell, dayName);
 
@@ -1110,17 +1111,17 @@ public partial class PageHome : LauncherPage
             var actual = (cell?.Background as SolidColorBrush)?.Color;
             var expected = (TryFindResource("Accent.Bright") as SolidColorBrush)?.Color;
 
-            Log.Info($"月历自检：显示 {_calendarMonth:yyyy-MM} 共 {CalDays.Children.Count} 格（前导补白 {leading}，" +
-                     $"当月 {DateTime.DaysInMonth(_calendarMonth.Year, _calendarMonth.Month)} 天），" +
-                     $"今天 {(inCurrentMonth ? $"在第 {index + 1} 格，背景={Describe(actual)}" : "不在当前显示的月份里")}，" +
+            Log.Info(Loc.F("月历自检：显示 {0:yyyy-MM} 共 {1} 格（前导补白 {2}，", _calendarMonth, CalDays.Children.Count, leading) +
+                     Loc.F("当月 {0} 天），", DateTime.DaysInMonth(_calendarMonth.Year, _calendarMonth.Month)) +
+                     Loc.F("今天 {0}，", (inCurrentMonth ? Loc.F("在第 {0} 格，背景={1}", index + 1, Describe(actual)) : Loc.T("不在当前显示的月份里"))) +
                      $"Accent.Bright={Describe(expected)}");
         }
         catch (Exception ex)
         {
-            Log.Info($"月历自检失败：{ex.Message}");
+            Log.Info(Loc.F("月历自检失败：{0}", ex.Message));
         }
 
-        static string Describe(Color? color) => color is { } value ? $"#{value.R:X2}{value.G:X2}{value.B:X2}" : "无";
+        static string Describe(Color? color) => color is { } value ? $"#{value.R:X2}{value.G:X2}{value.B:X2}" : Loc.T("无");
     }
 #endif
 
@@ -1207,7 +1208,7 @@ public partial class PageHome : LauncherPage
 
             LabWeatherCity.Text = city;
             LabWeatherTemp.Text = "…";
-            LabWeatherDesc.Text = "正在查询天气…";
+            LabWeatherDesc.Text = Loc.T("正在查询天气…");
             LabWeatherDetail.Text = string.Empty;
             LabWeatherNote.Visibility = Visibility.Collapsed;
 
@@ -1215,7 +1216,7 @@ public partial class PageHome : LauncherPage
 
             if (snapshot is null)
             {
-                var failure = WeatherService.LastError ?? "天气数据暂时取不到，请稍后再试";
+                var failure = WeatherService.LastError ?? Loc.T("天气数据暂时取不到，请稍后再试");
 
                 IcoWeather.Data = WeatherGlyph.For(WeatherKind.Unknown);
                 LabWeatherTemp.Text = string.Empty;
@@ -1224,8 +1225,8 @@ public partial class PageHome : LauncherPage
 
                 // 城市名本身没解析出来时给的是「去改设置」的提示，网络问题才提网络
                 LabWeatherNote.Text = failure.Contains("找不到城市", StringComparison.Ordinal)
-                    ? "到「设置 → 天气城市」里换一个城市名再试。"
-                    : "天气来自 Open-Meteo，检查网络后点右上角刷新重试。";
+                    ? Loc.T("到「设置 → 天气城市」里换一个城市名再试。")
+                    : Loc.T("天气来自 Open-Meteo，检查网络后点右上角刷新重试。");
                 LabWeatherNote.Visibility = Visibility.Visible;
                 return;
             }
@@ -1233,11 +1234,11 @@ public partial class PageHome : LauncherPage
             IcoWeather.Data = WeatherGlyph.For(snapshot.Kind);
 
 #if DEBUG
-            Log.Info($"天气自检：城市={snapshot.City} 温度={snapshot.Temperature:0.#}°C " +
-                     $"体感={snapshot.ApparentTemperature:0.#}°C 湿度={snapshot.Humidity:0.#}% " +
-                     $"风速={snapshot.WindSpeed:0.#}km/h 类型={snapshot.Kind} 描述={snapshot.Description} " +
-                     $"今日={snapshot.TodayHigh:0.#}/{snapshot.TodayLow:0.#}°C 代码={snapshot.WeatherCode} " +
-                     $"抓取时间={snapshot.FetchedAt:yyyy-MM-dd HH:mm:ss}");
+            Log.Info(Loc.F("天气自检：城市={0} 温度={1:0.#}°C ", snapshot.City, snapshot.Temperature) +
+                     Loc.F("体感={0:0.#}°C 湿度={1:0.#}% ", snapshot.ApparentTemperature, snapshot.Humidity) +
+                     Loc.F("风速={0:0.#}km/h 类型={1} 描述={2} ", snapshot.WindSpeed, snapshot.Kind, snapshot.Description) +
+                     Loc.F("今日={0:0.#}/{1:0.#}°C 代码={2} ", snapshot.TodayHigh, snapshot.TodayLow, snapshot.WeatherCode) +
+                     Loc.F("抓取时间={0:yyyy-MM-dd HH:mm:ss}", snapshot.FetchedAt));
 #endif
 
             LabWeatherCity.Text = snapshot.City;
@@ -1246,20 +1247,20 @@ public partial class PageHome : LauncherPage
 
             var parts = new List<string>
             {
-                $"体感 {snapshot.ApparentTemperature:0.#}°C",
-                $"湿度 {snapshot.Humidity:0.#}%",
-                $"风速 {snapshot.WindSpeed:0.#} km/h"
+                Loc.F("体感 {0:0.#}°C", snapshot.ApparentTemperature),
+                Loc.F("湿度 {0:0.#}%", snapshot.Humidity),
+                Loc.F("风速 {0:0.#} km/h", snapshot.WindSpeed)
             };
 
             if (snapshot.TodayHigh is { } high && snapshot.TodayLow is { } low)
-                parts.Add($"今日 {high:0.#}/{low:0.#}°C");
+                parts.Add(Loc.F("今日 {0:0.#}/{1:0.#}°C", high, low));
 
             LabWeatherDetail.Text = string.Join(" · ", parts);
 
             // LastError 仍有值说明这次是退回过期缓存的结果
             if (WeatherService.LastError is { Length: > 0 } reason)
             {
-                LabWeatherNote.Text = $"{reason}，当前显示的是缓存数据。";
+                LabWeatherNote.Text = Loc.F("{0}，当前显示的是缓存数据。", reason);
                 LabWeatherNote.Visibility = Visibility.Visible;
             }
             else
@@ -1270,8 +1271,8 @@ public partial class PageHome : LauncherPage
         catch (Exception ex)
         {
             // 兜底：天气再怎么样也不能把主页搞崩
-            Log.Info($"刷新天气小组件失败：{ex.Message}");
-            LabWeatherDesc.Text = "天气数据暂时取不到，请稍后再试";
+            Log.Info(Loc.F("刷新天气小组件失败：{0}", ex.Message));
+            LabWeatherDesc.Text = Loc.T("天气数据暂时取不到，请稍后再试");
             LabWeatherDetail.Text = string.Empty;
         }
         finally
@@ -1291,7 +1292,7 @@ public partial class PageHome : LauncherPage
 
         PanSites.ItemsSource = links.Select(link => new SiteLinkRow(link)).ToList();
 
-        LabSitesCount.Text = links.Count > 0 ? $"{links.Count} 个" : string.Empty;
+        LabSitesCount.Text = links.Count > 0 ? Loc.F("{0} 个", links.Count) : string.Empty;
         PanSitesEmpty.Visibility = links.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         ScrollSites.Visibility = links.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -1303,7 +1304,7 @@ public partial class PageHome : LauncherPage
 
         if (!SiteLinkCatalog.IsHttpUrl(url))
         {
-            Notify($"网址不是有效的 http/https 地址：{url}\n请到「设置 → 常用网站」里修改。", "打开网站", MessageBoxImage.Warning);
+            Notify(Loc.F("网址不是有效的 http/https 地址：{0}\n请到「设置 → 常用网站」里修改。", url), Loc.T("打开网站"), MessageBoxImage.Warning);
             return;
         }
 
@@ -1363,7 +1364,7 @@ public partial class PageHome : LauncherPage
         catch (Exception ex)
         {
             // 兜底：扩展再怎么样也不能把主页搞崩，最坏情况就是这一块不显示
-            Log.Info($"刷新扩展小组件失败：{ex.Message}");
+            Log.Info(Loc.F("刷新扩展小组件失败：{0}", ex.Message));
             PanExtensionWidgets.Visibility = Visibility.Collapsed;
         }
         finally
@@ -1467,7 +1468,7 @@ public partial class PageHome : LauncherPage
 
         if (!SiteLinkCatalog.IsHttpUrl(row.Link))
         {
-            Notify($"扩展给出的网址不是有效的 http/https 地址：{row.Link}", "扩展小组件", MessageBoxImage.Warning);
+            Notify(Loc.F("扩展给出的网址不是有效的 http/https 地址：{0}", row.Link), Loc.T("扩展小组件"), MessageBoxImage.Warning);
             return;
         }
 
@@ -1522,14 +1523,14 @@ public partial class PageHome : LauncherPage
         if (GameSessionHub.IsRunning)
         {
             GameSessionHub.Kill();
-            Log.Info("已请求结束游戏进程");
+            Log.Info(Loc.T("已请求结束游戏进程"));
             return;
         }
 
         var instance = InstanceManager.Current;
         if (instance is null)
         {
-            Notify("还没有可启动的实例。", "启动游戏", MessageBoxImage.Warning);
+            Notify(Loc.T("还没有可启动的实例。"), Loc.T("启动游戏"), MessageBoxImage.Warning);
             return;
         }
 
@@ -1541,13 +1542,13 @@ public partial class PageHome : LauncherPage
             // 启动成功时 GameSessionHub 会把「上次启动时间」写进实例并落盘
             if (!GameSessionHub.TryLaunch(instance, out var error))
             {
-                Notify(error ?? "启动失败：未知原因", "启动游戏", MessageBoxImage.Warning);
-                Log.Warn($"启动游戏失败：{error}");
+                Notify(error ?? Loc.T("启动失败：未知原因"), Loc.T("启动游戏"), MessageBoxImage.Warning);
+                Log.Warn(Loc.F("启动游戏失败：{0}", error));
                 return;
             }
 
-            ActivityLog.Write(LogSource.App, $"已启动实例「{instance.Name}」");
-            Log.Info($"界面：已启动实例「{instance.Name}」");
+            ActivityLog.Write(LogSource.App, Loc.F("已启动实例「{0}」", instance.Name));
+            Log.Info(Loc.F("界面：已启动实例「{0}」", instance.Name));
 
             RefreshBanner();
             RefreshCurrentInstance();

@@ -6,6 +6,7 @@ using SharpCompress.Common;
 using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Packages;
 
@@ -70,7 +71,7 @@ public static class ArchiveExtractor
         }
         catch (Exception ex)
         {
-            Log.Error($"读取压缩包内容失败：{archivePath}", ex);
+            Log.Error(Loc.F("读取压缩包内容失败：{0}", archivePath), ex);
         }
 
         return result;
@@ -86,20 +87,20 @@ public static class ArchiveExtractor
         {
             if (string.IsNullOrWhiteSpace(archivePath) || !File.Exists(archivePath))
             {
-                error = $"压缩包不存在：{archivePath}";
+                error = Loc.F("压缩包不存在：{0}", archivePath);
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(destinationDirectory))
             {
-                error = "目标目录为空";
+                error = Loc.T("目标目录为空");
                 return false;
             }
 
             var format = DetectFormat(archivePath);
             if (format is null)
             {
-                error = $"不支持的压缩格式：{Path.GetFileName(archivePath)}";
+                error = Loc.F("不支持的压缩格式：{0}", Path.GetFileName(archivePath));
                 return false;
             }
 
@@ -133,7 +134,7 @@ public static class ArchiveExtractor
             if (format == "7z")
             {
                 // 回退到 SharpCompress 会慢一个数量级，日志里明说，别让人对着进度条猜
-                Log.Warn($"{SevenZipTool.MissingMessage}；本次 7z 解压改用慢速实现，耗时会长很多");
+                Log.Warn(Loc.F("{0}；本次 7z 解压改用慢速实现，耗时会长很多", SevenZipTool.MissingMessage));
             }
 
             using var archive = ArchiveFactory.Open(archivePath);
@@ -185,13 +186,13 @@ public static class ArchiveExtractor
         }
         catch (OperationCanceledException)
         {
-            error = "操作已取消";
+            error = Loc.T("操作已取消");
             return false;
         }
         catch (Exception ex)
         {
             error = ex.Message;
-            Log.Error($"解压失败：{archivePath}", ex);
+            Log.Error(Loc.F("解压失败：{0}", archivePath), ex);
             return false;
         }
     }
@@ -214,7 +215,7 @@ public static class ArchiveExtractor
         }
         catch (Exception ex)
         {
-            Log.Warn($"识别解压根目录失败：{extractDirectory}（{ex.Message}）");
+            Log.Warn(Loc.F("识别解压根目录失败：{0}（{1}）", extractDirectory, ex.Message));
             return extractDirectory;
         }
     }
@@ -231,11 +232,11 @@ public static class ArchiveExtractor
         var (ok, error) = SevenZipTool.Extract(archivePath, destinationRoot,
             progress is null ? null : new PercentProgress(progress, totalBytes), token);
 
-        if (!ok) return $"解压失败：{error}";
+        if (!ok) return Loc.F("解压失败：{0}", error);
 
         progress?.Report(new ProgressSample(1, totalBytes, totalBytes));
 
-        Log.Info($"解压完成：{archiveName}（7-Zip 原生" +
+        Log.Info(Loc.F("解压完成：{0}（7-Zip 原生", archiveName) +
                  (totalBytes > 0 ? $"，{totalBytes / 1024d / 1024d:F1} MB" : string.Empty) +
                  $"）→ {destinationRoot}");
 
@@ -255,7 +256,7 @@ public static class ArchiveExtractor
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取压缩包总大小失败，本次进度只显示百分比：{archivePath}（{ex.Message}）");
+            Log.Warn(Loc.F("读取压缩包总大小失败，本次进度只显示百分比：{0}（{1}）", archivePath, ex.Message));
             return 0;
         }
     }
@@ -300,7 +301,7 @@ public static class ArchiveExtractor
             if (!PathGuard.TryResolve(destinationRoot, key, out var targetPath))
             {
                 rejected++;
-                Log.Warn($"压缩包条目路径不合法，已跳过：{key}（{archiveName}）");
+                Log.Warn(Loc.F("压缩包条目路径不合法，已跳过：{0}（{1}）", key, archiveName));
                 continue;
             }
 
@@ -328,7 +329,7 @@ public static class ArchiveExtractor
             catch (Exception ex)
             {
                 // 单个条目失败不影响整体
-                Log.Warn($"解压条目失败，已跳过：{key}（{ex.Message}）");
+                Log.Warn(Loc.F("解压条目失败，已跳过：{0}（{1}）", key, ex.Message));
             }
 
             finished++;
@@ -338,9 +339,9 @@ public static class ArchiveExtractor
         progress?.Report(new ProgressSample(1));
 
         if (rejected > 0)
-            Log.Warn($"解压 {archiveName} 时跳过了 {rejected} 个路径不合法的条目");
+            Log.Warn(Loc.F("解压 {0} 时跳过了 {1} 个路径不合法的条目", archiveName, rejected));
 
-        Log.Info($"解压完成：{archiveName}（格式 zip，文件 {finished} 个）→ {destinationRoot}");
+        Log.Info(Loc.F("解压完成：{0}（格式 zip，文件 {1} 个）→ {2}", archiveName, finished, destinationRoot));
         return true;
     }
 
@@ -380,7 +381,7 @@ public static class ArchiveExtractor
             if (!PathGuard.TryResolve(destinationRoot, key, out var targetPath))
             {
                 rejected++;
-                Log.Warn($"压缩包条目路径不合法，已跳过：{key}（{archiveName}）");
+                Log.Warn(Loc.F("压缩包条目路径不合法，已跳过：{0}（{1}）", key, archiveName));
                 continue;
             }
 
@@ -409,7 +410,7 @@ public static class ArchiveExtractor
                     // Size = 0 的条目（空文件）在 SharpCompress 里「没有流」，OpenEntryStream 会抛
                     // 「File does not have a stream.」。空文件已经建出来了，不算失败——
                     // 以前这里直接当失败跳过，装出来的包会缺这些文件。
-                    Log.Info($"条目没有可读的流，按空文件处理：{key}（{ex.Message}）");
+                    Log.Info(Loc.F("条目没有可读的流，按空文件处理：{0}（{1}）", key, ex.Message));
                 }
             }
             catch (OperationCanceledException)
@@ -419,7 +420,7 @@ public static class ArchiveExtractor
             catch (Exception ex)
             {
                 // 单个条目失败不影响整体
-                Log.Warn($"解压条目失败，已跳过：{key}（{ex.Message}）");
+                Log.Warn(Loc.F("解压条目失败，已跳过：{0}（{1}）", key, ex.Message));
             }
 
             finished++;
@@ -429,9 +430,9 @@ public static class ArchiveExtractor
         progress?.Report(new ProgressSample(1));
 
         if (rejected > 0)
-            Log.Warn($"解压 {archiveName} 时跳过了 {rejected} 个路径不合法的条目");
+            Log.Warn(Loc.F("解压 {0} 时跳过了 {1} 个路径不合法的条目", archiveName, rejected));
 
-        Log.Info($"解压完成：{archiveName}（格式 {format}，文件 {finished} 个）→ {destinationRoot}");
+        Log.Info(Loc.F("解压完成：{0}（格式 {1}，文件 {2} 个）→ {3}", archiveName, format, finished, destinationRoot));
         return true;
     }
 
@@ -443,7 +444,7 @@ public static class ArchiveExtractor
 
         if (!PathGuard.TryResolve(destinationRoot, name, out var targetPath))
         {
-            Log.Warn($"压缩包条目路径不合法，已跳过：{name}（{archiveName}）");
+            Log.Warn(Loc.F("压缩包条目路径不合法，已跳过：{0}（{1}）", name, archiveName));
             progress?.Report(new ProgressSample(1));
             return true;
         }
@@ -458,11 +459,11 @@ public static class ArchiveExtractor
         }
         catch (Exception ex)
         {
-            Log.Warn($"解压条目失败，已跳过：{name}（{ex.Message}）");
+            Log.Warn(Loc.F("解压条目失败，已跳过：{0}（{1}）", name, ex.Message));
         }
 
         progress?.Report(new ProgressSample(1));
-        Log.Info($"解压完成：{archiveName}（格式 {format}，单文件 gzip）→ {destinationRoot}");
+        Log.Info(Loc.F("解压完成：{0}（格式 {1}，单文件 gzip）→ {2}", archiveName, format, destinationRoot));
         return true;
     }
 
@@ -494,7 +495,7 @@ public static class ArchiveExtractor
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理临时文件失败：{file}（{ex.Message}）");
+            Log.Warn(Loc.F("清理临时文件失败：{0}（{1}）", file, ex.Message));
         }
     }
 
@@ -523,7 +524,7 @@ public static class ArchiveExtractor
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取压缩包文件头失败，改用扩展名判断：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("读取压缩包文件头失败，改用扩展名判断：{0}（{1}）", path, ex.Message));
         }
 
         return ExtensionFormat(path);

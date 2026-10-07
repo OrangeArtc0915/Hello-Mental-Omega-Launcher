@@ -1,5 +1,6 @@
 using System.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -30,7 +31,7 @@ public static class PathGuard
         }
         catch (Exception ex)
         {
-            Log.Warn($"路径无法解析：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("路径无法解析：{0}（{1}）", directory, ex.Message));
             return string.Empty;
         }
     }
@@ -84,7 +85,7 @@ public static class PathGuard
         }
         catch (Exception ex)
         {
-            Log.Warn($"解析路径失败：{relative}（{ex.Message}）");
+            Log.Warn(Loc.F("解析路径失败：{0}（{1}）", relative, ex.Message));
             return false;
         }
     }

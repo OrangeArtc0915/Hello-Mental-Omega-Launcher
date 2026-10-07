@@ -18,6 +18,7 @@ using HMOL.Core.Extensions;
 using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Layout;
+using HMOL.Core.Localization;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 using HMOL.Core.Updater;
@@ -35,7 +36,7 @@ public sealed class BgmTrackRow
         IsCurrent = isCurrent;
 
         var name = System.IO.Path.GetFileName(path);
-        Title = File.Exists(path) ? name : $"{name}（文件不存在）";
+        Title = File.Exists(path) ? name : Loc.F("{0}（文件不存在）", name);
     }
 
     public int Index { get; }
@@ -77,13 +78,13 @@ public sealed class ExtensionRow
         HasDescription = info.Description.Length > 0;
 
         IsEnabled = info.Status == ExtensionStatus.Enabled;
-        StatusText = $"状态：{info.StatusText}";
+        StatusText = Loc.F("状态：{0}", info.StatusText);
 
         ErrorText = info.Error ?? string.Empty;
         HasError = ErrorText.Length > 0;
 
         ToggleTone = IsEnabled ? ButtonTone.Plain : ButtonTone.Solid;
-        ToggleTip = IsEnabled ? "停用这个扩展（主页上它的卡片会消失）" : "启用这个扩展";
+        ToggleTip = IsEnabled ? Loc.T("停用这个扩展（主页上它的卡片会消失）") : Loc.T("启用这个扩展");
 
         // 无障碍（UIA）标识：同一行里三个按钮各不相同，读屏与自动化脚本都能定位
         EditId = $"{Id}:edit";
@@ -92,9 +93,9 @@ public sealed class ExtensionRow
 
         A11yName = $"{Name}，{MetaText}，{StatusText}";
         StatusA11yName = HasError ? $"{StatusText}，{ErrorText}" : StatusText;
-        EditA11yName = $"编辑扩展 {Name}";
+        EditA11yName = Loc.F("编辑扩展 {0}", Name);
         ToggleA11yName = $"{ToggleTip}：{Name}";
-        DeleteA11yName = $"删除扩展 {Name}";
+        DeleteA11yName = Loc.F("删除扩展 {0}", Name);
     }
 
     /// <summary>扩展 ID（清单文件名），增删改都按它定位。</summary>
@@ -187,6 +188,9 @@ public partial class PageSettings : LauncherPage
     /// <summary>刷新字体下拉框选中项时不触发切换事件。</summary>
     private bool _suppressFontChanged;
 
+    /// <summary>刷新语言下拉框选中项时不触发切换事件。</summary>
+    private bool _suppressLanguageChanged;
+
     private bool _suppressNicknameChanged;
 
     /// <summary>构造期与刷新期不让 HUD 透明度滑块的事件回写到配置。</summary>
@@ -221,6 +225,7 @@ public partial class PageSettings : LauncherPage
         _anim.Group(0, HeaderSettings);
         _anim.Group(40,
             CardAppearance,
+            CardLanguage,
             CardHome,
             CardBackground,
             CardMusic,
@@ -251,6 +256,8 @@ public partial class PageSettings : LauncherPage
         RefreshLook();
         RefreshAutoStart();
         BuildFontList();
+        RefreshLanguage();
+        RefreshAutoLanguage();
         BuildBackgroundPageList();
         RefreshExtensions();
         RefreshUpdate();
@@ -315,7 +322,7 @@ public partial class PageSettings : LauncherPage
     // ————— 分类卡片 —————
 
     /// <summary>设置分类数量。窗口侧栏的分类项、下面的卡片表都按这个数对齐。</summary>
-    private const int CategoryCount = 14;
+    private const int CategoryCount = 15;
 
     /// <summary>一个分类一张卡片，只给自检用。</summary>
     public override int SubViewCount => CategoryCount;
@@ -380,6 +387,7 @@ public partial class PageSettings : LauncherPage
         CardAutoStart,
         CardGamePath,
         CardAbout,
+        CardLanguage,
     ];
 
     /// <summary>设置主页里的快捷入口：跳到对应分类（展开分组与选中态交给窗口）。</summary>
@@ -427,7 +435,7 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
         RefreshSelection();
 
-        Log.Info($"主题模式已切换为 {tag}");
+        Log.Info(Loc.F("主题模式已切换为 {0}", tag));
     }
 
     private void OnAccentClick(object sender, RoutedEventArgs e)
@@ -439,7 +447,7 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
         RefreshSelection();
 
-        Log.Info($"强调色已切换为预设 {tag}");
+        Log.Info(Loc.F("强调色已切换为预设 {0}", tag));
     }
 
     // ————— 自定义强调色取色器 —————
@@ -462,8 +470,8 @@ public partial class PageSettings : LauncherPage
 
         BtnAccentClear.IsEnabled = ThemeService.HasCustomAccent;
         SetAccentHint(ThemeService.HasCustomAccent
-            ? "当前使用自定义强调色；点「用预设色」可回到上面的预设。"
-            : "拖动滑块或直接填 #RRGGBB 后点「应用」；也可以从当前主页背景里取主色。", warn: false);
+            ? Loc.T("当前使用自定义强调色；点「用预设色」可回到上面的预设。")
+            : Loc.T("拖动滑块或直接填 #RRGGBB 后点「应用」；也可以从当前主页背景里取主色。"), warn: false);
     }
 
     /// <summary>滑块 / hex / 预览三者同步，不落盘、不换主题。</summary>
@@ -504,14 +512,14 @@ public partial class PageSettings : LauncherPage
 
         if (!ThemeService.SetCustomAccent(hex))
         {
-            SetAccentHint("颜色格式不对，请用 #RRGGBB。", warn: true);
+            SetAccentHint(Loc.T("颜色格式不对，请用 #RRGGBB。"), warn: true);
             return;
         }
 
         SettingsStore.Save();
         RefreshSelection();
 
-        Log.Info($"强调色已设为自定义 {ThemeService.ToHex(ThemeService.CurrentAccentColor)}");
+        Log.Info(Loc.F("强调色已设为自定义 {0}", ThemeService.ToHex(ThemeService.CurrentAccentColor)));
     }
 
     private void OnAccentHexKeyDown(object sender, KeyEventArgs e)
@@ -528,7 +536,7 @@ public partial class PageSettings : LauncherPage
 
         if (path is null)
         {
-            SetAccentHint("还没有可用的主页背景，先去「主页背景」选一张图片。", warn: true);
+            SetAccentHint(Loc.T("还没有可用的主页背景，先去「主页背景」选一张图片。"), warn: true);
             return;
         }
 
@@ -536,7 +544,7 @@ public partial class PageSettings : LauncherPage
 
         if (color is null)
         {
-            SetAccentHint("这张背景取不出可用的颜色，换一张试试（纯灰或过暗的图信息量太少）。", warn: true);
+            SetAccentHint(Loc.T("这张背景取不出可用的颜色，换一张试试（纯灰或过暗的图信息量太少）。"), warn: true);
             return;
         }
 
@@ -545,8 +553,8 @@ public partial class PageSettings : LauncherPage
         RefreshSelection();
 
         var applied = ThemeService.ToHex(ThemeService.CurrentAccentColor);
-        SetAccentHint($"已从背景图取色：{applied}", warn: false);
-        Log.Info($"强调色已从背景图取色：{applied}");
+        SetAccentHint(Loc.F("已从背景图取色：{0}", applied), warn: false);
+        Log.Info(Loc.F("强调色已从背景图取色：{0}", applied));
     }
 
     private void OnClearCustomAccentClick(object sender, RoutedEventArgs e)
@@ -557,7 +565,7 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
         RefreshSelection();
 
-        SetAccentHint("已回到预设强调色。", warn: false);
+        SetAccentHint(Loc.T("已回到预设强调色。"), warn: false);
     }
 
     private void SetAccentHint(string message, bool warn)
@@ -665,7 +673,7 @@ public partial class PageSettings : LauncherPage
 
         if (BtnAnimations is not null)
         {
-            BtnAnimations.Content = animations ? "已开启" : "已关闭";
+            BtnAnimations.Content = animations ? Loc.T("已开启") : Loc.T("已关闭");
             BtnAnimations.Tone = animations ? ButtonTone.Solid : ButtonTone.Outline;
         }
     }
@@ -676,8 +684,8 @@ public partial class PageSettings : LauncherPage
 
     // ————— 界面字体 / 圆角 / 动效 —————
 
-    /// <summary>字体下拉框里代表「内置默认字体」的那一项。</summary>
-    private const string DefaultFontLabel = "（默认）系统界面字体";
+    /// <summary>字体下拉框里代表「内置默认字体」的那一项（属性：随界面语言变化）。</summary>
+    private static string DefaultFontLabel => Loc.T("（默认）系统界面字体");
 
     /// <summary>把系统已安装字体的名字填进下拉框；首项是内置默认。构造时调一次。</summary>
     private void BuildFontList()
@@ -696,7 +704,7 @@ public partial class PageSettings : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Warn($"枚举系统字体失败，只保留默认项：{ex.Message}");
+            Log.Warn(Loc.F("枚举系统字体失败，只保留默认项：{0}", ex.Message));
         }
 
         _suppressFontChanged = true;
@@ -730,7 +738,7 @@ public partial class PageSettings : LauncherPage
         AppearanceService.Apply();
         UpdateFontPreview();
 
-        Log.Info($"界面字体已切换为 {(string.IsNullOrWhiteSpace(SettingsStore.Current.AppFontFamily) ? "默认" : name)}");
+        Log.Info(Loc.F("界面字体已切换为 {0}", (string.IsNullOrWhiteSpace(SettingsStore.Current.AppFontFamily) ? Loc.T("默认") : name)));
     }
 
     private void UpdateFontPreview()
@@ -742,6 +750,83 @@ public partial class PageSettings : LauncherPage
         LabFontPreview.FontFamily = string.IsNullOrWhiteSpace(name)
             ? new FontFamily(AppearanceService.DefaultFont)
             : new FontFamily(name);
+    }
+
+    // ————— 界面语言 —————
+
+    /// <summary>按 <see cref="Loc.Available"/> 填语言下拉框，选中当前语言。</summary>
+    private void RefreshLanguage()
+    {
+        if (CmbLanguage is null) return;
+
+        _suppressLanguageChanged = true;
+
+        CmbLanguage.ItemsSource = Loc.Available;
+        CmbLanguage.SelectedItem =
+            Loc.Available.FirstOrDefault(option => option.Code.Equals(Loc.Current, StringComparison.OrdinalIgnoreCase))
+            ?? Loc.Available.FirstOrDefault();
+
+        _suppressLanguageChanged = false;
+    }
+
+    /// <summary>「跟随系统」开关的文案与选中态。</summary>
+    private void RefreshAutoLanguage()
+    {
+        if (BtnAutoLanguage is null) return;
+
+        var enabled = SettingsStore.Current.AutoLanguage;
+
+        BtnAutoLanguage.Content = enabled ? Loc.T("已开启") : Loc.T("已关闭");
+        BtnAutoLanguage.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
+    }
+
+    /// <summary>
+    /// 切换界面语言：存设置后交给 <see cref="Loc.SetLanguage"/> 广播，
+    /// 主窗口收到后重建页面与托盘菜单（本页也在其中，所以这里不用自己刷新界面）。
+    /// </summary>
+    private void OnLanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressLanguageChanged) return;
+        if (CmbLanguage.SelectedItem is not LanguageOption option) return;
+        if (option.Code.Equals(Loc.Current, StringComparison.OrdinalIgnoreCase)) return;
+
+        SettingsStore.Current.Language = option.Code;
+
+        // 用户明确挑了一次语言，就算定下来了：关掉「跟随系统」，否则下次启动又会被系统判定覆盖掉
+        SettingsStore.Current.AutoLanguage = false;
+
+        SettingsStore.Save();
+        RefreshAutoLanguage();
+
+        Log.Info(Loc.F("界面语言已切换为 {0}（{1}）", option.DisplayName, option.Code));
+
+        Loc.SetLanguage(option.Code);
+    }
+
+    /// <summary>
+    /// 「跟随系统」开关：打开时当场按系统时区与区域判一次，让用户马上看到结果；
+    /// 判不出来就保持当前语言不动（开关照样是开着的，下次启动再判）。
+    /// </summary>
+    private void OnToggleAutoLanguageClick(object sender, RoutedEventArgs e)
+    {
+        var enabled = !SettingsStore.Current.AutoLanguage;
+
+        SettingsStore.Current.AutoLanguage = enabled;
+        SettingsStore.Save();
+
+        RefreshAutoLanguage();
+
+        Log.Info(Loc.F("跟随系统语言已{0}", enabled ? Loc.T("开启") : Loc.T("关闭")));
+
+        if (!enabled) return;
+
+        var detected = Loc.DetectSystemLanguage();
+        if (detected is null || detected.Equals(Loc.Current, StringComparison.OrdinalIgnoreCase)) return;
+
+        SettingsStore.Current.Language = detected;
+        SettingsStore.Save();
+
+        Loc.SetLanguage(detected);
     }
 
     private void OnCornerRadiusChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -779,7 +864,7 @@ public partial class PageSettings : LauncherPage
 
         RefreshAppearanceLabels();
 
-        Log.Info($"界面动效已{(enabled ? "开启" : "关闭")}");
+        Log.Info(Loc.F("界面动效已{0}", (enabled ? Loc.T("开启") : Loc.T("关闭"))));
     }
 
     // ————— 程序更新 —————
@@ -791,7 +876,7 @@ public partial class PageSettings : LauncherPage
 
         var enabled = SettingsStore.Current.CheckUpdateOnStartup;
 
-        BtnAutoCheckUpdate.Content = enabled ? "已开启" : "已关闭";
+        BtnAutoCheckUpdate.Content = enabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnAutoCheckUpdate.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
 
         var source = SettingsStore.Current.LauncherUpdateSource;
@@ -802,19 +887,19 @@ public partial class PageSettings : LauncherPage
 
         var multiThread = SettingsStore.Current.MultiThreadDownload;
 
-        BtnMultiThreadDownload.Content = multiThread ? "已开启" : "已关闭";
+        BtnMultiThreadDownload.Content = multiThread ? Loc.T("已开启") : Loc.T("已关闭");
         BtnMultiThreadDownload.Tone = multiThread ? ButtonTone.Solid : ButtonTone.Outline;
 
         LabUpdateLastCheck.Text = SettingsStore.Current.LastUpdateCheck is { } checkedAt
-            ? $"上次检查：{checkedAt:yyyy-MM-dd HH:mm}"
-            : "上次检查：还没有检查过";
+            ? Loc.F("上次检查：{0:yyyy-MM-dd HH:mm}", checkedAt)
+            : Loc.T("上次检查：还没有检查过");
 
         // 三态按钮：还没有结果时是「检查」；查到了但发布页没挂可自动更新的文件时只能去发布页
         BtnCheckUpdate.Content = _updateInfo switch
         {
-            null => "检查启动器更新",
-            { Asset: null } => "打开下载页",
-            _ => $"下载并更新到 v{_updateInfo.Version}"
+            null => Loc.T("检查启动器更新"),
+            { Asset: null } => Loc.T("打开下载页"),
+            _ => Loc.F("下载并更新到 v{0}", _updateInfo.Version)
         };
 
         BtnCheckUpdate.Tone = ButtonTone.Solid;
@@ -829,10 +914,10 @@ public partial class PageSettings : LauncherPage
 
         RefreshUpdate();
         SetUpdateStatus(enabled
-            ? "已开启：下次启动会在后台检查一次新版本。"
-            : "已关闭：启动时不再提示普通更新（跨主/次版本的强制更新仍会检查），也可点下面的按钮手动检查。", warn: false);
+            ? Loc.T("已开启：下次启动会在后台检查一次新版本。")
+            : Loc.T("已关闭：启动时不再提示普通更新（跨主/次版本的强制更新仍会检查），也可点下面的按钮手动检查。"), warn: false);
 
-        Log.Info($"启动时自动检查更新已{(enabled ? "开启" : "关闭")}");
+        Log.Info(Loc.F("启动时自动检查更新已{0}", (enabled ? Loc.T("开启") : Loc.T("关闭"))));
     }
 
     private void OnUpdateSourceClick(object sender, RoutedEventArgs e)
@@ -844,9 +929,9 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
 
         RefreshUpdate();
-        SetUpdateStatus($"更新线路已改为「{tag}」。", warn: false);
+        SetUpdateStatus(Loc.F("更新线路已改为「{0}」。", tag), warn: false);
 
-        Log.Info($"更新线路已切换为 {tag}");
+        Log.Info(Loc.F("更新线路已切换为 {0}", tag));
     }
 
     private void OnMultiThreadDownloadClick(object sender, RoutedEventArgs e)
@@ -858,10 +943,10 @@ public partial class PageSettings : LauncherPage
 
         RefreshUpdate();
         SetUpdateStatus(enabled
-            ? "已开启多线程下载：大文件会分片并发下载。"
-            : "已关闭多线程下载：改为单连接下载，适合并发连接被限速的网络。", warn: false);
+            ? Loc.T("已开启多线程下载：大文件会分片并发下载。")
+            : Loc.T("已关闭多线程下载：改为单连接下载，适合并发连接被限速的网络。"), warn: false);
 
-        Log.Info($"多线程下载已{(enabled ? "开启" : "关闭")}");
+        Log.Info(Loc.F("多线程下载已{0}", (enabled ? Loc.T("开启") : Loc.T("关闭"))));
     }
 
     /// <summary>
@@ -883,7 +968,7 @@ public partial class PageSettings : LauncherPage
 
         _checkingUpdate = true;
         BtnCheckUpdate.IsEnabled = false;
-        SetUpdateStatus("正在检查新版本…", warn: false);
+        SetUpdateStatus(Loc.T("正在检查新版本…"), warn: false);
 
         try
         {
@@ -895,8 +980,8 @@ public partial class PageSettings : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Warn($"检查启动器更新失败：{ex.Message}");
-            SetUpdateStatus($"检查更新失败：{ex.Message}", warn: true);
+            Log.Warn(Loc.F("检查启动器更新失败：{0}", ex.Message));
+            SetUpdateStatus(Loc.F("检查更新失败：{0}", ex.Message), warn: true);
         }
         finally
         {
@@ -930,7 +1015,7 @@ public partial class PageSettings : LauncherPage
             SettingsStore.Current.Nickname = handle;
             SettingsStore.Save();
 
-            Log.Info($"已按 CnCNet 玩家名同步联机昵称：{handle}");
+            Log.Info(Loc.F("已按 CnCNet 玩家名同步联机昵称：{0}", handle));
         }
 
         // 有游戏目录时按客户端的 MaxNameLength 限制输入长度，避免两个名字被截成不一样
@@ -947,7 +1032,7 @@ public partial class PageSettings : LauncherPage
     {
         if (_suppressNicknameChanged || LabNicknameHint is null) return;
 
-        LabNicknameHint.Text = "有未保存的改动，点「保存昵称」后生效（会同时写入 CnCNet 玩家名）。";
+        LabNicknameHint.Text = Loc.T("有未保存的改动，点「保存昵称」后生效（会同时写入 CnCNet 玩家名）。");
         LabNicknameHint.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
     }
 
@@ -968,7 +1053,7 @@ public partial class PageSettings : LauncherPage
             SettingsStore.Current.Nickname = nickname;
             SettingsStore.Save();
 
-            Log.Info("已更新联机昵称设置");
+            Log.Info(Loc.T("已更新联机昵称设置"));
         }
 
         var gameDir = InstanceManager.Current?.GameDir;
@@ -983,12 +1068,12 @@ public partial class PageSettings : LauncherPage
 
         if (error is null)
         {
-            Log.Info($"CnCNet 玩家名已同步为：{nickname}");
+            Log.Info(Loc.F("CnCNet 玩家名已同步为：{0}", nickname));
             RefreshNicknameHint();
             return;
         }
 
-        SetNicknameHint($"CnCNet 玩家名没同步成功：{error}", warn: true);
+        SetNicknameHint(Loc.F("CnCNet 玩家名没同步成功：{0}", error), warn: true);
     }
 
     private void RefreshNicknameHint()
@@ -1000,12 +1085,12 @@ public partial class PageSettings : LauncherPage
         var file = CnCNetProfile.SettingsFileOf(gameDir);
 
         var head = string.IsNullOrWhiteSpace(nickname)
-            ? "未设置昵称，联机时会使用默认名称。"
-            : $"当前昵称：{nickname}";
+            ? Loc.T("未设置昵称，联机时会使用默认名称。")
+            : Loc.F("当前昵称：{0}", nickname);
 
         var sync = file is null
-            ? "没找到 CnCNet 设置文件（如 RA2MO.ini），保存后只改 HMOL 的昵称。"
-            : $"与 CnCNet 玩家名共用同一个值：保存后会写入 {Path.GetFileName(file)} 的 [MultiPlayer] Handle（最长 {CnCNetProfile.MaxNameLength(gameDir!)} 个字符）。";
+            ? Loc.T("没找到 CnCNet 设置文件（如 RA2MO.ini），保存后只改 HMOL 的昵称。")
+            : Loc.F("与 CnCNet 玩家名共用同一个值：保存后会写入 {0} 的 [MultiPlayer] Handle（最长 {1} 个字符）。", Path.GetFileName(file), CnCNetProfile.MaxNameLength(gameDir!));
 
         SetNicknameHint($"{head}\n{sync}", warn: false);
     }
@@ -1056,12 +1141,12 @@ public partial class PageSettings : LauncherPage
 
         var visible = MultiplayerHub.HudVisible;
 
-        BtnHudToggle.Content = visible ? "关闭游戏 HUD" : "打开游戏 HUD";
+        BtnHudToggle.Content = visible ? Loc.T("关闭游戏 HUD") : Loc.T("打开游戏 HUD");
         BtnHudToggle.Tone = visible ? ButtonTone.Danger : ButtonTone.Solid;
 
         LabHudStatus.Text = visible
-            ? "正在显示：可在屏幕上拖动；点浮窗右上角的 × 只是隐藏，这里会同步变回「打开」。"
-            : "点左边按钮打开置顶浮窗，联机时看状态与对端，也方便先调好看不看清楚。";
+            ? Loc.T("正在显示：可在屏幕上拖动；点浮窗右上角的 × 只是隐藏，这里会同步变回「打开」。")
+            : Loc.T("点左边按钮打开置顶浮窗，联机时看状态与对端，也方便先调好看不看清楚。");
     }
 
     /// <summary>开 / 关游戏内 HUD。不用连接房间也能开，便于调试外观与可读性。</summary>
@@ -1096,15 +1181,15 @@ public partial class PageSettings : LauncherPage
         var available = MultiplayerSakuraPanelWindow.IsRuntimeAvailable();
         var enabled = available && MultiplayerSettingsStore.Current.SakuraPanelEnabled;
 
-        BtnSakuraPanel.Content = enabled ? "已启用" : "未启用";
+        BtnSakuraPanel.Content = enabled ? Loc.T("已启用") : Loc.T("未启用");
         BtnSakuraPanel.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
         BtnSakuraPanel.IsEnabled = available;
 
         SetSakuraPanelHint(available
                 ? enabled
-                    ? "「樱花 Frp 直连」窗口里会多出「内嵌面板」按钮，可以在启动器里登录樱花FRP、建隧道与看流量。"
-                    : "打开后，「樱花 Frp 直连」窗口里会多一个「内嵌面板」按钮（默认关闭）。"
-                : "本机没有 WebView2 运行时，打不开这个面板；樱花 Frp 直连照常可用，建隧道去官网 natfrp.com 即可。",
+                    ? Loc.T("「樱花 Frp 直连」窗口里会多出「内嵌面板」按钮，可以在启动器里登录樱花FRP、建隧道与看流量。")
+                    : Loc.T("打开后，「樱花 Frp 直连」窗口里会多一个「内嵌面板」按钮（默认关闭）。")
+                : Loc.T("本机没有 WebView2 运行时，打不开这个面板；樱花 Frp 直连照常可用，建隧道去官网 natfrp.com 即可。"),
             warn: !available);
     }
 
@@ -1117,7 +1202,7 @@ public partial class PageSettings : LauncherPage
         MultiplayerSettingsStore.Update(settings => settings.SakuraPanelEnabled = enabled);
 
         RefreshSakuraPanel();
-        Log.Info($"樱花FRP 内嵌面板已{(enabled ? "开启" : "关闭")}");
+        Log.Info(Loc.F("樱花FRP 内嵌面板已{0}", (enabled ? Loc.T("开启") : Loc.T("关闭"))));
     }
 
     private void SetSakuraPanelHint(string message, bool warn)
@@ -1143,7 +1228,7 @@ public partial class PageSettings : LauncherPage
     {
         if (_suppressWeatherCityChanged || LabWeatherCityHint is null) return;
 
-        SetWeatherCityHint("有未保存的改动，点「保存城市」后主页才会用它。", warn: false);
+        SetWeatherCityHint(Loc.T("有未保存的改动，点「保存城市」后主页才会用它。"), warn: false);
     }
 
     private void OnSaveWeatherCityClick(object sender, RoutedEventArgs e)
@@ -1166,7 +1251,7 @@ public partial class PageSettings : LauncherPage
             SettingsStore.Current.WeatherCity = city;
             SettingsStore.Save();
 
-            Log.Info(city.Length == 0 ? "已清空天气城市设置" : $"天气城市已设置为：{city}");
+            Log.Info(city.Length == 0 ? Loc.T("已清空天气城市设置") : Loc.F("天气城市已设置为：{0}", city));
         }
 
         RefreshWeatherCityHint();
@@ -1184,11 +1269,11 @@ public partial class PageSettings : LauncherPage
 
         if (city.Length == 0)
         {
-            SetWeatherCityHint("还没填城市名，填好后再验证。", warn: true);
+            SetWeatherCityHint(Loc.T("还没填城市名，填好后再验证。"), warn: true);
             return;
         }
 
-        SetWeatherCityHint($"正在用 Open-Meteo 解析「{city}」…", warn: false);
+        SetWeatherCityHint(Loc.F("正在用 Open-Meteo 解析「{0}」…", city), warn: false);
         BtnSaveWeatherCity.IsEnabled = false;
         BtnCheckWeatherCity.IsEnabled = false;
 
@@ -1198,19 +1283,19 @@ public partial class PageSettings : LauncherPage
 
             if (coordinates is null)
             {
-                SetWeatherCityHint(WeatherService.LastError ?? "城市解析失败，换个写法再试。", warn: true);
+                SetWeatherCityHint(WeatherService.LastError ?? Loc.T("城市解析失败，换个写法再试。"), warn: true);
                 return;
             }
 
-            var suffix = saved ? "已保存，回主页即可看到天气。" : "点「保存城市」后主页才会用它。";
+            var suffix = saved ? Loc.T("已保存，回主页即可看到天气。") : Loc.T("点「保存城市」后主页才会用它。");
 
             SetWeatherCityHint(
-                $"解析成功：{city}（纬度 {coordinates.Value.Latitude:0.##}、经度 {coordinates.Value.Longitude:0.##}）。{suffix}",
+                Loc.F("解析成功：{0}（纬度 {1:0.##}、经度 {2:0.##}）。{3}", city, coordinates.Value.Latitude, coordinates.Value.Longitude, suffix),
                 warn: false);
         }
         catch (Exception ex)
         {
-            SetWeatherCityHint($"验证城市失败：{ex.Message}", warn: true);
+            SetWeatherCityHint(Loc.F("验证城市失败：{0}", ex.Message), warn: true);
         }
         finally
         {
@@ -1226,8 +1311,8 @@ public partial class PageSettings : LauncherPage
         var city = SettingsStore.Current.WeatherCity ?? string.Empty;
 
         SetWeatherCityHint(string.IsNullOrWhiteSpace(city)
-            ? "当前未设置城市，主页天气卡会提示去设置。"
-            : $"当前城市：{city}", warn: false);
+            ? Loc.T("当前未设置城市，主页天气卡会提示去设置。")
+            : Loc.F("当前城市：{0}", city), warn: false);
     }
 
     private void SetWeatherCityHint(string message, bool warn)
@@ -1250,7 +1335,7 @@ public partial class PageSettings : LauncherPage
 
         LabSitesEmptyHint.Visibility = links.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        SetSitesHint(links.Count == 0 ? string.Empty : $"共 {links.Count} 个站点，增删都会立即保存。", warn: false);
+        SetSitesHint(links.Count == 0 ? string.Empty : Loc.F("共 {0} 个站点，增删都会立即保存。", links.Count), warn: false);
     }
 
     private void OnAddSiteClick(object sender, RoutedEventArgs e)
@@ -1262,13 +1347,13 @@ public partial class PageSettings : LauncherPage
 
         if (name.Length == 0 || url.Length == 0)
         {
-            SetSitesHint("名称与网址都要填。", warn: true);
+            SetSitesHint(Loc.T("名称与网址都要填。"), warn: true);
             return;
         }
 
         if (!SiteLinkCatalog.IsHttpUrl(url))
         {
-            SetSitesHint($"网址不合法：只支持 http / https 且要有完整主机名（现在是 {url}）。", warn: true);
+            SetSitesHint(Loc.F("网址不合法：只支持 http / https 且要有完整主机名（现在是 {0}）。", url), warn: true);
             return;
         }
 
@@ -1276,7 +1361,7 @@ public partial class PageSettings : LauncherPage
 
         if (links.Any(link => string.Equals(link.Url, url, StringComparison.OrdinalIgnoreCase)))
         {
-            SetSitesHint("这个网址已经在列表里了。", warn: true);
+            SetSitesHint(Loc.T("这个网址已经在列表里了。"), warn: true);
             return;
         }
 
@@ -1287,9 +1372,9 @@ public partial class PageSettings : LauncherPage
         TxtSiteUrl.Text = string.Empty;
 
         RefreshSites();
-        SetSitesHint($"已添加「{name}」。", warn: false);
+        SetSitesHint(Loc.F("已添加「{0}」。", name), warn: false);
 
-        Log.Info($"已添加常用网站：{name}（{url}）");
+        Log.Info(Loc.F("已添加常用网站：{0}（{1}）", name, url));
     }
 
     private void OnRemoveSiteClick(object sender, RoutedEventArgs e)
@@ -1305,16 +1390,16 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
 
         RefreshSites();
-        SetSitesHint($"已移除「{removed}」。", warn: false);
+        SetSitesHint(Loc.F("已移除「{0}」。", removed), warn: false);
 
-        Log.Info($"已移除常用网站：{removed}");
+        Log.Info(Loc.F("已移除常用网站：{0}", removed));
     }
 
     private void OnRestoreSitesClick(object sender, RoutedEventArgs e)
     {
-        var choice = ChoiceWindow.Ask(Window.GetWindow(this), "恢复默认列表", "把常用网站恢复成默认清单？",
-            "会覆盖当前列表，替换为项目自带的默认站点（仓库、官网、QQ 群）。",
-            new ChoiceOption("恢复", "restore", ButtonTone.Danger), new ChoiceOption("取消", "cancel"));
+        var choice = ChoiceWindow.Ask(Window.GetWindow(this), Loc.T("恢复默认列表"), Loc.T("把常用网站恢复成默认清单？"),
+            Loc.T("会覆盖当前列表，替换为项目自带的默认站点（仓库、官网、QQ 群）。"),
+            new ChoiceOption(Loc.T("恢复"), "restore", ButtonTone.Danger), new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "restore") return;
 
@@ -1322,9 +1407,9 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
 
         RefreshSites();
-        SetSitesHint($"已恢复默认列表（{SettingsStore.Current.SiteLinks.Count} 个站点）。", warn: false);
+        SetSitesHint(Loc.F("已恢复默认列表（{0} 个站点）。", SettingsStore.Current.SiteLinks.Count), warn: false);
 
-        Log.Info("常用网站已恢复默认列表");
+        Log.Info(Loc.T("常用网站已恢复默认列表"));
     }
 
     private void SetSitesHint(string message, bool warn)
@@ -1340,8 +1425,8 @@ public partial class PageSettings : LauncherPage
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择主页背景",
-            Filter = $"图片与视频 ({BackgroundService.PickPattern})|{BackgroundService.PickPattern}|所有文件 (*.*)|*.*"
+            Title = Loc.T("选择主页背景"),
+            Filter = Loc.F("图片与视频 ({0})|{1}|所有文件 (*.*)|*.*", BackgroundService.PickPattern, BackgroundService.PickPattern)
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
@@ -1362,13 +1447,13 @@ public partial class PageSettings : LauncherPage
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择 Wallpaper Engine 壁纸包",
-            Filter = "壁纸包 (*.pkg;*.mpkg)|*.pkg;*.mpkg|所有文件 (*.*)|*.*"
+            Title = Loc.T("选择 Wallpaper Engine 壁纸包"),
+            Filter = Loc.T("壁纸包 (*.pkg;*.mpkg)|*.pkg;*.mpkg|所有文件 (*.*)|*.*")
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
 
-        SetBackgroundStatus($"正在解包 {Path.GetFileName(dialog.FileName)}，请稍候…", warn: false);
+        SetBackgroundStatus(Loc.F("正在解包 {0}，请稍候…", Path.GetFileName(dialog.FileName)), warn: false);
         BtnImportWallpaper.IsEnabled = false;
 
         try
@@ -1401,7 +1486,7 @@ public partial class PageSettings : LauncherPage
         RefreshBackground();
         ApplyBackgroundToWindow();
 
-        SetBackgroundStatus("已清除背景素材，恢复主题渐变。", warn: false);
+        SetBackgroundStatus(Loc.T("已清除背景素材，恢复主题渐变。"), warn: false);
     }
 
     private void OnBackgroundBlurChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1466,7 +1551,7 @@ public partial class PageSettings : LauncherPage
         RefreshBackground();
         ApplyBackgroundToWindow();
 
-        SetBackgroundStatus($"已切换背景：{fileName}", warn: false);
+        SetBackgroundStatus(Loc.F("已切换背景：{0}", fileName), warn: false);
     }
 
     /// <summary>从轮播清单与素材库里移除一张。</summary>
@@ -1481,7 +1566,7 @@ public partial class PageSettings : LauncherPage
         var wasCurrent = string.Equals(background.FileName, fileName, StringComparison.OrdinalIgnoreCase);
 
         if (!BackgroundService.Delete(fileName))
-            SetBackgroundStatus("这一张正被占用删不掉（多半是正在播放的视频），已先从清单里移除。", warn: true);
+            SetBackgroundStatus(Loc.T("这一张正被占用删不掉（多半是正在播放的视频），已先从清单里移除。"), warn: true);
 
         // 当前背景被删了：顺位到清单第一张，没有就回到主题渐变
         if (wasCurrent)
@@ -1508,8 +1593,8 @@ public partial class PageSettings : LauncherPage
         ApplyBackgroundToWindow();
 
         SetBackgroundStatus(background.RotateEnabled
-            ? $"已开启轮播：每 {background.RotateSeconds} 秒换下一张。"
-            : "已关闭轮播。", warn: false);
+            ? Loc.F("已开启轮播：每 {0} 秒换下一张。", background.RotateSeconds)
+            : Loc.T("已关闭轮播。"), warn: false);
     }
 
     private void OnRotateIntervalChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1562,19 +1647,19 @@ public partial class PageSettings : LauncherPage
 
     // ————— 每页独立背景 —————
 
-    /// <summary>「该页背景」下拉里代表「跟随全局」的那一项。</summary>
-    private const string FollowGlobalLabel = "跟随全局";
+    /// <summary>「该页背景」下拉里代表「跟随全局」的那一项（属性：随界面语言变化）。</summary>
+    private static string FollowGlobalLabel => Loc.T("跟随全局");
 
-    /// <summary>支持独立背景的页面：标识与显示名。标识要与 MainWindow.PageKey 一致。</summary>
-    private static readonly (string Key, string Label)[] BackgroundPages =
+    /// <summary>支持独立背景的页面：标识与显示名。标识要与 MainWindow.PageKey 一致。属性：标签随界面语言变化。</summary>
+    private static (string Key, string Label)[] BackgroundPages =>
     [
-        ("home", "主页"),
-        ("instances", "游戏实例"),
-        ("packages", "包管理"),
-        ("multiplayer", "联机"),
-        ("download", "下载"),
-        ("log", "运行日志"),
-        ("settings", "设置")
+        ("home", Loc.T("主页")),
+        ("instances", Loc.T("游戏实例")),
+        ("packages", Loc.T("包管理")),
+        ("multiplayer", Loc.T("联机")),
+        ("download", Loc.T("下载")),
+        ("log", Loc.T("运行日志")),
+        ("settings", Loc.T("设置"))
     ];
 
     private bool _suppressBackgroundPage;
@@ -1644,8 +1729,8 @@ public partial class PageSettings : LauncherPage
         var label = BackgroundPages.First(page => page.Key == key).Label;
 
         SetBackgroundStatus(selected == FollowGlobalLabel
-            ? $"「{label}」已改为跟随全局背景。"
-            : $"「{label}」已改用：{selected}", warn: false);
+            ? Loc.F("「{0}」已改为跟随全局背景。", label)
+            : Loc.F("「{0}」已改用：{1}", label, selected), warn: false);
     }
 
     /// <summary>让主窗口按最新设置重铺背景。</summary>
@@ -1667,15 +1752,15 @@ public partial class PageSettings : LauncherPage
         if (path is null)
         {
             LabBackground.Text = string.IsNullOrWhiteSpace(background.FileName)
-                ? "未设置，使用主题渐变。"
-                : "原先的素材已丢失，请重新选择。";
+                ? Loc.T("未设置，使用主题渐变。")
+                : Loc.T("原先的素材已丢失，请重新选择。");
         }
         else
         {
             var kind = BackgroundService.DescribeKind(BackgroundService.DetectKind(path));
 
-            LabBackground.Text = $"当前：{kind}　{Path.GetFileName(path)}" +
-                                 (background.FromWallpaperPackage ? "（来自壁纸包）" : string.Empty);
+            LabBackground.Text = Loc.F("当前：{0}　{1}", kind, Path.GetFileName(path)) +
+                                 (background.FromWallpaperPackage ? Loc.T("（来自壁纸包）") : string.Empty);
         }
 
         // 轮播清单：只列素材还在的
@@ -1689,10 +1774,10 @@ public partial class PageSettings : LauncherPage
 
         LabBackgroundListEmpty.Visibility = playlist.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        BtnRotate.Content = background.RotateEnabled ? "已开启" : "已关闭";
+        BtnRotate.Content = background.RotateEnabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnRotate.Tone = background.RotateEnabled ? ButtonTone.Solid : ButtonTone.Outline;
 
-        BtnRotateShuffle.Content = background.RotateShuffle ? "随机" : "顺序";
+        BtnRotateShuffle.Content = background.RotateShuffle ? Loc.T("随机") : Loc.T("顺序");
         BtnRotateShuffle.Tone = background.RotateShuffle ? ButtonTone.Solid : ButtonTone.Outline;
 
         BtnFillCover.Tone = FillTone(BackgroundFill.Cover);
@@ -1700,7 +1785,7 @@ public partial class PageSettings : LauncherPage
         BtnFillStretch.Tone = FillTone(BackgroundFill.Fill);
         BtnFillTile.Tone = FillTone(BackgroundFill.Tile);
 
-        BtnParallax.Content = background.Parallax ? "已开启" : "已关闭";
+        BtnParallax.Content = background.Parallax ? Loc.T("已开启") : Loc.T("已关闭");
         BtnParallax.Tone = background.Parallax ? ButtonTone.Solid : ButtonTone.Outline;
 
         RefreshBackgroundLabels();
@@ -1713,9 +1798,9 @@ public partial class PageSettings : LauncherPage
     {
         var background = SettingsStore.Current.Background;
 
-        LabBlur.Text = background.BlurRadius <= 0 ? "关闭" : background.BlurRadius.ToString();
+        LabBlur.Text = background.BlurRadius <= 0 ? Loc.T("关闭") : background.BlurRadius.ToString();
         LabDim.Text = $"{background.DimPercent}%";
-        LabRotateInterval.Text = $"{background.RotateSeconds} 秒";
+        LabRotateInterval.Text = Loc.F("{0} 秒", background.RotateSeconds);
     }
 
     private void SetBackgroundStatus(string message, bool warn)
@@ -1796,9 +1881,9 @@ public partial class PageSettings : LauncherPage
     {
         var dialog = new OpenFileDialog
         {
-            Title = "添加背景音乐",
+            Title = Loc.T("添加背景音乐"),
             Multiselect = true,
-            Filter = $"音频文件 ({BgmPlayer.PickPattern})|{BgmPlayer.PickPattern}|所有文件 (*.*)|*.*"
+            Filter = Loc.F("音频文件 ({0})|{1}|所有文件 (*.*)|*.*", BgmPlayer.PickPattern, BgmPlayer.PickPattern)
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
@@ -1806,8 +1891,8 @@ public partial class PageSettings : LauncherPage
         var (added, skipped) = BgmPlayer.AddTracks(dialog.FileNames);
 
         SetBgmHint(skipped == 0
-                ? $"已添加 {added} 首曲目。"
-                : $"已添加 {added} 首，跳过 {skipped} 首（重复、格式不支持或文件不存在）。",
+                ? Loc.F("已添加 {0} 首曲目。", added)
+                : Loc.F("已添加 {0} 首，跳过 {1} 首（重复、格式不支持或文件不存在）。", added, skipped),
             warn: added == 0 && skipped > 0);
 
         RefreshMusic();
@@ -1827,7 +1912,7 @@ public partial class PageSettings : LauncherPage
 
         if (bgm.Playlist.Count == 0)
         {
-            SetBgmHint("播放列表是空的。", warn: true);
+            SetBgmHint(Loc.T("播放列表是空的。"), warn: true);
             return;
         }
 
@@ -1855,26 +1940,26 @@ public partial class PageSettings : LauncherPage
         SldVolume.Value = Math.Clamp(bgm.Volume, 0, 100);
         _suppressSliderChanged = false;
 
-        BtnBgmEnabled.Content = bgm.Enabled ? "已启用" : "已关闭";
+        BtnBgmEnabled.Content = bgm.Enabled ? Loc.T("已启用") : Loc.T("已关闭");
         BtnBgmEnabled.Tone = bgm.Enabled ? ButtonTone.Solid : ButtonTone.Outline;
 
-        BtnBgmLoop.Content = bgm.Loop ? "循环：开" : "循环：关";
+        BtnBgmLoop.Content = bgm.Loop ? Loc.T("循环：开") : Loc.T("循环：关");
         BtnBgmLoop.Tone = bgm.Loop ? ButtonTone.Solid : ButtonTone.Outline;
 
-        BtnBgmShuffle.Content = bgm.Shuffle ? "随机：开" : "随机：关";
+        BtnBgmShuffle.Content = bgm.Shuffle ? Loc.T("随机：开") : Loc.T("随机：关");
         BtnBgmShuffle.Tone = bgm.Shuffle ? ButtonTone.Solid : ButtonTone.Outline;
 
-        BtnBgmPlayPause.Content = BgmPlayer.IsPlaying ? "暂停" : "播放";
+        BtnBgmPlayPause.Content = BgmPlayer.IsPlaying ? Loc.T("暂停") : Loc.T("播放");
         BtnBgmPlayPause.IsEnabled = bgm.Playlist.Count > 0;
 
         var index = Math.Clamp(bgm.CurrentIndex, 0, Math.Max(0, bgm.Playlist.Count - 1));
         var playing = BgmPlayer.CurrentTrackName;
 
         LabBgmNow.Text = !string.IsNullOrEmpty(playing)
-            ? $"{(BgmPlayer.IsPlaying ? "正在播放" : "当前曲目")}：{playing}（{index + 1}/{bgm.Playlist.Count}）"
+            ? $"{(BgmPlayer.IsPlaying ? Loc.T("正在播放") : Loc.T("当前曲目"))}：{playing}（{index + 1}/{bgm.Playlist.Count}）"
             : bgm.Playlist.Count == 0
-                ? "播放列表为空，先添加曲目。"
-                : "未播放";
+                ? Loc.T("播放列表为空，先添加曲目。")
+                : Loc.T("未播放");
 
         ListBgm.ItemsSource = bgm.Playlist
             .Select((path, i) => new BgmTrackRow(i, path, i == bgm.CurrentIndex))
@@ -1904,9 +1989,9 @@ public partial class PageSettings : LauncherPage
     {
         LayoutStore.EnsureLoaded(LayoutElements.Ids);
 
-        var choice = ChoiceWindow.Ask(Window.GetWindow(this), "恢复默认布局", "把界面布局恢复成默认？",
-            "会清空「默认布局」方案里的自定义顺序、显隐与名称，并切回默认布局；自己存的其它方案不受影响。",
-            new ChoiceOption("恢复", "restore", ButtonTone.Danger), new ChoiceOption("取消", "cancel"));
+        var choice = ChoiceWindow.Ask(Window.GetWindow(this), Loc.T("恢复默认布局"), Loc.T("把界面布局恢复成默认？"),
+            Loc.T("会清空「默认布局」方案里的自定义顺序、显隐与名称，并切回默认布局；自己存的其它方案不受影响。"),
+            new ChoiceOption(Loc.T("恢复"), "restore", ButtonTone.Danger), new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "restore") return;
 
@@ -1914,8 +1999,8 @@ public partial class PageSettings : LauncherPage
         ApplyLayoutToWindow();
         RefreshLayout();
 
-        SetLayoutStatus("已恢复默认布局。");
-        Log.Info("界面布局已恢复默认");
+        SetLayoutStatus(Loc.T("已恢复默认布局。"));
+        Log.Info(Loc.T("界面布局已恢复默认"));
     }
 
     private void RefreshLayout()
@@ -1927,8 +2012,8 @@ public partial class PageSettings : LauncherPage
         var active = LayoutStore.Active;
         var overridden = active.Items.Count(item => !string.IsNullOrWhiteSpace(item.DisplayName) || !item.Visible);
 
-        LabLayoutScheme.Text = $"当前方案：{active.Name}（共 {LayoutStore.All.Count} 套）" +
-                               (overridden == 0 ? "，未做任何调整。" : $"，已调整 {overridden} 项。");
+        LabLayoutScheme.Text = Loc.F("当前方案：{0}（共 {1} 套）", active.Name, LayoutStore.All.Count) +
+                               (overridden == 0 ? Loc.T("，未做任何调整。") : Loc.F("，已调整 {0} 项。", overridden));
 
         RefreshWidgetToggles();
     }
@@ -1946,8 +2031,8 @@ public partial class PageSettings : LauncherPage
         BtnHomeModeSimple.Tone = simple ? ButtonTone.Solid : ButtonTone.Outline;
 
         LabHomeModeHint.Text = simple
-            ? "当前：简洁模式 —— 主页只留右下角启动入口，其余留空以露出背景图。"
-            : "当前：默认模式 —— 完整主页。";
+            ? Loc.T("当前：简洁模式 —— 主页只留右下角启动入口，其余留空以露出背景图。")
+            : Loc.T("当前：默认模式 —— 完整主页。");
     }
 
     private void OnHomeModeClick(object sender, RoutedEventArgs e)
@@ -1961,7 +2046,7 @@ public partial class PageSettings : LauncherPage
         // 主页在切回去时会走 OnEnter → Refresh，按新模式重排，这里不必强刷
         RefreshHomeMode();
 
-        Log.Info($"主页显示模式已切换为 {mode}");
+        Log.Info(Loc.F("主页显示模式已切换为 {0}", mode));
     }
 
     // ————— 主页附加小组件（时钟 / 便签 / 快捷启动 / 音乐控制） —————
@@ -1976,14 +2061,14 @@ public partial class PageSettings : LauncherPage
 
         var extras = SettingsStore.Current.ExtraWidgets;
 
-        SyncToggle(BtnExtraClock, "时钟", extras.Clock);
-        SyncToggle(BtnExtraMemo, "便签", extras.Memo);
-        SyncToggle(BtnExtraMusic, "音乐", extras.Music);
+        SyncToggle(BtnExtraClock, Loc.T("时钟"), extras.Clock);
+        SyncToggle(BtnExtraMemo, Loc.T("便签"), extras.Memo);
+        SyncToggle(BtnExtraMusic, Loc.T("音乐"), extras.Music);
 
-        BtnClock24.Content = extras.Clock24Hour ? "24 小时制" : "12 小时制";
+        BtnClock24.Content = extras.Clock24Hour ? Loc.T("24 小时制") : Loc.T("12 小时制");
         BtnClock24.Tone = extras.Clock24Hour ? ButtonTone.Solid : ButtonTone.Outline;
 
-        BtnClockDate.Content = extras.ClockShowDate ? "显示日期" : "隐藏日期";
+        BtnClockDate.Content = extras.ClockShowDate ? Loc.T("显示日期") : Loc.T("隐藏日期");
         BtnClockDate.Tone = extras.ClockShowDate ? ButtonTone.Solid : ButtonTone.Outline;
 
         _suppressExtraWidgetChanged = true;
@@ -1995,7 +2080,7 @@ public partial class PageSettings : LauncherPage
 
         static void SyncToggle(OutlineButton button, string name, bool on)
         {
-            button.Content = $"{name}：{(on ? "已开启" : "已关闭")}";
+            button.Content = $"{name}：{(on ? Loc.T("已开启") : Loc.T("已关闭"))}";
             button.Tone = on ? ButtonTone.Solid : ButtonTone.Outline;
         }
     }
@@ -2017,7 +2102,7 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
         RefreshExtraWidgets();
 
-        Log.Info($"主页附加小组件已切换：{tag}");
+        Log.Info(Loc.F("主页附加小组件已切换：{0}", tag));
     }
 
     private void OnClockFormatClick(object sender, RoutedEventArgs e)
@@ -2078,9 +2163,9 @@ public partial class PageSettings : LauncherPage
 
         var settings = SettingsStore.Current;
 
-        LabIconStatus.Text = DescribeLookFile(settings.WindowIconFile, "当前：内置图标");
-        LabStartSoundStatus.Text = DescribeLookFile(settings.StartupSoundFile, "当前：不播放");
-        LabStopSoundStatus.Text = DescribeLookFile(settings.ShutdownSoundFile, "当前：不播放");
+        LabIconStatus.Text = DescribeLookFile(settings.WindowIconFile, Loc.T("当前：内置图标"));
+        LabStartSoundStatus.Text = DescribeLookFile(settings.StartupSoundFile, Loc.T("当前：不播放"));
+        LabStopSoundStatus.Text = DescribeLookFile(settings.ShutdownSoundFile, Loc.T("当前：不播放"));
 
         BtnClearIcon.IsEnabled = !string.IsNullOrWhiteSpace(settings.WindowIconFile);
         BtnClearStartSound.IsEnabled = !string.IsNullOrWhiteSpace(settings.StartupSoundFile);
@@ -2088,7 +2173,7 @@ public partial class PageSettings : LauncherPage
     }
 
     private static string DescribeLookFile(string? fileName, string emptyText)
-        => CustomizationService.Resolve(fileName) is { } path ? $"当前：{Path.GetFileName(path)}" : emptyText;
+        => CustomizationService.Resolve(fileName) is { } path ? Loc.F("当前：{0}", Path.GetFileName(path)) : emptyText;
 
     /// <summary>标题是边打边预览的，这里只记进内存，离开设置页时统一落盘。</summary>
     private void OnWindowTitleChanged(object sender, TextChangedEventArgs e)
@@ -2103,15 +2188,15 @@ public partial class PageSettings : LauncherPage
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择窗口图标",
-            Filter = $"图片 ({CustomizationService.IconPattern})|{CustomizationService.IconPattern}|所有文件 (*.*)|*.*"
+            Title = Loc.T("选择窗口图标"),
+            Filter = Loc.F("图片 ({0})|{1}|所有文件 (*.*)|*.*", CustomizationService.IconPattern, CustomizationService.IconPattern)
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
 
         if (CustomizationService.Import(dialog.FileName, "icon") is not { } name)
         {
-            SetLookStatus("导入图标失败，换一张图试试。", warn: true);
+            SetLookStatus(Loc.T("导入图标失败，换一张图试试。"), warn: true);
             return;
         }
 
@@ -2140,15 +2225,15 @@ public partial class PageSettings : LauncherPage
     {
         var dialog = new OpenFileDialog
         {
-            Title = startup ? "选择启动音效" : "选择关闭音效",
-            Filter = $"音频 ({CustomizationService.SoundPattern})|{CustomizationService.SoundPattern}|所有文件 (*.*)|*.*"
+            Title = startup ? Loc.T("选择启动音效") : Loc.T("选择关闭音效"),
+            Filter = Loc.F("音频 ({0})|{1}|所有文件 (*.*)|*.*", CustomizationService.SoundPattern, CustomizationService.SoundPattern)
         };
 
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
 
         if (CustomizationService.Import(dialog.FileName, startup ? "startup" : "shutdown") is not { } name)
         {
-            SetLookStatus("导入音效失败，换一个文件试试。", warn: true);
+            SetLookStatus(Loc.T("导入音效失败，换一个文件试试。"), warn: true);
             return;
         }
 
@@ -2202,13 +2287,13 @@ public partial class PageSettings : LauncherPage
 
         var widgets = SettingsStore.Current.HomeWidgets;
 
-        Sync(BtnWidgetCalendar, "日历", widgets.Calendar);
-        Sync(BtnWidgetWeather, "天气", widgets.Weather);
-        Sync(BtnWidgetSites, "常用网站", widgets.Sites);
+        Sync(BtnWidgetCalendar, Loc.T("日历"), widgets.Calendar);
+        Sync(BtnWidgetWeather, Loc.T("天气"), widgets.Weather);
+        Sync(BtnWidgetSites, Loc.T("常用网站"), widgets.Sites);
 
         static void Sync(OutlineButton button, string name, bool shown)
         {
-            button.Content = $"{name}：{(shown ? "显示" : "隐藏")}";
+            button.Content = $"{name}：{(shown ? Loc.T("显示") : Loc.T("隐藏"))}";
             button.Tone = shown ? ButtonTone.Solid : ButtonTone.Outline;
         }
     }
@@ -2231,7 +2316,7 @@ public partial class PageSettings : LauncherPage
         SettingsStore.Save();
         RefreshWidgetToggles();
 
-        Log.Info($"主页小组件「{tag}」已改为{(shown.Value ? "显示" : "隐藏")}");
+        Log.Info(Loc.F("主页小组件「{0}」已改为{1}", tag, (shown.Value ? Loc.T("显示") : Loc.T("隐藏"))));
     }
 
     /// <summary>让主窗口按启用方案重排侧栏。</summary>
@@ -2256,7 +2341,7 @@ public partial class PageSettings : LauncherPage
 
         var state = AutoStartManager.Query();
 
-        BtnAutoStart.Content = state.IsEnabled ? "已开启" : "已关闭";
+        BtnAutoStart.Content = state.IsEnabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnAutoStart.Tone = state.IsEnabled ? ButtonTone.Solid : ButtonTone.Outline;
 
         if (operation is not null)
@@ -2268,12 +2353,12 @@ public partial class PageSettings : LauncherPage
         switch (state.Status)
         {
             case AutoStartStatus.Enabled:
-                SetAutoStartStatus($"自启命令：{state.Command}", warn: false);
+                SetAutoStartStatus(Loc.F("自启命令：{0}", state.Command), warn: false);
                 break;
 
             // 注册表里那条指向别的 exe（程序被挪过）：开关先按「关」显示，再点一次就改成当前位置
             case AutoStartStatus.PointsToOtherExe:
-                SetAutoStartStatus($"{state.Message}再点一次开关即可改成当前位置。", warn: true);
+                SetAutoStartStatus(Loc.F("{0}再点一次开关即可改成当前位置。", state.Message), warn: true);
                 break;
 
             case AutoStartStatus.Failed:
@@ -2281,7 +2366,7 @@ public partial class PageSettings : LauncherPage
                 break;
 
             default:
-                SetAutoStartStatus("未设置开机自启。", warn: false);
+                SetAutoStartStatus(Loc.T("未设置开机自启。"), warn: false);
                 break;
         }
     }
@@ -2307,7 +2392,7 @@ public partial class PageSettings : LauncherPage
         }
         else
         {
-            Log.Warn($"开机自启设置失败：{result.Message}");
+            Log.Warn(Loc.F("开机自启设置失败：{0}", result.Message));
         }
 
         RefreshAutoStart(result);
@@ -2349,9 +2434,9 @@ public partial class PageSettings : LauncherPage
         var failed = all.Count(info => info.Status == ExtensionStatus.Failed);
 
         SetExtensionsHint(
-            $"共 {all.Count} 个扩展：已启用 {all.Count(info => info.Status == ExtensionStatus.Enabled)}，" +
-            $"已停用 {all.Count(info => info.Status == ExtensionStatus.Disabled)}，加载失败 {failed}。" +
-            "启用 / 停用会立即写回清单文件。",
+            Loc.F("共 {0} 个扩展：已启用 {1}，", all.Count, all.Count(info => info.Status == ExtensionStatus.Enabled)) +
+            Loc.F("已停用 {0}，加载失败 {1}。", all.Count(info => info.Status == ExtensionStatus.Disabled), failed) +
+            Loc.T("启用 / 停用会立即写回清单文件。"),
             warn: failed > 0);
     }
 
@@ -2362,7 +2447,7 @@ public partial class PageSettings : LauncherPage
 
         var allowed = SettingsStore.Current.AllowExtensionNetwork;
 
-        BtnExtensionNetwork.Content = allowed ? "联网：开" : "联网：关";
+        BtnExtensionNetwork.Content = allowed ? Loc.T("联网：开") : Loc.T("联网：关");
         BtnExtensionNetwork.Tone = allowed ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
@@ -2375,38 +2460,38 @@ public partial class PageSettings : LauncherPage
 
         RefreshExtensionNetworkButton();
         SetExtensionsHint(allowed
-            ? "已允许扩展读取数据源（只读 http/https GET，带超时与内存缓存）。"
-            : "已关闭扩展联网：扩展只显示清单里写死的静态内容。", warn: false);
+            ? Loc.T("已允许扩展读取数据源（只读 http/https GET，带超时与内存缓存）。")
+            : Loc.T("已关闭扩展联网：扩展只显示清单里写死的静态内容。"), warn: false);
 
-        Log.Info($"扩展数据源联网总开关已{(allowed ? "打开" : "关闭")}");
+        Log.Info(Loc.F("扩展数据源联网总开关已{0}", (allowed ? Loc.T("打开") : Loc.T("关闭"))));
     }
 
     private void OnReloadExtensionsClick(object sender, RoutedEventArgs e)
     {
-        SetExtensionsHint("正在重新读取扩展目录…", warn: false);
+        SetExtensionsHint(Loc.T("正在重新读取扩展目录…"), warn: false);
 
         RefreshExtensions();
 
-        Log.Info("界面：已重新加载扩展目录");
+        Log.Info(Loc.T("界面：已重新加载扩展目录"));
     }
 
     private void OnOpenExtensionsFolderClick(object sender, RoutedEventArgs e)
     {
-        if (!ExtensionStore.OpenFolder()) SetExtensionsHint("扩展目录不存在或无法打开。", warn: true);
+        if (!ExtensionStore.OpenFolder()) SetExtensionsHint(Loc.T("扩展目录不存在或无法打开。"), warn: true);
     }
 
     /// <summary>新建：先问一个扩展名（= 清单文件名），再用表单建内容。</summary>
     private void OnNewExtensionClick(object sender, RoutedEventArgs e)
     {
-        var id = TextInputWindow.Ask(Window.GetWindow(this), "新建扩展", "给这个扩展起一个名字",
-            "我的小组件", "会保存成「扩展目录\\<名字>.json」，只允许普通文件名（不能带路径分隔符）。",
+        var id = TextInputWindow.Ask(Window.GetWindow(this), Loc.T("新建扩展"), Loc.T("给这个扩展起一个名字"),
+            Loc.T("我的小组件"), Loc.T("会保存成「扩展目录\\<名字>.json」，只允许普通文件名（不能带路径分隔符）。"),
             name => ExtensionValidator.ValidateId(name));
 
         if (string.IsNullOrWhiteSpace(id)) return;
 
         if (ExtensionStore.Find(id) is not null)
         {
-            SetExtensionsHint($"已经有一个叫「{id}」的扩展了，换一个名字或直接编辑它。", warn: true);
+            SetExtensionsHint(Loc.F("已经有一个叫「{0}」的扩展了，换一个名字或直接编辑它。", id), warn: true);
             return;
         }
 
@@ -2420,7 +2505,7 @@ public partial class PageSettings : LauncherPage
 
         if (!ExtensionStore.TryRead(row.Id, out var manifest, out var error))
         {
-            SetExtensionsHint($"打不开「{row.Name}」的清单：{error}", warn: true);
+            SetExtensionsHint(Loc.F("打不开「{0}」的清单：{1}", row.Name, error), warn: true);
             return;
         }
 
@@ -2436,7 +2521,7 @@ public partial class PageSettings : LauncherPage
 
         RefreshExtensions();
 
-        if (saved) SetExtensionsHint($"已保存「{id}」，回主页就能看到它的卡片。", warn: false);
+        if (saved) SetExtensionsHint(Loc.F("已保存「{0}」，回主页就能看到它的卡片。", id), warn: false);
     }
 
     /// <summary>启用 / 停用：改清单里的 enabled 字段并落盘。</summary>
@@ -2448,37 +2533,37 @@ public partial class PageSettings : LauncherPage
 
         if (!ExtensionStore.TrySetEnabled(row.Id, enable, out var error))
         {
-            SetExtensionsHint($"操作失败：{error}", warn: true);
+            SetExtensionsHint(Loc.F("操作失败：{0}", error), warn: true);
             return;
         }
 
         RefreshExtensions();
 
         SetExtensionsHint(enable
-            ? $"已启用「{row.Name}」，主页上会出现它的卡片。"
-            : $"已停用「{row.Name}」，主页上它的卡片会消失。", warn: false);
+            ? Loc.F("已启用「{0}」，主页上会出现它的卡片。", row.Name)
+            : Loc.F("已停用「{0}」，主页上它的卡片会消失。", row.Name), warn: false);
     }
 
     private void OnDeleteExtensionClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: ExtensionRow row }) return;
 
-        var choice = ChoiceWindow.Ask(Window.GetWindow(this), "删除扩展",
-            $"要删除扩展「{row.Name}」吗？",
-            $"只会删掉扩展目录里的那份清单文件（{row.Id}.json），不会动你电脑上的其它文件。",
-            new ChoiceOption("删除", "delete", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+        var choice = ChoiceWindow.Ask(Window.GetWindow(this), Loc.T("删除扩展"),
+            Loc.F("要删除扩展「{0}」吗？", row.Name),
+            Loc.F("只会删掉扩展目录里的那份清单文件（{0}.json），不会动你电脑上的其它文件。", row.Id),
+            new ChoiceOption(Loc.T("删除"), "delete", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "delete") return;
 
         if (!ExtensionStore.TryDelete(row.Id, out var error))
         {
-            SetExtensionsHint($"删除失败：{error}", warn: true);
+            SetExtensionsHint(Loc.F("删除失败：{0}", error), warn: true);
             return;
         }
 
         RefreshExtensions();
-        SetExtensionsHint($"已删除「{row.Name}」。", warn: false);
+        SetExtensionsHint(Loc.F("已删除「{0}」。", row.Name), warn: false);
     }
 
     /// <summary>
@@ -2491,13 +2576,13 @@ public partial class PageSettings : LauncherPage
 
         _extensionNoticeShown = true;
 
-        ChoiceWindow.Ask(Window.GetWindow(this), "扩展模块说明", "扩展是纯声明式配置，不会执行任何代码",
-            "本启动器的扩展只是一份 JSON 清单：标题、图标、文字行，可选一个只读数据源与一个点击网址。\n\n" +
-            "· 启动器不会加载任何程序集、不会运行脚本，也没有任何执行用户代码的入口；\n" +
-            "· 扩展目录只被读取：启动器不会为扩展写缓存文件、不会写注册表、不会改动系统；\n" +
-            "· 数据源只做 http/https 的只读 GET，带超时与内存缓存，还可以在下面一键关掉；\n" +
-            "· 唯一会被写入的文件，就是你在这里新建 / 编辑的那份扩展清单本身。",
-            new ChoiceOption("我知道了", "ok", ButtonTone.Solid));
+        ChoiceWindow.Ask(Window.GetWindow(this), Loc.T("扩展模块说明"), Loc.T("扩展是纯声明式配置，不会执行任何代码"),
+            Loc.T("本启动器的扩展只是一份 JSON 清单：标题、图标、文字行，可选一个只读数据源与一个点击网址。\n\n") +
+            Loc.T("· 启动器不会加载任何程序集、不会运行脚本，也没有任何执行用户代码的入口；\n") +
+            Loc.T("· 扩展目录只被读取：启动器不会为扩展写缓存文件、不会写注册表、不会改动系统；\n") +
+            Loc.T("· 数据源只做 http/https 的只读 GET，带超时与内存缓存，还可以在下面一键关掉；\n") +
+            Loc.T("· 唯一会被写入的文件，就是你在这里新建 / 编辑的那份扩展清单本身。"),
+            new ChoiceOption(Loc.T("我知道了"), "ok", ButtonTone.Solid));
 
         SettingsStore.Current.ExtensionsNoticeShown = true;
         SettingsStore.Save();

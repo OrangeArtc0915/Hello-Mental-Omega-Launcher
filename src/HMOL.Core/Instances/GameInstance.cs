@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using HMOL.Core.App;
 using HMOL.Core.Games;
 using HMOL.Core.Packages;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Instances;
 
@@ -89,9 +90,9 @@ public sealed class GameInstance
     {
         get
         {
-            if (!Directory.Exists(GameDir)) return "游戏目录不可用";
-            if (!IsValid) return "未找到主程序，可在「编辑」里指定可执行文件";
-            return ExecutablePath is null ? "游戏目录有效，但未找到主程序" : "就绪";
+            if (!Directory.Exists(GameDir)) return Loc.T("游戏目录不可用");
+            if (!IsValid) return Loc.T("未找到主程序，可在「编辑」里指定可执行文件");
+            return ExecutablePath is null ? Loc.T("游戏目录有效，但未找到主程序") : Loc.T("就绪");
         }
     }
 

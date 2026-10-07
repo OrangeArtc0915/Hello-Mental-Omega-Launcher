@@ -3,6 +3,7 @@ using System.Text.Json;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Protocol;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -235,7 +236,7 @@ public sealed class HallChat
         var text = ChatCrypt.SanitizeText(ChatCrypt.Decrypt(_secret, encrypted), ChatCrypt.MaxTextLength);
         if (text.Length == 0 || !ChatCrypt.CheckPolicy(text).Ok) return;   // 无法解密或含违禁内容，丢弃
 
-        _onMessage(new ChatMessage(id, name.Length > 0 ? name : "未知", text, timestamp));
+        _onMessage(new ChatMessage(id, name.Length > 0 ? name : Loc.T("未知"), text, timestamp));
     }
 
     internal void HandleRoom(string id, string name, string community, string roomIp, string node, string latency)
@@ -405,15 +406,15 @@ public sealed class HallClient : IAsyncDisposable
                 catch { /* 同上 */ }
             });
 
-        progress?.Report("正在获取公网 IP...");
+        progress?.Report(Loc.T("正在获取公网 IP..."));
         _publicIp = await FetchPublicIpAsync(cancellationToken).ConfigureAwait(false);
 
-        progress?.Report("正在连接大厅信标...");
+        progress?.Report(Loc.T("正在连接大厅信标..."));
         var client = await ConnectAsync(cancellationToken).ConfigureAwait(false);
 
         if (client is null)
         {
-            LogLine("所有大厅信标均不可用, 进入大厅失败");
+            LogLine(Loc.T("所有大厅信标均不可用, 进入大厅失败"));
             _chat = null;
             _sessionActive = false;
             return false;
@@ -424,7 +425,7 @@ public sealed class HallClient : IAsyncDisposable
         PublishPresence();
         _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(_cts.Token));
 
-        LogLine($"已进入大厅, 公网IP={(Ip.Length > 0 ? Ip : "-")}");
+        LogLine(Loc.F("已进入大厅, 公网IP={0}", (Ip.Length > 0 ? Ip : Loc.T("-"))));
         return true;
     }
 
@@ -469,7 +470,7 @@ public sealed class HallClient : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                LogLine($"断开大厅信标失败：{ex.Message}");
+                LogLine(Loc.F("断开大厅信标失败：{0}", ex.Message));
             }
 
             try { client.Dispose(); }
@@ -482,7 +483,7 @@ public sealed class HallClient : IAsyncDisposable
         }
 
         _chat = null;
-        LogLine("已离开大厅");
+        LogLine(Loc.T("已离开大厅"));
     }
 
     /// <summary>查询大厅在线玩家（已排除本机），同时刷新缓存。</summary>
@@ -504,7 +505,7 @@ public sealed class HallClient : IAsyncDisposable
 
             var name = info.Name.Length > 0 ? info.Name : id[..Math.Min(8, id.Length)];
             var seconds = Math.Max(0, (int)(now - info.LastSeen));
-            var latency = seconds < 60 ? $"{seconds}秒" : $"{seconds / 60}分{seconds % 60}秒";
+            var latency = seconds < 60 ? Loc.F("{0}秒", seconds) : Loc.F("{0}分{1}秒", seconds / 60, seconds % 60);
 
             peers.Add(new HallPeer(id, info.Ip.Length > 0 ? info.Ip : "-", name, latency));
         }
@@ -611,7 +612,7 @@ public sealed class HallClient : IAsyncDisposable
                 _client = client;
                 _connected = true;
                 _reconnectFailureLogged = false;
-                LogLine($"已连接大厅信标 {host}:{port}");
+                LogLine(Loc.F("已连接大厅信标 {0}:{1}", host, port));
                 return client;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -622,7 +623,7 @@ public sealed class HallClient : IAsyncDisposable
             catch (Exception ex)
             {
                 _connected = false;
-                LogLine($"信标 {host}:{port} 连接失败：{ex.Message}");
+                LogLine(Loc.F("信标 {0}:{1} 连接失败：{2}", host, port, ex.Message));
 
                 try { client?.Dispose(); }
                 catch { /* 忽略 */ }
@@ -641,7 +642,7 @@ public sealed class HallClient : IAsyncDisposable
     private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs args)
     {
         _connected = false;
-        LogLine("大厅信标连接断开, 等待自动重连");
+        LogLine(Loc.T("大厅信标连接断开, 等待自动重连"));
         return Task.CompletedTask;
     }
 
@@ -653,7 +654,7 @@ public sealed class HallClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            LogLine($"处理大厅消息失败：{ex.Message}");
+            LogLine(Loc.F("处理大厅消息失败：{0}", ex.Message));
         }
 
         return Task.CompletedTask;
@@ -724,7 +725,7 @@ public sealed class HallClient : IAsyncDisposable
 
         var invite = new HallInvite(
             id,
-            name.Length > 0 ? name : "玩家",
+            name.Length > 0 ? name : Loc.T("玩家"),
             community,
             node,
             RoomChat.GetString(root, "key"),
@@ -737,7 +738,7 @@ public sealed class HallClient : IAsyncDisposable
         try { InviteReceived(invite); }
         catch (Exception ex)
         {
-            LogLine($"邀请回调异常：{ex.Message}");
+            LogLine(Loc.F("邀请回调异常：{0}", ex.Message));
         }
     }
 
@@ -776,7 +777,7 @@ public sealed class HallClient : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                LogLine($"大厅心跳失败：{ex.Message}");
+                LogLine(Loc.F("大厅心跳失败：{0}", ex.Message));
             }
 
             try { await Task.Delay(TimeSpan.FromSeconds(RoomChat.HeartbeatInterval), cancellationToken).ConfigureAwait(false); }
@@ -800,14 +801,14 @@ public sealed class HallClient : IAsyncDisposable
             if (!_reconnectFailureLogged)
             {
                 _reconnectFailureLogged = true;
-                LogLine("大厅信标重连失败, 将继续重试");
+                LogLine(Loc.T("大厅信标重连失败, 将继续重试"));
             }
 
             return;
         }
 
         _reconnectFailureLogged = false;
-        LogLine("已重新连接大厅信标");
+        LogLine(Loc.T("已重新连接大厅信标"));
     }
 
     private async Task<string> FetchPublicIpAsync(CancellationToken cancellationToken)
@@ -823,7 +824,7 @@ public sealed class HallClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            LogLine($"取公网 IP 失败（不影响大厅使用）：{ex.Message}");
+            LogLine(Loc.F("取公网 IP 失败（不影响大厅使用）：{0}", ex.Message));
             return string.Empty;
         }
     }
@@ -853,7 +854,7 @@ public sealed class HallClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            LogLine($"发布大厅消息失败：{ex.Message}");
+            LogLine(Loc.F("发布大厅消息失败：{0}", ex.Message));
         }
     }
 
@@ -865,7 +866,7 @@ public sealed class HallClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            LogLine($"发布大厅消息失败：{ex.Message}");
+            LogLine(Loc.F("发布大厅消息失败：{0}", ex.Message));
         }
     }
 
@@ -880,7 +881,7 @@ public sealed class HallClient : IAsyncDisposable
 
     private void LogLine(string message)
     {
-        try { _log?.Invoke($"[大厅] {message}"); }
+        try { _log?.Invoke(Loc.F("[大厅] {0}", message)); }
         catch { /* 日志回调异常不影响业务 */ }
     }
 

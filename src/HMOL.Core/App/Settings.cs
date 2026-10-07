@@ -1,4 +1,5 @@
 using HMOL.Core.Updater;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.App;
 
@@ -125,7 +126,7 @@ public sealed class HomeExtraWidgetSettings
     public bool Memo { get; set; }
 
     /// <summary>便签标题。</summary>
-    public string MemoTitle { get; set; } = "便签";
+    public string MemoTitle { get; set; } = Loc.T("便签");
 
     /// <summary>便签正文（多行）。</summary>
     public string MemoText { get; set; } = string.Empty;
@@ -186,6 +187,18 @@ public sealed class Settings
 
     /// <summary>界面字体名（系统已安装的字体）。留空表示用内置默认字体。</summary>
     public string AppFontFamily { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 界面语言代码（如 <c>zh-CN</c> / <c>en-US</c>）。旧配置文件里没有这个字段时按简体中文处理；
+    /// 语言包放在 <c>Data\lang</c>，见 <c>HMOL.Core.Localization.Loc</c>。切换立即生效并自动保存。
+    /// </summary>
+    public string Language { get; set; } = "zh-CN";
+
+    /// <summary>
+    /// 「跟随系统」：开启时每次启动都按系统时区与区域重新判定语言（见 <c>Loc.DetectSystemLanguage</c>），
+    /// <see cref="Language"/> 只当判不出来时的兜底。用户手动挑过一次语言就会自动关掉它。
+    /// </summary>
+    public bool AutoLanguage { get; set; } = true;
 
     /// <summary>界面动效总开关。关掉后所有过渡 / 淡入 / 呼吸效果都直接落到终态。</summary>
     public bool AnimationsEnabled { get; set; } = true;

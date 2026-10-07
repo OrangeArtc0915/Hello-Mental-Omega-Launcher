@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -24,7 +25,7 @@ public partial class MultiplayerChatWindow : Window
         Title = title;
         Card.Title = title;
 
-        _selfName = string.IsNullOrWhiteSpace(selfName) ? "我" : selfName;
+        _selfName = string.IsNullOrWhiteSpace(selfName) ? Loc.T("我") : selfName;
         _send = send;
 
         Loaded += (_, _) => TxtInput.Focus();
@@ -83,15 +84,15 @@ public partial class MultiplayerChatWindow : Window
                 break;
 
             case ChatSendStatus.Blocked:
-                AppendSystem("消息含违禁内容或网址，已被拦截");
+                AppendSystem(Loc.T("消息含违禁内容或网址，已被拦截"));
                 break;
 
             case ChatSendStatus.Limited:
-                AppendSystem("发送过快，请稍候再试");
+                AppendSystem(Loc.T("发送过快，请稍候再试"));
                 break;
 
             default:
-                AppendSystem("未连接，消息无法发送");
+                AppendSystem(Loc.T("未连接，消息无法发送"));
                 break;
         }
     }

@@ -1,6 +1,7 @@
 using System.IO;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -72,7 +73,7 @@ public sealed class OperationJournal
         }
         catch (Exception ex)
         {
-            Log.Warn($"覆盖前备份失败：{file}（{ex.Message}）");
+            Log.Warn(Loc.F("覆盖前备份失败：{0}（{1}）", file, ex.Message));
             return null;
         }
     }
@@ -102,7 +103,7 @@ public sealed class OperationJournal
         }
         catch (Exception ex)
         {
-            Log.Warn($"移动到隔离目录失败：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("移动到隔离目录失败：{0}（{1}）", path, ex.Message));
             return null;
         }
     }
@@ -155,13 +156,13 @@ public sealed class OperationJournal
             catch (Exception ex)
             {
                 failed++;
-                Log.Warn($"回滚失败：{entry.Path}（{ex.Message}）");
+                Log.Warn(Loc.F("回滚失败：{0}（{1}）", entry.Path, ex.Message));
             }
         }
 
         TryDeleteEmptyQuarantine();
 
-        Log.Info($"回滚完成：登记 {_entries.Count} 条，失败 {failed} 条");
+        Log.Info(Loc.F("回滚完成：登记 {0} 条，失败 {1} 条", _entries.Count, failed));
         return failed;
     }
 
@@ -173,7 +174,7 @@ public sealed class OperationJournal
             if (!Directory.Exists(_quarantineRoot)) return;
             if (Directory.EnumerateFileSystemEntries(_quarantineRoot).Any())
             {
-                Log.Warn($"隔离目录里仍有内容，未删除：{_quarantineRoot}");
+                Log.Warn(Loc.F("隔离目录里仍有内容，未删除：{0}", _quarantineRoot));
                 return;
             }
 
@@ -181,7 +182,7 @@ public sealed class OperationJournal
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理隔离目录失败：{_quarantineRoot}（{ex.Message}）");
+            Log.Warn(Loc.F("清理隔离目录失败：{0}（{1}）", _quarantineRoot, ex.Message));
         }
         finally
         {
@@ -197,7 +198,7 @@ public sealed class OperationJournal
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理隔离目录失败：{_quarantineRoot}（{ex.Message}）");
+            Log.Warn(Loc.F("清理隔离目录失败：{0}（{1}）", _quarantineRoot, ex.Message));
         }
         finally
         {

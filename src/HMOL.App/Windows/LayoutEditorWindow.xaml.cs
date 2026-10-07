@@ -9,6 +9,7 @@ using HMOL.App.Controls;
 using HMOL.App.Layout;
 using HMOL.Core.Layout;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -20,7 +21,7 @@ public sealed class LayoutElementRow
         Id = info.Id;
         Icon = info.Icon;
         Name = string.IsNullOrWhiteSpace(item.DisplayName) ? info.DisplayName : item.DisplayName!;
-        Hint = string.IsNullOrWhiteSpace(item.DisplayName) ? info.Group : $"{info.Group} · 已改名";
+        Hint = string.IsNullOrWhiteSpace(item.DisplayName) ? info.Group : Loc.F("{0} · 已改名", info.Group);
     }
 
     public string Id { get; }
@@ -39,7 +40,7 @@ public sealed class LayoutSchemeRow
     public LayoutSchemeRow(LayoutScheme scheme, bool isActive)
     {
         Id = scheme.Id;
-        NameText = isActive ? $"{scheme.Name}（当前启用）" : scheme.Name;
+        NameText = isActive ? Loc.F("{0}（当前启用）", scheme.Name) : scheme.Name;
     }
 
     public string Id { get; }
@@ -58,10 +59,10 @@ public sealed class HomeElementRow
 
         // 隐藏的元素优先标明「已隐藏」，否则看不出它为什么在主页上不出现
         Hint = item is { Visible: false }
-            ? "已隐藏"
+            ? Loc.T("已隐藏")
             : item is { HasBounds: true }
-                ? $"自由 {item.XPercent:0.#},{item.YPercent:0.#} · {item.WidthPercent:0.#}×{item.HeightPercent:0.#}"
-                : "跟随流式";
+                ? Loc.F("自由 {0:0.#},{1:0.#} · {2:0.#}×{3:0.#}", item.XPercent, item.YPercent, item.WidthPercent, item.HeightPercent)
+                : Loc.T("跟随流式");
     }
 
     public string Id { get; }
@@ -173,7 +174,7 @@ public partial class LayoutEditorWindow : Window
         LoadTarget();
         RefreshSchemeList();
 
-        SetStatus($"已载入方案「{scheme.Name}」，改完点「保存并应用」生效。", warn: false);
+        SetStatus(Loc.F("已载入方案「{0}」，改完点「保存并应用」生效。", scheme.Name), warn: false);
     }
 
     private void SelectSchemeRow(string id)
@@ -188,7 +189,7 @@ public partial class LayoutEditorWindow : Window
 
     private void OnSchemeNewClick(object sender, RoutedEventArgs e)
     {
-        var name = TextInputWindow.Ask(this, "新建方案", "新方案名称：", "自定义布局", "新方案使用默认顺序，全部元素显示。",
+        var name = TextInputWindow.Ask(this, Loc.T("新建方案"), Loc.T("新方案名称："), Loc.T("自定义布局"), Loc.T("新方案使用默认顺序，全部元素显示。"),
             value => LayoutStore.ValidateName(value, null));
 
         if (name is null) return;
@@ -196,7 +197,7 @@ public partial class LayoutEditorWindow : Window
         var scheme = LayoutStore.Create(name, LayoutElements.Ids);
         if (scheme is null)
         {
-            SetStatus("新建失败，请换一个名称。", warn: true);
+            SetStatus(Loc.T("新建失败，请换一个名称。"), warn: true);
             return;
         }
 
@@ -204,43 +205,43 @@ public partial class LayoutEditorWindow : Window
         LoadTarget();
         RefreshSchemeList();
 
-        SetStatus($"已新建方案「{scheme.Name}」，点「保存并应用」后生效。", warn: false);
+        SetStatus(Loc.F("已新建方案「{0}」，点「保存并应用」后生效。", scheme.Name), warn: false);
     }
 
     private void OnSchemeRenameClick(object sender, RoutedEventArgs e)
     {
         if (_target.IsBuiltIn)
         {
-            SetStatus($"内置方案「{LayoutScheme.DefaultName}」不支持重命名。", warn: true);
+            SetStatus(Loc.F("内置方案「{0}」不支持重命名。", LayoutScheme.DefaultName), warn: true);
             return;
         }
 
-        var name = TextInputWindow.Ask(this, "重命名方案", "新名称：", _target.Name, string.Empty,
+        var name = TextInputWindow.Ask(this, Loc.T("重命名方案"), Loc.T("新名称："), _target.Name, string.Empty,
             value => LayoutStore.ValidateName(value, _target.Id));
 
         if (name is null) return;
 
         if (!LayoutStore.Rename(_target, name))
         {
-            SetStatus("重命名失败，请换一个名称。", warn: true);
+            SetStatus(Loc.T("重命名失败，请换一个名称。"), warn: true);
             return;
         }
 
         RefreshSchemeList();
-        SetStatus($"方案已重命名为「{name}」。", warn: false);
+        SetStatus(Loc.F("方案已重命名为「{0}」。", name), warn: false);
     }
 
     private void OnSchemeDeleteClick(object sender, RoutedEventArgs e)
     {
         if (_target.IsBuiltIn)
         {
-            SetStatus($"内置方案「{LayoutScheme.DefaultName}」不支持删除。", warn: true);
+            SetStatus(Loc.F("内置方案「{0}」不支持删除。", LayoutScheme.DefaultName), warn: true);
             return;
         }
 
-        var choice = ChoiceWindow.Ask(this, "删除方案", $"确定删除方案「{_target.Name}」？",
-            "删除后无法恢复。若删的正是当前启用的方案，界面会回到默认布局。",
-            new ChoiceOption("删除", "delete", ButtonTone.Danger), new ChoiceOption("取消", "cancel"));
+        var choice = ChoiceWindow.Ask(this, Loc.T("删除方案"), Loc.F("确定删除方案「{0}」？", _target.Name),
+            Loc.T("删除后无法恢复。若删的正是当前启用的方案，界面会回到默认布局。"),
+            new ChoiceOption(Loc.T("删除"), "delete", ButtonTone.Danger), new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "delete") return;
 
@@ -248,7 +249,7 @@ public partial class LayoutEditorWindow : Window
 
         if (!LayoutStore.Delete(_target))
         {
-            SetStatus("删除失败。", warn: true);
+            SetStatus(Loc.T("删除失败。"), warn: true);
             return;
         }
 
@@ -259,7 +260,7 @@ public partial class LayoutEditorWindow : Window
         // 删掉的正是启用方案时，主界面必须立刻回到默认布局
         if (wasActive) ApplyToMainWindow();
 
-        SetStatus("已删除方案。", warn: false);
+        SetStatus(Loc.T("已删除方案。"), warn: false);
     }
 
     /// <summary>把当前方案（含未保存的改动）导出成 JSON，方便备份或分享给朋友。</summary>
@@ -278,17 +279,17 @@ public partial class LayoutEditorWindow : Window
 
         var dialog = new SaveFileDialog
         {
-            Title = "导出布局方案",
-            Filter = "布局方案 (*.json)|*.json|所有文件 (*.*)|*.*",
+            Title = Loc.T("导出布局方案"),
+            Filter = Loc.T("布局方案 (*.json)|*.json|所有文件 (*.*)|*.*"),
             FileName = $"{_target.Name}.json",
         };
 
         if (dialog.ShowDialog(this) != true) return;
 
         if (LayoutStore.ExportTo(export, dialog.FileName, out var error))
-            SetStatus($"已导出方案「{_target.Name}」：{dialog.FileName}", warn: false);
+            SetStatus(Loc.F("已导出方案「{0}」：{1}", _target.Name, dialog.FileName), warn: false);
         else
-            SetStatus($"导出失败：{error}", warn: true);
+            SetStatus(Loc.F("导出失败：{0}", error), warn: true);
     }
 
     /// <summary>从别人的 JSON 导入一套方案，导入后自动切过去。</summary>
@@ -296,8 +297,8 @@ public partial class LayoutEditorWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "导入布局方案",
-            Filter = "布局方案 (*.json)|*.json|所有文件 (*.*)|*.*",
+            Title = Loc.T("导入布局方案"),
+            Filter = Loc.T("布局方案 (*.json)|*.json|所有文件 (*.*)|*.*"),
         };
 
         if (dialog.ShowDialog(this) != true) return;
@@ -308,7 +309,7 @@ public partial class LayoutEditorWindow : Window
 
         if (scheme is null)
         {
-            SetStatus($"导入失败：{error}", warn: true);
+            SetStatus(Loc.F("导入失败：{0}", error), warn: true);
             return;
         }
 
@@ -316,20 +317,20 @@ public partial class LayoutEditorWindow : Window
         LoadTarget();
         RefreshSchemeList();
 
-        SetStatus($"已导入方案「{scheme.Name}」，点「保存并应用」后生效。", warn: false);
+        SetStatus(Loc.F("已导入方案「{0}」，点「保存并应用」后生效。", scheme.Name), warn: false);
     }
 
     private void OnSaveAsClick(object sender, RoutedEventArgs e)
     {
-        var name = TextInputWindow.Ask(this, "另存为新方案", "新方案名称：", $"布局 {DateTime.Now:MM-dd HHmm}",
-            "会把当前编辑内容存成一套新方案。", value => LayoutStore.ValidateName(value, null));
+        var name = TextInputWindow.Ask(this, Loc.T("另存为新方案"), Loc.T("新方案名称："), Loc.F("布局 {0:MM-dd HHmm}", DateTime.Now),
+            Loc.T("会把当前编辑内容存成一套新方案。"), value => LayoutStore.ValidateName(value, null));
 
         if (name is null) return;
 
         var scheme = LayoutStore.Create(name, LayoutElements.Ids);
         if (scheme is null)
         {
-            SetStatus("另存失败，请换一个名称。", warn: true);
+            SetStatus(Loc.T("另存失败，请换一个名称。"), warn: true);
             return;
         }
 
@@ -339,7 +340,7 @@ public partial class LayoutEditorWindow : Window
         _target = scheme;
         RefreshSchemeList();
 
-        SetStatus($"已另存为「{scheme.Name}」，点「保存并应用」后生效。", warn: false);
+        SetStatus(Loc.F("已另存为「{0}」，点「保存并应用」后生效。", scheme.Name), warn: false);
     }
 
     private void OnApplyClick(object sender, RoutedEventArgs e)
@@ -349,7 +350,7 @@ public partial class LayoutEditorWindow : Window
 
         if (!LayoutStore.Save(_target))
         {
-            SetStatus("保存失败，请检查数据目录是否可写。", warn: true);
+            SetStatus(Loc.T("保存失败，请检查数据目录是否可写。"), warn: true);
             return;
         }
 
@@ -360,8 +361,8 @@ public partial class LayoutEditorWindow : Window
         RefreshHomeTab(PanHomePreview.SelectedId);
         ApplyToMainWindow();
 
-        SetStatus($"已应用方案「{_target.Name}」。", warn: false);
-        Log.Info($"界面布局已切换到方案「{_target.Name}」");
+        SetStatus(Loc.F("已应用方案「{0}」。", _target.Name), warn: false);
+        Log.Info(Loc.F("界面布局已切换到方案「{0}」", _target.Name));
     }
 
     private void OnResetClick(object sender, RoutedEventArgs e)
@@ -374,7 +375,7 @@ public partial class LayoutEditorWindow : Window
 
         RefreshElementLists(null);
         RefreshHomeTab(null);
-        SetStatus("已恢复默认顺序、显示状态、名称与主页位置，点「保存并应用」后生效。", warn: false);
+        SetStatus(Loc.T("已恢复默认顺序、显示状态、名称与主页位置，点「保存并应用」后生效。"), warn: false);
     }
 
     // ————— 元素列表 —————
@@ -497,7 +498,7 @@ public partial class LayoutEditorWindow : Window
 
         if (!info.CanHide)
         {
-            SetStatus($"「{info.DisplayName}」是布局编辑器的入口，不能隐藏。", warn: true);
+            SetStatus(Loc.F("「{0}」是布局编辑器的入口，不能隐藏。", info.DisplayName), warn: true);
             return;
         }
 
@@ -514,8 +515,8 @@ public partial class LayoutEditorWindow : Window
 
         var current = string.IsNullOrWhiteSpace(item.DisplayName) ? info.DisplayName : item.DisplayName!;
 
-        var name = TextInputWindow.Ask(this, "重命名元素", $"「{info.DisplayName}」在界面上显示的名称：", current,
-            $"留空表示恢复成「{info.DisplayName}」。", value => value.Length > 12 ? "名称不要超过 12 个字。" : null);
+        var name = TextInputWindow.Ask(this, Loc.T("重命名元素"), Loc.F("「{0}」在界面上显示的名称：", info.DisplayName), current,
+            Loc.F("留空表示恢复成「{0}」。", info.DisplayName), value => value.Length > 12 ? Loc.T("名称不要超过 12 个字。") : null);
 
         if (name is null) return;
 
@@ -620,7 +621,7 @@ public partial class LayoutEditorWindow : Window
 
         if (!info.CanHide)
         {
-            SetStatus($"「{info.DisplayName}」是主页的启动入口，不能隐藏。", warn: true);
+            SetStatus(Loc.F("「{0}」是主页的启动入口，不能隐藏。", info.DisplayName), warn: true);
             return;
         }
 
@@ -647,8 +648,8 @@ public partial class LayoutEditorWindow : Window
         if (info is null || item is null) return;
 
         SetStatus(item is { HasBounds: true }
-            ? $"「{info.DisplayName}」左 {item.XPercent:0.#}%、上 {item.YPercent:0.#}%、宽 {item.WidthPercent:0.#}%、高 {item.HeightPercent:0.#}%（点「保存并应用」后生效）"
-            : $"「{info.DisplayName}」跟随流式布局（点「保存并应用」后生效）", warn: false);
+            ? Loc.F("「{0}」左 {1:0.#}%、上 {2:0.#}%、宽 {3:0.#}%、高 {4:0.#}%（点「保存并应用」后生效）", info.DisplayName, item.XPercent, item.YPercent, item.WidthPercent, item.HeightPercent)
+            : Loc.F("「{0}」跟随流式布局（点「保存并应用」后生效）", info.DisplayName), warn: false);
     }
 
     // ————— 拖拽 —————
@@ -714,7 +715,7 @@ public partial class LayoutEditorWindow : Window
 
         if (!info.CanHide)
         {
-            SetStatus($"「{info.DisplayName}」是布局编辑器的入口，不能隐藏。", warn: true);
+            SetStatus(Loc.F("「{0}」是布局编辑器的入口，不能隐藏。", info.DisplayName), warn: true);
             return;
         }
 
@@ -830,9 +831,9 @@ public partial class LayoutEditorWindow : Window
         base.OnClosing(e);
     }
 
-    private bool ConfirmDiscard() => ChoiceWindow.Ask(this, "放弃改动", "这套方案还有未保存的改动。",
-        "点「放弃」会丢掉这些改动，界面布局保持原样。",
-        new ChoiceOption("放弃", "discard", ButtonTone.Danger), new ChoiceOption("继续编辑", "keep")) == "discard";
+    private bool ConfirmDiscard() => ChoiceWindow.Ask(this, Loc.T("放弃改动"), Loc.T("这套方案还有未保存的改动。"),
+        Loc.T("点「放弃」会丢掉这些改动，界面布局保持原样。"),
+        new ChoiceOption(Loc.T("放弃"), "discard", ButtonTone.Danger), new ChoiceOption(Loc.T("继续编辑"), "keep")) == "discard";
 
     private void ApplyToMainWindow()
     {

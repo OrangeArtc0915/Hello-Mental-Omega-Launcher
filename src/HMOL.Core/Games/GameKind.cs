@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.Games;
 
 /// <summary>
@@ -33,9 +35,9 @@ public static class GameKinds
 
     public static string DisplayName(GameKind kind) => kind switch
     {
-        GameKind.OriginalRa2 => "原版（红色警戒2）",
-        GameKind.YurisRevenge => "尤里的复仇",
-        GameKind.Other => "其它红警 Mod",
-        _ => "心灵终结"
+        GameKind.OriginalRa2 => Loc.T("原版（红色警戒2）"),
+        GameKind.YurisRevenge => Loc.T("尤里的复仇"),
+        GameKind.Other => Loc.T("其它红警 Mod"),
+        _ => Loc.T("心灵终结")
     };
 }

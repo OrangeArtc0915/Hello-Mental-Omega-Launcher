@@ -9,6 +9,7 @@ using HMOL.Core.Games;
 using HMOL.Core.Instances;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -53,18 +54,81 @@ public partial class ConfigWizardWindow : Window
     /// <summary>步骤指示点：圆点 + 序号 + 步骤名。</summary>
     private readonly List<(Border Dot, TextBlock Number, TextBlock Label)> _indicators = [];
 
-    /// <summary>各步固定的顺序，不要缓存候选目录之类的东西。</summary>
-    private static readonly string[] StepNames = ["欢迎", "选择目录", "检查环境", "创建实例", "接下来"];
+    /// <summary>各步固定的顺序，不要缓存候选目录之类的东西。属性而非静态字段：步骤名随界面语言变化。</summary>
+    private static string[] StepNames => [Loc.T("欢迎"), Loc.T("选择目录"), Loc.T("检查环境"), Loc.T("创建实例"), Loc.T("接下来")];
+
+    /// <summary>刷新向导自己的语言下拉框时不触发切换事件。</summary>
+    private bool _suppressWizardLanguage;
 
     public ConfigWizardWindow()
     {
         InitializeComponent();
 
-        Card.Title = "配置向导";
+        Card.Title = Loc.T("配置向导");
 
         BuildStepIndicator();
         UpdateKindButtons();
+        RefreshWizardLanguage();
         SwitchStep(1);
+    }
+
+    // ————— 界面语言 —————
+
+    /// <summary>第 1 步的语言下拉框：列出可用语言，选中当前语言。</summary>
+    private void RefreshWizardLanguage()
+    {
+        _suppressWizardLanguage = true;
+
+        CmbWizardLanguage.ItemsSource = Loc.Available;
+        CmbWizardLanguage.SelectedItem =
+            Loc.Available.FirstOrDefault(option => option.Code.Equals(Loc.Current, StringComparison.OrdinalIgnoreCase))
+            ?? Loc.Available.FirstOrDefault();
+
+        _suppressWizardLanguage = false;
+    }
+
+    /// <summary>
+    /// 向导里挑语言：立即切换并落盘。挑过一次就算定下来了——顺手关掉「跟随系统」，
+    /// 否则下次启动又会被系统判定覆盖回去。
+    /// </summary>
+    private void OnWizardLanguageChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressWizardLanguage) return;
+        if (CmbWizardLanguage.SelectedItem is not LanguageOption option) return;
+        if (option.Code.Equals(Loc.Current, StringComparison.OrdinalIgnoreCase)) return;
+
+        SettingsStore.Current.Language = option.Code;
+        SettingsStore.Current.AutoLanguage = false;
+        SettingsStore.Save();
+
+        Log.Info(Loc.F("界面语言已切换为 {0}（{1}）", option.DisplayName, option.Code));
+
+        Loc.SetLanguage(option.Code);
+        ApplyLanguage();
+    }
+
+    /// <summary>
+    /// 换语言后刷一遍向导里「取过一次」的文案：XAML 的 {loc:T} 绑定会自己刷新，
+    /// 但 C# 侧（窗口标题、步骤指示点、按钮、当前步的校验结果）刷不回来，得手动重算。
+    /// 向导是独立窗口、不在主窗口的页面重建范围里，所以这套刷新只有这里做。
+    /// </summary>
+    private void ApplyLanguage()
+    {
+        Card.Title = Loc.T("配置向导");
+
+        PanSteps.Children.Clear();
+        _indicators.Clear();
+        BuildStepIndicator();
+        UpdateStepIndicator();
+
+        BtnNext.Content = _step == 5 ? Loc.T("完成") : Loc.T("下一步");
+
+        switch (_step)
+        {
+            case 2: ValidateDirectory(); break;
+            case 3: RefreshEnvironment(); break;
+            case 4: PrepareSummary(); break;
+        }
     }
 
     // ————— 步骤机 —————
@@ -84,7 +148,7 @@ public partial class ConfigWizardWindow : Window
         UpdateStepIndicator();
 
         BtnPrev.Visibility = step == 1 ? Visibility.Collapsed : Visibility.Visible;
-        BtnNext.Content = step == 5 ? "完成" : "下一步";
+        BtnNext.Content = step == 5 ? Loc.T("完成") : Loc.T("下一步");
 
         switch (step)
         {
@@ -141,12 +205,12 @@ public partial class ConfigWizardWindow : Window
     {
         if (_busy) return;
 
-        var choice = ChoiceWindow.Ask(this, "跳过配置向导",
-            "确定要跳过吗？",
-            "跳过后不会自动创建游戏实例。之后再想配置，可以到「设置 → 游戏路径 → 重新运行配置向导」，" +
-            "也可以直接在「游戏实例」页新建。",
-            new ChoiceOption("跳过", "skip", ButtonTone.Solid),
-            new ChoiceOption("继续配置", "back"));
+        var choice = ChoiceWindow.Ask(this, Loc.T("跳过配置向导"),
+            Loc.T("确定要跳过吗？"),
+            Loc.T("跳过后不会自动创建游戏实例。之后再想配置，可以到「设置 → 游戏路径 → 重新运行配置向导」，") +
+            Loc.T("也可以直接在「游戏实例」页新建。"),
+            new ChoiceOption(Loc.T("跳过"), "skip", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("继续配置"), "back"));
 
         if (choice != "skip") return;
 
@@ -196,7 +260,7 @@ public partial class ConfigWizardWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "选择游戏目录",
+            Title = Loc.T("选择游戏目录"),
             Multiselect = false
         };
 
@@ -210,8 +274,8 @@ public partial class ConfigWizardWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择游戏主程序",
-            Filter = "可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*",
+            Title = Loc.T("选择游戏主程序"),
+            Filter = Loc.T("可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*"),
             CheckFileExists = true,
             Multiselect = false
         };
@@ -245,19 +309,19 @@ public partial class ConfigWizardWindow : Window
 
         if (normalized.Length == 0)
         {
-            SetDirectoryState("请选择游戏目录。", "Text.Tertiary");
+            SetDirectoryState(Loc.T("请选择游戏目录。"), "Text.Tertiary");
             return false;
         }
 
         if (!Directory.Exists(normalized))
         {
-            SetDirectoryState($"目录不存在：{normalized}", "Status.Danger");
+            SetDirectoryState(Loc.F("目录不存在：{0}", normalized), "Status.Danger");
             return false;
         }
 
         if (InstanceManager.All.Any(item => GameLocator.IsSamePath(item.GameDir, normalized)))
         {
-            SetDirectoryState("这个目录已经被其它实例使用了，请在「游戏实例」页查看，或换一个目录。", "Status.Danger");
+            SetDirectoryState(Loc.T("这个目录已经被其它实例使用了，请在「游戏实例」页查看，或换一个目录。"), "Status.Danger");
             return false;
         }
 
@@ -265,9 +329,9 @@ public partial class ConfigWizardWindow : Window
         {
             SetDirectoryState(
                 _kind == GameKind.Other && executable.Length == 0
-                    ? "「其它红警 Mod」需要先指定一个可执行文件，否则无法确认这是个游戏目录。"
-                    : "这个目录下没有找到该类型的特征主程序。请确认选的是游戏安装根目录"
-                      + "（里面应有 Mental_Omega 子目录或游戏主程序）。",
+                    ? Loc.T("「其它红警 Mod」需要先指定一个可执行文件，否则无法确认这是个游戏目录。")
+                    : Loc.T("这个目录下没有找到该类型的特征主程序。请确认选的是游戏安装根目录")
+                      + Loc.T("（里面应有 Mental_Omega 子目录或游戏主程序）。"),
                 "Status.Danger");
             return false;
         }
@@ -277,8 +341,8 @@ public partial class ConfigWizardWindow : Window
 
         SetDirectoryState(
             _resolvedExecutable is null
-                ? "目录有效，但没有找到游戏主程序；可以继续，启动前请确认游戏文件完整。"
-                : $"已找到主程序：{Path.GetFileName(_resolvedExecutable)}",
+                ? Loc.T("目录有效，但没有找到游戏主程序；可以继续，启动前请确认游戏文件完整。")
+                : Loc.F("已找到主程序：{0}", Path.GetFileName(_resolvedExecutable)),
             _resolvedExecutable is null ? "Status.Warn" : "Status.Success");
 
         return true;
@@ -299,13 +363,13 @@ public partial class ConfigWizardWindow : Window
     {
         if (_resolvedExecutable is not null)
         {
-            LabExecutableState.Text = $"已找到：{_resolvedExecutable}";
+            LabExecutableState.Text = Loc.F("已找到：{0}", _resolvedExecutable);
             LabExecutableState.SetResourceReference(TextBlock.ForegroundProperty, "Status.Success");
         }
         else
         {
-            LabExecutableState.Text = "没有找到该类型的主程序。可以先继续，之后在实例编辑器里手动指定主程序，"
-                                      + "或确认游戏文件是否完整。";
+            LabExecutableState.Text = Loc.T("没有找到该类型的主程序。可以先继续，之后在实例编辑器里手动指定主程序，")
+                                      + Loc.T("或确认游戏文件是否完整。");
             LabExecutableState.SetResourceReference(TextBlock.ForegroundProperty, "Status.Warn");
         }
 
@@ -317,12 +381,12 @@ public partial class ConfigWizardWindow : Window
 
         if (missing is null)
         {
-            LabRuntimeState.Text = "组网组件已就绪，可以联机。";
+            LabRuntimeState.Text = Loc.T("组网组件已就绪，可以联机。");
             LabRuntimeState.SetResourceReference(TextBlock.ForegroundProperty, "Status.Success");
         }
         else
         {
-            LabRuntimeState.Text = $"{missing}。联机暂时用不了，但不影响单机。";
+            LabRuntimeState.Text = Loc.F("{0}。联机暂时用不了，但不影响单机。", missing);
             LabRuntimeState.SetResourceReference(TextBlock.ForegroundProperty, "Status.Warn");
         }
     }
@@ -339,17 +403,17 @@ public partial class ConfigWizardWindow : Window
             var baseName = Path.GetFileName(
                 _selectedDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
-            TxtName.Text = string.IsNullOrWhiteSpace(baseName) ? "心灵终结" : baseName;
+            TxtName.Text = string.IsNullOrWhiteSpace(baseName) ? Loc.T("心灵终结") : baseName;
         }
 
         var executable = _resolvedExecutable is null
-            ? "（未找到，之后可在实例编辑器里指定）"
+            ? Loc.T("（未找到，之后可在实例编辑器里指定）")
             : Path.GetFileName(_resolvedExecutable);
 
         LabSummary.Text =
-            $"类型：{GameKinds.DisplayName(_kind)}\n" +
-            $"目录：{_selectedDirectory}\n" +
-            $"主程序：{executable}";
+            Loc.F("类型：{0}\n", GameKinds.DisplayName(_kind)) +
+            Loc.F("目录：{0}\n", _selectedDirectory) +
+            Loc.F("主程序：{0}", executable);
     }
 
     private void CreateInstance()
@@ -357,7 +421,7 @@ public partial class ConfigWizardWindow : Window
         var name = TxtName.Text?.Trim() ?? string.Empty;
         if (name.Length == 0)
         {
-            ShowNotice("请填写实例名称。", "Status.Danger");
+            ShowNotice(Loc.T("请填写实例名称。"), "Status.Danger");
             return;
         }
 
@@ -379,13 +443,13 @@ public partial class ConfigWizardWindow : Window
 
             // 建完不直接关窗：再走一步把「备份原版游戏」和「联机怎么用」讲清楚。
             // 这两件事新人最容易漏，而漏掉原版备份会让卸载只剩「全量恢复」一条路。
-            ChoiceWindow.Info(this, "实例已创建", $"{result.Message}。接下来还有两件建议尽早做的事。");
+            ChoiceWindow.Info(this, Loc.T("实例已创建"), Loc.F("{0}。接下来还有两件建议尽早做的事。", result.Message));
             SwitchStep(5);
         }
         catch (Exception ex)
         {
-            Log.Error("配置向导创建实例失败", ex);
-            ShowNotice($"创建实例时出错：{ex.Message}", "Status.Danger");
+            Log.Error(Loc.T("配置向导创建实例失败"), ex);
+            ShowNotice(Loc.F("创建实例时出错：{0}", ex.Message), "Status.Danger");
         }
         finally
         {

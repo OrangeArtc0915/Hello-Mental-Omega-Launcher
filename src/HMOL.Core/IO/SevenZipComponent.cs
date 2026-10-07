@@ -3,6 +3,7 @@ using HMOL.Core.App;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 using HMOL.Core.Updater;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -47,7 +48,7 @@ public static class SevenZipComponent
         IProgress<double>? downloadProgress = null, IProgress<ProgressSample>? extractProgress = null,
         CancellationToken token = default)
     {
-        if (IsInstalled) return (true, "7-Zip 组件已就绪");
+        if (IsInstalled) return (true, Loc.T("7-Zip 组件已就绪"));
 
         var download = await RequiredAssetDownloader.DownloadAsync(
             ArchiveName, ArchivePath, preferred, downloadProgress, token).ConfigureAwait(false);
@@ -56,13 +57,13 @@ public static class SevenZipComponent
 
         var (ok, message) = RequiredAssetDownloader.ExtractInto(ArchivePath, InstallDirectory, extractProgress, token);
 
-        if (!ok) return (false, $"解压 7-Zip 组件失败：{message}");
-        if (!IsInstalled) return (false, "解压完成但未找到 7za.exe，请确认压缩包内容。");
+        if (!ok) return (false, Loc.F("解压 7-Zip 组件失败：{0}", message));
+        if (!IsInstalled) return (false, Loc.T("解压完成但未找到 7za.exe，请确认压缩包内容。"));
 
         // 之前可能已经缓存了「找不到 7za」的结果，装好后必须让它重新解析
         SevenZipTool.ResetCache();
 
-        Log.Info($"7-Zip 组件已安装：{ExePath}");
-        return (true, "7-Zip 组件已就绪");
+        Log.Info(Loc.F("7-Zip 组件已安装：{0}", ExePath));
+        return (true, Loc.T("7-Zip 组件已就绪"));
     }
 }

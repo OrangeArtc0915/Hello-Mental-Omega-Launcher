@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Weather;
 
@@ -81,7 +82,7 @@ public static class WeatherService
 
         if (city.Length == 0)
         {
-            LastError = "还没设置城市";
+            LastError = Loc.T("还没设置城市");
             return null;
         }
 
@@ -102,7 +103,7 @@ public static class WeatherService
                 results.ValueKind != JsonValueKind.Array ||
                 results.GetArrayLength() == 0)
             {
-                LastError = $"找不到城市「{city}」，请确认城市名后再试";
+                LastError = Loc.F("找不到城市「{0}」，请确认城市名后再试", city);
                 return null;
             }
 
@@ -112,7 +113,7 @@ public static class WeatherService
 
             if (latitude is null || longitude is null)
             {
-                LastError = $"城市「{city}」没有返回经纬度";
+                LastError = Loc.F("城市「{0}」没有返回经纬度", city);
                 return null;
             }
 
@@ -123,20 +124,20 @@ public static class WeatherService
         }
         catch (OperationCanceledException)
         {
-            LastError = "解析城市超时，请检查网络";
+            LastError = Loc.T("解析城市超时，请检查网络");
             return null;
         }
         catch (HttpRequestException ex)
         {
             // 断网 / 代理不可用 / DNS 失败等都走这里，提示语用中文起头，细节跟在后面方便排查
-            LastError = $"连不上 Open-Meteo，无法解析城市「{city}」（{ex.Message}）";
-            Log.Info($"天气地理编码失败：{ex.Message}");
+            LastError = Loc.F("连不上 Open-Meteo，无法解析城市「{0}」（{1}）", city, ex.Message);
+            Log.Info(Loc.F("天气地理编码失败：{0}", ex.Message));
             return null;
         }
         catch (Exception ex)
         {
-            LastError = $"解析城市失败：{ex.Message}";
-            Log.Info($"天气地理编码失败：{ex.Message}");
+            LastError = Loc.F("解析城市失败：{0}", ex.Message);
+            Log.Info(Loc.F("天气地理编码失败：{0}", ex.Message));
             return null;
         }
     }
@@ -149,7 +150,7 @@ public static class WeatherService
 
         if (city.Length == 0)
         {
-            LastError = "还没设置城市";
+            LastError = Loc.T("还没设置城市");
             return null;
         }
 
@@ -167,11 +168,11 @@ public static class WeatherService
         {
             if (cache is not null)
             {
-                Log.Info($"天气不可用（{LastError}），退回缓存：{cache.FetchedAt:MM-dd HH:mm}");
+                Log.Info(Loc.F("天气不可用（{0}），退回缓存：{1:MM-dd HH:mm}", LastError, cache.FetchedAt));
                 return cache.ToSnapshot();
             }
 
-            Log.Info($"天气不可用：{LastError}");
+            Log.Info(Loc.F("天气不可用：{0}", LastError));
             return null;
         }
 
@@ -181,11 +182,11 @@ public static class WeatherService
         {
             if (cache is not null)
             {
-                Log.Info($"天气不可用（{LastError}），退回缓存：{cache.FetchedAt:MM-dd HH:mm}");
+                Log.Info(Loc.F("天气不可用（{0}），退回缓存：{1:MM-dd HH:mm}", LastError, cache.FetchedAt));
                 return cache.ToSnapshot();
             }
 
-            Log.Info($"天气不可用：{LastError}");
+            Log.Info(Loc.F("天气不可用：{0}", LastError));
             return null;
         }
 
@@ -201,43 +202,43 @@ public static class WeatherService
     /// </summary>
     public static (WeatherKind Kind, string Description) Classify(int? code) => code switch
     {
-        0 => (WeatherKind.Clear, "晴"),
-        1 => (WeatherKind.PartlyCloudy, "晴间多云"),
-        2 => (WeatherKind.PartlyCloudy, "多云"),
-        3 => (WeatherKind.Cloudy, "阴"),
+        0 => (WeatherKind.Clear, Loc.T("晴")),
+        1 => (WeatherKind.PartlyCloudy, Loc.T("晴间多云")),
+        2 => (WeatherKind.PartlyCloudy, Loc.T("多云")),
+        3 => (WeatherKind.Cloudy, Loc.T("阴")),
 
-        45 => (WeatherKind.Fog, "雾"),
-        48 => (WeatherKind.Fog, "雾凇"),
+        45 => (WeatherKind.Fog, Loc.T("雾")),
+        48 => (WeatherKind.Fog, Loc.T("雾凇")),
 
-        51 => (WeatherKind.Drizzle, "小毛毛雨"),
-        53 => (WeatherKind.Drizzle, "毛毛雨"),
-        55 => (WeatherKind.Drizzle, "大毛毛雨"),
-        56 => (WeatherKind.FreezingRain, "轻度冻毛毛雨"),
-        57 => (WeatherKind.FreezingRain, "强冻毛毛雨"),
+        51 => (WeatherKind.Drizzle, Loc.T("小毛毛雨")),
+        53 => (WeatherKind.Drizzle, Loc.T("毛毛雨")),
+        55 => (WeatherKind.Drizzle, Loc.T("大毛毛雨")),
+        56 => (WeatherKind.FreezingRain, Loc.T("轻度冻毛毛雨")),
+        57 => (WeatherKind.FreezingRain, Loc.T("强冻毛毛雨")),
 
-        61 => (WeatherKind.Rain, "小雨"),
-        63 => (WeatherKind.Rain, "中雨"),
-        65 => (WeatherKind.Rain, "大雨"),
-        66 => (WeatherKind.FreezingRain, "轻度冻雨"),
-        67 => (WeatherKind.FreezingRain, "强冻雨"),
+        61 => (WeatherKind.Rain, Loc.T("小雨")),
+        63 => (WeatherKind.Rain, Loc.T("中雨")),
+        65 => (WeatherKind.Rain, Loc.T("大雨")),
+        66 => (WeatherKind.FreezingRain, Loc.T("轻度冻雨")),
+        67 => (WeatherKind.FreezingRain, Loc.T("强冻雨")),
 
-        71 => (WeatherKind.Snow, "小雪"),
-        73 => (WeatherKind.Snow, "中雪"),
-        75 => (WeatherKind.Snow, "大雪"),
-        77 => (WeatherKind.Snow, "米雪（霰）"),
+        71 => (WeatherKind.Snow, Loc.T("小雪")),
+        73 => (WeatherKind.Snow, Loc.T("中雪")),
+        75 => (WeatherKind.Snow, Loc.T("大雪")),
+        77 => (WeatherKind.Snow, Loc.T("米雪（霰）")),
 
-        80 => (WeatherKind.Rain, "小阵雨"),
-        81 => (WeatherKind.Rain, "阵雨"),
-        82 => (WeatherKind.Rain, "强阵雨"),
+        80 => (WeatherKind.Rain, Loc.T("小阵雨")),
+        81 => (WeatherKind.Rain, Loc.T("阵雨")),
+        82 => (WeatherKind.Rain, Loc.T("强阵雨")),
 
-        85 => (WeatherKind.Snow, "小阵雪"),
-        86 => (WeatherKind.Snow, "大阵雪"),
+        85 => (WeatherKind.Snow, Loc.T("小阵雪")),
+        86 => (WeatherKind.Snow, Loc.T("大阵雪")),
 
-        95 => (WeatherKind.Thunderstorm, "雷阵雨"),
-        96 => (WeatherKind.Thunderstorm, "雷阵雨伴小冰雹"),
-        99 => (WeatherKind.Thunderstorm, "雷阵雨伴大冰雹"),
+        95 => (WeatherKind.Thunderstorm, Loc.T("雷阵雨")),
+        96 => (WeatherKind.Thunderstorm, Loc.T("雷阵雨伴小冰雹")),
+        99 => (WeatherKind.Thunderstorm, Loc.T("雷阵雨伴大冰雹")),
 
-        _ => (WeatherKind.Unknown, "未知天气")
+        _ => (WeatherKind.Unknown, Loc.T("未知天气"))
     };
 
     // ————— 网络 —————
@@ -259,7 +260,7 @@ public static class WeatherService
 
             if (!root.TryGetProperty("current", out var current))
             {
-                LastError = "天气接口没有返回当前数据";
+                LastError = Loc.T("天气接口没有返回当前数据");
                 return null;
             }
 
@@ -290,19 +291,19 @@ public static class WeatherService
         }
         catch (OperationCanceledException)
         {
-            LastError = "天气请求超时，请检查网络";
+            LastError = Loc.T("天气请求超时，请检查网络");
             return null;
         }
         catch (HttpRequestException ex)
         {
-            LastError = $"连不上 Open-Meteo 天气服务（{ex.Message}）";
-            Log.Info($"获取天气失败：{ex.Message}");
+            LastError = Loc.F("连不上 Open-Meteo 天气服务（{0}）", ex.Message);
+            Log.Info(Loc.F("获取天气失败：{0}", ex.Message));
             return null;
         }
         catch (Exception ex)
         {
-            LastError = $"天气请求失败：{ex.Message}";
-            Log.Info($"获取天气失败：{ex.Message}");
+            LastError = Loc.F("天气请求失败：{0}", ex.Message);
+            Log.Info(Loc.F("获取天气失败：{0}", ex.Message));
             return null;
         }
     }
@@ -337,7 +338,7 @@ public static class WeatherService
         }
         catch (Exception ex)
         {
-            Log.Info($"读取天气缓存失败（按无缓存处理）：{ex.Message}");
+            Log.Info(Loc.F("读取天气缓存失败（按无缓存处理）：{0}", ex.Message));
             return null;
         }
     }
@@ -366,7 +367,7 @@ public static class WeatherService
         }
         catch (Exception ex)
         {
-            Log.Info($"写入天气缓存失败（不影响本次显示）：{ex.Message}");
+            Log.Info(Loc.F("写入天气缓存失败（不影响本次显示）：{0}", ex.Message));
         }
     }
 

@@ -5,6 +5,7 @@ using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Services;
 
@@ -26,14 +27,14 @@ internal static class RequiredFilesFlow
 
         if (confirm)
         {
-            var answer = ChoiceWindow.Confirm(owner, "下载组网组件",
-                $"当前联机方案需要 {name}，本机还没有。",
-                confirmText: "下载并安装", cancelText: "取消");
+            var answer = ChoiceWindow.Confirm(owner, Loc.T("下载组网组件"),
+                Loc.F("当前联机方案需要 {0}，本机还没有。", name),
+                confirmText: Loc.T("下载并安装"), cancelText: Loc.T("取消"));
 
             if (!answer) return false;
         }
 
-        var progress = ProgressWindow.Open(owner, "下载组网组件", $"正在下载 {name}…", canCancel: true);
+        var progress = ProgressWindow.Open(owner, Loc.T("下载组网组件"), Loc.F("正在下载 {0}…", name), canCancel: true);
 
         try
         {
@@ -42,14 +43,14 @@ internal static class RequiredFilesFlow
 
             ActivityLog.Write(LogSource.App, message, ok ? ActivityLevel.Info : ActivityLevel.Warn);
 
-            if (!ok) ChoiceWindow.Warn(owner, "下载组网组件失败", $"{name}：{message}");
+            if (!ok) ChoiceWindow.Warn(owner, Loc.T("下载组网组件失败"), $"{name}：{message}");
 
             return ok;
         }
         catch (Exception ex)
         {
-            Log.Error($"下载组网组件失败：{name}", ex);
-            ChoiceWindow.Warn(owner, "下载组网组件失败", $"{name}：{ex.Message}");
+            Log.Error(Loc.F("下载组网组件失败：{0}", name), ex);
+            ChoiceWindow.Warn(owner, Loc.T("下载组网组件失败"), $"{name}：{ex.Message}");
             return false;
         }
         finally
@@ -66,12 +67,12 @@ internal static class RequiredFilesFlow
     {
         if (SevenZipComponent.IsInstalled) return;
 
-        var choice = ChoiceWindow.Ask(owner, "下载 7-Zip 组件",
-            "启动器需要一个解压组件（7-Zip，约 1 MB），当前没有检测到。",
-            "它对大多数操作不是必需的：zip / tar / gz 走内置解压；只有 7z 压缩包会退回较慢的实现。\n" +
-            "现在下载会放到启动器目录的 runtime\\7zip\\，之后也能在左侧「下载」页重新下载。",
-            new ChoiceOption("立即下载", "ok", ButtonTone.Solid),
-            new ChoiceOption("跳过", "skip"));
+        var choice = ChoiceWindow.Ask(owner, Loc.T("下载 7-Zip 组件"),
+            Loc.T("启动器需要一个解压组件（7-Zip，约 1 MB），当前没有检测到。"),
+            Loc.T("它对大多数操作不是必需的：zip / tar / gz 走内置解压；只有 7z 压缩包会退回较慢的实现。\n") +
+            Loc.T("现在下载会放到启动器目录的 runtime\\7zip\\，之后也能在左侧「下载」页重新下载。"),
+            new ChoiceOption(Loc.T("立即下载"), "ok", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("跳过"), "skip"));
 
         if (choice != "ok") return;
 
@@ -83,7 +84,7 @@ internal static class RequiredFilesFlow
     {
         if (SevenZipComponent.IsInstalled) return true;
 
-        var progress = ProgressWindow.Open(owner, "下载 7-Zip 组件", "正在下载 7-Zip 组件…", canCancel: true);
+        var progress = ProgressWindow.Open(owner, Loc.T("下载 7-Zip 组件"), Loc.T("正在下载 7-Zip 组件…"), canCancel: true);
 
         try
         {
@@ -92,15 +93,15 @@ internal static class RequiredFilesFlow
 
             ActivityLog.Write(LogSource.App, message, ok ? ActivityLevel.Info : ActivityLevel.Warn);
 
-            if (!ok) ChoiceWindow.Warn(owner, "下载 7-Zip 组件失败",
-                $"{message}\n\n不影响单机与 zip / tar 解压；稍后可在左侧「下载」页重试。");
+            if (!ok) ChoiceWindow.Warn(owner, Loc.T("下载 7-Zip 组件失败"),
+                Loc.F("{0}\n\n不影响单机与 zip / tar 解压；稍后可在左侧「下载」页重试。", message));
 
             return ok;
         }
         catch (Exception ex)
         {
-            Log.Error("下载 7-Zip 组件失败", ex);
-            ChoiceWindow.Warn(owner, "下载 7-Zip 组件失败", $"{ex.Message}\n\n不影响单机使用，稍后可重试。");
+            Log.Error(Loc.T("下载 7-Zip 组件失败"), ex);
+            ChoiceWindow.Warn(owner, Loc.T("下载 7-Zip 组件失败"), Loc.F("{0}\n\n不影响单机使用，稍后可重试。", ex.Message));
             return false;
         }
         finally

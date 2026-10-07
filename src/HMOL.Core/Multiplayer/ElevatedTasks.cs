@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Unicode;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -77,7 +78,7 @@ public static class ElevatedTasks
     {
         var status = await ExecuteAsync(request.Task, cancellationToken).ConfigureAwait(false);
 
-        Log.Info($"提权任务「{request.Task}」执行结果：{status.Message}");
+        Log.Info(Loc.F("提权任务「{0}」执行结果：{1}", request.Task, status.Message));
         WriteResult(request.ResultFile, request.Task, status.Ok, status.Message);
 
         return status.Ok ? 0 : 1;
@@ -91,7 +92,7 @@ public static class ElevatedTasks
             FirewallOn => NetworkToolkit.SetFirewallAsync(true, cancellationToken),
             FirewallOff => NetworkToolkit.SetFirewallAsync(false, cancellationToken),
             WinIpBroadcastInstall => NetworkToolkit.EnsureWinIpBroadcastAsync(cancellationToken),
-            _ => Task.FromResult(new ToolkitStatus(false, $"未知的提权任务：{task}"))
+            _ => Task.FromResult(new ToolkitStatus(false, Loc.F("未知的提权任务：{0}", task)))
         };
 
     /// <summary>把结果写进结果文件，供主实例读回。</summary>
@@ -109,7 +110,7 @@ public static class ElevatedTasks
         }
         catch (Exception ex)
         {
-            Log.Error($"写入提权结果文件失败：{resultFile}", ex);
+            Log.Error(Loc.F("写入提权结果文件失败：{0}", resultFile), ex);
         }
     }
 

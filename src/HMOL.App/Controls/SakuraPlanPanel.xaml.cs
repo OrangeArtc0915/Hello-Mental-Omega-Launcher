@@ -5,6 +5,7 @@ using HMOL.App.Services;
 using HMOL.App.Windows.Multiplayer;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Controls;
 
@@ -59,7 +60,7 @@ public partial class SakuraPlanPanel : UserControl
         var settings = MultiplayerSettingsStore.Current;
 
         TxtKey.Text = settings.SakuraAccessKey;
-        TxtTunnelName.Text = string.IsNullOrWhiteSpace(settings.SakuraTunnelName) ? "心灵终结" : settings.SakuraTunnelName;
+        TxtTunnelName.Text = string.IsNullOrWhiteSpace(settings.SakuraTunnelName) ? Loc.T("心灵终结") : settings.SakuraTunnelName;
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -110,7 +111,7 @@ public partial class SakuraPlanPanel : UserControl
             return;
         }
 
-        LabFrpc.Text = "隧道正在运行。";
+        LabFrpc.Text = Loc.T("隧道正在运行。");
         PanRunning.Visibility = Visibility.Visible;
         ApplyAddresses(frpc);
     }
@@ -138,11 +139,11 @@ public partial class SakuraPlanPanel : UserControl
 
         if (key.Length == 0)
         {
-            SetAccount("请先填写访问密钥。", warn: true);
+            SetAccount(Loc.T("请先填写访问密钥。"), warn: true);
             return false;
         }
 
-        SetAccount("正在验证访问密钥…", warn: false);
+        SetAccount(Loc.T("正在验证访问密钥…"), warn: false);
 
         var user = await Api.GetUserAsync(key);
 
@@ -158,7 +159,7 @@ public partial class SakuraPlanPanel : UserControl
 
         if (!nodes.Ok || nodes.Value is null)
         {
-            AppendLog($"读取节点列表失败：{nodes.Message}", warn: true);
+            AppendLog(Loc.F("读取节点列表失败：{0}", nodes.Message), warn: true);
             return true;
         }
 
@@ -169,7 +170,7 @@ public partial class SakuraPlanPanel : UserControl
         // 验证通过才落盘，避免把写错的密钥存起来
         MultiplayerSettingsStore.Update(settings => settings.SakuraAccessKey = key);
 
-        if (!silent) AppendLog($"已加载 {_nodes.Count} 个可用节点。");
+        if (!silent) AppendLog(Loc.F("已加载 {0} 个可用节点。", _nodes.Count));
 
         await ReloadTunnelsAsync(key);
         return true;
@@ -183,9 +184,9 @@ public partial class SakuraPlanPanel : UserControl
             return;
         }
 
-        var traffic = $"已用 {SakuraFrpApi.FormatTraffic(user.TrafficUsed)} · 剩余 {SakuraFrpApi.FormatTraffic(user.TrafficRemaining)}";
+        var traffic = Loc.F("已用 {0} · 剩余 {1}", SakuraFrpApi.FormatTraffic(user.TrafficUsed), SakuraFrpApi.FormatTraffic(user.TrafficRemaining));
 
-        SetAccount($"账号：{user.Name}　隧道上限 {user.TunnelLimit}　速度 {user.Speed}　{traffic}", warn: false);
+        SetAccount(Loc.F("账号：{0}　隧道上限 {1}　速度 {2}　{3}", user.Name, user.TunnelLimit, user.Speed, traffic), warn: false);
     }
 
     private void SetAccount(string message, bool warn)
@@ -221,7 +222,7 @@ public partial class SakuraPlanPanel : UserControl
         {
             if (TxtKey.Text.Trim().Length == 0)
             {
-                SetAccount("请先填写访问密钥。", warn: true);
+                SetAccount(Loc.T("请先填写访问密钥。"), warn: true);
                 return;
             }
 
@@ -239,7 +240,7 @@ public partial class SakuraPlanPanel : UserControl
 
         if (!result.Ok || result.Value is null)
         {
-            AppendLog($"读取隧道列表失败：{result.Message}", warn: true);
+            AppendLog(Loc.F("读取隧道列表失败：{0}", result.Message), warn: true);
             return;
         }
 
@@ -259,10 +260,10 @@ public partial class SakuraPlanPanel : UserControl
             .Select(tunnel => new SakuraTunnelRow
             {
                 Source = tunnel,
-                Title = tunnel.Name + (tunnel.Id == lastUsed ? "　（上次用的）" : string.Empty),
-                Detail = $"ID {tunnel.Id}　本地 {tunnel.LocalIp}:{tunnel.LocalPort}　远程 {tunnel.Remote}" +
-                         (tunnel.LocalPort == SakuraFrpApi.MoJoinPort ? string.Empty : $"　⚠ 本地端口不是 {SakuraFrpApi.MoJoinPort}，MO 用不了") +
-                         (tunnel.Status != 0 ? $"　状态异常：{tunnel.StatusReason}" : string.Empty)
+                Title = tunnel.Name + (tunnel.Id == lastUsed ? Loc.T("　（上次用的）") : string.Empty),
+                Detail = Loc.F("ID {0}　本地 {1}:{2}　远程 {3}", tunnel.Id, tunnel.LocalIp, tunnel.LocalPort, tunnel.Remote) +
+                         (tunnel.LocalPort == SakuraFrpApi.MoJoinPort ? string.Empty : Loc.F("　⚠ 本地端口不是 {0}，MO 用不了", SakuraFrpApi.MoJoinPort)) +
+                         (tunnel.Status != 0 ? Loc.F("　状态异常：{0}", tunnel.StatusReason) : string.Empty)
             })
             .ToList();
     }
@@ -274,7 +275,7 @@ public partial class SakuraPlanPanel : UserControl
         var name = TxtTunnelName.Text.Trim();
         if (name.Length == 0)
         {
-            AppendLog("请先填隧道名。", warn: true);
+            AppendLog(Loc.T("请先填隧道名。"), warn: true);
             return;
         }
 
@@ -287,23 +288,23 @@ public partial class SakuraPlanPanel : UserControl
 
             if (nodeId <= 0)
             {
-                AppendLog("请先在上面选一个节点。", warn: true);
+                AppendLog(Loc.T("请先在上面选一个节点。"), warn: true);
                 return;
             }
 
-            AppendLog($"正在创建 TCP 隧道「{name}」（节点 {nodeId}，本地端口 {SakuraFrpApi.MoJoinPort}）…");
+            AppendLog(Loc.F("正在创建 TCP 隧道「{0}」（节点 {1}，本地端口 {2}）…", name, nodeId, SakuraFrpApi.MoJoinPort));
 
             var created = await Api.CreateTcpTunnelAsync(TxtKey.Text.Trim(), name, nodeId);
 
             if (!created.Ok || created.Value is null)
             {
-                AppendLog($"创建隧道失败：{created.Message}", warn: true);
+                AppendLog(Loc.F("创建隧道失败：{0}", created.Message), warn: true);
                 return;
             }
 
             MultiplayerSettingsStore.Update(settings => settings.SakuraTunnelName = name);
 
-            AppendLog($"隧道已创建：{created.Value.Name}（ID {created.Value.Id}）");
+            AppendLog(Loc.F("隧道已创建：{0}（ID {1}）", created.Value.Name, created.Value.Id));
             await ReloadTunnelsAsync(TxtKey.Text.Trim());
         }
         finally
@@ -319,7 +320,7 @@ public partial class SakuraPlanPanel : UserControl
 
         if (Frpc.IsRunning)
         {
-            AppendLog("已经有一条隧道在运行，先停掉再启动另一条。", warn: true);
+            AppendLog(Loc.T("已经有一条隧道在运行，先停掉再启动另一条。"), warn: true);
             return;
         }
 
@@ -339,8 +340,8 @@ public partial class SakuraPlanPanel : UserControl
 
             _ipAddress = string.Empty;
             _domainAddress = string.Empty;
-            LabIpAddress.Text = "等待 frpc 输出…";
-            LabDomainAddress.Text = "等待 frpc 输出…";
+            LabIpAddress.Text = Loc.T("等待 frpc 输出…");
+            LabDomainAddress.Text = Loc.T("等待 frpc 输出…");
             PanRunning.Visibility = Visibility.Visible;
 
             var started = Frpc.Start(TxtKey.Text.Trim(), row.Source.Id);
@@ -362,7 +363,7 @@ public partial class SakuraPlanPanel : UserControl
 
             MultiplayerSettingsStore.Update(settings => settings.SakuraTunnelId = row.Source.Id);
 
-            AppendLog($"已启动隧道「{row.Source.Name}」，等 frpc 报出连接地址。");
+            AppendLog(Loc.F("已启动隧道「{0}」，等 frpc 报出连接地址。", row.Source.Name));
         }
         finally
         {
@@ -380,7 +381,7 @@ public partial class SakuraPlanPanel : UserControl
         PanRunning.Visibility = Visibility.Collapsed;
         UpdateFrpcState();
 
-        AppendLog("已停止隧道。");
+        AppendLog(Loc.T("已停止隧道。"));
     }
 
     // ————— frpc —————
@@ -390,14 +391,14 @@ public partial class SakuraPlanPanel : UserControl
         if (_busy) return;
 
         SetBusy(true);
-        LabFrpc.Text = "正在准备 frpc…";
+        LabFrpc.Text = Loc.T("正在准备 frpc…");
 
         try
         {
             var result = await Frpc.EnsureFrpcAsync();
 
             if (!result.Ok) AppendLog(result.Message, warn: true);
-            else AppendLog($"frpc 已就绪：{result.Value}");
+            else AppendLog(Loc.F("frpc 已就绪：{0}", result.Value));
         }
         finally
         {
@@ -410,20 +411,20 @@ public partial class SakuraPlanPanel : UserControl
     {
         if (Frpc.IsRunning)
         {
-            LabFrpc.Text = "隧道正在运行。";
+            LabFrpc.Text = Loc.T("隧道正在运行。");
             return;
         }
 
         var present = System.IO.File.Exists(SakuraFrpcRunner.FrpcPath);
 
         LabFrpc.Text = present
-            ? "frpc 已就绪，可以启动隧道。"
-            : "还没有准备 frpc 客户端，启动隧道前需要先下载一次（约 5 MB）。";
+            ? Loc.T("frpc 已就绪，可以启动隧道。")
+            : Loc.T("还没有准备 frpc 客户端，启动隧道前需要先下载一次（约 5 MB）。");
 
-        BtnPrepare.Content = present ? "重新准备 frpc" : "准备 frpc";
+        BtnPrepare.Content = present ? Loc.T("重新准备 frpc") : Loc.T("准备 frpc");
     }
 
-    private void OnFrpcStarted() => Dispatch(() => AppendLog("隧道启动成功，正在等待连接地址…"));
+    private void OnFrpcStarted() => Dispatch(() => AppendLog(Loc.T("隧道启动成功，正在等待连接地址…")));
 
     private void OnFrpcLog(string line) => Dispatch(() => Log?.Invoke(line));
 
@@ -434,8 +435,8 @@ public partial class SakuraPlanPanel : UserControl
         if (frpc.DomainAddress.Length > 0) _domainAddress = frpc.DomainAddress;
         if (frpc.IpAddress.Length > 0) _ipAddress = frpc.IpAddress;
 
-        LabDomainAddress.Text = _domainAddress.Length > 0 ? _domainAddress : "等待 frpc 输出…";
-        LabIpAddress.Text = _ipAddress.Length > 0 ? _ipAddress : "等待 frpc 输出…";
+        LabDomainAddress.Text = _domainAddress.Length > 0 ? _domainAddress : Loc.T("等待 frpc 输出…");
+        LabIpAddress.Text = _ipAddress.Length > 0 ? _ipAddress : Loc.T("等待 frpc 输出…");
     }
 
     // ————— 复制 —————
@@ -444,23 +445,23 @@ public partial class SakuraPlanPanel : UserControl
     {
         if (_ipAddress.Length == 0)
         {
-            AppendLog("还没拿到 IP 形式的地址，等 frpc 输出后再复制（客户端只认纯 IP，域名用不了）。", warn: true);
+            AppendLog(Loc.T("还没拿到 IP 形式的地址，等 frpc 输出后再复制（客户端只认纯 IP，域名用不了）。"), warn: true);
             return;
         }
 
-        Copy(_ipAddress, "口令");
-        AppendLog("队友拿到后：粘到 MO 客户端「局域网大厅」底部的地址框（Ctrl+V）回车即可加入。");
+        Copy(_ipAddress, Loc.T("口令"));
+        AppendLog(Loc.T("队友拿到后：粘到 MO 客户端「局域网大厅」底部的地址框（Ctrl+V）回车即可加入。"));
     }
 
     private void OnCopyDomainClick(object sender, RoutedEventArgs e)
     {
         if (_domainAddress.Length == 0)
         {
-            AppendLog("还没拿到域名形式的地址。", warn: true);
+            AppendLog(Loc.T("还没拿到域名形式的地址。"), warn: true);
             return;
         }
 
-        Copy(_domainAddress, "域名地址");
+        Copy(_domainAddress, Loc.T("域名地址"));
     }
 
     private void Copy(string text, string label)
@@ -468,11 +469,11 @@ public partial class SakuraPlanPanel : UserControl
         try
         {
             Clipboard.SetText(text);
-            AppendLog($"已复制{label}。");
+            AppendLog(Loc.F("已复制{0}。", label));
         }
         catch (Exception ex)
         {
-            AppendLog($"复制到剪贴板失败：{ex.Message}", warn: true);
+            AppendLog(Loc.F("复制到剪贴板失败：{0}", ex.Message), warn: true);
         }
     }
 
@@ -482,13 +483,13 @@ public partial class SakuraPlanPanel : UserControl
     {
         if (!MultiplayerSettingsStore.Current.SakuraPanelEnabled)
         {
-            AppendLog("内嵌面板没开：到「设置 → 联机设置」里打开（需要本机装了 WebView2 运行时）。", warn: true);
+            AppendLog(Loc.T("内嵌面板没开：到「设置 → 联机设置」里打开（需要本机装了 WebView2 运行时）。"), warn: true);
             return;
         }
 
         if (!MultiplayerSakuraPanelWindow.IsRuntimeAvailable())
         {
-            AppendLog("本机没有 WebView2 运行时，打不开内嵌面板；可到设置里确认，或直接用浏览器打开 natfrp.com。", warn: true);
+            AppendLog(Loc.T("本机没有 WebView2 运行时，打不开内嵌面板；可到设置里确认，或直接用浏览器打开 natfrp.com。"), warn: true);
             return;
         }
 
@@ -501,8 +502,8 @@ public partial class SakuraPlanPanel : UserControl
 
         BtnPanel.IsEnabled = enabled;
         BtnPanel.ToolTip = enabled
-            ? "在内嵌浏览器里打开樱花FRP 管理面板（登录后可建隧道 / 看流量）"
-            : "内嵌面板未启用或本机缺少 WebView2 运行时，可在「设置 → 联机设置」里查看";
+            ? Loc.T("在内嵌浏览器里打开樱花FRP 管理面板（登录后可建隧道 / 看流量）")
+            : Loc.T("内嵌面板未启用或本机缺少 WebView2 运行时，可在「设置 → 联机设置」里查看");
     }
 
     // ————— 通用 —————
@@ -535,7 +536,7 @@ public partial class SakuraPlanPanel : UserControl
             return;
         }
 
-        Log?.Invoke(warn ? $"[樱花FRP] ⚠ {message}" : $"[樱花FRP] {message}");
-        HMOL.Core.Logging.Log.Info($"[樱花FRP] {message}");
+        Log?.Invoke(warn ? Loc.F("[樱花FRP] ⚠ {0}", message) : Loc.F("[樱花FRP] {0}", message));
+        HMOL.Core.Logging.Log.Info(Loc.F("[樱花FRP] {0}", message));
     }
 }

@@ -5,6 +5,7 @@ using System.Security.Principal;
 using System.Text.Json;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -65,11 +66,11 @@ public static class ElevationHelper
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(task)) return new ElevatedTaskResult(false, "提权任务名为空", null);
+        if (string.IsNullOrWhiteSpace(task)) return new ElevatedTaskResult(false, Loc.T("提权任务名为空"), null);
 
         var self = SelfExecutablePath;
         if (string.IsNullOrWhiteSpace(self) || !File.Exists(self))
-            return new ElevatedTaskResult(false, "取不到自身程序路径，无法提权", null);
+            return new ElevatedTaskResult(false, Loc.T("取不到自身程序路径，无法提权"), null);
 
         Paths.Init();
 
@@ -94,7 +95,7 @@ public static class ElevationHelper
         try
         {
             using var process = Process.Start(startInfo);
-            if (process is null) return new ElevatedTaskResult(false, "提权进程启动失败", null);
+            if (process is null) return new ElevatedTaskResult(false, Loc.T("提权进程启动失败"), null);
 
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutSource.CancelAfter(timeout ?? DefaultTimeout);
@@ -107,13 +108,13 @@ public static class ElevationHelper
             {
                 if (cancellationToken.IsCancellationRequested) throw;
 
-                return new ElevatedTaskResult(false, "提权任务超时未返回结果", null);
+                return new ElevatedTaskResult(false, Loc.T("提权任务超时未返回结果"), null);
             }
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
             // ERROR_CANCELLED：用户在 UAC 弹窗里点了「否」
-            return new ElevatedTaskResult(false, "已取消提权：用户拒绝了管理员权限请求", null);
+            return new ElevatedTaskResult(false, Loc.T("已取消提权：用户拒绝了管理员权限请求"), null);
         }
         catch (OperationCanceledException)
         {
@@ -121,8 +122,8 @@ public static class ElevationHelper
         }
         catch (Exception ex)
         {
-            Log.Warn($"启动提权进程失败：{ex.Message}");
-            return new ElevatedTaskResult(false, $"无法启动提权进程：{ex.Message}", null);
+            Log.Warn(Loc.F("启动提权进程失败：{0}", ex.Message));
+            return new ElevatedTaskResult(false, Loc.F("无法启动提权进程：{0}", ex.Message), null);
         }
 
         return ReadResult(resultFile);
@@ -133,16 +134,16 @@ public static class ElevationHelper
         try
         {
             if (!File.Exists(resultFile))
-                return new ElevatedTaskResult(false, "提权进程没有返回结果（可能被系统拦截或提前退出）", null);
+                return new ElevatedTaskResult(false, Loc.T("提权进程没有返回结果（可能被系统拦截或提前退出）"), null);
 
             var payload = JsonSerializer.Deserialize<ElevatedResult>(File.ReadAllText(resultFile));
-            if (payload is null) return new ElevatedTaskResult(false, "提权结果文件内容损坏", null);
+            if (payload is null) return new ElevatedTaskResult(false, Loc.T("提权结果文件内容损坏"), null);
 
             return new ElevatedTaskResult(payload.Ok, payload.Message, payload.Task);
         }
         catch (Exception ex)
         {
-            return new ElevatedTaskResult(false, $"读取提权结果失败：{ex.Message}", null);
+            return new ElevatedTaskResult(false, Loc.F("读取提权结果失败：{0}", ex.Message), null);
         }
         finally
         {
@@ -160,7 +161,7 @@ public static class ElevationHelper
         }
         catch (Exception ex)
         {
-            Log.Warn($"判断管理员权限失败，按普通权限处理：{ex.Message}");
+            Log.Warn(Loc.F("判断管理员权限失败，按普通权限处理：{0}", ex.Message));
             return false;
         }
     }

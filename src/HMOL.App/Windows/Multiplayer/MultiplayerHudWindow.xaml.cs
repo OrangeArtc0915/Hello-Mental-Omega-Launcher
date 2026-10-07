@@ -6,6 +6,7 @@ using System.Windows.Media;
 using HMOL.App.Controls.Svg;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -84,8 +85,8 @@ public partial class MultiplayerHudWindow : Window
     /// <summary>更新内容。<paramref name="title"/> 是状态文本，<paramref name="rows"/> 是对端列表。</summary>
     public void SetContent(string title, IReadOnlyList<HudRow> rows)
     {
-        LabTitle.Text = string.IsNullOrWhiteSpace(title) ? "联机" : title;
-        LabCount.Text = rows.Count > 0 ? $"在线 {rows.Count}" : string.Empty;
+        LabTitle.Text = string.IsNullOrWhiteSpace(title) ? Loc.T("联机") : title;
+        LabCount.Text = rows.Count > 0 ? Loc.F("在线 {0}", rows.Count) : string.Empty;
 
         PanRows.Children.Clear();
 
@@ -148,7 +149,7 @@ public partial class MultiplayerHudWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Warn($"保存 HUD 位置失败：{ex.Message}");
+            Log.Warn(Loc.F("保存 HUD 位置失败：{0}", ex.Message));
         }
     }
 
@@ -202,7 +203,7 @@ public partial class MultiplayerHudWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Warn($"调整 HUD 位置失败：{ex.Message}");
+            Log.Warn(Loc.F("调整 HUD 位置失败：{0}", ex.Message));
         }
     }
 

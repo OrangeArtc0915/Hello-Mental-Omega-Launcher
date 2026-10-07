@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using HMOL.App.Services;
 using HMOL.App.Windows;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -73,7 +74,7 @@ public partial class MultiplayerFileWindow : Window
             if (match is not null) ListPeers.SelectedItem = match;
         }
 
-        if (rows.Count == 0) AppendLog("暂无在线对端（请先连接组网并确认队友已加入）");
+        if (rows.Count == 0) AppendLog(Loc.T("暂无在线对端（请先连接组网并确认队友已加入）"));
     }
 
     private void AppendLog(string text)
@@ -101,8 +102,8 @@ public partial class MultiplayerFileWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择要发送的文件",
-            Filter = "所有文件 (*.*)|*.*"
+            Title = Loc.T("选择要发送的文件"),
+            Filter = Loc.T("所有文件 (*.*)|*.*")
         };
 
         if (dialog.ShowDialog(this) != true) return;
@@ -112,14 +113,14 @@ public partial class MultiplayerFileWindow : Window
             var info = new FileInfo(dialog.FileName);
             if (info.Length <= 0)
             {
-                LabFile.Text = "空文件无法发送";
+                LabFile.Text = Loc.T("空文件无法发送");
                 _path = string.Empty;
                 return;
             }
 
             if (info.Length > FileTransfer.MaxFileSize)
             {
-                LabFile.Text = $"{info.Name} 超过 500MB 上限，请压缩后再试";
+                LabFile.Text = Loc.F("{0} 超过 500MB 上限，请压缩后再试", info.Name);
                 _path = string.Empty;
                 return;
             }
@@ -130,7 +131,7 @@ public partial class MultiplayerFileWindow : Window
         catch (Exception ex)
         {
             _path = string.Empty;
-            LabFile.Text = $"文件不可访问：{ex.Message}";
+            LabFile.Text = Loc.F("文件不可访问：{0}", ex.Message);
         }
     }
 
@@ -140,22 +141,22 @@ public partial class MultiplayerFileWindow : Window
 
         if (ListPeers.SelectedItem is not FilePeerRow peer)
         {
-            ChoiceWindow.Info(this, "文件传输", "请先在列表里选择接收方。");
+            ChoiceWindow.Info(this, Loc.T("文件传输"), Loc.T("请先在列表里选择接收方。"));
             return;
         }
 
         if (string.IsNullOrEmpty(_path) || !File.Exists(_path))
         {
-            ChoiceWindow.Info(this, "文件传输", "请先选择要发送的文件。");
+            ChoiceWindow.Info(this, Loc.T("文件传输"), Loc.T("请先选择要发送的文件。"));
             return;
         }
 
         var size = new FileInfo(_path).Length;
 
-        var answer = ChoiceWindow.Confirm(this, "确认发送",
-            $"发送前请先压缩文件，可大幅提升传输速度。\n\n发送给：{peer.Name}（{peer.Ip}）\n" +
-            $"文件：{Path.GetFileName(_path)}（{FileTransfer.FormatSize(size)}）\n\n确定发送？",
-            confirmText: "发送");
+        var answer = ChoiceWindow.Confirm(this, Loc.T("确认发送"),
+            Loc.F("发送前请先压缩文件，可大幅提升传输速度。\n\n发送给：{0}（{1}）\n", peer.Name, peer.Ip) +
+            Loc.F("文件：{0}（{1}）\n\n确定发送？", Path.GetFileName(_path), FileTransfer.FormatSize(size)),
+            confirmText: Loc.T("发送"));
 
         if (!answer) return;
 
@@ -163,22 +164,22 @@ public partial class MultiplayerFileWindow : Window
         BtnSend.IsEnabled = false;
         BtnCancel.IsEnabled = true;
         Bar.Value = 0;
-        AppendLog($"开始发送 → {peer.Ip}：{Path.GetFileName(_path)}");
+        AppendLog(Loc.F("开始发送 → {0}：{1}", peer.Ip, Path.GetFileName(_path)));
 
         var progress = new Progress<FileSendProgress>(value => Bar.Value = value.Fraction);
 
         try
         {
             var result = await MultiplayerHub.Transfer.SendAsync(peer.Ip, _path, _selfName, progress, _cts.Token);
-            AppendLog(result.Ok ? $"成功：{result.Message}" : $"失败：{result.Message}");
+            AppendLog(result.Ok ? Loc.F("成功：{0}", result.Message) : Loc.F("失败：{0}", result.Message));
         }
         catch (OperationCanceledException)
         {
-            AppendLog("已取消发送");
+            AppendLog(Loc.T("已取消发送"));
         }
         catch (Exception ex)
         {
-            AppendLog($"失败：{ex.Message}");
+            AppendLog(Loc.F("失败：{0}", ex.Message));
         }
         finally
         {
@@ -194,6 +195,6 @@ public partial class MultiplayerFileWindow : Window
         try { _cts.Cancel(); }
         catch { /* 已释放 */ }
 
-        LabStatus.Text = "正在取消…";
+        LabStatus.Text = Loc.T("正在取消…");
     }
 }

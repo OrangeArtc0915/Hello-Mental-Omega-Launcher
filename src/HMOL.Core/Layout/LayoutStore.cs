@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Text.Unicode;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Layout;
 
@@ -66,7 +67,7 @@ public static class LayoutStore
 
                     if (scheme is null)
                     {
-                        Log.Warn($"布局方案解析失败，已跳过：{Path.GetFileName(file)}（{error}）");
+                        Log.Warn(Loc.F("布局方案解析失败，已跳过：{0}（{1}）", Path.GetFileName(file), error));
                         continue;
                     }
 
@@ -75,7 +76,7 @@ public static class LayoutStore
             }
             catch (Exception ex)
             {
-                Log.Error("读取布局方案失败", ex);
+                Log.Error(Loc.T("读取布局方案失败"), ex);
             }
         }
 
@@ -87,7 +88,7 @@ public static class LayoutStore
             foreach (var scheme in Schemes)
             {
                 var name = scheme.Name;
-                scheme.Normalize(knownElementIds, dropped => Log.Warn($"布局方案「{name}」引用了不存在的元素「{dropped}」，已忽略"));
+                scheme.Normalize(knownElementIds, dropped => Log.Warn(Loc.F("布局方案「{0}」引用了不存在的元素「{1}」，已忽略", name, dropped)));
             }
         }
 
@@ -96,7 +97,7 @@ public static class LayoutStore
 
         IsLoaded = true;
         Changed?.Invoke();
-        Log.Info($"已载入 {Schemes.Count} 套布局方案，当前启用：{Active.Name}");
+        Log.Info(Loc.F("已载入 {0} 套布局方案，当前启用：{1}", Schemes.Count, Active.Name));
     }
 
     /// <summary>从指定文件读一个方案。</summary>
@@ -108,14 +109,14 @@ public static class LayoutStore
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
-                error = "文件不存在";
+                error = Loc.T("文件不存在");
                 return null;
             }
 
             var scheme = JsonSerializer.Deserialize<LayoutScheme>(File.ReadAllText(filePath), Options);
             if (scheme is null)
             {
-                error = "内容为空";
+                error = Loc.T("内容为空");
                 return null;
             }
 
@@ -182,7 +183,7 @@ public static class LayoutStore
         {
             Id = MakeId(trimmed),
             Name = trimmed,
-            Description = copyFrom is null ? "自定义布局" : $"复制自 {copyFrom.Name}",
+            Description = copyFrom is null ? Loc.T("自定义布局") : Loc.F("复制自 {0}", copyFrom.Name),
             Version = LayoutScheme.CurrentVersion,
         };
 
@@ -267,17 +268,17 @@ public static class LayoutStore
     {
         var trimmed = name?.Trim() ?? string.Empty;
 
-        if (trimmed.Length == 0) return "方案名不能为空。";
-        if (trimmed.Length > 24) return "方案名不要超过 24 个字。";
+        if (trimmed.Length == 0) return Loc.T("方案名不能为空。");
+        if (trimmed.Length > 24) return Loc.T("方案名不要超过 24 个字。");
 
         if (string.Equals(trimmed, LayoutScheme.DefaultName, StringComparison.OrdinalIgnoreCase))
-            return $"「{LayoutScheme.DefaultName}」是内置方案名，请换一个。";
+            return Loc.F("「{0}」是内置方案名，请换一个。", LayoutScheme.DefaultName);
 
         var duplicated = Schemes.Any(scheme =>
             !LayoutScheme.Same(scheme.Id, exceptId) &&
             string.Equals(scheme.Name, trimmed, StringComparison.OrdinalIgnoreCase));
 
-        return duplicated ? "已有同名方案，请换一个。" : null;
+        return duplicated ? Loc.T("已有同名方案，请换一个。") : null;
     }
 
     /// <summary>把一个方案写到指定文件（导出分享用）。失败原因写进 <paramref name="error"/>。</summary>
@@ -291,13 +292,13 @@ public static class LayoutStore
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
             File.WriteAllText(path, JsonSerializer.Serialize(scheme, Options));
-            Log.Info($"已导出布局方案「{scheme.Name}」→ {path}");
+            Log.Info(Loc.F("已导出布局方案「{0}」→ {1}", scheme.Name, path));
             return true;
         }
         catch (Exception ex)
         {
             error = ex.Message;
-            Log.Error($"导出布局方案失败：{path}", ex);
+            Log.Error(Loc.F("导出布局方案失败：{0}", path), ex);
             return false;
         }
     }
@@ -313,7 +314,7 @@ public static class LayoutStore
         var scheme = ReadFrom(path, out var readError);
         if (scheme is null)
         {
-            error = readError ?? "文件内容无法解析。";
+            error = readError ?? Loc.T("文件内容无法解析。");
             return null;
         }
 
@@ -324,11 +325,11 @@ public static class LayoutStore
 
         if (!Save(scheme))
         {
-            error = "写入方案失败，请检查数据目录是否可写。";
+            error = Loc.T("写入方案失败，请检查数据目录是否可写。");
             return null;
         }
 
-        Log.Info($"已导入布局方案「{scheme.Name}」（来自 {Path.GetFileName(path)}）");
+        Log.Info(Loc.F("已导入布局方案「{0}」（来自 {1}）", scheme.Name, Path.GetFileName(path)));
         return scheme;
     }
 
@@ -337,7 +338,7 @@ public static class LayoutStore
     {
         var baseName = (name ?? string.Empty).Trim();
 
-        if (baseName.Length == 0) baseName = "导入的方案";
+        if (baseName.Length == 0) baseName = Loc.T("导入的方案");
         if (baseName.Length > 18) baseName = baseName[..18];
 
         var candidate = baseName;
@@ -357,7 +358,7 @@ public static class LayoutStore
             var found = Find(id);
             if (found is not null) return found;
 
-            Log.Warn($"设置里启用的布局方案「{id}」不存在，已回退到默认布局");
+            Log.Warn(Loc.F("设置里启用的布局方案「{0}」不存在，已回退到默认布局", id));
         }
 
         return Schemes.First(scheme => scheme.IsBuiltIn);
@@ -381,7 +382,7 @@ public static class LayoutStore
         }
         catch (Exception ex)
         {
-            Log.Error($"布局方案保存失败：{scheme.Name}", ex);
+            Log.Error(Loc.F("布局方案保存失败：{0}", scheme.Name), ex);
             return false;
         }
     }
@@ -394,7 +395,7 @@ public static class LayoutStore
         }
         catch (Exception ex)
         {
-            Log.Warn($"布局方案文件删除失败：{file}（{ex.Message}）");
+            Log.Warn(Loc.F("布局方案文件删除失败：{0}（{1}）", file, ex.Message));
         }
     }
 

@@ -1,4 +1,5 @@
 using HMOL.Core.App;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Extensions;
 
@@ -16,34 +17,34 @@ public static class ExtensionValidator
     /// </summary>
     public static string? Validate(ExtensionManifest? manifest)
     {
-        if (manifest is null) return "清单内容为空";
+        if (manifest is null) return Loc.T("清单内容为空");
 
         var data = manifest.Normalize();
 
-        if (data.Title!.Length == 0) return "缺少必填字段「title」（卡片标题）";
+        if (data.Title!.Length == 0) return Loc.T("缺少必填字段「title」（卡片标题）");
 
-        var titleError = Limit("title（卡片标题）", data.Title, ExtensionLimits.TitleMax);
+        var titleError = Limit(Loc.T("title（卡片标题）"), data.Title, ExtensionLimits.TitleMax);
         if (titleError is not null) return titleError;
 
-        var versionError = Limit("version（版本号）", data.Version, ExtensionLimits.VersionMax);
+        var versionError = Limit(Loc.T("version（版本号）"), data.Version, ExtensionLimits.VersionMax);
         if (versionError is not null) return versionError;
 
-        var authorError = Limit("author（作者）", data.Author, ExtensionLimits.AuthorMax);
+        var authorError = Limit(Loc.T("author（作者）"), data.Author, ExtensionLimits.AuthorMax);
         if (authorError is not null) return authorError;
 
-        var descriptionError = Limit("description（说明）", data.Description, ExtensionLimits.DescriptionMax);
+        var descriptionError = Limit(Loc.T("description（说明）"), data.Description, ExtensionLimits.DescriptionMax);
         if (descriptionError is not null) return descriptionError;
 
-        var iconError = Limit("icon（图标名）", data.Icon, ExtensionLimits.IconMax);
+        var iconError = Limit(Loc.T("icon（图标名）"), data.Icon, ExtensionLimits.IconMax);
         if (iconError is not null) return iconError;
 
         if (data.Icon!.Length > 0 && !ExtensionIcons.Exists(data.Icon))
         {
-            return $"图标「{data.Icon}」不在内置图标包里（可用图标见 docs/extensions.md 的图标清单；" +
-                   $"也可以留空用默认图标 {ExtensionIcons.Fallback}）";
+            return Loc.F("图标「{0}」不在内置图标包里（可用图标见 docs/extensions.md 的图标清单；", data.Icon) +
+                   Loc.F("也可以留空用默认图标 {0}）", ExtensionIcons.Fallback);
         }
 
-        var valueError = Limit("value（主数值）", data.Value, ExtensionLimits.ValueMax);
+        var valueError = Limit(Loc.T("value（主数值）"), data.Value, ExtensionLimits.ValueMax);
         if (valueError is not null) return valueError;
 
         var linesError = ValidateLines(data);
@@ -54,16 +55,16 @@ public static class ExtensionValidator
 
         if (data.Link!.Length > 0)
         {
-            var linkError = Limit("link（点击打开的网址）", data.Link, ExtensionLimits.UrlMax);
+            var linkError = Limit(Loc.T("link（点击打开的网址）"), data.Link, ExtensionLimits.UrlMax);
             if (linkError is not null) return linkError;
 
             if (!SiteLinkCatalog.IsHttpUrl(data.Link))
-                return $"link（点击打开的网址）不是有效的 http/https 地址：{data.Link}";
+                return Loc.F("link（点击打开的网址）不是有效的 http/https 地址：{0}", data.Link);
         }
 
         // 卡片上什么都没有的话，主页会出现一张只有标题的空卡，不如直接判无效
         if (data.Value!.Length == 0 && data.Lines!.Count == 0 && data.DataSource is null)
-            return "清单里至少要有一项内容：value（主数值）、lines（文字行）或 dataSource（数据源）";
+            return Loc.T("清单里至少要有一项内容：value（主数值）、lines（文字行）或 dataSource（数据源）");
 
         return null;
     }
@@ -73,14 +74,14 @@ public static class ExtensionValidator
         var lines = data.Lines ?? [];
 
         if (lines.Count > ExtensionLimits.LineCountMax)
-            return $"lines（文字行）最多 {ExtensionLimits.LineCountMax} 行，当前 {lines.Count} 行";
+            return Loc.F("lines（文字行）最多 {0} 行，当前 {1} 行", ExtensionLimits.LineCountMax, lines.Count);
 
         for (var i = 0; i < lines.Count; i++)
         {
-            var labelError = Limit($"lines[{i}].label（标签）", lines[i].Label, ExtensionLimits.LineLabelMax);
+            var labelError = Limit(Loc.F("lines[{0}].label（标签）", i), lines[i].Label, ExtensionLimits.LineLabelMax);
             if (labelError is not null) return labelError;
 
-            var textError = Limit($"lines[{i}].text（内容）", lines[i].Text, ExtensionLimits.LineTextMax);
+            var textError = Limit(Loc.F("lines[{0}].text（内容）", i), lines[i].Text, ExtensionLimits.LineTextMax);
             if (textError is not null) return textError;
         }
 
@@ -92,27 +93,27 @@ public static class ExtensionValidator
         if (data.DataSource is not { } source) return null;
 
         if ((source.Url ?? string.Empty).Length == 0)
-            return "dataSource（数据源）缺了必填的 url";
+            return Loc.T("dataSource（数据源）缺了必填的 url");
 
-        var urlError = Limit("dataSource.url（数据源网址）", source.Url, ExtensionLimits.UrlMax);
+        var urlError = Limit(Loc.T("dataSource.url（数据源网址）"), source.Url, ExtensionLimits.UrlMax);
         if (urlError is not null) return urlError;
 
         if (!SiteLinkCatalog.IsHttpUrl(source.Url))
-            return $"dataSource.url（数据源网址）不是有效的 http/https 地址：{source.Url}";
+            return Loc.F("dataSource.url（数据源网址）不是有效的 http/https 地址：{0}", source.Url);
 
-        var pathError = Limit("dataSource.path（取值路径）", source.Path, ExtensionLimits.DataPathMax);
+        var pathError = Limit(Loc.T("dataSource.path（取值路径）"), source.Path, ExtensionLimits.DataPathMax);
         if (pathError is not null) return pathError;
 
         if (source.RefreshSeconds < ExtensionLimits.RefreshSecondsMin)
         {
-            return $"dataSource.refreshSeconds（刷新间隔）不能小于 {ExtensionLimits.RefreshSecondsMin} 秒" +
-                   $"（现在是 {source.RefreshSeconds}），避免过于频繁地请求别人的接口";
+            return Loc.F("dataSource.refreshSeconds（刷新间隔）不能小于 {0} 秒", ExtensionLimits.RefreshSecondsMin) +
+                   Loc.F("（现在是 {0}），避免过于频繁地请求别人的接口", source.RefreshSeconds);
         }
 
         if (source.RefreshSeconds > ExtensionLimits.RefreshSecondsMax)
         {
-            return $"dataSource.refreshSeconds（刷新间隔）不能大于 {ExtensionLimits.RefreshSecondsMax} 秒" +
-                   $"（现在是 {source.RefreshSeconds}）";
+            return Loc.F("dataSource.refreshSeconds（刷新间隔）不能大于 {0} 秒", ExtensionLimits.RefreshSecondsMax) +
+                   Loc.F("（现在是 {0}）", source.RefreshSeconds);
         }
 
         return null;
@@ -122,7 +123,7 @@ public static class ExtensionValidator
     private static string? Limit(string field, string? value, int max)
     {
         var text = (value ?? string.Empty).Trim();
-        return text.Length <= max ? null : $"{field}最多 {max} 个字符（当前 {text.Length} 个）";
+        return text.Length <= max ? null : Loc.F("{0}最多 {1} 个字符（当前 {2} 个）", field, max, text.Length);
     }
 
     /// <summary>
@@ -133,22 +134,22 @@ public static class ExtensionValidator
     {
         var name = (id ?? string.Empty).Trim();
 
-        if (name.Length == 0) return "扩展名不能为空";
+        if (name.Length == 0) return Loc.T("扩展名不能为空");
 
         if (name.Length > ExtensionLimits.IdMax)
-            return $"扩展名最多 {ExtensionLimits.IdMax} 个字符（当前 {name.Length} 个）";
+            return Loc.F("扩展名最多 {0} 个字符（当前 {1} 个）", ExtensionLimits.IdMax, name.Length);
 
-        if (name is "." or "..") return "扩展名不能是「.」或「..」";
+        if (name is "." or "..") return Loc.T("扩展名不能是「.」或「..」");
 
         if (name.IndexOfAny(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) >= 0)
-            return "扩展名里不能包含 \\ / : * ? \" < > | 这些字符";
+            return Loc.T("扩展名里不能包含 \\ / : * ? \" < > | 这些字符");
 
-        if (name.Any(char.IsControl)) return "扩展名里不能包含控制字符";
+        if (name.Any(char.IsControl)) return Loc.T("扩展名里不能包含控制字符");
 
         var stem = name.Split('.')[0].ToUpperInvariant();
 
         if (ReservedNames.Contains(stem))
-            return $"扩展名「{name}」是系统保留名，换一个吧";
+            return Loc.F("扩展名「{0}」是系统保留名，换一个吧", name);
 
         return null;
     }

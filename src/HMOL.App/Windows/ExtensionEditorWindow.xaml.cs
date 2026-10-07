@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using HMOL.App.Controls;
 using HMOL.Core.Extensions;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -27,8 +28,8 @@ public partial class ExtensionEditorWindow : Window
 
         _id = id;
 
-        Title = $"扩展 · {id}";
-        LabFilePath.Text = $"保存到：{Path.Combine(ExtensionStore.RootDirectory, id + ExtensionStore.FileExtension)}（只会写这一个文件）";
+        Title = Loc.F("扩展 · {0}", id);
+        LabFilePath.Text = Loc.F("保存到：{0}（只会写这一个文件）", Path.Combine(ExtensionStore.RootDirectory, id + ExtensionStore.FileExtension));
 
         TxtTitle.Text = manifest.Title ?? string.Empty;
         TxtVersion.Text = manifest.Version ?? string.Empty;
@@ -115,7 +116,7 @@ public partial class ExtensionEditorWindow : Window
 
         if (refreshText.Length > 0 && !int.TryParse(refreshText, NumberStyles.Integer, CultureInfo.InvariantCulture, out refresh))
         {
-            formError = "「刷新间隔」要填整数秒，例如 600";
+            formError = Loc.T("「刷新间隔」要填整数秒，例如 600");
             refresh = ExtensionLimits.RefreshSecondsDefault;
         }
 
@@ -157,11 +158,11 @@ public partial class ExtensionEditorWindow : Window
 
         var (labelFrame, labelBox) = MakeInput(ExtensionLimits.LineLabelMax);
         labelBox.Text = label;
-        labelBox.ToolTip = "标签（可留空）";
+        labelBox.ToolTip = Loc.T("标签（可留空）");
 
         var (textFrame, textBox) = MakeInput(ExtensionLimits.LineTextMax);
         textBox.Text = text;
-        textBox.ToolTip = "这一行显示的内容";
+        textBox.ToolTip = Loc.T("这一行显示的内容");
         textFrame.Margin = new Thickness(6, 0, 0, 0);
 
         var remove = new RoundIconButton
@@ -171,7 +172,7 @@ public partial class ExtensionEditorWindow : Window
             Icon = "lucide/trash-2",
             Tone = ButtonTone.Danger,
             Margin = new Thickness(6, 0, 0, 0),
-            ToolTip = "删掉这一行"
+            ToolTip = Loc.T("删掉这一行")
         };
 
         var entry = new LineEntry(labelBox, textBox);
@@ -233,7 +234,7 @@ public partial class ExtensionEditorWindow : Window
 
         var empty = TxtTitle.Text.Trim().Length == 0;
 
-        LabTitleHint.Text = empty ? "名称不能为空。" : $"扩展 ID：{_id}";
+        LabTitleHint.Text = empty ? Loc.T("名称不能为空。") : Loc.F("扩展 ID：{0}", _id);
         LabTitleHint.SetResourceReference(TextBlock.ForegroundProperty, empty ? "Status.Warn" : "Text.Tertiary");
     }
 
@@ -247,7 +248,7 @@ public partial class ExtensionEditorWindow : Window
         if (icon.Length == 0)
         {
             IcoPreview.Icon = ExtensionIcons.Fallback;
-            LabIconHint.Text = $"留空则使用默认图标 {ExtensionIcons.Fallback}";
+            LabIconHint.Text = Loc.F("留空则使用默认图标 {0}", ExtensionIcons.Fallback);
             LabIconHint.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
             return;
         }
@@ -257,22 +258,22 @@ public partial class ExtensionEditorWindow : Window
         IcoPreview.Icon = exists ? icon : ExtensionIcons.Fallback;
 
         LabIconHint.Text = exists
-            ? $"将使用图标 {icon}"
-            : $"图标「{icon}」不在内置图标包里，保存会被拒绝（可用图标见 docs/extensions.md）";
+            ? Loc.F("将使用图标 {0}", icon)
+            : Loc.F("图标「{0}」不在内置图标包里，保存会被拒绝（可用图标见 docs/extensions.md）", icon);
 
         LabIconHint.SetResourceReference(TextBlock.ForegroundProperty, exists ? "Text.Tertiary" : "Status.Warn");
     }
 
     private void RefreshEnabledButton()
     {
-        BtnEnabled.Content = _enabled ? "已启用" : "已停用";
+        BtnEnabled.Content = _enabled ? Loc.T("已启用") : Loc.T("已停用");
         BtnEnabled.Tone = _enabled ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
     private void RefreshAddLineState()
     {
         BtnAddLine.IsEnabled = _lines.Count < ExtensionLimits.LineCountMax;
-        BtnAddLine.Content = $"添加一行（{_lines.Count}/{ExtensionLimits.LineCountMax}）";
+        BtnAddLine.Content = Loc.F("添加一行（{0}/{1}）", _lines.Count, ExtensionLimits.LineCountMax);
     }
 
     private void SetError(string? message)

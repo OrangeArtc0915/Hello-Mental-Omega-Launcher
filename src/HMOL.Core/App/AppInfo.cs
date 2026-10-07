@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.App;
 
 /// <summary>
@@ -7,12 +9,12 @@ namespace HMOL.Core.App;
 public static class AppInfo
 {
     public const string Name = "Hello Mental Omega Launcher";
-    public const string Version = "1.5.10";
-    public const string VersionDisplay = "v1.5.10";
+    public const string Version = "1.5.11";
+    public const string VersionDisplay = "v1.5.11";
     public const string Author = "mmm";
 
-    /// <summary>许可声明摘要：本项目为专有软件，保留所有权利（许可证正文见仓库根 LICENSE）。</summary>
-    public const string License = "保留所有权利";
+    /// <summary>许可声明摘要：PolyForm Noncommercial 1.0.0，免费非商业使用（许可证正文见仓库根 LICENSE）。</summary>
+    public const string License = "PolyForm Noncommercial 1.0.0";
 
     // 展示用的仓库地址不带结尾的 .git
     public const string GitHubUrl = "https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher";
@@ -30,38 +32,38 @@ public static class AppInfo
 
     /// <summary>
     /// 鸣谢：参与测试与反馈的朋友。名字按顺序展示，<see cref="ThanksCredit.Title"/> 为空表示不显示头衔标签。
-    /// 「关于」窗口与 README 都从这里/同一份名单取值。
+    /// 「关于」窗口与 README 都从这里/同一份名单取值。属性（而非静态字段）以便切换语言后重新求值。
     /// </summary>
-    public static readonly ThanksCredit[] Thanks =
+    public static ThanksCredit[] Thanks =>
     [
-        new("罒ω罒", "猫娘"),
-        new("绮梦", "猪"),
-        new("心弦连", "猫娘"),
+        new(Loc.T("罒ω罒"), Loc.T("猫娘")),
+        new(Loc.T("绮梦"), Loc.T("猪")),
+        new(Loc.T("心弦连"), Loc.T("猫娘")),
         new("a114514", ""),
-        new("艾尔登皮蛋", ""),
-        new("安然的岛不叫安然", ""),
-        new("白小梦です", "梦梦酱"),
-        new("雪枫", "猪"),
+        new(Loc.T("艾尔登皮蛋"), ""),
+        new(Loc.T("安然的岛不叫安然"), ""),
+        new(Loc.T("白小梦です"), Loc.T("梦梦酱")),
+        new(Loc.T("雪枫"), Loc.T("猪")),
         new("Drawer😳", ""),
-        new("枫～", ""),
-        new("飞行", ""),
+        new(Loc.T("枫～"), ""),
+        new(Loc.T("飞行"), ""),
         new("fs bga3", ""),
-        new("鸽尔德⁧ ~咕⁧‭", ""),
+        new(Loc.T("鸽尔德⁧ ~咕⁧‭"), ""),
         new("GinkgobilobaL", ""),
-        new("靖安司管", ""),
+        new(Loc.T("靖安司管"), ""),
         new("Lmsh", ""),
-        new("墨笙", ""),
-        new("ovide（内奸）", ""),
-        new("浅梦", ""),
-        new("世蓝喧", ""),
-        new("月見ヤチヨ是一", ""),
-        new("夜幕", ""),
+        new(Loc.T("墨笙"), ""),
+        new(Loc.T("ovide（内奸）"), ""),
+        new(Loc.T("浅梦"), ""),
+        new(Loc.T("世蓝喧"), ""),
+        new(Loc.T("月見ヤチヨ是一"), ""),
+        new(Loc.T("夜幕"), ""),
         new("YUN✨RÚ", ""),
         new("zxc", ""),
-        new("悲伤的天使", ""),
-        new("ㅤ弃世", ""),
-        new("07", "沃尔玛购物袋"),
-        new("快猫_Channel", "雌小鬼")
+        new(Loc.T("悲伤的天使"), ""),
+        new(Loc.T("ㅤ弃世"), ""),
+        new("07", Loc.T("沃尔玛购物袋")),
+        new(Loc.T("快猫_Channel"), Loc.T("雌小鬼"))
     ];
 }
 

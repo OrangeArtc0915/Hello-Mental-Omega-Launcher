@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.Security;
 
 /// <summary>
@@ -27,19 +29,19 @@ public static class StartupSecurityCheck
         // 1. 调试器
         foreach (var check in DebuggerDetector.Inspect())
         {
-            if (check.Detected) issues.Add($"疑似被调试：{check.Method}（{check.Detail}）");
-            else if (!check.Available) notes.Add($"{check.Method} 无法判定：{check.Detail}");
+            if (check.Detected) issues.Add(Loc.F("疑似被调试：{0}（{1}）", check.Method, check.Detail));
+            else if (!check.Available) notes.Add(Loc.F("{0} 无法判定：{1}", check.Method, check.Detail));
         }
 
         // 2. 可疑运行环境
         var suspicions = SandboxDetector.FindSuspicions();
-        if (suspicions.Count > 0) issues.Add($"可疑运行环境：{string.Join("；", suspicions)}");
+        if (suspicions.Count > 0) issues.Add(Loc.F("可疑运行环境：{0}", string.Join(Loc.T("；"), suspicions)));
 
         // 3. 自身完整性。旧版校验的是 HMOL_qt.py / crypto_utils.py 两个源文件，
         //    单文件 exe 没有对应的源文件，这里校验程序本体。
         string[] targets = IntegrityChecker.SelfPath is { } self ? [self] : [];
         var tamper = IntegrityChecker.CheckTampering(targets);
-        if (!tamper.Intact) issues.Add($"文件被改动：{string.Join("；", tamper.Problems)}");
+        if (!tamper.Intact) issues.Add(Loc.F("文件被改动：{0}", string.Join(Loc.T("；"), tamper.Problems)));
         notes.AddRange(tamper.NotConfigured);
 
         return new SecurityReport(issues.Count == 0 || !strict, issues, notes);

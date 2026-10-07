@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Layout;
 
@@ -127,7 +128,7 @@ public sealed class LayoutScheme
     {
         Id = DefaultId,
         Name = DefaultName,
-        Description = "系统默认布局",
+        Description = Loc.T("系统默认布局"),
         Version = CurrentVersion,
     };
 

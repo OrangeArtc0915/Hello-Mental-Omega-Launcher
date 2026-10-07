@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using HMOL.App.Controls;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -114,7 +115,7 @@ public partial class PickWindow : Window
     {
         var selected = _checks.Count(check => check.IsChecked == true);
 
-        LabCount.Text = $"已选 {selected} / {_items.Count} 项";
+        LabCount.Text = Loc.F("已选 {0} / {1} 项", selected, _items.Count);
 
         // 一个都没勾选就没什么可删 / 可回退的，直接禁用确定
         BtnOk.IsEnabled = selected > 0;

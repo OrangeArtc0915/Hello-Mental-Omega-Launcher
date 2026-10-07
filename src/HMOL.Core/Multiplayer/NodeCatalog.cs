@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.Multiplayer;
 
 /// <summary>内置公共节点。</summary>
@@ -34,32 +36,32 @@ public static class NodeCatalog
     public static IReadOnlyList<PublicNode> N2nPublicNodes { get; } =
     [
         // —— 2026-10 实测在线，均只服务 fox 小组 ——
-        new("n2n.hxsh.store:5199", "上海腾讯云（小组名固定 fox）", N2nFixedCommunity),
-        new("n2n.sfcs.eu.org:10086", "韩国甲骨文（小组名固定 fox）", N2nFixedCommunity),
-        new("hnzsct.moyann.com:10086", "中山电信家宽（小组名固定 fox）", N2nFixedCommunity),
-        new("ouno.eu.org:10084", "成都联通家宽（小组名固定 fox）", N2nFixedCommunity),
+        new("n2n.hxsh.store:5199", Loc.T("上海腾讯云（小组名固定 fox）"), N2nFixedCommunity),
+        new("n2n.sfcs.eu.org:10086", Loc.T("韩国甲骨文（小组名固定 fox）"), N2nFixedCommunity),
+        new("hnzsct.moyann.com:10086", Loc.T("中山电信家宽（小组名固定 fox）"), N2nFixedCommunity),
+        new("ouno.eu.org:10084", Loc.T("成都联通家宽（小组名固定 fox）"), N2nFixedCommunity),
 
         // —— 历史公益节点（多数已失效，保留供自定义与参考） ——
-        new("n2n.aobacore.com:9555", "融合节点(北京/上海/广州/香港/日本/孟买)"),
-        new("bj.n2n.aobacore.com:9555", "北京节点"),
-        new("sh.n2n.aobacore.com:9555", "上海节点"),
-        new("gz.n2n.aobacore.com:9555", "广州节点"),
-        new("cd.n2n.aobacore.com:9555", "成都节点"),
-        new("n2n.bugxia.com:8888", "Bugxia 节点"),
-        new("supernode.ntop.org:7777", "n2n 官方测试节点")
+        new("n2n.aobacore.com:9555", Loc.T("融合节点(北京/上海/广州/香港/日本/孟买)")),
+        new("bj.n2n.aobacore.com:9555", Loc.T("北京节点")),
+        new("sh.n2n.aobacore.com:9555", Loc.T("上海节点")),
+        new("gz.n2n.aobacore.com:9555", Loc.T("广州节点")),
+        new("cd.n2n.aobacore.com:9555", Loc.T("成都节点")),
+        new("n2n.bugxia.com:8888", Loc.T("Bugxia 节点")),
+        new("supernode.ntop.org:7777", Loc.T("n2n 官方测试节点"))
     ];
 
     /// <summary>EasyTier 内置公共节点（nodes.py:20-29 <c>EASYTIER_PUBLIC_NODES</c>）。</summary>
     public static IReadOnlyList<PublicNode> EasyTierPublicNodes { get; } =
     [
-        new("udp://39.108.52.138:11010", "阿里云广州(UDP)"),
-        new("tcp://38.147.105.178:11010", "国内节点"),
-        new("tcp://39.108.52.138:11010", "阿里云广州(TCP)"),
-        new("udp://38.147.105.178:11010", "国内节点(UDP)"),
-        new("tcp://103.224.243.207:11010", "腾讯云节点"),
-        new("tcp://47.108.0.143:11010", "阿里云节点"),
-        new("tcp://119.23.247.86:11010", "阿里云节点"),
-        new("tcp://43.136.62.122:11010", "腾讯云节点")
+        new("udp://39.108.52.138:11010", Loc.T("阿里云广州(UDP)")),
+        new("tcp://38.147.105.178:11010", Loc.T("国内节点")),
+        new("tcp://39.108.52.138:11010", Loc.T("阿里云广州(TCP)")),
+        new("udp://38.147.105.178:11010", Loc.T("国内节点(UDP)")),
+        new("tcp://103.224.243.207:11010", Loc.T("腾讯云节点")),
+        new("tcp://47.108.0.143:11010", Loc.T("阿里云节点")),
+        new("tcp://119.23.247.86:11010", Loc.T("阿里云节点")),
+        new("tcp://43.136.62.122:11010", Loc.T("腾讯云节点"))
     ];
 
     /// <summary>下拉框用的 n2n 节点列表（内置 + 自定义）。</summary>

@@ -1,4 +1,4 @@
-<c:LauncherPage x:Class="HMOL.App.Pages.PagePackages"
+<c:LauncherPage xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Pages.PagePackages"
                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                 xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -19,19 +19,19 @@
         <!-- 页头：与其余页面同一形态，本页操作按钮组放在右侧 -->
         <c:PageHeader x:Name="HeaderPackages"
                       Grid.Row="0"
-                      Title="包管理"
-                      Subtitle="导入、安装、卸载与移除游戏包（INI / 地图 / 任务 / 插件）"
+                      Title="{loc:T '包管理'}"
+                      Subtitle="{loc:T '导入、安装、卸载与移除游戏包（INI / 地图 / 任务 / 插件）'}"
                       Icon="lucide/package">
             <StackPanel Orientation="Horizontal">
-                <c:OutlineButton Content="导入包"
-                                 ToolTip="把选中的压缩包复制进当前分类的包目录"
+                <c:OutlineButton Content="{loc:T '导入包'}"
+                                 ToolTip="{loc:T '把选中的压缩包复制进当前分类的包目录'}"
                                  Tone="Solid"
                                  Click="OnImportPackageClick" />
                 <c:OutlineButton Margin="8,0,0,0"
-                                 Content="打开包目录"
+                                 Content="{loc:T '打开包目录'}"
                                  Click="OnOpenPackageDirClick" />
                 <c:OutlineButton Margin="8,0,0,0"
-                                 Content="刷新"
+                                 Content="{loc:T '刷新'}"
                                  Click="OnRefreshClick" />
             </StackPanel>
         </c:PageHeader>
@@ -118,7 +118,7 @@
                     <c:OutlineButton Grid.Column="2"
                                      Padding="12,5"
                                      VerticalAlignment="Center"
-                                     Content="管理实例"
+                                     Content="{loc:T '管理实例'}"
                                      FontSize="12"
                                      Click="OnManageInstanceClick" />
                 </Grid>
@@ -172,7 +172,7 @@
             <c:SurfaceCard x:Name="CardAvailable"
                            Grid.Column="0"
                            HasHoverEffect="False"
-                           Title="可用包"
+                           Title="{loc:T '可用包'}"
                            UseShadow="False">
                 <Grid>
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled"
@@ -209,21 +209,21 @@
                                                        VerticalAlignment="Center"
                                                        FontSize="11"
                                                        Foreground="{DynamicResource Status.Success}"
-                                                       Text="已安装"
+                                                       Text="{loc:T '已安装'}"
                                                        Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}" />
 
                                             <StackPanel Grid.Column="2"
                                                         VerticalAlignment="Center"
                                                         Orientation="Horizontal">
                                                 <c:OutlineButton Padding="12,4"
-                                                                 Content="安装"
+                                                                 Content="{loc:T '安装'}"
                                                                  FontSize="12"
                                                                  Tag="{Binding}"
                                                                  Tone="Solid"
                                                                  Click="OnInstallClick" />
                                                 <c:OutlineButton Margin="6,0,0,0"
                                                                  Padding="12,4"
-                                                                 Content="移除"
+                                                                 Content="{loc:T '移除'}"
                                                                  FontSize="12"
                                                                  Tag="{Binding}"
                                                                  Tone="Plain"
@@ -258,7 +258,7 @@
                                    HorizontalAlignment="Center"
                                    FontSize="12.5"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="这个分类下还没有可用的包"
+                                   Text="{loc:T '这个分类下还没有可用的包'}"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap" />
 
@@ -266,7 +266,7 @@
                                    HorizontalAlignment="Center"
                                    FontSize="11"
                                    Foreground="{DynamicResource Text.Tertiary}"
-                                   Text="把包文件放进包目录，或点右上角「导入包」。"
+                                   Text="{loc:T '把包文件放进包目录，或点右上角「导入包」。'}"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap" />
                     </StackPanel>
@@ -276,7 +276,7 @@
             <c:SurfaceCard x:Name="CardInstalled"
                            Grid.Column="2"
                            HasHoverEffect="False"
-                           Title="当前实例已安装"
+                           Title="{loc:T '当前实例已安装'}"
                            UseShadow="False">
                 <Grid>
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled"
@@ -311,7 +311,7 @@
                                             <c:OutlineButton Grid.Column="1"
                                                              Padding="12,4"
                                                              VerticalAlignment="Center"
-                                                             Content="卸载"
+                                                             Content="{loc:T '卸载'}"
                                                              FontSize="12"
                                                              Tag="{Binding}"
                                                              Tone="Danger"
@@ -345,7 +345,7 @@
                                    HorizontalAlignment="Center"
                                    FontSize="12.5"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="当前实例还没有安装这个分类的包"
+                                   Text="{loc:T '当前实例还没有安装这个分类的包'}"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap" />
 
@@ -353,7 +353,7 @@
                                    HorizontalAlignment="Center"
                                    FontSize="11"
                                    Foreground="{DynamicResource Text.Tertiary}"
-                                   Text="在左边选一个包点「安装」即可。"
+                                   Text="{loc:T '在左边选一个包点「安装」即可。'}"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap" />
                     </StackPanel>

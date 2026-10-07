@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -72,10 +73,10 @@ public static class CnCNetProfile
     public static string? WriteHandle(string? gameDir, string handle)
     {
         var path = SettingsFileOf(gameDir);
-        if (path is null) return "没找到 CnCNet 客户端的设置文件（如 RA2MO.ini）";
+        if (path is null) return Loc.T("没找到 CnCNet 客户端的设置文件（如 RA2MO.ini）");
 
         var name = ChatCrypt.SanitizeText(handle, MaxNameLength(gameDir));
-        if (name.Length == 0) return "玩家名不能为空";
+        if (name.Length == 0) return Loc.T("玩家名不能为空");
 
         try
         {
@@ -84,7 +85,7 @@ public static class CnCNetProfile
         }
         catch (Exception ex)
         {
-            Log.Warn($"写入 CnCNet 玩家名失败：{ex.Message}");
+            Log.Warn(Loc.F("写入 CnCNet 玩家名失败：{0}", ex.Message));
             return ex.Message;
         }
     }
@@ -125,7 +126,7 @@ public static class CnCNetProfile
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取 INI 失败：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("读取 INI 失败：{0}（{1}）", path, ex.Message));
         }
 
         return null;

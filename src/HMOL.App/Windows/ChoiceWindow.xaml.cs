@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using HMOL.App.Controls;
 using HMOL.App.Controls.Svg;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -110,14 +111,14 @@ public partial class ChoiceWindow : Window
 
     /// <summary>是 / 否确认。返回 true 表示选了「确定」。</summary>
     public static bool Confirm(Window? owner, string title, string message, string detail = "",
-        string confirmText = "确定", string cancelText = "取消",
+        string? confirmText = null, string? cancelText = null,
         DialogIcon icon = DialogIcon.Question, bool danger = false)
         => Ask(owner, title, message, detail, icon,
-            new ChoiceOption(confirmText, "yes", danger ? ButtonTone.Danger : ButtonTone.Solid),
-            new ChoiceOption(cancelText, "no")) == "yes";
+            new ChoiceOption(confirmText ?? Loc.T("确定"), "yes", danger ? ButtonTone.Danger : ButtonTone.Solid),
+            new ChoiceOption(cancelText ?? Loc.T("取消"), "no")) == "yes";
 
     private static void Alert(Window? owner, string title, string message, string detail, DialogIcon icon)
-        => Ask(owner, title, message, detail, icon, new ChoiceOption("知道了", "ok", ButtonTone.Solid));
+        => Ask(owner, title, message, detail, icon, new ChoiceOption(Loc.T("知道了"), "ok", ButtonTone.Solid));
 
     private void ApplyIcon(DialogIcon icon)
     {

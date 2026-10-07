@@ -1,4 +1,5 @@
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -166,7 +167,7 @@ public sealed class ProcessGuard : IAsyncDisposable
             if (_restarts.Count >= _maxRestarts)
             {
                 _enabled = false;
-                LogLine($"进程 {name} 频繁崩溃, 已停止自动重启");
+                LogLine(Loc.F("进程 {0} 频繁崩溃, 已停止自动重启", name));
                 return;
             }
 
@@ -174,7 +175,7 @@ public sealed class ProcessGuard : IAsyncDisposable
             _restarts.Add(now);
         }
 
-        LogLine($"检测到 {name} 异常退出, 正在自动重启...");
+        LogLine(Loc.F("检测到 {0} 异常退出, 正在自动重启...", name));
 
         try
         {
@@ -182,7 +183,7 @@ public sealed class ProcessGuard : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            LogLine($"自动重启失败: {ex.Message}");
+            LogLine(Loc.F("自动重启失败: {0}", ex.Message));
         }
     }
 
@@ -190,9 +191,9 @@ public sealed class ProcessGuard : IAsyncDisposable
 
     private void LogLine(string message)
     {
-        Log.Info($"[守护] {message}");
+        Log.Info(Loc.F("[守护] {0}", message));
 
-        try { _log?.Invoke($"[守护] {message}"); }
+        try { _log?.Invoke(Loc.F("[守护] {0}", message)); }
         catch { /* 日志回调异常不影响业务 */ }
     }
 

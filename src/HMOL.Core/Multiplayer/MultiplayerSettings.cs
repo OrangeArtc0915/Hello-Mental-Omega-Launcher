@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using HMOL.Core.Security;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -113,7 +114,7 @@ public sealed class MultiplayerSettings
     public int SakuraTunnelId { get; set; }
 
     /// <summary>新建樱花FRP 隧道时默认用的名字。</summary>
-    public string SakuraTunnelName { get; set; } = "心灵终结";
+    public string SakuraTunnelName { get; set; } = Loc.T("心灵终结");
 
     /// <summary>
     /// 是否在启动器里内嵌樱花FRP 网页面板（需要本机装了 WebView2 运行时）。

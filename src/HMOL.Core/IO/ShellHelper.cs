@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -20,7 +21,7 @@ public static class ShellHelper
 
         if (!SiteLinkCatalog.IsHttpUrl(text))
         {
-            Log.Warn($"拒绝打开非 http/https 链接：{text}");
+            Log.Warn(Loc.F("拒绝打开非 http/https 链接：{0}", text));
             return;
         }
 
@@ -30,7 +31,7 @@ public static class ShellHelper
         }
         catch (Exception ex)
         {
-            Log.Warn($"打开链接失败 {text}：{ex.Message}");
+            Log.Warn(Loc.F("打开链接失败 {0}：{1}", text, ex.Message));
         }
     }
 
@@ -42,7 +43,7 @@ public static class ShellHelper
         {
             if (!Directory.Exists(path))
             {
-                Log.Warn($"目录不存在，无法打开：{path}");
+                Log.Warn(Loc.F("目录不存在，无法打开：{0}", path));
                 return;
             }
 
@@ -50,7 +51,7 @@ public static class ShellHelper
         }
         catch (Exception ex)
         {
-            Log.Warn($"打开目录失败 {path}：{ex.Message}");
+            Log.Warn(Loc.F("打开目录失败 {0}：{1}", path, ex.Message));
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -65,13 +66,13 @@ public static class DirectoryCopier
         {
             if (string.IsNullOrWhiteSpace(source) || (!File.Exists(source) && !Directory.Exists(source)))
             {
-                errors.Add($"来源不存在：{source}");
+                errors.Add(Loc.F("来源不存在：{0}", source));
                 return new CopySummary(0, 0, 0, 0, errors);
             }
 
             if (string.IsNullOrWhiteSpace(target))
             {
-                errors.Add("目标目录为空");
+                errors.Add(Loc.T("目标目录为空"));
                 return new CopySummary(0, 0, 0, 0, errors);
             }
 
@@ -124,7 +125,7 @@ public static class DirectoryCopier
                         if (!PathGuard.IsInside(targetRoot, pair.Target))
                         {
                             failed++;
-                            errors.Add($"落点超出目标目录：{pair.Source}");
+                            errors.Add(Loc.F("落点超出目标目录：{0}", pair.Source));
                             continue;
                         }
 
@@ -161,7 +162,7 @@ public static class DirectoryCopier
                 {
                     failed++;
                     errors.Add($"{pair.Source}：{ex.Message}");
-                    Log.Error($"复制文件失败：{pair.Source}", ex);
+                    Log.Error(Loc.F("复制文件失败：{0}", pair.Source), ex);
                 }
 
                 finished++;
@@ -171,19 +172,19 @@ public static class DirectoryCopier
             progress?.Report(new ProgressSample(1));
 
             if (failed > 0)
-                Log.Warn($"复制完成：共 {total} 个文件，失败 {failed}，跳过 {skipped}");
+                Log.Warn(Loc.F("复制完成：共 {0} 个文件，失败 {1}，跳过 {2}", total, failed, skipped));
 
             return new CopySummary(total, failed, skipped, bytes, errors);
         }
         catch (OperationCanceledException)
         {
-            errors.Add("操作已取消");
+            errors.Add(Loc.T("操作已取消"));
             return new CopySummary(total, failed, skipped, bytes, errors);
         }
         catch (Exception ex)
         {
             errors.Add(ex.Message);
-            Log.Error($"复制目录失败：{source} → {target}", ex);
+            Log.Error(Loc.F("复制目录失败：{0} → {1}", source, target), ex);
             return new CopySummary(total, failed, skipped, bytes, errors);
         }
     }
@@ -273,7 +274,7 @@ public static class DirectoryCopier
         }
         catch (Exception ex)
         {
-            Log.Error($"列举目录文件失败：{directory}", ex);
+            Log.Error(Loc.F("列举目录文件失败：{0}", directory), ex);
         }
 
         return result;
@@ -298,7 +299,7 @@ public static class DirectoryCopier
         }
         catch (Exception ex)
         {
-            Log.Warn($"统计目录大小失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("统计目录大小失败：{0}（{1}）", directory, ex.Message));
         }
 
         return total;
@@ -318,7 +319,7 @@ public static class DirectoryCopier
         }
         catch (Exception ex)
         {
-            Log.Warn($"统计目录文件数失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("统计目录文件数失败：{0}（{1}）", directory, ex.Message));
             return 0;
         }
     }
@@ -349,7 +350,7 @@ public static class DirectoryCopier
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn($"清理空目录失败：{parent}（{ex.Message}）");
+                    Log.Warn(Loc.F("清理空目录失败：{0}（{1}）", parent, ex.Message));
                     break;
                 }
             }

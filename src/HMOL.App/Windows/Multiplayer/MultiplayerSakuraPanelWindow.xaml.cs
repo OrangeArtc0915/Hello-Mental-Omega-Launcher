@@ -4,6 +4,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -69,7 +70,7 @@ public partial class MultiplayerSakuraPanelWindow : Window
             var core = browser.CoreWebView2;
             if (core is null)
             {
-                ShowError("WebView2 内核没有创建成功，换个方式打开 natfrp.com 吧。");
+                ShowError(Loc.T("WebView2 内核没有创建成功，换个方式打开 natfrp.com 吧。"));
                 return;
             }
 
@@ -92,11 +93,11 @@ public partial class MultiplayerSakuraPanelWindow : Window
             BtnRefresh.IsEnabled = true;
 
             core.Navigate(PanelUrl);
-            Log.Info("樱花FRP 面板已在内嵌浏览器中打开");
+            Log.Info(Loc.T("樱花FRP 面板已在内嵌浏览器中打开"));
         }
         catch (Exception ex)
         {
-            ShowError($"无法打开内嵌浏览器：{ex.Message}");
+            ShowError(Loc.F("无法打开内嵌浏览器：{0}", ex.Message));
         }
     }
 
@@ -108,7 +109,7 @@ public partial class MultiplayerSakuraPanelWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Warn($"释放樱花FRP 面板失败：{ex.Message}");
+            Log.Warn(Loc.F("释放樱花FRP 面板失败：{0}", ex.Message));
         }
 
         _browser = null;
@@ -157,6 +158,6 @@ public partial class MultiplayerSakuraPanelWindow : Window
         LabError.Visibility = Visibility.Visible;
         PanHost.Visibility = Visibility.Collapsed;
 
-        Log.Warn($"樱花FRP 面板初始化失败：{message}");
+        Log.Warn(Loc.F("樱花FRP 面板初始化失败：{0}", message));
     }
 }

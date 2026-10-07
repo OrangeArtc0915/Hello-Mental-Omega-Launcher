@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -145,10 +146,10 @@ public static class NetworkToolkit
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"无法在端口 {port} 启动测速服务端：{ex.Message}");
+            throw new InvalidOperationException(Loc.F("无法在端口 {0} 启动测速服务端：{1}", port, ex.Message));
         }
 
-        progress?.Report("等待客户端连接...");
+        progress?.Report(Loc.T("等待客户端连接..."));
 
         try
         {
@@ -187,7 +188,7 @@ public static class NetworkToolkit
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        progress?.Report($"连接 {host}:{port} 并发送数据...");
+        progress?.Report(Loc.F("连接 {0}:{1} 并发送数据...", host, port));
 
         using var client = new TcpClient();
 
@@ -203,7 +204,7 @@ public static class NetworkToolkit
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"无法连接 {host}:{port}（{ex.Message}），请确认对方已开启测速服务端且防火墙已放行。");
+            throw new InvalidOperationException(Loc.F("无法连接 {0}:{1}（{2}），请确认对方已开启测速服务端且防火墙已放行。", host, port, ex.Message));
         }
 
         var payload = RandomNumberGenerator.GetBytes(65536);
@@ -253,10 +254,10 @@ public static class NetworkToolkit
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"无法在端口 {port} 启动 UDP 测速服务端：{ex.Message}");
+            throw new InvalidOperationException(Loc.F("无法在端口 {0} 启动 UDP 测速服务端：{1}", port, ex.Message));
         }
 
-        progress?.Report("等待客户端数据...");
+        progress?.Report(Loc.T("等待客户端数据..."));
 
         var buffer = new byte[65536];
         long total = 0;
@@ -312,7 +313,7 @@ public static class NetworkToolkit
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        progress?.Report($"发送 UDP 数据到 {host}:{port}...");
+        progress?.Report(Loc.F("发送 UDP 数据到 {0}:{1}...", host, port));
 
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         var payload = RandomNumberGenerator.GetBytes(1200);
@@ -393,10 +394,10 @@ public static class NetworkToolkit
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        progress?.Report("正在请求 STUN 服务器...");
+        progress?.Report(Loc.T("正在请求 STUN 服务器..."));
 
         var local = LocalIpv4();
-        if (string.IsNullOrEmpty(local)) return "检测失败";
+        if (string.IsNullOrEmpty(local)) return Loc.T("检测失败");
 
         var localPort = RandomNumberGenerator.GetInt32(20000, 60000);
         var results = new List<(string Ip, int Port)>();
@@ -409,17 +410,17 @@ public static class NetworkToolkit
             if (mapped is not null) results.Add(mapped.Value);
         }
 
-        if (results.Count == 0) return "检测失败";
+        if (results.Count == 0) return Loc.T("检测失败");
 
         var (publicIp, publicPort) = results[0];
-        if (publicIp == local) return "开放(公网IP)";
+        if (publicIp == local) return Loc.T("开放(公网IP)");
 
         foreach (var (ip, port) in results.Skip(1))
         {
-            if (ip != publicIp || port != publicPort) return "对称型 NAT";
+            if (ip != publicIp || port != publicPort) return Loc.T("对称型 NAT");
         }
 
-        return "锥形 NAT(受限锥形/全锥形)";
+        return Loc.T("锥形 NAT(受限锥形/全锥形)");
     }
 
     /// <summary>本机在默认路由上使用的 IPv4 地址；取不到时返回空串。</summary>
@@ -522,16 +523,16 @@ public static class NetworkToolkit
             .RunAsync("netsh", "advfirewall show allprofiles", TimeSpan.FromSeconds(10), cancellationToken)
             .ConfigureAwait(false);
 
-        if (!result.Started || string.IsNullOrWhiteSpace(result.Output)) return "未知";
+        if (!result.Started || string.IsNullOrWhiteSpace(result.Output)) return Loc.T("未知");
 
         var matches = FirewallStatePattern.Matches(result.Output);
-        if (matches.Count == 0) return "未知";
+        if (matches.Count == 0) return Loc.T("未知");
 
         var hasOff = matches.Any(match => match.Groups["off"].Success);
-        if (hasOff) return "已关闭";
+        if (hasOff) return Loc.T("已关闭");
 
         var hasOn = matches.Any(match => match.Groups["on"].Success);
-        return hasOn ? "已开启" : "未知";
+        return hasOn ? Loc.T("已开启") : Loc.T("未知");
     }
 
     /// <summary>
@@ -541,19 +542,19 @@ public static class NetworkToolkit
     public static async Task<ToolkitStatus> SetFirewallAsync(bool enabled, CancellationToken cancellationToken = default)
     {
         if (!ElevationHelper.IsElevated)
-            return new ToolkitStatus(false, "修改防火墙需要管理员权限（当前以普通权限运行）");
+            return new ToolkitStatus(false, Loc.T("修改防火墙需要管理员权限（当前以普通权限运行）"));
 
         var state = enabled ? "on" : "off";
         var result = await ProcessRunner
             .RunAsync("netsh", $"advfirewall set allprofiles state {state}", TimeSpan.FromSeconds(20), cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.Ok) return new ToolkitStatus(true, enabled ? "防火墙已开启" : "防火墙已关闭");
+        if (result.Ok) return new ToolkitStatus(true, enabled ? Loc.T("防火墙已开启") : Loc.T("防火墙已关闭"));
 
         var reason = result.FirstLine();
         return new ToolkitStatus(false, string.IsNullOrEmpty(reason)
-            ? $"防火墙{(enabled ? "开启" : "关闭")}失败（netsh 退出码 {result.ExitCode}）"
-            : $"防火墙{(enabled ? "开启" : "关闭")}失败：{reason}");
+            ? Loc.F("防火墙{0}失败（netsh 退出码 {1}）", (enabled ? Loc.T("开启") : Loc.T("关闭")), result.ExitCode)
+            : Loc.F("防火墙{0}失败：{1}", (enabled ? Loc.T("开启") : Loc.T("关闭")), reason));
     }
 
     /// <summary>
@@ -565,7 +566,7 @@ public static class NetworkToolkit
         int port,
         CancellationToken cancellationToken = default)
     {
-        if (!OperatingSystem.IsWindows()) return new ToolkitStatus(false, "非 Windows 无需放行端口");
+        if (!OperatingSystem.IsWindows()) return new ToolkitStatus(false, Loc.T("非 Windows 无需放行端口"));
 
         var arguments = $"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=allow protocol=TCP localport={port}";
 
@@ -573,15 +574,15 @@ public static class NetworkToolkit
             .RunAsync("netsh", arguments, TimeSpan.FromSeconds(15), cancellationToken)
             .ConfigureAwait(false);
 
-        if (result.Ok) return new ToolkitStatus(true, $"已放行 TCP {port}");
+        if (result.Ok) return new ToolkitStatus(true, Loc.F("已放行 TCP {0}", port));
 
         var reason = result.FirstLine();
         if (LooksLikePermissionError(reason) || !ElevationHelper.IsElevated)
-            return new ToolkitStatus(false, "需要管理员权限才能自动放行端口（可在 Windows 防火墙里手动放行）");
+            return new ToolkitStatus(false, Loc.T("需要管理员权限才能自动放行端口（可在 Windows 防火墙里手动放行）"));
 
         return new ToolkitStatus(false, string.IsNullOrEmpty(reason)
-            ? $"添加防火墙规则失败（netsh 退出码 {result.ExitCode}）"
-            : $"添加防火墙规则失败：{reason}");
+            ? Loc.F("添加防火墙规则失败（netsh 退出码 {0}）", result.ExitCode)
+            : Loc.F("添加防火墙规则失败：{0}", reason));
     }
 
     private static bool LooksLikePermissionError(string text)
@@ -632,7 +633,7 @@ public static class NetworkToolkit
         CancellationToken cancellationToken = default)
     {
         if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(ip))
-            return new ToolkitStatus(false, "没有可调整的虚拟 IP");
+            return new ToolkitStatus(false, Loc.T("没有可调整的虚拟 IP"));
 
         var script =
             $"Get-NetIPAddress -IPAddress {ip} -ErrorAction SilentlyContinue "
@@ -643,8 +644,8 @@ public static class NetworkToolkit
             .ConfigureAwait(false);
 
         return result.Started
-            ? new ToolkitStatus(true, $"已将 {ip} 所在网卡跃点数设为 {metric}")
-            : new ToolkitStatus(false, $"调整网卡跃点数失败：{result.Output}");
+            ? new ToolkitStatus(true, Loc.F("已将 {0} 所在网卡跃点数设为 {1}", ip, metric))
+            : new ToolkitStatus(false, Loc.F("调整网卡跃点数失败：{0}", result.Output));
     }
 
     /// <summary>
@@ -653,7 +654,7 @@ public static class NetworkToolkit
     /// </summary>
     public static async Task<ToolkitStatus> InstallTapDriverAsync(CancellationToken cancellationToken = default)
     {
-        if (!OperatingSystem.IsWindows()) return new ToolkitStatus(false, "非 Windows 无需安装 TAP 驱动");
+        if (!OperatingSystem.IsWindows()) return new ToolkitStatus(false, Loc.T("非 Windows 无需安装 TAP 驱动"));
 
         var missing = RuntimeLocator.Verify(
             (RuntimeLocator.TapInstallExe, "tapinstall.exe"),
@@ -672,8 +673,8 @@ public static class NetworkToolkit
         {
             var reason = result.FirstLine();
             return new ToolkitStatus(false, string.IsNullOrEmpty(reason)
-                ? $"TAP 驱动安装失败（tapinstall 退出码 {result.ExitCode}）"
-                : $"TAP 驱动安装失败：{reason}");
+                ? Loc.F("TAP 驱动安装失败（tapinstall 退出码 {0}）", result.ExitCode)
+                : Loc.F("TAP 驱动安装失败：{0}", reason));
         }
 
         // 驱动装完系统需要几秒枚举网卡，等一下再确认
@@ -681,8 +682,8 @@ public static class NetworkToolkit
 
         var count = await TapCountAsync(cancellationToken).ConfigureAwait(false);
         return count > 0
-            ? new ToolkitStatus(true, "TAP 驱动安装完成")
-            : new ToolkitStatus(false, "驱动已执行安装，但未检测到 TAP 网卡，请重启后再试");
+            ? new ToolkitStatus(true, Loc.T("TAP 驱动安装完成"))
+            : new ToolkitStatus(false, Loc.T("驱动已执行安装，但未检测到 TAP 网卡，请重启后再试"));
     }
 
     /// <summary>
@@ -691,7 +692,7 @@ public static class NetworkToolkit
     /// </summary>
     public static async Task<ToolkitStatus> EnsureWinIpBroadcastAsync(CancellationToken cancellationToken = default)
     {
-        if (!OperatingSystem.IsWindows()) return new ToolkitStatus(false, "非 Windows 不支持 WinIPBroadcast");
+        if (!OperatingSystem.IsWindows()) return new ToolkitStatus(false, Loc.T("非 Windows 不支持 WinIPBroadcast"));
 
         var query = await ProcessRunner
             .RunAsync("sc", "query WinIPBroadcast", TimeSpan.FromSeconds(8), cancellationToken)
@@ -703,7 +704,7 @@ public static class NetworkToolkit
                 .RunAsync("net", "start WinIPBroadcast", TimeSpan.FromSeconds(15), cancellationToken)
                 .ConfigureAwait(false);
 
-            return new ToolkitStatus(true, start.Ok ? "WinIPBroadcast 服务已在运行" : "WinIPBroadcast 服务已安装（启动未成功，请手动启动）");
+            return new ToolkitStatus(true, start.Ok ? Loc.T("WinIPBroadcast 服务已在运行") : Loc.T("WinIPBroadcast 服务已安装（启动未成功，请手动启动）"));
         }
 
         if (!RuntimeLocator.Exists(RuntimeLocator.WinIpBroadcastExe))
@@ -717,7 +718,7 @@ public static class NetworkToolkit
             workingDirectory: RuntimeLocator.WinIpBroadcastDir).ConfigureAwait(false);
 
         if (!install.Started)
-            return new ToolkitStatus(false, $"WinIPBroadcast 安装程序启动失败：{install.Output}");
+            return new ToolkitStatus(false, Loc.F("WinIPBroadcast 安装程序启动失败：{0}", install.Output));
 
         await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
 
@@ -725,7 +726,7 @@ public static class NetworkToolkit
             .RunAsync("net", "start WinIPBroadcast", TimeSpan.FromSeconds(15), cancellationToken)
             .ConfigureAwait(false);
 
-        return new ToolkitStatus(true, started.Ok ? "WinIPBroadcast 已安装并启动" : "WinIPBroadcast 已安装（启动未成功，请手动启动）");
+        return new ToolkitStatus(true, started.Ok ? Loc.T("WinIPBroadcast 已安装并启动") : Loc.T("WinIPBroadcast 已安装（启动未成功，请手动启动）"));
     }
 
     /// <summary>查询本机公网 IP；失败返回 "?"（与旧版 _wan_ip 一致）。</summary>
@@ -742,7 +743,7 @@ public static class NetworkToolkit
         }
         catch (Exception ex)
         {
-            Log.Warn($"查询公网 IP 失败：{ex.Message}");
+            Log.Warn(Loc.F("查询公网 IP 失败：{0}", ex.Message));
             return "?";
         }
     }

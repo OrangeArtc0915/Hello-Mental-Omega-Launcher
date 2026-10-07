@@ -1,4 +1,4 @@
-<Window x:Class="HMOL.App.Windows.PickWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.PickWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -34,8 +34,8 @@
                         Grid.Row="1"
                         Margin="0,10,0,0"
                         Orientation="Horizontal">
-                <c:OutlineButton Content="全选" Click="OnSelectAllClick" />
-                <c:OutlineButton Margin="8,0,0,0" Content="全不选" Click="OnClearAllClick" />
+                <c:OutlineButton Content="{loc:T '全选'}" Click="OnSelectAllClick" />
+                <c:OutlineButton Margin="8,0,0,0" Content="{loc:T '全不选'}" Click="OnClearAllClick" />
             </StackPanel>
 
             <!-- 列表可能几百项，必须放在 ScrollViewer 里；窗口高度固定，只有这里滚动 -->
@@ -62,13 +62,13 @@
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                     <c:OutlineButton Width="88"
                                      Height="32"
-                                     Content="取消"
+                                     Content="{loc:T '取消'}"
                                      Click="OnCancelClick" />
                     <c:OutlineButton x:Name="BtnOk"
                                      Width="88"
                                      Height="32"
                                      Margin="8,0,0,0"
-                                     Content="确定"
+                                     Content="{loc:T '确定'}"
                                      Tone="Solid"
                                      Click="OnOkClick" />
                 </StackPanel>

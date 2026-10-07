@@ -11,6 +11,7 @@ using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Packages;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Pages;
 
@@ -34,7 +35,7 @@ public sealed class AvailableRowItem
         get
         {
             var size = BackupService.FormatSize(Entry.SizeBytes);
-            var kind = Entry.IsDirectory ? "文件夹" : Entry.IsArchive ? "压缩包" : "文件";
+            var kind = Entry.IsDirectory ? Loc.T("文件夹") : Entry.IsArchive ? Loc.T("压缩包") : Loc.T("文件");
 
             return $"{kind} · {size}";
         }
@@ -55,8 +56,8 @@ public sealed class InstalledRowItem
     public PackageEntry? Entry { get; }
 
     public string Detail => Entry is null
-        ? "包目录里已找不到源文件，仍可按记录卸载"
-        : $"来源：{Entry.FullPath}";
+        ? Loc.T("包目录里已找不到源文件，仍可按记录卸载")
+        : Loc.F("来源：{0}", Entry.FullPath);
 }
 
 /// <summary>
@@ -81,7 +82,7 @@ public partial class PagePackages : LauncherPage
 
         // 分段控件的文案取自 Core 的分类定义，界面里不重复写一遍
         for (var i = 0; i < _tabs.Length; i++)
-            _tabs[i].Content = PackageTypes.Of(PackageTypes.All[i]).DisplayName + " 包";
+            _tabs[i].Content = PackageTypes.Of(PackageTypes.All[i]).DisplayName + Loc.T(" 包");
 
         // 入场计划：页头 → 实例条与页签 → 两个列表卡（自上而下，组内 40ms 一档，总时长 < 500ms）
         _anim.Group(0, HeaderPackages);
@@ -161,7 +162,7 @@ public partial class PagePackages : LauncherPage
             _tabs[i].Tone = i == clamped ? ButtonTone.Solid : ButtonTone.Outline;
 
         var spec = PackageTypes.Of(_type);
-        LabTypeHint.Text = $"包目录：{PackageTypes.DirectoryOf(_type)}\n允许的扩展名：{string.Join("、", spec.Extensions)}";
+        LabTypeHint.Text = Loc.F("包目录：{0}\n允许的扩展名：{1}", PackageTypes.DirectoryOf(_type), string.Join(Loc.T("、"), spec.Extensions));
 
         UpdateInstanceStrip();
         _ = RefreshAsync();
@@ -174,8 +175,8 @@ public partial class PagePackages : LauncherPage
         var instance = InstanceManager.Current;
 
         LabInstance.Text = instance is null
-            ? "当前没有游戏实例：安装 / 卸载需要先在「游戏实例」页创建一个实例并设为当前实例。"
-            : $"当前实例：{instance.Name}";
+            ? Loc.T("当前没有游戏实例：安装 / 卸载需要先在「游戏实例」页创建一个实例并设为当前实例。")
+            : Loc.F("当前实例：{0}", instance.Name);
         LabInstancePath.Text = instance?.GameDir ?? string.Empty;
     }
 
@@ -194,8 +195,8 @@ public partial class PagePackages : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Error($"列举包失败：{PackageTypes.DirectoryOf(type)}", ex);
-            ShowNotice($"读取包目录失败：{ex.Message}", true);
+            Log.Error(Loc.F("列举包失败：{0}", PackageTypes.DirectoryOf(type)), ex);
+            ShowNotice(Loc.F("读取包目录失败：{0}", ex.Message), true);
             return;
         }
 
@@ -233,7 +234,7 @@ public partial class PagePackages : LauncherPage
         }
         catch (Exception ex)
         {
-            Notify($"包目录不可用：{ex.Message}", "打开包目录", MessageBoxImage.Warning);
+            Notify(Loc.F("包目录不可用：{0}", ex.Message), Loc.T("打开包目录"), MessageBoxImage.Warning);
             return;
         }
 
@@ -249,8 +250,8 @@ public partial class PagePackages : LauncherPage
 
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = $"导入{PackageTypes.Of(type).DisplayName}包",
-            Filter = $"允许的包文件 ({pattern})|{pattern}|所有文件 (*.*)|*.*",
+            Title = Loc.F("导入{0}包", PackageTypes.Of(type).DisplayName),
+            Filter = Loc.F("允许的包文件 ({0})|{1}|所有文件 (*.*)|*.*", pattern, pattern),
             CheckFileExists = true,
             Multiselect = false
         };
@@ -264,18 +265,18 @@ public partial class PagePackages : LauncherPage
 
         if (File.Exists(target))
         {
-            var choice = ChoiceWindow.Ask(owner, "包目录已存在同名文件",
-                $"包目录里已有：\n{target}",
-                "覆盖会删除包目录里的同名文件后重新导入。",
-                new ChoiceOption("覆盖", "overwrite", ButtonTone.Danger),
-                new ChoiceOption("取消", "cancel"));
+            var choice = ChoiceWindow.Ask(owner, Loc.T("包目录已存在同名文件"),
+                Loc.F("包目录里已有：\n{0}", target),
+                Loc.T("覆盖会删除包目录里的同名文件后重新导入。"),
+                new ChoiceOption(Loc.T("覆盖"), "overwrite", ButtonTone.Danger),
+                new ChoiceOption(Loc.T("取消"), "cancel"));
 
             if (choice != "overwrite") return;
             overwrite = true;
         }
 
         // 单文件复制无法中断，因此不给取消按钮
-        var progress = ProgressWindow.Open(owner, "导入包", $"正在导入「{Path.GetFileName(source)}」…",
+        var progress = ProgressWindow.Open(owner, Loc.T("导入包"), Loc.F("正在导入「{0}」…", Path.GetFileName(source)),
             indeterminate: true, canCancel: false);
 
         try
@@ -286,14 +287,14 @@ public partial class PagePackages : LauncherPage
             progress.Finish();
             ShowNotice(message, !ok);
 
-            if (!ok) Notify(message, "导入包", MessageBoxImage.Warning);
+            if (!ok) Notify(message, Loc.T("导入包"), MessageBoxImage.Warning);
             else await RefreshAsync();
         }
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"导入包失败：{source}", ex);
-            ShowNotice($"导入失败：{ex.Message}", true);
+            Log.Error(Loc.F("导入包失败：{0}", source), ex);
+            ShowNotice(Loc.F("导入失败：{0}", ex.Message), true);
         }
     }
 
@@ -306,20 +307,20 @@ public partial class PagePackages : LauncherPage
         var inUse = PackageLibrary.InUseBy(_type, entry.Name);
 
         var detail = inUse.Count > 0
-            ? $"该包已被这些实例记为已安装：{string.Join("、", inUse)}。\n移除只删除包目录里的源文件，不会动已装进游戏目录的内容，但之后无法再用它执行安装 / 卸载。"
-            : "移除只删除包目录里的源文件，不影响已装进游戏目录的内容。";
+            ? Loc.F("该包已被这些实例记为已安装：{0}。\n移除只删除包目录里的源文件，不会动已装进游戏目录的内容，但之后无法再用它执行安装 / 卸载。", string.Join(Loc.T("、"), inUse))
+            : Loc.T("移除只删除包目录里的源文件，不影响已装进游戏目录的内容。");
 
-        var choice = ChoiceWindow.Ask(owner, "移除包",
-            $"从包目录移除「{entry.Name}」？",
+        var choice = ChoiceWindow.Ask(owner, Loc.T("移除包"),
+            Loc.F("从包目录移除「{0}」？", entry.Name),
             detail,
-            new ChoiceOption("移除", "remove", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+            new ChoiceOption(Loc.T("移除"), "remove", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "remove") return;
 
         var ok = PackageLibrary.Remove(_type, entry.Name, out var message);
         ShowNotice(message, !ok);
-        if (!ok) Notify(message, "移除包", MessageBoxImage.Warning);
+        if (!ok) Notify(message, Loc.T("移除包"), MessageBoxImage.Warning);
 
         _ = RefreshAsync();
     }
@@ -332,13 +333,13 @@ public partial class PagePackages : LauncherPage
         var instance = InstanceManager.Current;
         if (instance is null)
         {
-            ShowNotice("请先在「游戏实例」页创建并选择一个实例。", true);
+            ShowNotice(Loc.T("请先在「游戏实例」页创建并选择一个实例。"), true);
             return;
         }
 
         if (!Directory.Exists(instance.GameDir))
         {
-            ShowNotice($"当前实例的游戏目录不可用：{instance.GameDir}", true);
+            ShowNotice(Loc.F("当前实例的游戏目录不可用：{0}", instance.GameDir), true);
             return;
         }
 
@@ -353,13 +354,13 @@ public partial class PagePackages : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Error($"解析安装目标失败：{entry.Name}", ex);
-            ShowNotice($"解析安装目标失败：{ex.Message}", true);
+            Log.Error(Loc.F("解析安装目标失败：{0}", entry.Name), ex);
+            ShowNotice(Loc.F("解析安装目标失败：{0}", ex.Message), true);
             return;
         }
 
-        var kind = entry.IsDirectory ? "文件夹" : entry.IsArchive ? "压缩包" : "文件";
-        var message = $"即将安装{kind}：\n{entry.Name}\n\n到实例「{instance.Name}」：\n{target.TargetDirectory}";
+        var kind = entry.IsDirectory ? Loc.T("文件夹") : entry.IsArchive ? Loc.T("压缩包") : Loc.T("文件");
+        var message = Loc.F("即将安装{0}：\n{1}\n\n到实例「{2}」：\n{3}", kind, entry.Name, instance.Name, target.TargetDirectory);
 
         var policy = CopyConflictPolicy.Overwrite;
 
@@ -373,35 +374,35 @@ public partial class PagePackages : LauncherPage
             }
             catch (Exception ex)
             {
-                Log.Warn($"扫描安装冲突失败：{target.TargetDirectory}（{ex.Message}）");
+                Log.Warn(Loc.F("扫描安装冲突失败：{0}（{1}）", target.TargetDirectory, ex.Message));
                 conflicts = [];
             }
 
             if (conflicts.Count == 0)
             {
-                var choice = ChoiceWindow.Ask(owner, "目标已存在", message,
-                    $"目标目录已存在：\n{target.TargetDirectory}\n\n未检测到文件级冲突，替换会先移走原目录再铺入新内容。",
-                    new ChoiceOption("替换", "overwrite", ButtonTone.Danger),
-                    new ChoiceOption("取消", "cancel"));
+                var choice = ChoiceWindow.Ask(owner, Loc.T("目标已存在"), message,
+                    Loc.F("目标目录已存在：\n{0}\n\n未检测到文件级冲突，替换会先移走原目录再铺入新内容。", target.TargetDirectory),
+                    new ChoiceOption(Loc.T("替换"), "overwrite", ButtonTone.Danger),
+                    new ChoiceOption(Loc.T("取消"), "cancel"));
 
                 if (choice != "overwrite") return;
             }
             else
             {
                 var sample = string.Join("\n", conflicts.Take(10).Select(item => "  • " + item));
-                if (conflicts.Count > 10) sample += $"\n  … 另外 {conflicts.Count - 10} 个";
+                if (conflicts.Count > 10) sample += Loc.F("\n  … 另外 {0} 个", conflicts.Count - 10);
 
                 var detail = $"{sample}\n\n" +
-                             "• 覆盖全部：用新包覆盖目标目录中的冲突文件\n" +
-                             "• 跳过已有：保留目标目录中的现有文件，只装入新文件\n" +
-                             "• 取消：中止本次安装";
+                             Loc.T("• 覆盖全部：用新包覆盖目标目录中的冲突文件\n") +
+                             Loc.T("• 跳过已有：保留目标目录中的现有文件，只装入新文件\n") +
+                             Loc.T("• 取消：中止本次安装");
 
-                var choice = ChoiceWindow.Ask(owner, "检测到文件冲突",
-                    $"{message}\n\n与目标目录有 {conflicts.Count} 处文件冲突（最多统计 50 条）：",
+                var choice = ChoiceWindow.Ask(owner, Loc.T("检测到文件冲突"),
+                    Loc.F("{0}\n\n与目标目录有 {1} 处文件冲突（最多统计 50 条）：", message, conflicts.Count),
                     detail,
-                    new ChoiceOption("覆盖全部", "overwrite", ButtonTone.Danger),
-                    new ChoiceOption("跳过已有", "skip"),
-                    new ChoiceOption("取消", "cancel"));
+                    new ChoiceOption(Loc.T("覆盖全部"), "overwrite", ButtonTone.Danger),
+                    new ChoiceOption(Loc.T("跳过已有"), "skip"),
+                    new ChoiceOption(Loc.T("取消"), "cancel"));
 
                 if (choice is null || choice == "cancel") return;
 
@@ -410,15 +411,15 @@ public partial class PagePackages : LauncherPage
         }
         else
         {
-            var choice = ChoiceWindow.Ask(owner, "确认安装", message,
-                "同名文件会先备份为 .bak-<时间戳>，安装过程可取消。",
-                new ChoiceOption("安装", "install", ButtonTone.Solid),
-                new ChoiceOption("取消", "cancel"));
+            var choice = ChoiceWindow.Ask(owner, Loc.T("确认安装"), message,
+                Loc.T("同名文件会先备份为 .bak-<时间戳>，安装过程可取消。"),
+                new ChoiceOption(Loc.T("安装"), "install", ButtonTone.Solid),
+                new ChoiceOption(Loc.T("取消"), "cancel"));
 
             if (choice != "install") return;
         }
 
-        var progress = ProgressWindow.Open(owner, "安装包", $"正在安装「{entry.Name}」…");
+        var progress = ProgressWindow.Open(owner, Loc.T("安装包"), Loc.F("正在安装「{0}」…", entry.Name));
 
         try
         {
@@ -429,7 +430,7 @@ public partial class PagePackages : LauncherPage
             progress.Finish();
 
             ShowNotice(outcome.Message, !outcome.Success);
-            Notify(outcome.Message, outcome.Success ? "安装完成" : "安装未完成",
+            Notify(outcome.Message, outcome.Success ? Loc.T("安装完成") : Loc.T("安装未完成"),
                 outcome.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
             await RefreshAsync();
@@ -437,8 +438,8 @@ public partial class PagePackages : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"安装包失败：{entry.Name}", ex);
-            ShowNotice($"安装失败：{ex.Message}", true);
+            Log.Error(Loc.F("安装包失败：{0}", entry.Name), ex);
+            ShowNotice(Loc.F("安装失败：{0}", ex.Message), true);
         }
     }
 
@@ -450,7 +451,7 @@ public partial class PagePackages : LauncherPage
         var instance = InstanceManager.Current;
         if (instance is null)
         {
-            ShowNotice("请先在「游戏实例」页创建并选择一个实例。", true);
+            ShowNotice(Loc.T("请先在「游戏实例」页创建并选择一个实例。"), true);
             return;
         }
 
@@ -471,7 +472,7 @@ public partial class PagePackages : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Warn($"扫描可回退时间点失败：{ex.Message}");
+            Log.Warn(Loc.F("扫描可回退时间点失败：{0}", ex.Message));
             revertPoints = [];
         }
 
@@ -480,52 +481,52 @@ public partial class PagePackages : LauncherPage
 
         if (mapFileOnly)
         {
-            detail.Append("地图文件直接从 Maps\\Custom 删除，不需要原版备份。");
-            options.Add(new ChoiceOption("卸载地图文件", "selective", ButtonTone.Danger));
+            detail.Append(Loc.T("地图文件直接从 Maps\\Custom 删除，不需要原版备份。"));
+            options.Add(new ChoiceOption(Loc.T("卸载地图文件"), "selective", ButtonTone.Danger));
         }
         else
         {
             if (hasRecord)
             {
-                detail.Append("• 选择性卸载：只删除该包装进游戏目录的文件，被它覆盖掉的原版文件从 MO 原版备份还原。\n");
+                detail.Append(Loc.T("• 选择性卸载：只删除该包装进游戏目录的文件，被它覆盖掉的原版文件从 MO 原版备份还原。\n"));
 
                 if (hasOriginalBackup)
-                    options.Add(new ChoiceOption("选择性卸载", "selective", ButtonTone.Solid));
+                    options.Add(new ChoiceOption(Loc.T("选择性卸载"), "selective", ButtonTone.Solid));
                 else
-                    detail.Append("  注意：还没有 MO 原版备份，无法还原被覆盖的原版文件，只能选全量恢复。\n");
+                    detail.Append(Loc.T("  注意：还没有 MO 原版备份，无法还原被覆盖的原版文件，只能选全量恢复。\n"));
 
-                detail.Append("• 按文件删除：从安装记录里逐个勾选，只删勾中的文件，其余保留在游戏目录，被覆盖的原版同样从 MO 原版备份还原。\n");
-                options.Add(new ChoiceOption("按文件删除…", "files"));
+                detail.Append(Loc.T("• 按文件删除：从安装记录里逐个勾选，只删勾中的文件，其余保留在游戏目录，被覆盖的原版同样从 MO 原版备份还原。\n"));
+                options.Add(new ChoiceOption(Loc.T("按文件删除…"), "files"));
             }
             else
             {
-                detail.Append("包目录里没有找到该包的精确安装记录，无法选择性卸载。\n");
+                detail.Append(Loc.T("包目录里没有找到该包的精确安装记录，无法选择性卸载。\n"));
             }
 
-            detail.Append("• 全量恢复原版：清空当前实例的游戏目录，再用 MO 原版备份整体覆盖，" +
-                          "实例上安装的所有包都会被移除（破坏性操作）。\n");
+            detail.Append(Loc.T("• 全量恢复原版：清空当前实例的游戏目录，再用 MO 原版备份整体覆盖，") +
+                          Loc.T("实例上安装的所有包都会被移除（破坏性操作）。\n"));
 
             if (PathGuard.IsInside(instance.GameDir, instance.InstallRecordsDirectory))
-                detail.Append("  ⚠️ 该实例的安装记录就位于游戏目录内，全量恢复后会被清除。\n");
+                detail.Append(Loc.T("  ⚠️ 该实例的安装记录就位于游戏目录内，全量恢复后会被清除。\n"));
 
             if (hasOriginalBackup)
-                options.Add(new ChoiceOption("全量恢复原版", "full", ButtonTone.Danger));
+                options.Add(new ChoiceOption(Loc.T("全量恢复原版"), "full", ButtonTone.Danger));
             else
-                detail.Append($"  但当前没有 MO 原版备份（{BackupService.OriginalBackupPath}），请先执行「备份原版游戏」。");
+                detail.Append(Loc.F("  但当前没有 MO 原版备份（{0}），请先执行「备份原版游戏」。", BackupService.OriginalBackupPath));
         }
 
         // 时间点回退与具体包无关，只要游戏目录里还留着 .bak- 备份就提供
         if (revertPoints.Count > 0)
         {
-            detail.Append($"• 回到某个时间点：把历次安装覆盖文件时留下的 .bak-<时间戳> 备份覆盖回原位置，" +
-                          $"当前有 {revertPoints.Count} 个时间点可选。\n");
-            options.Add(new ChoiceOption("回到某个时间点…", "revert"));
+            detail.Append(Loc.T("• 回到某个时间点：把历次安装覆盖文件时留下的 .bak-<时间戳> 备份覆盖回原位置，") +
+                          Loc.F("当前有 {0} 个时间点可选。\n", revertPoints.Count));
+            options.Add(new ChoiceOption(Loc.T("回到某个时间点…"), "revert"));
         }
 
-        options.Add(new ChoiceOption("取消", "cancel"));
+        options.Add(new ChoiceOption(Loc.T("取消"), "cancel"));
 
-        var choice = ChoiceWindow.Ask(owner, "卸载包",
-            $"卸载「{name}」（{PackageTypes.Of(type).DisplayName}包）", detail.ToString(), options.ToArray());
+        var choice = ChoiceWindow.Ask(owner, Loc.T("卸载包"),
+            Loc.F("卸载「{0}」（{1}包）", name, PackageTypes.Of(type).DisplayName), detail.ToString(), options.ToArray());
 
         if (choice is null || choice == "cancel") return;
 
@@ -543,13 +544,13 @@ public partial class PagePackages : LauncherPage
 
         if (choice == "full" && !hasOriginalBackup)
         {
-            Notify($"未找到 MO 原版备份，无法全量恢复：\n{BackupService.OriginalBackupPath}\n\n" +
-                   "请先在实例页执行「备份原版游戏」。", "卸载包", MessageBoxImage.Warning);
+            Notify(Loc.F("未找到 MO 原版备份，无法全量恢复：\n{0}\n\n", BackupService.OriginalBackupPath) +
+                   Loc.T("请先在实例页执行「备份原版游戏」。"), Loc.T("卸载包"), MessageBoxImage.Warning);
             return;
         }
 
-        var progress = ProgressWindow.Open(owner, "卸载包",
-            choice == "full" ? "正在从原版备份恢复…" : $"正在卸载「{name}」…");
+        var progress = ProgressWindow.Open(owner, Loc.T("卸载包"),
+            choice == "full" ? Loc.T("正在从原版备份恢复…") : Loc.F("正在卸载「{0}」…", name));
 
         var success = false;
         var message = string.Empty;
@@ -575,7 +576,7 @@ public partial class PagePackages : LauncherPage
                     InstanceStore.Save(instance);
                     InstallRecordStore.DeleteAll(instance);
 
-                    message += $"\n\n已清空实例「{instance.Name}」的已安装记录。";
+                    message += Loc.F("\n\n已清空实例「{0}」的已安装记录。", instance.Name);
                 }
             }
             else
@@ -590,15 +591,15 @@ public partial class PagePackages : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"卸载包失败：{name}", ex);
-            ShowNotice($"卸载失败：{ex.Message}", true);
+            Log.Error(Loc.F("卸载包失败：{0}", name), ex);
+            ShowNotice(Loc.F("卸载失败：{0}", ex.Message), true);
             return;
         }
 
         progress.Finish();
 
         ShowNotice(message, !success);
-        Notify(message, choice == "full" ? "全量恢复" : "卸载",
+        Notify(message, choice == "full" ? Loc.T("全量恢复") : Loc.T("卸载"),
             success ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
         await RefreshAsync();
@@ -628,7 +629,7 @@ public partial class PagePackages : LauncherPage
 
         if (record is not { Files.Count: > 0 })
         {
-            ShowNotice("这个包没有精确安装记录，无法按文件删除。", true);
+            ShowNotice(Loc.T("这个包没有精确安装记录，无法按文件删除。"), true);
             return;
         }
 
@@ -638,24 +639,24 @@ public partial class PagePackages : LauncherPage
         var items = record.Files.Select(file =>
         {
             var exists = PathGuard.TryResolve(root, file, out var full) && File.Exists(full);
-            return new PickItem(file, exists ? file : file + "（已不存在）");
+            return new PickItem(file, exists ? file : file + Loc.T("（已不存在）"));
         }).ToList();
 
-        var picked = PickWindow.Pick(owner, "按文件删除",
-            $"从「{name}」的安装记录里勾选要删除的文件（共 {items.Count} 个）：", items, PickMode.Multi);
+        var picked = PickWindow.Pick(owner, Loc.T("按文件删除"),
+            Loc.F("从「{0}」的安装记录里勾选要删除的文件（共 {1} 个）：", name, items.Count), items, PickMode.Multi);
 
         if (picked is null || picked.Count == 0) return;
 
         // 删文件是破坏性操作，选完必须再确认一次
-        var answer = ChoiceWindow.Ask(owner, "确认删除文件",
-            $"将从游戏目录删除这 {picked.Count} 个文件。",
-            "被覆盖的原版文件会从 MO 原版备份还原；未勾选的文件保留。这是破坏性操作，删除后无法撤销。",
-            new ChoiceOption("删除", "delete", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+        var answer = ChoiceWindow.Ask(owner, Loc.T("确认删除文件"),
+            Loc.F("将从游戏目录删除这 {0} 个文件。", picked.Count),
+            Loc.T("被覆盖的原版文件会从 MO 原版备份还原；未勾选的文件保留。这是破坏性操作，删除后无法撤销。"),
+            new ChoiceOption(Loc.T("删除"), "delete", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (answer != "delete") return;
 
-        var progress = ProgressWindow.Open(owner, "按文件删除", $"正在删除「{name}」的 {picked.Count} 个文件…");
+        var progress = ProgressWindow.Open(owner, Loc.T("按文件删除"), Loc.F("正在删除「{0}」的 {1} 个文件…", name, picked.Count));
 
         var success = false;
         var message = string.Empty;
@@ -674,15 +675,15 @@ public partial class PagePackages : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"按文件卸载失败：{name}", ex);
-            ShowNotice($"按文件删除失败：{ex.Message}", true);
+            Log.Error(Loc.F("按文件卸载失败：{0}", name), ex);
+            ShowNotice(Loc.F("按文件删除失败：{0}", ex.Message), true);
             return;
         }
 
         progress.Finish();
 
         ShowNotice(message, !success);
-        Notify(message, "按文件删除", success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        Notify(message, Loc.T("按文件删除"), success ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
         await RefreshAsync();
     }
@@ -695,11 +696,11 @@ public partial class PagePackages : LauncherPage
     {
         var items = points
             .Select(point => new PickItem(point.Stamp, point.Time.ToString("yyyy-MM-dd HH:mm:ss"),
-                $"该时间点有 {point.FileCount} 个文件可回退"))
+                Loc.F("该时间点有 {0} 个文件可回退", point.FileCount)))
             .ToList();
 
-        var picked = PickWindow.Pick(owner, "回到某个时间点",
-            "选择一个要回退到的备份时间点：来自历次安装覆盖文件时留下的 .bak-<时间戳> 备份。",
+        var picked = PickWindow.Pick(owner, Loc.T("回到某个时间点"),
+            Loc.T("选择一个要回退到的备份时间点：来自历次安装覆盖文件时留下的 .bak-<时间戳> 备份。"),
             items, PickMode.Single);
 
         if (picked is null || picked.Count == 0) return;
@@ -710,17 +711,17 @@ public partial class PagePackages : LauncherPage
         if (point is null) return;
 
         // 回退会用备份盖掉当前文件，同样属于破坏性操作，必须再明确确认一次
-        var answer = ChoiceWindow.Ask(owner, "确认回退",
-            $"回到 {point.Time:yyyy-MM-dd HH:mm:ss} 这个时间点？",
-            $"会用该时间点的 {point.FileCount} 个 .bak 备份覆盖当前文件，当前内容会被替换；备份文件本身会保留。\n" +
-            "如果这个时间点对应某个包的安装，该包会被视为已撤销：新建的文件会删除，并从「已安装」列表移除。",
-            new ChoiceOption("回退", "revert", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+        var answer = ChoiceWindow.Ask(owner, Loc.T("确认回退"),
+            Loc.F("回到 {0:yyyy-MM-dd HH:mm:ss} 这个时间点？", point.Time),
+            Loc.F("会用该时间点的 {0} 个 .bak 备份覆盖当前文件，当前内容会被替换；备份文件本身会保留。\n", point.FileCount) +
+            Loc.T("如果这个时间点对应某个包的安装，该包会被视为已撤销：新建的文件会删除，并从「已安装」列表移除。"),
+            new ChoiceOption(Loc.T("回退"), "revert", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (answer != "revert") return;
 
-        var progress = ProgressWindow.Open(owner, "回到时间点",
-            $"正在回退到 {point.Time:yyyy-MM-dd HH:mm:ss}…");
+        var progress = ProgressWindow.Open(owner, Loc.T("回到时间点"),
+            Loc.F("正在回退到 {0:yyyy-MM-dd HH:mm:ss}…", point.Time));
 
         var success = false;
         var message = string.Empty;
@@ -736,15 +737,15 @@ public partial class PagePackages : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"按时间点回退失败：{stamp}", ex);
-            ShowNotice($"回退失败：{ex.Message}", true);
+            Log.Error(Loc.F("按时间点回退失败：{0}", stamp), ex);
+            ShowNotice(Loc.F("回退失败：{0}", ex.Message), true);
             return;
         }
 
         progress.Finish();
 
         ShowNotice(message, !success);
-        Notify(message, "回到时间点", success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        Notify(message, Loc.T("回到时间点"), success ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
         await RefreshAsync();
     }

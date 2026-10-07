@@ -1,4 +1,4 @@
-<Window x:Class="HMOL.App.Windows.Multiplayer.MultiplayerFileWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.Multiplayer.MultiplayerFileWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -34,14 +34,14 @@
                 <TextBlock FontSize="11.5"
                            Foreground="{DynamicResource Status.Warn}"
                            TextWrapping="Wrap"
-                           Text="提示：发送前请先压缩文件（zip / 7z），可大幅提升传输速度；单文件上限 500MB。" />
+                           Text="{loc:T '提示：发送前请先压缩文件（zip / 7z），可大幅提升传输速度；单文件上限 500MB。'}" />
             </Border>
 
             <TextBlock Grid.Row="1"
                        Margin="0,12,0,0"
                        FontSize="12"
                        Foreground="{DynamicResource Text.Secondary}"
-                       Text="选择接收方（在线对端，自动刷新）" />
+                       Text="{loc:T '选择接收方（在线对端，自动刷新）'}" />
             <ListBox x:Name="ListPeers"
                      Grid.Row="2"
                      Height="120"
@@ -75,24 +75,24 @@
             </ListBox>
 
             <StackPanel Grid.Row="3" Margin="0,10,0,0" Orientation="Horizontal">
-                <c:OutlineButton Content="选择文件" Click="OnPickClick" />
+                <c:OutlineButton Content="{loc:T '选择文件'}" Click="OnPickClick" />
                 <TextBlock x:Name="LabFile"
                            Margin="10,0,0,0"
                            VerticalAlignment="Center"
                            FontSize="11.5"
                            Foreground="{DynamicResource Text.Tertiary}"
-                           Text="未选择文件"
+                           Text="{loc:T '未选择文件'}"
                            TextTrimming="CharacterEllipsis" />
             </StackPanel>
 
             <StackPanel Grid.Row="4" Margin="0,12,0,0" Orientation="Horizontal">
                 <c:OutlineButton x:Name="BtnSend"
-                                 Content="发 送"
+                                 Content="{loc:T '发 送'}"
                                  Tone="Solid"
                                  Click="OnSendClick" />
                 <c:OutlineButton x:Name="BtnCancel"
                                  Margin="8,0,0,0"
-                                 Content="取消"
+                                 Content="{loc:T '取消'}"
                                  IsEnabled="False"
                                  Click="OnCancelClick" />
                 <TextBlock x:Name="LabStatus"
@@ -108,7 +108,7 @@
             <StackPanel Grid.Row="6" Margin="0,12,0,0">
                 <TextBlock FontSize="12"
                            Foreground="{DynamicResource Text.Secondary}"
-                           Text="传输记录" />
+                           Text="{loc:T '传输记录'}" />
                 <ScrollViewer Margin="0,6,0,0"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">

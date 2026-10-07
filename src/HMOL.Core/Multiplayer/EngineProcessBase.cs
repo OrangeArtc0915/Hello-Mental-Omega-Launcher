@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -79,7 +80,7 @@ public abstract class EngineProcessBase : IAsyncDisposable
     protected void LogLine(string message)
     {
         try { LogCallback?.Invoke($"[{EnginePrefix}] {message}"); }
-        catch (Exception ex) { Log.Warn($"引擎日志回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("引擎日志回调异常：{0}", ex.Message)); }
     }
 
     /// <summary>日志前缀，默认取展示名。</summary>
@@ -110,7 +111,7 @@ public abstract class EngineProcessBase : IAsyncDisposable
         }
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-        if (!process.Start()) throw new InvalidOperationException($"无法启动进程：{exe}");
+        if (!process.Start()) throw new InvalidOperationException(Loc.F("无法启动进程：{0}", exe));
 
         _process = process;
 
@@ -141,7 +142,7 @@ public abstract class EngineProcessBase : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"结束 {EnginePrefix} 进程失败：{ex.Message}");
+            Log.Warn(Loc.F("结束 {0} 进程失败：{1}", EnginePrefix, ex.Message));
         }
 
         try
@@ -187,10 +188,10 @@ public abstract class EngineProcessBase : IAsyncDisposable
         }
 
         try { OutputReceived?.Invoke(line); }
-        catch (Exception ex) { Log.Warn($"引擎输出回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("引擎输出回调异常：{0}", ex.Message)); }
 
         try { OnEngineLine(line); }
-        catch (Exception ex) { Log.Warn($"引擎日志过滤异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("引擎日志过滤异常：{0}", ex.Message)); }
     }
 
     /// <summary>

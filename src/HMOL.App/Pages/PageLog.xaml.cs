@@ -10,6 +10,7 @@ using HMOL.App.Windows;
 using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Pages;
 
@@ -211,9 +212,9 @@ public partial class PageLog : LauncherPage
 
         LabEmpty.Text = _tab switch
         {
-            2 => "日志目录里还没有文件。",
-            1 => "还没有游戏日志。",
-            _ => "还没有日志。"
+            2 => Loc.T("日志目录里还没有文件。"),
+            1 => Loc.T("还没有游戏日志。"),
+            _ => Loc.T("还没有日志。")
         };
     }
 
@@ -223,12 +224,12 @@ public partial class PageLog : LauncherPage
 
         var scope = _tab switch
         {
-            2 => _diskFile is null ? "磁盘日志" : $"磁盘日志 · {Path.GetFileName(_diskFile)}",
-            1 => "游戏日志",
-            _ => "应用日志"
+            2 => _diskFile is null ? Loc.T("磁盘日志") : Loc.F("磁盘日志 · {0}", Path.GetFileName(_diskFile)),
+            1 => Loc.T("游戏日志"),
+            _ => Loc.T("应用日志")
         };
 
-        LabStatus.Text = $"共 {_rows.Count} 行 · {scope}";
+        LabStatus.Text = Loc.F("共 {0} 行 · {1}", _rows.Count, scope);
     }
 
     // ————— 磁盘日志 —————
@@ -244,7 +245,7 @@ public partial class PageLog : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取日志目录失败：{ex.Message}");
+            Log.Warn(Loc.F("读取日志目录失败：{0}", ex.Message));
             return [];
         }
     }
@@ -312,7 +313,7 @@ public partial class PageLog : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取日志文件失败 {_diskFile}：{ex.Message}");
+            Log.Warn(Loc.F("读取日志文件失败 {0}：{1}", _diskFile, ex.Message));
         }
     }
 
@@ -321,7 +322,7 @@ public partial class PageLog : LauncherPage
         var match = LineRegex.Match(raw);
 
         if (!match.Success)
-            return new ViewRow(date, "磁盘", "INFO", raw, "Text.Secondary");
+            return new ViewRow(date, Loc.T("磁盘"), "INFO", raw, "Text.Secondary");
 
         var time = match.Groups["time"].Value;
         if (date.Length > 0) time = $"{date} {time}";
@@ -329,7 +330,7 @@ public partial class PageLog : LauncherPage
         var level = match.Groups["level"].Value.ToUpperInvariant();
         var text = $"[{match.Groups["module"].Value}] {match.Groups["message"].Value}";
 
-        return new ViewRow(time, "磁盘", level, text, BrushKeyOf(level));
+        return new ViewRow(time, Loc.T("磁盘"), level, text, BrushKeyOf(level));
     }
 
     /// <summary>从 <c>HMOL-2026-9-23-192828382.log</c> 里取出日期部分，用于补全每行的时间。</summary>
@@ -349,16 +350,16 @@ public partial class PageLog : LauncherPage
     {
         if (_rows.Count == 0)
         {
-            Notify("当前视图里没有可导出的日志。", "导出日志", MessageBoxImage.Information);
+            Notify(Loc.T("当前视图里没有可导出的日志。"), Loc.T("导出日志"), MessageBoxImage.Information);
             return;
         }
 
         var isCsv = extension == ".csv";
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "导出日志",
+            Title = Loc.T("导出日志"),
             FileName = $"HMOL_log_{DateTime.Now:yyyyMMdd_HHmmss}{extension}",
-            Filter = isCsv ? "CSV 文件 (*.csv)|*.csv" : "文本文件 (*.txt)|*.txt"
+            Filter = isCsv ? Loc.T("CSV 文件 (*.csv)|*.csv") : Loc.T("文本文件 (*.txt)|*.txt")
         };
 
         var owner = Window.GetWindow(this);
@@ -370,13 +371,13 @@ public partial class PageLog : LauncherPage
             // 带 BOM 写出，Excel 打开 CSV 才不会把中文识别成乱码
             File.WriteAllText(dialog.FileName, isCsv ? BuildCsv() : BuildTxt(), new UTF8Encoding(true));
 
-            Log.Info($"已导出 {_rows.Count} 行日志到 {dialog.FileName}");
-            Notify($"已导出 {_rows.Count} 行到：\n{dialog.FileName}", "导出日志", MessageBoxImage.Information);
+            Log.Info(Loc.F("已导出 {0} 行日志到 {1}", _rows.Count, dialog.FileName));
+            Notify(Loc.F("已导出 {0} 行到：\n{1}", _rows.Count, dialog.FileName), Loc.T("导出日志"), MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            Log.Error($"导出日志失败：{ex.Message}", ex);
-            Notify($"导出失败：{ex.Message}", "导出日志", MessageBoxImage.Warning);
+            Log.Error(Loc.F("导出日志失败：{0}", ex.Message), ex);
+            Notify(Loc.F("导出失败：{0}", ex.Message), Loc.T("导出日志"), MessageBoxImage.Warning);
         }
     }
 
@@ -392,7 +393,7 @@ public partial class PageLog : LauncherPage
     private string BuildCsv()
     {
         var builder = new StringBuilder();
-        builder.AppendLine("时间,级别,来源,内容");
+        builder.AppendLine(Loc.T("时间,级别,来源,内容"));
 
         foreach (var row in _rows)
             builder.AppendLine($"{Csv(row.Time)},{Csv(row.Level)},{Csv(row.Source)},{Csv(row.Text)}");
@@ -406,15 +407,15 @@ public partial class PageLog : LauncherPage
 
     private void OnCleanupClick(object sender, RoutedEventArgs e)
     {
-        var question = $"将删除 {CleanupKeepDays} 天前的日志文件。\n当前日志目录：{Paths.Log}\n\n确定继续？";
+        var question = Loc.F("将删除 {0} 天前的日志文件。\n当前日志目录：{1}\n\n确定继续？", CleanupKeepDays, Paths.Log);
 
         var owner = Window.GetWindow(this);
-        var reply = ChoiceWindow.Confirm(owner, "清理旧日志", question, confirmText: "清理", danger: true);
+        var reply = ChoiceWindow.Confirm(owner, Loc.T("清理旧日志"), question, confirmText: Loc.T("清理"), danger: true);
 
         if (!reply) return;
 
         var removed = CleanupOldFiles();
-        Notify($"已清理 {removed} 个旧日志文件。", "清理旧日志", MessageBoxImage.Information);
+        Notify(Loc.F("已清理 {0} 个旧日志文件。", removed), Loc.T("清理旧日志"), MessageBoxImage.Information);
 
         if (_tab == 2) Reload();
     }
@@ -438,7 +439,7 @@ public partial class PageLog : LauncherPage
             }
             catch (Exception ex)
             {
-                Log.Warn($"删除旧日志失败 {file.Name}：{ex.Message}");
+                Log.Warn(Loc.F("删除旧日志失败 {0}：{1}", file.Name, ex.Message));
             }
         }
 
@@ -472,7 +473,7 @@ public partial class PageLog : LauncherPage
 
     private static ViewRow ToRow(ActivityLine line) => new(
         line.Time.ToString("HH:mm:ss"),
-        line.Source == LogSource.Game ? "游戏" : "应用",
+        line.Source == LogSource.Game ? Loc.T("游戏") : Loc.T("应用"),
         line.Level.ToString().ToUpperInvariant(),
         line.Text,
         line.Level switch

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Appearance;
 
@@ -53,7 +54,7 @@ public static class WallpaperPackageService
         }
         catch (Exception ex)
         {
-            Log.Warn($"取系统 ANSI 代码页失败，RePKG 的输出将按 UTF-8 读取：{ex.Message}");
+            Log.Warn(Loc.F("取系统 ANSI 代码页失败，RePKG 的输出将按 UTF-8 读取：{0}", ex.Message));
             return Encoding.UTF8;
         }
     }
@@ -76,7 +77,7 @@ public static class WallpaperPackageService
             var payload = ReadEmbeddedTool();
             if (payload is null)
             {
-                Log.Error("内嵌的 RePKG.exe 资源缺失，无法导入壁纸包");
+                Log.Error(Loc.T("内嵌的 RePKG.exe 资源缺失，无法导入壁纸包"));
                 return null;
             }
 
@@ -85,13 +86,13 @@ public static class WallpaperPackageService
             if (File.Exists(ToolPath) && new FileInfo(ToolPath).Length == payload.Length) return ToolPath;
 
             File.WriteAllBytes(ToolPath, payload);
-            Log.Info($"已释放壁纸包解包工具：{ToolPath}（{payload.Length} 字节）");
+            Log.Info(Loc.F("已释放壁纸包解包工具：{0}（{1} 字节）", ToolPath, payload.Length));
 
             return ToolPath;
         }
         catch (Exception ex)
         {
-            Log.Error("释放 RePKG.exe 失败", ex);
+            Log.Error(Loc.T("释放 RePKG.exe 失败"), ex);
             return null;
         }
     }
@@ -122,15 +123,15 @@ public static class WallpaperPackageService
     public static async Task<WallpaperImport> ImportAsync(string packagePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(packagePath) || !File.Exists(packagePath))
-            return Fail("壁纸包文件不存在。");
+            return Fail(Loc.T("壁纸包文件不存在。"));
 
         if (!IsPackage(packagePath))
-            return Fail($"只支持 {string.Join(" / ", PackageExtensions)} 格式的壁纸包。");
+            return Fail(Loc.F("只支持 {0} 格式的壁纸包。", string.Join(Loc.T(" / "), PackageExtensions)));
 
         var tool = EnsureTool();
         if (tool is null)
         {
-            return Fail("无法释放内嵌的解包工具 RePKG.exe（程序文件可能不完整），本次导入未执行。");
+            return Fail(Loc.T("无法释放内嵌的解包工具 RePKG.exe（程序文件可能不完整），本次导入未执行。"));
         }
 
         var displayName = Path.GetFileName(packagePath);
@@ -157,36 +158,36 @@ public static class WallpaperPackageService
             var (exitCode, output) = await RunExtractAsync(tool, input, extractDir, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (exitCode is null) return Fail("解包超时（超过 5 分钟），已中止。");
+            if (exitCode is null) return Fail(Loc.T("解包超时（超过 5 分钟），已中止。"));
 
             if (exitCode != 0)
             {
                 // 输出常常是一整段异常堆栈：界面只放第一行，完整内容写进日志
-                Log.Warn($"RePKG 解包失败（退出码 {exitCode}）：{output}");
+                Log.Warn(Loc.F("RePKG 解包失败（退出码 {0}）：{1}", exitCode, output));
 
-                return Fail($"RePKG 解包失败（退出码 {exitCode}）：{FirstLine(output)}");
+                return Fail(Loc.F("RePKG 解包失败（退出码 {0}）：{1}", exitCode, FirstLine(output)));
             }
 
             var media = FindBackgroundMedia(extractDir);
-            if (media is null) return Fail("解包完成，但包内没有可用的视频 / 图片文件，无法作为背景。");
+            if (media is null) return Fail(Loc.T("解包完成，但包内没有可用的视频 / 图片文件，无法作为背景。"));
 
-            Log.Info($"壁纸包已解出可用素材：{media}");
+            Log.Info(Loc.F("壁纸包已解出可用素材：{0}", media));
 
             var imported = BackgroundService.ImportFile(media, moveSource: true);
             if (!imported.Ok) return new WallpaperImport(false, imported.Message, BackgroundKind.None, string.Empty);
 
             return new WallpaperImport(true,
-                $"已导入壁纸包 {displayName}，当前背景：{Path.GetFileName(media)}（{BackgroundService.DescribeKind(imported.Kind)}）",
+                Loc.F("已导入壁纸包 {0}，当前背景：{1}（{2}）", displayName, Path.GetFileName(media), BackgroundService.DescribeKind(imported.Kind)),
                 imported.Kind, imported.FileName);
         }
         catch (OperationCanceledException)
         {
-            return Fail("导入已取消。");
+            return Fail(Loc.T("导入已取消。"));
         }
         catch (Exception ex)
         {
-            Log.Error($"导入壁纸包失败：{packagePath}", ex);
-            return Fail($"导入壁纸包失败：{ex.Message}");
+            Log.Error(Loc.F("导入壁纸包失败：{0}", packagePath), ex);
+            return Fail(Loc.F("导入壁纸包失败：{0}", ex.Message));
         }
         finally
         {
@@ -219,7 +220,7 @@ public static class WallpaperPackageService
         };
 
         using var process = Process.Start(startInfo);
-        if (process is null) return (null, "进程启动失败：Process.Start 返回空。");
+        if (process is null) return (null, Loc.T("进程启动失败：Process.Start 返回空。"));
 
         var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -247,10 +248,10 @@ public static class WallpaperPackageService
         var text = new StringBuilder();
 
         try { text.Append(await stdout.ConfigureAwait(false)); }
-        catch (Exception ex) { Log.Warn($"读取 RePKG 标准输出失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("读取 RePKG 标准输出失败：{0}", ex.Message)); }
 
         try { text.Append(await stderr.ConfigureAwait(false)); }
-        catch (Exception ex) { Log.Warn($"读取 RePKG 标准错误失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("读取 RePKG 标准错误失败：{0}", ex.Message)); }
 
         return text.ToString().Trim();
     }
@@ -262,7 +263,7 @@ public static class WallpaperPackageService
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .FirstOrDefault();
 
-        if (string.IsNullOrWhiteSpace(line)) return "RePKG 没有输出任何信息";
+        if (string.IsNullOrWhiteSpace(line)) return Loc.T("RePKG 没有输出任何信息");
 
         return line.Length <= maxLength ? line : line[..maxLength] + "…";
     }
@@ -308,7 +309,7 @@ public static class WallpaperPackageService
         }
         catch (Exception ex)
         {
-            Log.Warn($"结束 RePKG 进程失败：{ex.Message}");
+            Log.Warn(Loc.F("结束 RePKG 进程失败：{0}", ex.Message));
         }
     }
 
@@ -317,7 +318,7 @@ public static class WallpaperPackageService
         if (string.IsNullOrEmpty(path)) return;
 
         try { File.Delete(path); }
-        catch (Exception ex) { Log.Warn($"删除临时文件失败 {path}：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("删除临时文件失败 {0}：{1}", path, ex.Message)); }
     }
 
     private static void TryDeleteDirectory(string path)
@@ -328,7 +329,7 @@ public static class WallpaperPackageService
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理解包目录失败 {path}：{ex.Message}");
+            Log.Warn(Loc.F("清理解包目录失败 {0}：{1}", path, ex.Message));
         }
     }
 }

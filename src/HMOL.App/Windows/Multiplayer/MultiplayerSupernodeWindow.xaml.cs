@@ -2,6 +2,7 @@ using System.Windows;
 using HMOL.App.Controls;
 using HMOL.App.Services;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -43,17 +44,17 @@ public partial class MultiplayerSupernodeWindow : Window
 
         if (server is { IsRunning: true })
         {
-            LabStatus.Text = "运行中";
+            LabStatus.Text = Loc.T("运行中");
 
             _ = ShowAddressAsync();
-            BtnToggle.Content = "停止服务";
+            BtnToggle.Content = Loc.T("停止服务");
             BtnToggle.Tone = ButtonTone.Danger;
         }
         else
         {
-            LabStatus.Text = "未启动";
+            LabStatus.Text = Loc.T("未启动");
             BarAddress.Visibility = Visibility.Collapsed;
-            BtnToggle.Content = "启动服务";
+            BtnToggle.Content = Loc.T("启动服务");
             BtnToggle.Tone = ButtonTone.Solid;
         }
     }
@@ -66,12 +67,12 @@ public partial class MultiplayerSupernodeWindow : Window
         try
         {
             var address = await server.PublicAddressAsync(_cts.Token);
-            LabAddress.Text = $"公网地址：{address}（队友节点栏填这个）";
+            LabAddress.Text = Loc.F("公网地址：{0}（队友节点栏填这个）", address);
             BarAddress.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
         {
-            LabAddress.Text = $"取公网地址失败：{ex.Message}";
+            LabAddress.Text = Loc.F("取公网地址失败：{0}", ex.Message);
             BarAddress.Visibility = Visibility.Visible;
         }
     }
@@ -85,7 +86,7 @@ public partial class MultiplayerSupernodeWindow : Window
         if (server is { IsRunning: true })
         {
             BtnToggle.IsEnabled = false;
-            LabStatus.Text = "正在停止…";
+            LabStatus.Text = Loc.T("正在停止…");
 
             await MultiplayerHub.StopServerAsync();
 
@@ -96,7 +97,7 @@ public partial class MultiplayerSupernodeWindow : Window
 
         if (!int.TryParse(TxtPort.Text.Trim(), out var port) || port < 1024 || port > 65535)
         {
-            LabStatus.Text = "端口必须是 1024 - 65535 之间的数字";
+            LabStatus.Text = Loc.T("端口必须是 1024 - 65535 之间的数字");
             return;
         }
 
@@ -105,7 +106,7 @@ public partial class MultiplayerSupernodeWindow : Window
 
         _starting = true;
         BtnToggle.IsEnabled = false;
-        LabStatus.Text = "正在启动…";
+        LabStatus.Text = Loc.T("正在启动…");
 
         try
         {
@@ -113,7 +114,7 @@ public partial class MultiplayerSupernodeWindow : Window
 
             if (!result.Ok)
             {
-                LabStatus.Text = $"启动失败：{result.Message}";
+                LabStatus.Text = Loc.F("启动失败：{0}", result.Message);
                 return;
             }
 
@@ -127,11 +128,11 @@ public partial class MultiplayerSupernodeWindow : Window
         }
         catch (OperationCanceledException)
         {
-            LabStatus.Text = "已取消";
+            LabStatus.Text = Loc.T("已取消");
         }
         catch (Exception ex)
         {
-            LabStatus.Text = $"启动失败：{ex.Message}";
+            LabStatus.Text = Loc.F("启动失败：{0}", ex.Message);
         }
         finally
         {

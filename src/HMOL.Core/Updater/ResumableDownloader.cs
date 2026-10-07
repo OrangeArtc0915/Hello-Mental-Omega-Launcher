@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Updater;
 
@@ -52,10 +53,10 @@ public static class ResumableDownloader
         IReadOnlyDictionary<string, string>? headers = null, bool? multiThread = null)
     {
         if (string.IsNullOrWhiteSpace(url))
-            return new DownloadResult(false, null, 0, "下载地址为空");
+            return new DownloadResult(false, null, 0, Loc.T("下载地址为空"));
 
         if (string.IsNullOrWhiteSpace(destinationPath))
-            return new DownloadResult(false, null, 0, "目标文件路径为空");
+            return new DownloadResult(false, null, 0, Loc.T("目标文件路径为空"));
 
         string partPath;
         try
@@ -66,8 +67,8 @@ public static class ResumableDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"准备下载目录失败：{destinationPath}（{ex.Message}）");
-            return new DownloadResult(false, null, 0, $"准备下载目录失败：{ex.Message}");
+            Log.Warn(Loc.F("准备下载目录失败：{0}（{1}）", destinationPath, ex.Message));
+            return new DownloadResult(false, null, 0, Loc.F("准备下载目录失败：{0}", ex.Message));
         }
 
         // 目标文件已在、且没有残留分片，视为上一次已下完
@@ -75,7 +76,7 @@ public static class ResumableDownloader
         {
             var size = SafeLength(destinationPath);
             progress?.Report(1);
-            return new DownloadResult(true, destinationPath, size, "目标文件已存在，跳过下载");
+            return new DownloadResult(true, destinationPath, size, Loc.T("目标文件已存在，跳过下载"));
         }
 
         if (!HasFreeSpace(destinationPath, 1, out var spaceError))
@@ -92,12 +93,12 @@ public static class ResumableDownloader
             }
             catch (OperationCanceledException)
             {
-                Log.Info($"下载已取消：{url}");
-                return new DownloadResult(false, null, SafeLength(partPath), "下载已取消");
+                Log.Info(Loc.F("下载已取消：{0}", url));
+                return new DownloadResult(false, null, SafeLength(partPath), Loc.T("下载已取消"));
             }
             catch (Exception ex)
             {
-                Log.Warn($"分片下载异常，改用单连接：{url}（{ex.Message}）");
+                Log.Warn(Loc.F("分片下载异常，改用单连接：{0}（{1}）", url, ex.Message));
                 segmented = null;
             }
 
@@ -105,7 +106,7 @@ public static class ResumableDownloader
             {
                 if (segmented.Success) return segmented;
 
-                Log.Warn($"分片下载失败，改用单连接重试：{url}（{segmented.Message}）");
+                Log.Warn(Loc.F("分片下载失败，改用单连接重试：{0}（{1}）", url, segmented.Message));
                 CleanupResidue(destinationPath);
             }
         }
@@ -116,7 +117,7 @@ public static class ResumableDownloader
         }
 
         var received = File.Exists(partPath) ? SafeLength(partPath) : 0;
-        var lastMessage = "下载失败";
+        var lastMessage = Loc.T("下载失败");
 
         for (var attempt = 0; attempt <= RetryDelaysMs.Length; attempt++)
         {
@@ -128,12 +129,12 @@ public static class ResumableDownloader
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                Log.Info($"下载已取消：{url}");
-                return new DownloadResult(false, null, SafeLength(partPath), "下载已取消");
+                Log.Info(Loc.F("下载已取消：{0}", url));
+                return new DownloadResult(false, null, SafeLength(partPath), Loc.T("下载已取消"));
             }
             catch (OperationCanceledException)
             {
-                outcome = new AttemptOutcome(true, null, "下载超时");
+                outcome = new AttemptOutcome(true, null, Loc.T("下载超时"));
             }
             catch (Exception ex)
             {
@@ -143,11 +144,11 @@ public static class ResumableDownloader
             // 兜底：正常路径下 Retry=false 一定带结果，这里避免任何情况下返回 null
             if (!outcome.Retry)
                 return outcome.Result ?? new DownloadResult(false, null, SafeLength(partPath),
-                    outcome.Message ?? "下载失败");
+                    outcome.Message ?? Loc.T("下载失败"));
 
             lastMessage = outcome.Message ?? lastMessage;
             received = outcome.BytesReceived ?? SafeLength(partPath);
-            Log.Warn($"下载失败（第 {attempt + 1} 次）：{url}（{lastMessage}）");
+            Log.Warn(Loc.F("下载失败（第 {0} 次）：{1}（{2}）", attempt + 1, url, lastMessage));
 
             if (attempt >= RetryDelaysMs.Length) break;
 
@@ -159,11 +160,11 @@ public static class ResumableDownloader
             }
             catch (OperationCanceledException)
             {
-                return new DownloadResult(false, null, received, "下载已取消");
+                return new DownloadResult(false, null, received, Loc.T("下载已取消"));
             }
         }
 
-        return new DownloadResult(false, null, received, $"重试 {RetryDelaysMs.Length} 次后仍失败：{lastMessage}");
+        return new DownloadResult(false, null, received, Loc.F("重试 {0} 次后仍失败：{1}", RetryDelaysMs.Length, lastMessage));
     }
 
     /// <summary>单次尝试：返回是否应重试，以及最终结果。</summary>
@@ -219,7 +220,7 @@ public static class ResumableDownloader
             // 服务器不支持 Range（返回 200），丢掉分片从头开始
             if (startAt > 0)
             {
-                Log.Info($"服务器不支持断点续传，将从头下载：{url}");
+                Log.Info(Loc.F("服务器不支持断点续传，将从头下载：{0}", url));
                 TryDelete(partPath);
                 startAt = 0;
             }
@@ -255,14 +256,14 @@ public static class ResumableDownloader
         {
             // 连接被中途掐断：保留分片，下次续传
             return new AttemptOutcome(true, null,
-                $"下载中断：已收 {FormatSize(received)} / {FormatSize(total)}", null, received);
+                Loc.F("下载中断：已收 {0} / {1}", FormatSize(received), FormatSize(total)), null, received);
         }
 
         File.Move(partPath, destinationPath, overwrite: true);
         progress?.Report(1);
-        Log.Info($"下载完成：{destinationPath}（{FormatSize(received)}）");
+        Log.Info(Loc.F("下载完成：{0}（{1}）", destinationPath, FormatSize(received)));
 
-        return new AttemptOutcome(false, new DownloadResult(true, destinationPath, received, "下载完成"));
+        return new AttemptOutcome(false, new DownloadResult(true, destinationPath, received, Loc.T("下载完成")));
     }
 
     /// <summary>
@@ -360,15 +361,15 @@ public static class ResumableDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"分片合并失败：{destinationPath}（{ex.Message}）");
-            return new DownloadResult(false, null, Interlocked.Read(ref receivedBox[0]), $"分片合并失败：{ex.Message}");
+            Log.Warn(Loc.F("分片合并失败：{0}（{1}）", destinationPath, ex.Message));
+            return new DownloadResult(false, null, Interlocked.Read(ref receivedBox[0]), Loc.F("分片合并失败：{0}", ex.Message));
         }
 
         CleanupSegments(destinationPath);
         progress?.Report(1);
-        Log.Info($"分片下载完成：{destinationPath}（{FormatSize(total)}，{segmentCount} 路并发）");
+        Log.Info(Loc.F("分片下载完成：{0}（{1}，{2} 路并发）", destinationPath, FormatSize(total), segmentCount));
 
-        return new DownloadResult(true, destinationPath, total, "下载完成");
+        return new DownloadResult(true, destinationPath, total, Loc.T("下载完成"));
     }
 
     /// <summary>下载单个分片（含重试与断点续传）；已收字节累加到 <paramref name="receivedBox"/> 用于进度。</summary>
@@ -377,7 +378,7 @@ public static class ResumableDownloader
         IProgress<double>? progress, long total, CancellationToken token)
     {
         var segmentLength = to - from + 1;
-        var lastMessage = "分片下载失败";
+        var lastMessage = Loc.T("分片下载失败");
 
         for (var attempt = 0; attempt <= RetryDelaysMs.Length; attempt++)
         {
@@ -402,7 +403,7 @@ public static class ResumableDownloader
                 using var response = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
 
                 if (response.StatusCode != HttpStatusCode.PartialContent)
-                    return (false, $"服务器未按分片返回内容（HTTP {(int)response.StatusCode}）");
+                    return (false, Loc.F("服务器未按分片返回内容（HTTP {0}）", (int)response.StatusCode));
 
                 await using (var source = await response.Content.ReadAsStreamAsync(token))
                 await using (var target = new FileStream(segmentPath,
@@ -425,7 +426,7 @@ public static class ResumableDownloader
                 var now = SafeLength(segmentPath);
                 if (now >= segmentLength) return (true, string.Empty);
 
-                lastMessage = $"分片下载中断：已收 {FormatSize(now - from)} / {FormatSize(segmentLength)}";
+                lastMessage = Loc.F("分片下载中断：已收 {0} / {1}", FormatSize(now - from), FormatSize(segmentLength));
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -433,7 +434,7 @@ public static class ResumableDownloader
             }
             catch (OperationCanceledException)
             {
-                lastMessage = "下载超时";
+                lastMessage = Loc.T("下载超时");
             }
             catch (Exception ex)
             {
@@ -452,7 +453,7 @@ public static class ResumableDownloader
             }
         }
 
-        return (false, $"重试 {RetryDelaysMs.Length} 次后仍失败：{lastMessage}");
+        return (false, Loc.F("重试 {0} 次后仍失败：{1}", RetryDelaysMs.Length, lastMessage));
     }
 
     private static void ApplyHeaders(HttpRequestMessage request, IReadOnlyDictionary<string, string>? headers)
@@ -479,7 +480,7 @@ public static class ResumableDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"复用半截下载文件失败：{partPath}（{ex.Message}）");
+            Log.Warn(Loc.F("复用半截下载文件失败：{0}（{1}）", partPath, ex.Message));
             TryDelete(partPath);
         }
     }
@@ -521,7 +522,7 @@ public static class ResumableDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理下载分片失败：{destinationPath}（{ex.Message}）");
+            Log.Warn(Loc.F("清理下载分片失败：{0}（{1}）", destinationPath, ex.Message));
         }
     }
 
@@ -540,15 +541,15 @@ public static class ResumableDownloader
 
             if (requiredBytes > 0 && drive.AvailableFreeSpace < requiredBytes)
             {
-                error = $"磁盘剩余空间不足：需要 {FormatSize(requiredBytes)}，可用 {FormatSize(drive.AvailableFreeSpace)}";
-                Log.Warn($"磁盘空间不足：{path}（{error}）");
+                error = Loc.F("磁盘剩余空间不足：需要 {0}，可用 {1}", FormatSize(requiredBytes), FormatSize(drive.AvailableFreeSpace));
+                Log.Warn(Loc.F("磁盘空间不足：{0}（{1}）", path, error));
                 return false;
             }
         }
         catch (Exception ex)
         {
             // 空间检查失败不阻断下载
-            Log.Warn($"磁盘空间检查失败：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("磁盘空间检查失败：{0}（{1}）", path, ex.Message));
         }
 
         return true;
@@ -574,7 +575,7 @@ public static class ResumableDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理分片文件失败：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("清理分片文件失败：{0}（{1}）", path, ex.Message));
         }
     }
 

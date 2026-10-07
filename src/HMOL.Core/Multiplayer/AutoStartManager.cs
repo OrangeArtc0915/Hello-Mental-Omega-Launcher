@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -83,7 +84,7 @@ public static class AutoStartManager
         if (ExePath is null)
         {
             return new AutoStartState(AutoStartStatus.Failed, string.Empty,
-                "取不到程序自身路径，无法判断开机自启状态。");
+                Loc.T("取不到程序自身路径，无法判断开机自启状态。"));
         }
 
         try
@@ -91,28 +92,28 @@ public static class AutoStartManager
             using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
 
             if (key?.GetValue(ValueName) is not string command || string.IsNullOrWhiteSpace(command))
-                return new AutoStartState(AutoStartStatus.NotRegistered, string.Empty, "未设置开机自启。");
+                return new AutoStartState(AutoStartStatus.NotRegistered, string.Empty, Loc.T("未设置开机自启。"));
 
             var target = CommandExePath(command);
 
             return string.Equals(target, ExePath, StringComparison.OrdinalIgnoreCase)
-                ? new AutoStartState(AutoStartStatus.Enabled, command, "已设置开机自启。")
+                ? new AutoStartState(AutoStartStatus.Enabled, command, Loc.T("已设置开机自启。"))
                 : new AutoStartState(AutoStartStatus.PointsToOtherExe, command,
                     string.IsNullOrWhiteSpace(target)
-                        ? "注册表里的启动项内容无法解析，可能不是本程序写的。"
-                        : $"注册表里的启动项指向 {target}，不是当前程序（程序可能被移动过）。");
+                        ? Loc.T("注册表里的启动项内容无法解析，可能不是本程序写的。")
+                        : Loc.F("注册表里的启动项指向 {0}，不是当前程序（程序可能被移动过）。", target));
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取开机自启注册表项失败：{ex.Message}");
-            return new AutoStartState(AutoStartStatus.Failed, string.Empty, "读取注册表失败，无法判断开机自启状态。");
+            Log.Warn(Loc.F("读取开机自启注册表项失败：{0}", ex.Message));
+            return new AutoStartState(AutoStartStatus.Failed, string.Empty, Loc.T("读取注册表失败，无法判断开机自启状态。"));
         }
     }
 
     /// <summary>启用开机自启。已存在指向别处的旧值时会被改写为当前位置。</summary>
     public static AutoStartResult Enable()
     {
-        if (ExePath is null) return new AutoStartResult(false, "取不到程序自身路径，无法设置开机自启。");
+        if (ExePath is null) return new AutoStartResult(false, Loc.T("取不到程序自身路径，无法设置开机自启。"));
 
         var command = CurrentCommand;
 
@@ -120,17 +121,17 @@ public static class AutoStartManager
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
 
-            if (key is null) return new AutoStartResult(false, "打不开注册表启动项，无法设置开机自启。");
+            if (key is null) return new AutoStartResult(false, Loc.T("打不开注册表启动项，无法设置开机自启。"));
 
             key.SetValue(ValueName, command, RegistryValueKind.String);
 
-            Log.Info($"已启用开机自启：{command}");
-            return new AutoStartResult(true, "已启用开机自启。");
+            Log.Info(Loc.F("已启用开机自启：{0}", command));
+            return new AutoStartResult(true, Loc.T("已启用开机自启。"));
         }
         catch (Exception ex)
         {
-            Log.Warn($"写入开机自启注册表项失败：{ex.Message}");
-            return new AutoStartResult(false, $"设置开机自启失败：{ex.Message}");
+            Log.Warn(Loc.F("写入开机自启注册表项失败：{0}", ex.Message));
+            return new AutoStartResult(false, Loc.F("设置开机自启失败：{0}", ex.Message));
         }
     }
 
@@ -142,17 +143,17 @@ public static class AutoStartManager
             using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
 
             // 键不存在 == 本来就没有启动项，直接算完成
-            if (key is null) return new AutoStartResult(true, "已关闭开机自启。");
+            if (key is null) return new AutoStartResult(true, Loc.T("已关闭开机自启。"));
 
             key.DeleteValue(ValueName, throwOnMissingValue: false);
 
-            Log.Info("已关闭开机自启");
-            return new AutoStartResult(true, "已关闭开机自启。");
+            Log.Info(Loc.T("已关闭开机自启"));
+            return new AutoStartResult(true, Loc.T("已关闭开机自启。"));
         }
         catch (Exception ex)
         {
-            Log.Warn($"删除开机自启注册表项失败：{ex.Message}");
-            return new AutoStartResult(false, $"关闭开机自启失败：{ex.Message}");
+            Log.Warn(Loc.F("删除开机自启注册表项失败：{0}", ex.Message));
+            return new AutoStartResult(false, Loc.F("关闭开机自启失败：{0}", ex.Message));
         }
     }
 
@@ -178,11 +179,11 @@ public static class AutoStartManager
             var repaired = CurrentCommand;
             key.SetValue(ValueName, repaired, RegistryValueKind.String);
 
-            Log.Info($"开机自启项指向 {target} 已失效，已自动改写为当前位置：{repaired}");
+            Log.Info(Loc.F("开机自启项指向 {0} 已失效，已自动改写为当前位置：{1}", target, repaired));
         }
         catch (Exception ex)
         {
-            Log.Warn($"自动修复开机自启注册表项失败：{ex.Message}");
+            Log.Warn(Loc.F("自动修复开机自启注册表项失败：{0}", ex.Message));
         }
     }
 
@@ -215,7 +216,7 @@ public static class AutoStartManager
         }
         catch (Exception ex)
         {
-            Log.Warn($"取自身 exe 路径失败：{ex.Message}");
+            Log.Warn(Loc.F("取自身 exe 路径失败：{0}", ex.Message));
         }
 
         try
@@ -225,7 +226,7 @@ public static class AutoStartManager
         }
         catch (Exception ex)
         {
-            Log.Warn($"从主模块取自身 exe 路径失败：{ex.Message}");
+            Log.Warn(Loc.F("从主模块取自身 exe 路径失败：{0}", ex.Message));
         }
 
         return null;

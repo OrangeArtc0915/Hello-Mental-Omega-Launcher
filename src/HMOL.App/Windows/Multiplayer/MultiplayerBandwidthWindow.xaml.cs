@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using HMOL.App.Controls;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -23,7 +24,7 @@ public partial class MultiplayerBandwidthWindow : Window
         InitializeComponent();
 
         _protocol = protocol;
-        Title = $"{protocol} 带宽测速";
+        Title = Loc.F("{0} 带宽测速", protocol);
         Card.Title = Title;
 
         if (!string.IsNullOrWhiteSpace(defaultHost)) TxtHost.Text = defaultHost;
@@ -76,32 +77,32 @@ public partial class MultiplayerBandwidthWindow : Window
 
         if (!_server && !IsValidIp(host))
         {
-            LabStatus.Text = "请输入正确的对方虚拟 IP。";
+            LabStatus.Text = Loc.T("请输入正确的对方虚拟 IP。");
             return;
         }
 
         _running = true;
         BtnGo.IsEnabled = false;
         BtnCancel.IsEnabled = true;
-        LabStatus.Text = $"正在{( _server ? "等待对方连接" : $"连接 {host}")}（{_seconds} 秒）…";
+        LabStatus.Text = Loc.F("正在{0}（{1} 秒）…", ( _server ? Loc.T("等待对方连接") : Loc.F("连接 {0}", host)), _seconds);
 
         var progress = new Progress<string>(text => LabStatus.Text = text);
 
         try
         {
             var result = await RunAsync(host, progress, _cts.Token);
-            var text = $"{_protocol} 测速完成：{result.Mbps} Mbps（{result.Bytes} 字节 / {result.Seconds} 秒）";
-            LabStatus.Text = result.Bytes > 0 ? text : "没有收到数据（请确认两端角色与端口是否对应）";
+            var text = Loc.F("{0} 测速完成：{1} Mbps（{2} 字节 / {3} 秒）", _protocol, result.Mbps, result.Bytes, result.Seconds);
+            LabStatus.Text = result.Bytes > 0 ? text : Loc.T("没有收到数据（请确认两端角色与端口是否对应）");
             Append(text);
         }
         catch (OperationCanceledException)
         {
-            LabStatus.Text = "已取消";
+            LabStatus.Text = Loc.T("已取消");
         }
         catch (Exception ex)
         {
-            LabStatus.Text = $"测速失败：{ex.Message}";
-            Append($"失败：{ex.Message}");
+            LabStatus.Text = Loc.F("测速失败：{0}", ex.Message);
+            Append(Loc.F("失败：{0}", ex.Message));
         }
         finally
         {
@@ -154,6 +155,6 @@ public partial class MultiplayerBandwidthWindow : Window
         try { _cts.Cancel(); }
         catch { /* 已释放 */ }
 
-        LabStatus.Text = "正在取消…";
+        LabStatus.Text = Loc.T("正在取消…");
     }
 }

@@ -3,6 +3,7 @@ using HMOL.Core.App;
 using HMOL.Core.Games;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Instances;
 
@@ -31,16 +32,16 @@ public static class InstanceManager
         var gameDir = GameLocator.NormalizePath(path);
 
         if (instanceName.Length == 0 || gameDir.Length == 0)
-            return new InstanceResult(false, "实例名称和路径不能为空");
+            return new InstanceResult(false, Loc.T("实例名称和路径不能为空"));
 
         if (All.Any(item => string.Equals(item.Name, instanceName, StringComparison.OrdinalIgnoreCase)))
-            return new InstanceResult(false, "实例名称已存在");
+            return new InstanceResult(false, Loc.T("实例名称已存在"));
 
         if (!GameLocator.IsGameDirectory(gameDir, kind, executable))
             return new InstanceResult(false, InvalidDirectoryMessage(kind, executable));
 
         if (All.Any(item => GameLocator.IsSamePath(item.GameDir, gameDir)))
-            return new InstanceResult(false, "该游戏路径已被其他实例使用");
+            return new InstanceResult(false, Loc.T("该游戏路径已被其他实例使用"));
 
         var instance = new GameInstance
         {
@@ -56,8 +57,8 @@ public static class InstanceManager
 
         if (InstanceStore.Current is null) InstanceStore.SetCurrent(instance);
 
-        Log.Info($"已创建实例「{instance.Name}」：{instance.GameDir}");
-        return new InstanceResult(true, $"实例「{instanceName}」创建成功");
+        Log.Info(Loc.F("已创建实例「{0}」：{1}", instance.Name, instance.GameDir));
+        return new InstanceResult(true, Loc.F("实例「{0}」创建成功", instanceName));
     }
 
     /// <summary>编辑实例：名称 / 路径 / 备注 / 游戏类型 / 主程序可以只改其中一部分（对应旧版 update_instance）。</summary>
@@ -65,16 +66,16 @@ public static class InstanceManager
         string? newNote = null, GameKind? newKind = null, string? newExecutable = null)
     {
         var instance = InstanceStore.FindById(instanceId);
-        if (instance is null) return new InstanceResult(false, "实例不存在");
+        if (instance is null) return new InstanceResult(false, Loc.T("实例不存在"));
 
         if (newName is not null && !string.Equals(newName, instance.Name, StringComparison.Ordinal))
         {
             var name = newName.Trim();
-            if (name.Length == 0) return new InstanceResult(false, "实例名称不能为空");
+            if (name.Length == 0) return new InstanceResult(false, Loc.T("实例名称不能为空"));
 
             if (All.Any(item => !ReferenceEquals(item, instance) &&
                                 string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
-                return new InstanceResult(false, "实例名称已存在");
+                return new InstanceResult(false, Loc.T("实例名称已存在"));
 
             instance.Name = name;
         }
@@ -98,7 +99,7 @@ public static class InstanceManager
 
             if (pathChanged && All.Any(item => !ReferenceEquals(item, instance) &&
                                                GameLocator.IsSamePath(item.GameDir, targetDir)))
-                return new InstanceResult(false, "该游戏路径已被其他实例使用");
+                return new InstanceResult(false, Loc.T("该游戏路径已被其他实例使用"));
 
             instance.GameDir = targetDir;
             instance.Kind = targetKind;
@@ -109,7 +110,7 @@ public static class InstanceManager
 
         InstanceStore.Upsert(instance);
 
-        return new InstanceResult(true, "实例信息已更新");
+        return new InstanceResult(true, Loc.T("实例信息已更新"));
     }
 
     /// <summary>
@@ -129,43 +130,43 @@ public static class InstanceManager
     /// <summary>目录校验失败时给用户的原因，「其它 Mod」要额外提醒去指定主程序。</summary>
     private static string InvalidDirectoryMessage(GameKind kind, string? executable)
         => kind == GameKind.Other && string.IsNullOrWhiteSpace(executable)
-            ? "「其它红警 Mod」需要先指定一个可执行文件。"
-            : "指定路径不是有效的游戏目录（或是主程序文件不存在）。";
+            ? Loc.T("「其它红警 Mod」需要先指定一个可执行文件。")
+            : Loc.T("指定路径不是有效的游戏目录（或是主程序文件不存在）。");
 
     /// <summary>重命名实例（对应旧版 rename_instance）。</summary>
     public static InstanceResult Rename(string instanceId, string newName)
     {
         var instance = InstanceStore.FindById(instanceId);
-        if (instance is null) return new InstanceResult(false, "实例不存在");
+        if (instance is null) return new InstanceResult(false, Loc.T("实例不存在"));
 
         var name = (newName ?? string.Empty).Trim();
-        if (name.Length == 0) return new InstanceResult(false, "实例名称不能为空");
+        if (name.Length == 0) return new InstanceResult(false, Loc.T("实例名称不能为空"));
 
         if (All.Any(item => !ReferenceEquals(item, instance) &&
                             string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
-            return new InstanceResult(false, "实例名称已存在");
+            return new InstanceResult(false, Loc.T("实例名称已存在"));
 
         var oldName = instance.Name;
         instance.Name = name;
 
         InstanceStore.Upsert(instance);
 
-        return new InstanceResult(true, $"实例重命名成功：「{oldName}」→「{name}」");
+        return new InstanceResult(true, Loc.F("实例重命名成功：「{0}」→「{1}」", oldName, name));
     }
 
     /// <summary>删除实例：配置文件与 <c>instances\&lt;id&gt;\</c> 一并删除（对应旧版 remove_instance）。</summary>
     public static InstanceResult Remove(string instanceId)
     {
         var instance = InstanceStore.FindById(instanceId);
-        if (instance is null) return new InstanceResult(false, "实例不存在");
+        if (instance is null) return new InstanceResult(false, Loc.T("实例不存在"));
 
         var name = instance.Name;
         SizeCache.Remove(instanceId);
 
         if (!InstanceStore.Delete(instance, out var error))
-            return new InstanceResult(false, $"删除实例时出错：{error}");
+            return new InstanceResult(false, Loc.F("删除实例时出错：{0}", error));
 
-        return new InstanceResult(true, $"实例「{name}」已删除");
+        return new InstanceResult(true, Loc.F("实例「{0}」已删除", name));
     }
 
     /// <summary>把某个实例设为当前实例（对应旧版 set_current_instance）。</summary>
@@ -192,7 +193,7 @@ public static class InstanceManager
         IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         var instance = InstanceStore.FindById(instanceId);
-        if (instance is null) return new InstanceResult(false, "实例不存在");
+        if (instance is null) return new InstanceResult(false, Loc.T("实例不存在"));
 
         return InstanceArchive.Export(instance, exportPath, level, progress, token);
     }
@@ -239,7 +240,7 @@ public static class InstanceManager
         }
         catch (Exception ex)
         {
-            Log.Error($"创建实例目录失败：{instance.InstanceDirectory}", ex);
+            Log.Error(Loc.F("创建实例目录失败：{0}", instance.InstanceDirectory), ex);
         }
     }
 }

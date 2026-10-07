@@ -2,6 +2,7 @@ using System.IO;
 using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Packages;
 
@@ -44,12 +45,13 @@ public static class PackageTypes
     /// <summary>旧版 INI 包目录名。存在时自动迁移为 "ini"。</summary>
     public const string LegacyIniDirectoryName = "mod";
 
-    private static readonly PackageTypeSpec[] Specs =
+    /// <summary>分类元信息。属性而非静态字段：显示名随界面语言变化。</summary>
+    private static PackageTypeSpec[] Specs =>
     [
         new(PackageType.Ini, "INI", "ini", ArchiveFormats.Extensions),
-        new(PackageType.Map, "地图", "map", [".map", .. ArchiveFormats.Extensions]),
-        new(PackageType.Mission, "任务", "mission", ArchiveFormats.Extensions),
-        new(PackageType.Plugin, "插件", "plugin", ArchiveFormats.Extensions)
+        new(PackageType.Map, Loc.T("地图"), "map", [".map", .. ArchiveFormats.Extensions]),
+        new(PackageType.Mission, Loc.T("任务"), "mission", ArchiveFormats.Extensions),
+        new(PackageType.Plugin, Loc.T("插件"), "plugin", ArchiveFormats.Extensions)
     ];
 
     public static IReadOnlyList<PackageType> All { get; } =
@@ -122,7 +124,7 @@ public static class PackageTypes
             }
             catch (Exception ex)
             {
-                Log.Error($"创建包目录失败：{DirectoryOf(type)}", ex);
+                Log.Error(Loc.F("创建包目录失败：{0}", DirectoryOf(type)), ex);
             }
         }
     }
@@ -138,11 +140,11 @@ public static class PackageTypes
         try
         {
             Directory.Move(oldDirectory, newDirectory);
-            Log.Info($"已将旧版 INI 包目录重命名：{oldDirectory} → {newDirectory}");
+            Log.Info(Loc.F("已将旧版 INI 包目录重命名：{0} → {1}", oldDirectory, newDirectory));
         }
         catch (Exception ex)
         {
-            Log.Error($"重命名 INI 包目录失败：{oldDirectory}", ex);
+            Log.Error(Loc.F("重命名 INI 包目录失败：{0}", oldDirectory), ex);
         }
     }
 }

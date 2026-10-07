@@ -4,6 +4,7 @@ using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Packages;
 using HMOL.Core.Updater;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -44,10 +45,10 @@ public static class RuntimeComponents
     /// <summary>界面显示名。</summary>
     public static string DisplayName(RuntimeComponent component) => component switch
     {
-        RuntimeComponent.EasyTier => "EasyTier 组网组件",
-        RuntimeComponent.N2n => "n2n 组网组件",
-        RuntimeComponent.Tap => "TAP 虚拟网卡驱动",
-        RuntimeComponent.WinIpBroadcast => "WinIPBroadcast 广播转发",
+        RuntimeComponent.EasyTier => Loc.T("EasyTier 组网组件"),
+        RuntimeComponent.N2n => Loc.T("n2n 组网组件"),
+        RuntimeComponent.Tap => Loc.T("TAP 虚拟网卡驱动"),
+        RuntimeComponent.WinIpBroadcast => Loc.T("WinIPBroadcast 广播转发"),
         _ => component.ToString()
     };
 
@@ -117,7 +118,7 @@ public static class RuntimeComponents
         LauncherUpdateSource preferred, IProgress<double>? downloadProgress = null,
         IProgress<ProgressSample>? extractProgress = null, CancellationToken token = default)
     {
-        if (IsInstalled(component)) return (true, $"{DisplayName(component)} 已就绪");
+        if (IsInstalled(component)) return (true, Loc.F("{0} 已就绪", DisplayName(component)));
 
         var name = DisplayName(component);
         var archive = ArchivePath(component);
@@ -133,10 +134,10 @@ public static class RuntimeComponents
 
         var (ok, message) = RequiredAssetDownloader.ExtractInto(archive, InstallDirectory(component), extractProgress, token);
 
-        if (!ok) return (false, $"解压 {name} 失败：{message}");
-        if (!IsInstalled(component)) return (false, $"{name} 解压完成但未找到标志文件，请确认压缩包内容。");
+        if (!ok) return (false, Loc.F("解压 {0} 失败：{1}", name, message));
+        if (!IsInstalled(component)) return (false, Loc.F("{0} 解压完成但未找到标志文件，请确认压缩包内容。", name));
 
-        Log.Info($"组网组件已安装：{name} → {InstallDirectory(component)}");
-        return (true, $"{name} 已就绪");
+        Log.Info(Loc.F("组网组件已安装：{0} → {1}", name, InstallDirectory(component)));
+        return (true, Loc.F("{0} 已就绪", name));
     }
 }

@@ -10,6 +10,7 @@ using HMOL.Core.Games;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Packages;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Instances;
 
@@ -83,28 +84,28 @@ public static class InstanceArchive
         CompressionLevel level = CompressionLevel.Optimal, IProgress<ProgressSample>? progress = null,
         CancellationToken token = default)
     {
-        if (instance is null) return new InstanceResult(false, "实例不存在");
+        if (instance is null) return new InstanceResult(false, Loc.T("实例不存在"));
 
-        if (string.IsNullOrWhiteSpace(exportPath)) return new InstanceResult(false, "导出路径不能为空");
+        if (string.IsNullOrWhiteSpace(exportPath)) return new InstanceResult(false, Loc.T("导出路径不能为空"));
 
         if (!Directory.Exists(instance.GameDir))
-            return new InstanceResult(false, $"游戏路径不存在：{instance.GameDir}");
+            return new InstanceResult(false, Loc.F("游戏路径不存在：{0}", instance.GameDir));
 
         var target = Path.GetFullPath(exportPath);
         var targetDirectory = Path.GetDirectoryName(target);
 
         if (string.IsNullOrEmpty(targetDirectory) || !Directory.Exists(targetDirectory))
-            return new InstanceResult(false, $"导出目录不存在：{targetDirectory}");
+            return new InstanceResult(false, Loc.F("导出目录不存在：{0}", targetDirectory));
 
         if (File.Exists(target))
-            return new InstanceResult(false, $"目标文件已存在，请先删除或更换名称：{target}");
+            return new InstanceResult(false, Loc.F("目标文件已存在，请先删除或更换名称：{0}", target));
 
         if (!ArchiveFormats.IsExportable(target))
         {
             return new InstanceResult(false, string.Equals(Path.GetExtension(target), ".rar", StringComparison.OrdinalIgnoreCase)
-                ? "无法导出为 rar：RAR 是专有格式，没有可用的写入实现（WinRAR 的商业组件不能随包分发）。\n" +
-                  $"请改用 {ArchiveFormats.ExportDisplay} 导出。"
-                : $"不支持的导出格式，请使用 {ArchiveFormats.ExportDisplay}。");
+                ? Loc.T("无法导出为 rar：RAR 是专有格式，没有可用的写入实现（WinRAR 的商业组件不能随包分发）。\n") +
+                  Loc.F("请改用 {0} 导出。", ArchiveFormats.ExportDisplay)
+                : Loc.F("不支持的导出格式，请使用 {0}。", ArchiveFormats.ExportDisplay));
         }
 
         var partial = target + ".partial";
@@ -112,7 +113,7 @@ public static class InstanceArchive
         try
         {
             var files = CollectFiles(instance.GameDir);
-            if (files.Count == 0) return new InstanceResult(false, "实例中没有文件可导出");
+            if (files.Count == 0) return new InstanceResult(false, Loc.T("实例中没有文件可导出"));
 
             var totalSize = files.Sum(file => file.Size);
 
@@ -194,7 +195,7 @@ public static class InstanceArchive
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         // 单个文件读不了就跳过，尽量把能导的都导出去（与旧版一致）
-                        Log.Warn($"导出时跳过无法读取的文件：{file.Full}（{ex.Message}）");
+                        Log.Warn(Loc.F("导出时跳过无法读取的文件：{0}（{1}）", file.Full, ex.Message));
                         continue;
                     }
 
@@ -209,19 +210,19 @@ public static class InstanceArchive
             var sizeText = BackupService.FormatSize(new FileInfo(target).Length);
 
             return new InstanceResult(true,
-                $"实例「{instance.Name}」已导出到：\n{target}\n\n" +
-                $"源文件：{files.Count} 个（{BackupService.FormatSize(totalSize)}）\n压缩包：{sizeText}");
+                Loc.F("实例「{0}」已导出到：\n{1}\n\n", instance.Name, target) +
+                Loc.F("源文件：{0} 个（{1}）\n压缩包：{2}", files.Count, BackupService.FormatSize(totalSize), sizeText));
         }
         catch (OperationCanceledException)
         {
             TryDeleteFile(partial);
-            return new InstanceResult(false, "导出已取消");
+            return new InstanceResult(false, Loc.T("导出已取消"));
         }
         catch (Exception ex)
         {
             TryDeleteFile(partial);
-            Log.Error($"导出实例失败：{instance.Name}", ex);
-            return new InstanceResult(false, $"导出失败：{ex.Message}");
+            Log.Error(Loc.F("导出实例失败：{0}", instance.Name), ex);
+            return new InstanceResult(false, Loc.F("导出失败：{0}", ex.Message));
         }
     }
 
@@ -249,8 +250,8 @@ public static class InstanceArchive
 
             if (!Junction.TryCreate(linkPath, instance.GameDir, out var junctionError))
             {
-                return $"无法为游戏目录建立目录联接（{junctionError}）。\n" +
-                       "目录联接需要 NTFS 分区，请改用 .zip 导出。";
+                return Loc.F("无法为游戏目录建立目录联接（{0}）。\n", junctionError) +
+                       Loc.T("目录联接需要 NTFS 分区，请改用 .zip 导出。");
             }
 
             var (ok, error) = SevenZipTool.Create(content, archivePath, ToSevenZipLevel(level),
@@ -260,7 +261,7 @@ public static class InstanceArchive
 
             TryDeleteFile(archivePath);
 
-            return $"导出失败：{error}";
+            return Loc.F("导出失败：{0}", error);
         }
         finally
         {
@@ -287,11 +288,11 @@ public static class InstanceArchive
         IProgress<ProgressSample>? progress = null, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(archivePath) || !File.Exists(archivePath))
-            return (new InstanceResult(false, "文件不存在"), null);
+            return (new InstanceResult(false, Loc.T("文件不存在")), null);
 
         if (!ArchiveFormats.IsSupported(archivePath))
             return (new InstanceResult(false,
-                $"只支持 {ArchiveFormats.Display} 格式的实例包，当前文件是 {Path.GetFileName(archivePath)}"), null);
+                Loc.F("只支持 {0} 格式的实例包，当前文件是 {1}", ArchiveFormats.Display, Path.GetFileName(archivePath))), null);
 
         // id 先定下来：暂存目录要落在「实例目录所在分区」上。同盘才有机会直接改名搬过去，
         // 否则 GB 级内容得先写到系统盘再复制过来，既慢又容易把系统盘写满。
@@ -307,24 +308,24 @@ public static class InstanceArchive
             if (!ArchiveExtractor.TryExtract(archivePath, tempDirectory, out var error,
                     progress is null ? null : new ProgressSpan(progress, 0.05, 0.3), token))
             {
-                return (new InstanceResult(false, $"导入失败：{error}"), null);
+                return (new InstanceResult(false, Loc.F("导入失败：{0}", error)), null);
             }
 
             var infoPath = Path.Combine(tempDirectory, InfoFileName);
             if (!File.Exists(infoPath))
-                return (new InstanceResult(false, "无效的实例文件：缺少配置文件"), null);
+                return (new InstanceResult(false, Loc.T("无效的实例文件：缺少配置文件")), null);
 
             var info = JsonSerializer.Deserialize<InstanceArchiveInfo>(File.ReadAllText(infoPath), Options);
-            if (info is null) return (new InstanceResult(false, "配置文件格式错误"), null);
+            if (info is null) return (new InstanceResult(false, Loc.T("配置文件格式错误")), null);
 
             var gameFiles = Path.Combine(tempDirectory, GameFilesDirectoryName);
             if (!Directory.Exists(gameFiles))
-                return (new InstanceResult(false, "无法找到游戏文件目录（game_files）"), null);
+                return (new InstanceResult(false, Loc.T("无法找到游戏文件目录（game_files）")), null);
 
             if (!GameLocator.IsGameDirectory(gameFiles, info.Kind, info.Executable))
-                return (new InstanceResult(false, "解压出来的文件不是有效的游戏目录"), null);
+                return (new InstanceResult(false, Loc.T("解压出来的文件不是有效的游戏目录")), null);
 
-            var name = ResolveName(string.IsNullOrWhiteSpace(info.Name) ? "导入的实例" : info.Name);
+            var name = ResolveName(string.IsNullOrWhiteSpace(info.Name) ? Loc.T("导入的实例") : info.Name);
 
             var summary = MoveIntoPlace(gameFiles, instanceDirectory, progress, token);
 
@@ -332,14 +333,14 @@ public static class InstanceArchive
             {
                 TryDeleteDirectory(instanceDirectory);
                 return (new InstanceResult(false, summary.Total == 0
-                    ? "游戏文件为空，导入失败"
-                    : $"复制游戏文件失败：所有 {summary.Total} 个文件均无法复制"), null);
+                    ? Loc.T("游戏文件为空，导入失败")
+                    : Loc.F("复制游戏文件失败：所有 {0} 个文件均无法复制", summary.Total)), null);
             }
 
             if (token.IsCancellationRequested)
             {
                 TryDeleteDirectory(instanceDirectory);
-                return (new InstanceResult(false, "导入已取消"), null);
+                return (new InstanceResult(false, Loc.T("导入已取消")), null);
             }
 
             var instance = new GameInstance
@@ -360,24 +361,24 @@ public static class InstanceArchive
             InstanceStore.Upsert(instance);
             progress?.Report(new ProgressSample(1));
 
-            Log.Info($"实例「{name}」导入成功，共 {summary.Total} 个文件 → {instanceDirectory}");
+            Log.Info(Loc.F("实例「{0}」导入成功，共 {1} 个文件 → {2}", name, summary.Total, instanceDirectory));
 
             return (new InstanceResult(true,
-                $"实例「{name}」导入成功" +
-                (summary.Failed > 0 ? $"\n（其中 {summary.Failed} 个文件复制失败）" : string.Empty)), id);
+                Loc.F("实例「{0}」导入成功", name) +
+                (summary.Failed > 0 ? Loc.F("\n（其中 {0} 个文件复制失败）", summary.Failed) : string.Empty)), id);
         }
         catch (OperationCanceledException)
         {
-            return (new InstanceResult(false, "导入已取消"), null);
+            return (new InstanceResult(false, Loc.T("导入已取消")), null);
         }
         catch (JsonException)
         {
-            return (new InstanceResult(false, "配置文件格式错误"), null);
+            return (new InstanceResult(false, Loc.T("配置文件格式错误")), null);
         }
         catch (Exception ex)
         {
-            Log.Error($"导入实例失败：{archivePath}", ex);
-            return (new InstanceResult(false, $"导入失败：{ex.Message}"), null);
+            Log.Error(Loc.F("导入实例失败：{0}", archivePath), ex);
+            return (new InstanceResult(false, Loc.F("导入失败：{0}", ex.Message)), null);
         }
         finally
         {
@@ -406,7 +407,7 @@ public static class InstanceArchive
             catch (IOException ex)
             {
                 // 目标卷不支持目录改名等情况：退回逐文件复制
-                Log.Warn($"同分区搬移失败，退回复制：{source} → {target}（{ex.Message}）");
+                Log.Warn(Loc.F("同分区搬移失败，退回复制：{0} → {1}（{2}）", source, target, ex.Message));
             }
         }
 
@@ -430,7 +431,7 @@ public static class InstanceArchive
             }
             catch (Exception ex)
             {
-                Log.Warn($"跳过无法读取的文件：{file}（{ex.Message}）");
+                Log.Warn(Loc.F("跳过无法读取的文件：{0}（{1}）", file, ex.Message));
             }
         }
 
@@ -464,7 +465,7 @@ public static class InstanceArchive
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理文件失败：{file}（{ex.Message}）");
+            Log.Warn(Loc.F("清理文件失败：{0}（{1}）", file, ex.Message));
         }
     }
 
@@ -476,7 +477,7 @@ public static class InstanceArchive
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理目录失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("清理目录失败：{0}（{1}）", directory, ex.Message));
         }
     }
 }

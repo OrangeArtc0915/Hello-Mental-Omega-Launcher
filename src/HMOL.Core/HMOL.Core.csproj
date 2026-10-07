@@ -23,4 +23,10 @@
     <EmbeddedResource Include="Resources\RePKG.exe" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 内嵌语言包：Loc 从程序集资源 HMOL.Core.Languages.<code>.json 读，
+         Data\lang\<code>.json 可整份覆盖同名条目；新增语种把 json 丢进来即可。 -->
+    <EmbeddedResource Include="Languages\*.json" />
+  </ItemGroup>
+
 </Project>

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using HMOL.App.Controls;
 using HMOL.Core.Games;
 using HMOL.Core.Instances;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -28,9 +29,9 @@ public partial class InstanceEditorWindow : Window
         _editingId = instance?.Id;
         var isEdit = instance is not null;
 
-        Title = isEdit ? "编辑实例" : "新建实例";
+        Title = isEdit ? Loc.T("编辑实例") : Loc.T("新建实例");
         Card.Title = Title;
-        BtnSave.Content = isEdit ? "保存" : "创建";
+        BtnSave.Content = isEdit ? Loc.T("保存") : Loc.T("创建");
 
         if (instance is not null)
         {
@@ -94,7 +95,7 @@ public partial class InstanceEditorWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "选择游戏目录",
+            Title = Loc.T("选择游戏目录"),
             Multiselect = false
         };
 
@@ -110,8 +111,8 @@ public partial class InstanceEditorWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择游戏主程序",
-            Filter = "可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*",
+            Title = Loc.T("选择游戏主程序"),
+            Filter = Loc.T("可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*"),
             CheckFileExists = true,
             Multiselect = false
         };
@@ -156,7 +157,7 @@ public partial class InstanceEditorWindow : Window
 
         if (name.Length == 0)
         {
-            Fail("请填写实例名称。");
+            Fail(Loc.T("请填写实例名称。"));
             return false;
         }
 
@@ -166,33 +167,33 @@ public partial class InstanceEditorWindow : Window
 
         if (duplicatedName)
         {
-            Fail($"实例名称「{name}」已存在，请换一个。");
+            Fail(Loc.F("实例名称「{0}」已存在，请换一个。", name));
             return false;
         }
 
         if (directory.Length == 0)
         {
-            Fail("请选择游戏目录。");
+            Fail(Loc.T("请选择游戏目录。"));
             return false;
         }
 
         if (!Directory.Exists(normalized))
         {
-            Fail($"目录不存在：{normalized}");
+            Fail(Loc.F("目录不存在：{0}", normalized));
             return false;
         }
 
         if (executable.Length > 0 && GameLocator.ResolveExecutable(normalized, executable) is null)
         {
-            Fail($"指定的主程序不存在：{executable}");
+            Fail(Loc.F("指定的主程序不存在：{0}", executable));
             return false;
         }
 
         if (!GameLocator.IsGameDirectory(normalized, _kind, executable))
         {
             Fail(_kind == GameKind.Other && executable.Length == 0
-                ? "「其它红警 Mod」需要先指定一个可执行文件。"
-                : "该目录不是有效的游戏目录（需含该类型的特征主程序，或手动指定主程序）。");
+                ? Loc.T("「其它红警 Mod」需要先指定一个可执行文件。")
+                : Loc.T("该目录不是有效的游戏目录（需含该类型的特征主程序，或手动指定主程序）。"));
             return false;
         }
 
@@ -202,7 +203,7 @@ public partial class InstanceEditorWindow : Window
 
         if (duplicatedPath)
         {
-            Fail("该游戏目录已被其他实例使用。");
+            Fail(Loc.T("该游戏目录已被其他实例使用。"));
             return false;
         }
 
@@ -210,8 +211,8 @@ public partial class InstanceEditorWindow : Window
                        ?? GameLocator.FindExecutable(normalized, _kind);
 
         LabDirState.Text = resolved is null
-            ? "目录有效，但未找到游戏主程序，启动前请确认游戏文件完整。"
-            : $"已找到主程序：{Path.GetFileName(resolved)}";
+            ? Loc.T("目录有效，但未找到游戏主程序，启动前请确认游戏文件完整。")
+            : Loc.F("已找到主程序：{0}", Path.GetFileName(resolved));
         LabDirState.SetResourceReference(TextBlock.ForegroundProperty,
             resolved is null ? "Status.Warn" : "Status.Success");
 

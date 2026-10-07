@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using HMOL.Core.Games;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Launch;
 
@@ -24,7 +25,7 @@ public static class GameLauncher
 
         if (string.IsNullOrWhiteSpace(gameDirectory) || !Directory.Exists(gameDirectory))
         {
-            error = $"游戏目录不存在：{gameDirectory}";
+            error = Loc.F("游戏目录不存在：{0}", gameDirectory);
             return false;
         }
 
@@ -35,7 +36,7 @@ public static class GameLauncher
             executable = GameLocator.ResolveExecutable(gameDirectory, executableOverride);
             if (executable is null)
             {
-                error = $"指定的主程序不存在：{executableOverride}";
+                error = Loc.F("指定的主程序不存在：{0}", executableOverride);
                 return false;
             }
         }
@@ -47,8 +48,8 @@ public static class GameLauncher
             {
                 var names = GameLocator.DefaultExecutables(kind);
                 error = names.Count == 0
-                    ? $"该实例没有指定主程序，请在「编辑」里选择一个可执行文件：{gameDirectory}"
-                    : $"未找到游戏主程序（{string.Join(" / ", names)}）：{gameDirectory}";
+                    ? Loc.F("该实例没有指定主程序，请在「编辑」里选择一个可执行文件：{0}", gameDirectory)
+                    : Loc.F("未找到游戏主程序（{0}）：{1}", string.Join(Loc.T(" / "), names), gameDirectory);
                 return false;
             }
         }
@@ -69,19 +70,19 @@ public static class GameLauncher
             var process = Process.Start(startInfo);
             if (process is null)
             {
-                error = "进程启动失败：Process.Start 返回空";
+                error = Loc.T("进程启动失败：Process.Start 返回空");
                 return false;
             }
 
             session = new GameProcessSession(process) { ExecutablePath = executable };
-            Log.Info($"已启动游戏：{executable}");
+            Log.Info(Loc.F("已启动游戏：{0}", executable));
 
             return true;
         }
         catch (Exception ex)
         {
-            error = $"启动游戏失败：{ex.Message}";
-            Log.Error($"启动游戏失败：{executable}", ex);
+            error = Loc.F("启动游戏失败：{0}", ex.Message);
+            Log.Error(Loc.F("启动游戏失败：{0}", executable), ex);
             return false;
         }
     }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Unicode;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.App;
 
@@ -39,7 +40,7 @@ public static class SettingsStore
         }
         catch (Exception ex)
         {
-            Log.Warn($"设置文件解析失败，将重建为默认值：{ex.Message}");
+            Log.Warn(Loc.F("设置文件解析失败，将重建为默认值：{0}", ex.Message));
             TryBackupBadFile(file);
             Current = new Settings();
             Save();
@@ -54,7 +55,7 @@ public static class SettingsStore
         }
         catch (Exception ex)
         {
-            Log.Error("设置保存失败", ex);
+            Log.Error(Loc.T("设置保存失败"), ex);
         }
     }
 

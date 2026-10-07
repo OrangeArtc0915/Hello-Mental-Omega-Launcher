@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using System.Text.Unicode;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -53,7 +54,7 @@ public static class MultiplayerSettingsStore
         }
         catch (Exception ex)
         {
-            Log.Warn($"联机配置解析失败，将重建为默认值：{ex.Message}");
+            Log.Warn(Loc.F("联机配置解析失败，将重建为默认值：{0}", ex.Message));
             TryBackupBadFile(FilePath);
             Current = new MultiplayerSettings();
             Save();
@@ -71,7 +72,7 @@ public static class MultiplayerSettingsStore
         }
         catch (Exception ex)
         {
-            Log.Error("联机配置保存失败", ex);
+            Log.Error(Loc.T("联机配置保存失败"), ex);
         }
     }
 
@@ -91,7 +92,7 @@ public static class MultiplayerSettingsStore
         if (Current.EasyTierNode == "tcp://39.108.52.138:11010")
         {
             Current.EasyTierNode = "udp://39.108.52.138:11010";
-            Log.Info("联机配置迁移：EasyTier 默认节点 TCP 已不可用，自动切换为 udp://39.108.52.138:11010");
+            Log.Info(Loc.T("联机配置迁移：EasyTier 默认节点 TCP 已不可用，自动切换为 udp://39.108.52.138:11010"));
             Save();
         }
     }

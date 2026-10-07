@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -39,7 +40,7 @@ public static class Junction
 
         if (exitCode == 0 && Directory.Exists(linkPath)) return true;
 
-        error = string.IsNullOrWhiteSpace(output) ? $"mklink 返回 {exitCode}" : output.Trim();
+        error = string.IsNullOrWhiteSpace(output) ? Loc.F("mklink 返回 {0}", exitCode) : output.Trim();
         return false;
     }
 
@@ -74,7 +75,7 @@ public static class Junction
 
             if (process is null)
             {
-                output = "无法启动 cmd.exe";
+                output = Loc.T("无法启动 cmd.exe");
                 return -1;
             }
 

@@ -1,4 +1,5 @@
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Updater;
 
@@ -13,7 +14,7 @@ public static class SemVer
     {
         if (!TryParse(left, out var a) || !TryParse(right, out var b))
         {
-            Log.Warn($"版本号无法解析，按相等处理：left=\"{left}\"，right=\"{right}\"");
+            Log.Warn(Loc.F("版本号无法解析，按相等处理：left=\"{0}\"，right=\"{1}\"", left, right));
             return 0;
         }
 

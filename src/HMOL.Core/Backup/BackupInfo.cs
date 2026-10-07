@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.Backup;
 
 /// <summary>备份种类。</summary>
@@ -55,7 +57,7 @@ public sealed record BackupEntry(BackupKind Kind, string Name, string Path, Date
     int FileCount, long SizeBytes, string SourceInstance)
 {
     /// <summary>列表展示用的种类文字。</summary>
-    public string KindText => Kind == BackupKind.Original ? "原版游戏" : "用户备份";
+    public string KindText => Kind == BackupKind.Original ? Loc.T("原版游戏") : Loc.T("用户备份");
 }
 
 /// <summary>备份 / 还原的结果。</summary>

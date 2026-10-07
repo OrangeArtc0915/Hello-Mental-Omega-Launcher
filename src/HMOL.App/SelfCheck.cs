@@ -1,5 +1,6 @@
 using HMOL.App.Controls.Svg;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App;
 
@@ -22,7 +23,7 @@ internal static class SelfCheck
 
             if (names.Count == 0)
             {
-                Log.Warn("自检：未能枚举到任何图标资源");
+                Log.Warn(Loc.T("自检：未能枚举到任何图标资源"));
                 return;
             }
 
@@ -33,13 +34,13 @@ internal static class SelfCheck
             }
 
             if (failed.Count == 0)
-                Log.Info($"自检：{names.Count} 个图标全部解析成功");
+                Log.Info(Loc.F("自检：{0} 个图标全部解析成功", names.Count));
             else
-                Log.Warn($"自检：{names.Count} 个图标中有 {failed.Count} 个解析失败 → {string.Join(", ", failed)}");
+                Log.Warn(Loc.F("自检：{0} 个图标中有 {1} 个解析失败 → {2}", names.Count, failed.Count, string.Join(Loc.T(", "), failed)));
         }
         catch (Exception ex)
         {
-            Log.Warn($"自检（图标）执行失败：{ex.Message}");
+            Log.Warn(Loc.F("自检（图标）执行失败：{0}", ex.Message));
         }
     }
 }

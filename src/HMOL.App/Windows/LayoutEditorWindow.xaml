@@ -1,10 +1,10 @@
-<Window x:Class="HMOL.App.Windows.LayoutEditorWindow"
+<Window xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Windows.LayoutEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:HMOL.App.Controls"
         xmlns:l="clr-namespace:HMOL.App.Layout"
         xmlns:svg="clr-namespace:HMOL.App.Controls.Svg"
-        Title="界面布局"
+        Title="{loc:T '界面布局'}"
         Width="1060"
         Height="700"
         MinWidth="940"
@@ -148,18 +148,18 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock FontSize="16" FontWeight="Bold" Text="自定义界面布局" />
+            <TextBlock FontSize="16" FontWeight="Bold" Text="{loc:T '自定义界面布局'}" />
             <TextBlock Margin="0,4,0,0"
                        FontSize="12"
                        Foreground="{DynamicResource Text.Secondary}"
                        TextWrapping="Wrap"
-                       Text="调整左侧导航的顺序、显隐与名称，以及主页控件的位置与大小。编辑过程不影响主界面，点「保存并应用」后才生效。" />
+                       Text="{loc:T '调整左侧导航的顺序、显隐与名称，以及主页控件的位置与大小。编辑过程不影响主界面，点「保存并应用」后才生效。'}" />
         </StackPanel>
 
         <TabControl Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource EditorTabControlStyle}">
 
             <!-- 侧栏导航：固定布局，只能改顺序 / 显隐 / 名称 -->
-            <TabItem Header="侧栏导航">
+            <TabItem Header="{loc:T '侧栏导航'}">
                 <Grid Margin="0,10,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
@@ -187,7 +187,7 @@
                                        Margin="2,0,0,6"
                                        FontSize="12"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="布局方案" />
+                                       Text="{loc:T '布局方案'}" />
 
                             <Border Grid.Row="1"
                                     MinHeight="120"
@@ -203,27 +203,27 @@
 
                             <StackPanel Grid.Row="2" Margin="0,8,0,0">
                                 <c:OutlineButton x:Name="BtnSchemeNew"
-                                                 Content="新建空白"
-                                                 ToolTip="新建一套只含默认顺序的方案"
+                                                 Content="{loc:T '新建空白'}"
+                                                 ToolTip="{loc:T '新建一套只含默认顺序的方案'}"
                                                  Click="OnSchemeNewClick" />
                                 <c:OutlineButton x:Name="BtnSchemeRename"
                                                  Margin="0,6,0,0"
-                                                 Content="重命名方案"
+                                                 Content="{loc:T '重命名方案'}"
                                                  Click="OnSchemeRenameClick" />
                                 <c:OutlineButton x:Name="BtnSchemeDelete"
                                                  Margin="0,6,0,0"
-                                                 Content="删除方案"
+                                                 Content="{loc:T '删除方案'}"
                                                  Tone="Danger"
                                                  Click="OnSchemeDeleteClick" />
                                 <c:OutlineButton x:Name="BtnSchemeExport"
                                                  Margin="0,6,0,0"
-                                                 Content="导出方案"
-                                                 ToolTip="把当前方案存成 JSON，方便备份或分享"
+                                                 Content="{loc:T '导出方案'}"
+                                                 ToolTip="{loc:T '把当前方案存成 JSON，方便备份或分享'}"
                                                  Click="OnSchemeExportClick" />
                                 <c:OutlineButton x:Name="BtnSchemeImport"
                                                  Margin="0,6,0,0"
-                                                 Content="导入方案"
-                                                 ToolTip="从别人的 JSON 文件导入一套方案"
+                                                 Content="{loc:T '导入方案'}"
+                                                 ToolTip="{loc:T '从别人的 JSON 文件导入一套方案'}"
                                                  Click="OnSchemeImportClick" />
                             </StackPanel>
                         </Grid>
@@ -238,10 +238,10 @@
                             <StackPanel Grid.Row="0" Margin="2,0,0,6">
                                 <TextBlock FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
-                                           Text="可选元素（当前隐藏）" />
+                                           Text="{loc:T '可选元素（当前隐藏）'}" />
                                 <TextBlock FontSize="11"
                                            Foreground="{DynamicResource Text.Tertiary}"
-                                           Text="拖到右边即显示" />
+                                           Text="{loc:T '拖到右边即显示'}" />
                             </StackPanel>
 
                             <Border Grid.Row="1"
@@ -279,10 +279,10 @@
                             <StackPanel Grid.Row="0" Margin="2,0,0,6">
                                 <TextBlock FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
-                                           Text="当前布局（显示中）" />
+                                           Text="{loc:T '当前布局（显示中）'}" />
                                 <TextBlock FontSize="11"
                                            Foreground="{DynamicResource Text.Tertiary}"
-                                           Text="上下拖动可排序，拖回左边即隐藏" />
+                                           Text="{loc:T '上下拖动可排序，拖回左边即隐藏'}" />
                             </StackPanel>
 
                             <Border Grid.Row="1"
@@ -317,31 +317,31 @@
                                 HorizontalAlignment="Left"
                                 Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnMoveUp"
-                                         Content="上移"
+                                         Content="{loc:T '上移'}"
                                          Click="OnMoveUpClick" />
                         <c:OutlineButton x:Name="BtnMoveDown"
                                          Margin="6,0,0,0"
-                                         Content="下移"
+                                         Content="{loc:T '下移'}"
                                          Click="OnMoveDownClick" />
                         <c:OutlineButton x:Name="BtnHide"
                                          Margin="6,0,0,0"
-                                         Content="隐藏"
-                                         ToolTip="选择「设置」时不可用：它是布局编辑器的入口，隐藏后不好找回"
+                                         Content="{loc:T '隐藏'}"
+                                         ToolTip="{loc:T '选择「设置」时不可用：它是布局编辑器的入口，隐藏后不好找回'}"
                                          Click="OnHideClick" />
                         <c:OutlineButton x:Name="BtnShow"
                                          Margin="6,0,0,0"
-                                         Content="显示"
+                                         Content="{loc:T '显示'}"
                                          Click="OnShowClick" />
                         <c:OutlineButton x:Name="BtnRenameElement"
                                          Margin="6,0,0,0"
-                                         Content="重命名元素"
+                                         Content="{loc:T '重命名元素'}"
                                          Click="OnRenameElementClick" />
                     </StackPanel>
                 </Grid>
             </TabItem>
 
             <!-- 主页控件：自由定位 -->
-            <TabItem Header="主页控件">
+            <TabItem Header="{loc:T '主页控件'}">
                 <Grid Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -369,11 +369,11 @@
                         <StackPanel Grid.Row="0" Margin="2,0,0,6">
                             <TextBlock FontSize="12"
                                        Foreground="{DynamicResource Text.Secondary}"
-                                       Text="主页控件" />
+                                       Text="{loc:T '主页控件'}" />
                             <TextBlock FontSize="11"
                                        Foreground="{DynamicResource Text.Tertiary}"
                                        TextWrapping="Wrap"
-                                       Text="拖动方块移动、拉手柄缩放、双击居中。虚线框表示仍跟随流式布局，半透明表示已隐藏；横幅与三块小组件也在这里拖动缩放。启动入口类控件不允许隐藏。" />
+                                       Text="{loc:T '拖动方块移动、拉手柄缩放、双击居中。虚线框表示仍跟随流式布局，半透明表示已隐藏；横幅与三块小组件也在这里拖动缩放。启动入口类控件不允许隐藏。'}" />
                         </StackPanel>
 
                         <Border Grid.Row="1"
@@ -390,23 +390,23 @@
 
                         <StackPanel Grid.Row="2" Margin="0,8,0,0">
                             <c:OutlineButton x:Name="BtnHomeCenter"
-                                             Content="居中"
-                                             ToolTip="按当前大小在主页内容区里居中"
+                                             Content="{loc:T '居中'}"
+                                             ToolTip="{loc:T '按当前大小在主页内容区里居中'}"
                                              Click="OnHomeCenterClick" />
                             <c:OutlineButton x:Name="BtnHomeReset"
                                              Margin="0,6,0,0"
-                                             Content="恢复默认位置与大小"
-                                             ToolTip="清掉坐标，让这个控件回到流式布局"
+                                             Content="{loc:T '恢复默认位置与大小'}"
+                                             ToolTip="{loc:T '清掉坐标，让这个控件回到流式布局'}"
                                              Click="OnHomeResetClick" />
                             <c:OutlineButton x:Name="BtnHomeHide"
                                              Margin="0,6,0,0"
-                                             Content="隐藏这个控件"
-                                             ToolTip="主页上不再显示它（启动入口类控件不可隐藏）"
+                                             Content="{loc:T '隐藏这个控件'}"
+                                             ToolTip="{loc:T '主页上不再显示它（启动入口类控件不可隐藏）'}"
                                              Click="OnHomeHideClick" />
                             <c:OutlineButton x:Name="BtnHomeShow"
                                              Margin="0,6,0,0"
-                                             Content="显示这个控件"
-                                             ToolTip="让隐藏的控件重新出现"
+                                             Content="{loc:T '显示这个控件'}"
+                                             ToolTip="{loc:T '让隐藏的控件重新出现'}"
                                              Click="OnHomeShowClick" />
                         </StackPanel>
                     </Grid>
@@ -419,21 +419,21 @@
                     HorizontalAlignment="Right"
                     Orientation="Horizontal">
             <c:OutlineButton x:Name="BtnReset"
-                             Content="恢复默认"
-                             ToolTip="恢复默认顺序、显示状态、名称与主页位置（点保存并应用后生效）"
+                             Content="{loc:T '恢复默认'}"
+                             ToolTip="{loc:T '恢复默认顺序、显示状态、名称与主页位置（点保存并应用后生效）'}"
                              Click="OnResetClick" />
             <c:OutlineButton x:Name="BtnSaveAs"
                              Margin="6,0,0,0"
-                             Content="另存为新方案"
+                             Content="{loc:T '另存为新方案'}"
                              Click="OnSaveAsClick" />
             <c:OutlineButton x:Name="BtnApply"
                              Margin="6,0,0,0"
-                             Content="保存并应用"
+                             Content="{loc:T '保存并应用'}"
                              Tone="Solid"
                              Click="OnApplyClick" />
             <c:OutlineButton x:Name="BtnClose"
                              Margin="6,0,0,0"
-                             Content="关闭"
+                             Content="{loc:T '关闭'}"
                              Click="OnCloseClick" />
         </StackPanel>
 

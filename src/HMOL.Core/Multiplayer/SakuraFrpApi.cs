@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Text.Json;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -32,7 +33,7 @@ public sealed record SakuraNode(int Id, string Name, string Host, string Descrip
     {
         get
         {
-            var state = IsOffline ? "离线" : AllowsCreate ? "可新建" : "满员";
+            var state = IsOffline ? Loc.T("离线") : AllowsCreate ? Loc.T("可新建") : Loc.T("满员");
             var traffic = AllowsUdp ? "TCP/UDP" : "TCP";
 
             return $"{state} · {traffic}";
@@ -135,7 +136,7 @@ public sealed class SakuraFrpApi : IDisposable
         }
         catch (Exception ex)
         {
-            return SakuraResult<SakuraUser>.Fail($"解析账号信息失败：{ex.Message}");
+            return SakuraResult<SakuraUser>.Fail(Loc.F("解析账号信息失败：{0}", ex.Message));
         }
     }
 
@@ -169,7 +170,7 @@ public sealed class SakuraFrpApi : IDisposable
         }
         catch (Exception ex)
         {
-            return SakuraResult<List<SakuraNode>>.Fail($"解析节点列表失败：{ex.Message}");
+            return SakuraResult<List<SakuraNode>>.Fail(Loc.F("解析节点列表失败：{0}", ex.Message));
         }
     }
 
@@ -193,7 +194,7 @@ public sealed class SakuraFrpApi : IDisposable
         }
         catch (Exception ex)
         {
-            return SakuraResult<List<SakuraTunnel>>.Fail($"解析隧道列表失败：{ex.Message}");
+            return SakuraResult<List<SakuraTunnel>>.Fail(Loc.F("解析隧道列表失败：{0}", ex.Message));
         }
     }
 
@@ -230,7 +231,7 @@ public sealed class SakuraFrpApi : IDisposable
         }
         catch (Exception ex)
         {
-            return SakuraResult<SakuraTunnel>.Fail($"解析创建结果失败：{ex.Message}");
+            return SakuraResult<SakuraTunnel>.Fail(Loc.F("解析创建结果失败：{0}", ex.Message));
         }
     }
 
@@ -259,7 +260,7 @@ public sealed class SakuraFrpApi : IDisposable
     /// <summary>流量数值转成人看的大小（0 或负数表示接口没给，显示「未知」）。</summary>
     public static string FormatTraffic(long bytes)
     {
-        if (bytes <= 0) return "未知";
+        if (bytes <= 0) return Loc.T("未知");
 
         const double giga = 1024d * 1024 * 1024;
         return bytes >= giga ? $"{bytes / giga:0.##} GB" : $"{bytes / 1024d / 1024:0.#} MB";
@@ -270,7 +271,7 @@ public sealed class SakuraFrpApi : IDisposable
     private async Task<(bool Ok, JsonElement? Body, string Message)> SendAsync(
         HttpMethod method, string path, string accessKey, Dictionary<string, string>? form, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(accessKey)) return (false, null, "请先填写樱花FRP 访问密钥");
+        if (string.IsNullOrWhiteSpace(accessKey)) return (false, null, Loc.T("请先填写樱花FRP 访问密钥"));
 
         try
         {
@@ -286,7 +287,7 @@ public sealed class SakuraFrpApi : IDisposable
             {
                 return response.IsSuccessStatusCode
                     ? (true, null, string.Empty)
-                    : (false, null, $"服务端返回 HTTP {(int)response.StatusCode}");
+                    : (false, null, Loc.F("服务端返回 HTTP {0}", (int)response.StatusCode));
             }
 
             using var document = JsonDocument.Parse(text);
@@ -307,20 +308,20 @@ public sealed class SakuraFrpApi : IDisposable
         }
         catch (TaskCanceledException)
         {
-            return (false, null, "请求超时，检查网络后重试");
+            return (false, null, Loc.T("请求超时，检查网络后重试"));
         }
         catch (Exception ex)
         {
-            return (false, null, $"请求失败：{ex.Message}");
+            return (false, null, Loc.F("请求失败：{0}", ex.Message));
         }
     }
 
     private static string DescribeError(int code, string message) => code switch
     {
-        401 => $"访问密钥无效或已过期（{message}）。请到樱花FRP 管理面板重新复制「访问密钥」。",
-        403 => $"无权访问（{message}）。可能没有实名认证，或该功能对你的账号未开放。",
-        404 => $"接口不存在（{message}）。",
-        _ => string.IsNullOrWhiteSpace(message) ? $"服务端返回错误代码 {code}" : $"{message}（代码 {code}）"
+        401 => Loc.F("访问密钥无效或已过期（{0}）。请到樱花FRP 管理面板重新复制「访问密钥」。", message),
+        403 => Loc.F("无权访问（{0}）。可能没有实名认证，或该功能对你的账号未开放。", message),
+        404 => Loc.F("接口不存在（{0}）。", message),
+        _ => string.IsNullOrWhiteSpace(message) ? Loc.F("服务端返回错误代码 {0}", code) : Loc.F("{0}（代码 {1}）", message, code)
     };
 
     private static SakuraTunnel ReadTunnel(JsonElement item) => new(

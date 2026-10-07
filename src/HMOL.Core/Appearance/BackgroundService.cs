@@ -1,6 +1,7 @@
 using System.IO;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Appearance;
 
@@ -58,10 +59,10 @@ public static class BackgroundService
     /// <summary>类型的中文名，用于界面提示。</summary>
     public static string DescribeKind(BackgroundKind kind) => kind switch
     {
-        BackgroundKind.Image => "静态图片",
-        BackgroundKind.Gif => "动图",
-        BackgroundKind.Video => "视频",
-        _ => "无"
+        BackgroundKind.Image => Loc.T("静态图片"),
+        BackgroundKind.Gif => Loc.T("动图"),
+        BackgroundKind.Video => Loc.T("视频"),
+        _ => Loc.T("无")
     };
 
     // ————— 路径 —————
@@ -96,14 +97,14 @@ public static class BackgroundService
     public static BackgroundImport ImportFile(string sourcePath, bool moveSource = false)
     {
         if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
-            return new BackgroundImport(false, "文件不存在。", BackgroundKind.None, string.Empty);
+            return new BackgroundImport(false, Loc.T("文件不存在。"), BackgroundKind.None, string.Empty);
 
         var kind = DetectKind(sourcePath);
         if (kind == BackgroundKind.None)
         {
             return new BackgroundImport(false,
-                $"不支持的文件类型（{Path.GetExtension(sourcePath)}）。" +
-                $"可用的有：{string.Join(" / ", SupportedExtensions)}。",
+                Loc.F("不支持的文件类型（{0}）。", Path.GetExtension(sourcePath)) +
+                Loc.F("可用的有：{0}。", string.Join(Loc.T(" / "), SupportedExtensions)),
                 BackgroundKind.None, string.Empty);
         }
 
@@ -118,8 +119,8 @@ public static class BackgroundService
             if (string.Equals(Path.GetDirectoryName(existing), Path.GetFullPath(StorageDirectory), StringComparison.OrdinalIgnoreCase))
             {
                 var keptName = Path.GetFileName(existing);
-                Log.Info($"背景素材已在素材库中，直接复用：{keptName}");
-                return new BackgroundImport(true, $"已设为背景：{keptName}", kind, keptName);
+                Log.Info(Loc.F("背景素材已在素材库中，直接复用：{0}", keptName));
+                return new BackgroundImport(true, Loc.F("已设为背景：{0}", keptName), kind, keptName);
             }
 
             var targetName = BuildTargetName(Path.GetExtension(sourcePath));
@@ -128,14 +129,14 @@ public static class BackgroundService
             if (moveSource) MoveFile(sourcePath, targetPath);
             else File.Copy(sourcePath, targetPath, overwrite: false);
 
-            Log.Info($"背景素材已导入：{Path.GetFileName(sourcePath)} → {targetPath}（{kind}）");
+            Log.Info(Loc.F("背景素材已导入：{0} → {1}（{2}）", Path.GetFileName(sourcePath), targetPath, kind));
 
-            return new BackgroundImport(true, $"已设为背景：{Path.GetFileName(sourcePath)}", kind, targetName);
+            return new BackgroundImport(true, Loc.F("已设为背景：{0}", Path.GetFileName(sourcePath)), kind, targetName);
         }
         catch (Exception ex)
         {
-            Log.Error($"导入背景素材失败：{sourcePath}", ex);
-            return new BackgroundImport(false, $"导入背景失败：{ex.Message}", BackgroundKind.None, string.Empty);
+            Log.Error(Loc.F("导入背景素材失败：{0}", sourcePath), ex);
+            return new BackgroundImport(false, Loc.F("导入背景失败：{0}", ex.Message), BackgroundKind.None, string.Empty);
         }
     }
 
@@ -145,11 +146,11 @@ public static class BackgroundService
         try
         {
             ClearFiles();
-            Log.Info("已清除主页背景素材");
+            Log.Info(Loc.T("已清除主页背景素材"));
         }
         catch (Exception ex)
         {
-            Log.Warn($"清除背景素材失败：{ex.Message}");
+            Log.Warn(Loc.F("清除背景素材失败：{0}", ex.Message));
         }
     }
 
@@ -170,7 +171,7 @@ public static class BackgroundService
         }
         catch (Exception ex)
         {
-            Log.Warn($"枚举背景素材失败：{ex.Message}");
+            Log.Warn(Loc.F("枚举背景素材失败：{0}", ex.Message));
             return [];
         }
     }
@@ -184,12 +185,12 @@ public static class BackgroundService
         try
         {
             File.Delete(path);
-            Log.Info($"已移除背景素材：{Path.GetFileName(path)}");
+            Log.Info(Loc.F("已移除背景素材：{0}", Path.GetFileName(path)));
             return true;
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景素材删除失败（可能正被占用）：{ex.Message}");
+            Log.Warn(Loc.F("背景素材删除失败（可能正被占用）：{0}", ex.Message));
             return false;
         }
     }
@@ -226,7 +227,7 @@ public static class BackgroundService
         {
             File.Copy(sourcePath, targetPath, overwrite: false);
             try { File.Delete(sourcePath); }
-            catch (Exception ex) { Log.Warn($"删除已导入的源文件失败：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("删除已导入的源文件失败：{0}", ex.Message)); }
         }
     }
 
@@ -252,7 +253,7 @@ public static class BackgroundService
             }
             catch (Exception ex)
             {
-                Log.Warn($"旧背景素材删除失败（可能正被占用，下次导入时会再清理）：{ex.Message}");
+                Log.Warn(Loc.F("旧背景素材删除失败（可能正被占用，下次导入时会再清理）：{0}", ex.Message));
             }
         }
     }

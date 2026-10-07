@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.Extensions;
 
 /// <summary>扩展的加载状态。</summary>
@@ -55,9 +57,9 @@ public sealed record ExtensionInfo
     /// <summary>界面上的状态文案。</summary>
     public string StatusText => Status switch
     {
-        ExtensionStatus.Enabled => "已启用",
-        ExtensionStatus.Disabled => "已停用",
-        _ => "加载失败"
+        ExtensionStatus.Enabled => Loc.T("已启用"),
+        ExtensionStatus.Disabled => Loc.T("已停用"),
+        _ => Loc.T("加载失败")
     };
 
     /// <summary>列表里的次要信息：作者 / 版本 / 数据源。</summary>
@@ -67,9 +69,9 @@ public sealed record ExtensionInfo
         {
             var parts = new List<string>();
 
-            if (Author.Length > 0) parts.Add($"作者 {Author}");
+            if (Author.Length > 0) parts.Add(Loc.F("作者 {0}", Author));
             if (Version.Length > 0) parts.Add($"v{Version.TrimStart('v', 'V')}");
-            parts.Add(HasDataSource ? "有数据源" : "无数据源");
+            parts.Add(HasDataSource ? Loc.T("有数据源") : Loc.T("无数据源"));
 
             return string.Join(" · ", parts);
         }

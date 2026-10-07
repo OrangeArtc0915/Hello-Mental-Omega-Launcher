@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Controls;
 
@@ -9,5 +10,5 @@ namespace HMOL.App.Controls;
 public static class AppCommands
 {
     /// <summary>关闭当前窗口。</summary>
-    public static readonly RoutedUICommand CloseWindow = new("关闭窗口", nameof(CloseWindow), typeof(AppCommands));
+    public static readonly RoutedUICommand CloseWindow = new(Loc.T("关闭窗口"), nameof(CloseWindow), typeof(AppCommands));
 }

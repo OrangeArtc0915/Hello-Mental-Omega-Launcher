@@ -9,6 +9,7 @@ using HMOL.App.Animation;
 using HMOL.Core.App;
 using HMOL.Core.Appearance;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Views;
 
@@ -128,14 +129,14 @@ public partial class BackgroundLayer : UserControl
 
         if (path is null)
         {
-            Log.Info("背景：未设置素材或素材已丢失，使用主题渐变");
+            Log.Info(Loc.T("背景：未设置素材或素材已丢失，使用主题渐变"));
             return;
         }
 
         var kind = BackgroundService.DetectKind(path);
         if (kind == BackgroundKind.None)
         {
-            Log.Warn($"背景：无法识别的素材类型，使用主题渐变（{Path.GetFileName(path)}）");
+            Log.Warn(Loc.F("背景：无法识别的素材类型，使用主题渐变（{0}）", Path.GetFileName(path)));
             return;
         }
 
@@ -164,14 +165,14 @@ public partial class BackgroundLayer : UserControl
                     if (_tiling)
                     {
                         ShowTiled(path);
-                        Log.Info($"背景：图片平铺 {Path.GetFileName(path)}（{FillText(fill)}）");
+                        Log.Info(Loc.F("背景：图片平铺 {0}（{1}）", Path.GetFileName(path), FillText(fill)));
                     }
                     else
                     {
                         ImgBackground.Source = LoadFrozen(path);
                         ImgBackground.Visibility = Visibility.Visible;
 
-                        Log.Info($"背景：图片 {Path.GetFileName(path)}（模糊 {blur}，暗化 {dimPercent}%，{FillText(fill)}）");
+                        Log.Info(Loc.F("背景：图片 {0}（模糊 {1}，暗化 {2}%，{3}）", Path.GetFileName(path), blur, dimPercent, FillText(fill)));
                     }
                     break;
             }
@@ -181,7 +182,7 @@ public partial class BackgroundLayer : UserControl
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景加载失败，回退主题渐变：{ex.Message}");
+            Log.Warn(Loc.F("背景加载失败，回退主题渐变：{0}", ex.Message));
             Reset();
             return;
         }
@@ -191,10 +192,10 @@ public partial class BackgroundLayer : UserControl
 
     private static string FillText(BackgroundFill fill) => fill switch
     {
-        BackgroundFill.Fit => "适应",
-        BackgroundFill.Fill => "拉伸",
-        BackgroundFill.Tile => "平铺",
-        _ => "铺满"
+        BackgroundFill.Fit => Loc.T("适应"),
+        BackgroundFill.Fill => Loc.T("拉伸"),
+        BackgroundFill.Tile => Loc.T("平铺"),
+        _ => Loc.T("铺满")
     };
 
     /// <summary>
@@ -321,7 +322,7 @@ public partial class BackgroundLayer : UserControl
         var blur = kind == BackgroundKind.Video ? 0 : Math.Clamp(blurRadius, 0, MaxBlurRadius);
 
         if (kind == BackgroundKind.Video && blurRadius > 0)
-            Log.Info("背景：视频不支持模糊，已只应用暗化（与旧版行为一致）");
+            Log.Info(Loc.T("背景：视频不支持模糊，已只应用暗化（与旧版行为一致）"));
 
         _blur.Radius = blur;
 
@@ -346,7 +347,7 @@ public partial class BackgroundLayer : UserControl
             }
             catch (Exception ex)
             {
-                Log.Warn($"背景视频{(paused ? "暂停" : "恢复")}失败：{ex.Message}");
+                Log.Warn(Loc.F("背景视频{0}失败：{1}", (paused ? Loc.T("暂停") : Loc.T("恢复")), ex.Message));
             }
         }
 
@@ -380,11 +381,11 @@ public partial class BackgroundLayer : UserControl
 
             ScheduleNextGifFrame();
 
-            Log.Info($"背景：动图 {Path.GetFileName(file)}（{frames.Count} 帧）");
+            Log.Info(Loc.F("背景：动图 {0}（{1} 帧）", Path.GetFileName(file), frames.Count));
         }
         catch (Exception ex)
         {
-            Log.Warn($"动图背景加载失败：{ex.Message}");
+            Log.Warn(Loc.F("动图背景加载失败：{0}", ex.Message));
 
             if (version == _loadVersion) Reset();
         }
@@ -467,7 +468,7 @@ public partial class BackgroundLayer : UserControl
         VidBackground.Visibility = Visibility.Visible;
         VidBackground.Source = new Uri(file);
 
-        Log.Info($"背景：视频 {Path.GetFileName(file)}，等待解码…");
+        Log.Info(Loc.F("背景：视频 {0}，等待解码…", Path.GetFileName(file)));
     }
 
     private void OnVideoOpened(object sender, RoutedEventArgs e)
@@ -476,8 +477,8 @@ public partial class BackgroundLayer : UserControl
 
         _videoOpened = true;
 
-        Log.Info($"背景视频已解码：{VidBackground.NaturalVideoWidth}×{VidBackground.NaturalVideoHeight}，" +
-                 $"时长 {VidBackground.NaturalDuration.TimeSpan.TotalSeconds:0.0} 秒");
+        Log.Info(Loc.F("背景视频已解码：{0}×{1}，", VidBackground.NaturalVideoWidth, VidBackground.NaturalVideoHeight) +
+                 Loc.F("时长 {0:0.0} 秒", VidBackground.NaturalDuration.TimeSpan.TotalSeconds));
 
         try
         {
@@ -488,7 +489,7 @@ public partial class BackgroundLayer : UserControl
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景视频起播失败：{ex.Message}");
+            Log.Warn(Loc.F("背景视频起播失败：{0}", ex.Message));
         }
     }
 
@@ -498,8 +499,8 @@ public partial class BackgroundLayer : UserControl
         // 换背景时旧媒体也会报失败，那一份已经被收掉了，不用再处理
         if (VidBackground.Visibility != Visibility.Visible) return;
 
-        Log.Warn($"背景视频无法解码（{e.ErrorException?.Message ?? "未知原因"}），已回退为无背景。" +
-                 "常见原因是系统缺少该视频编码的解码器（HEVC / AV1 / MKV 需另装解码器）");
+        Log.Warn(Loc.F("背景视频无法解码（{0}），已回退为无背景。", e.ErrorException?.Message ?? Loc.T("未知原因")) +
+                 Loc.T("常见原因是系统缺少该视频编码的解码器（HEVC / AV1 / MKV 需另装解码器）"));
 
         _videoOpened = false;
 
@@ -525,7 +526,7 @@ public partial class BackgroundLayer : UserControl
         }
         catch (Exception ex)
         {
-            Log.Warn($"背景视频循环播放失败：{ex.Message}");
+            Log.Warn(Loc.F("背景视频循环播放失败：{0}", ex.Message));
         }
     }
 

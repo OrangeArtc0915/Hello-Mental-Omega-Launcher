@@ -5,6 +5,7 @@ using HMOL.App.Services;
 using HMOL.App.Windows;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -32,7 +33,7 @@ public partial class MultiplayerMoreWindow : Window
     {
         var enabled = MultiplayerSettingsStore.Current.GuardEnabled;
 
-        BtnGuard.Content = enabled ? "已开启" : "已关闭";
+        BtnGuard.Content = enabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnGuard.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
@@ -44,7 +45,7 @@ public partial class MultiplayerMoreWindow : Window
         if (MultiplayerSettingsStore.Current.ValidCustomNodes.Any(item =>
                 string.Equals(item, node, StringComparison.OrdinalIgnoreCase)))
         {
-            ChoiceWindow.Info(this, "自定义节点", "这个节点已经在列表里了。");
+            ChoiceWindow.Info(this, Loc.T("自定义节点"), Loc.T("这个节点已经在列表里了。"));
             return;
         }
 
@@ -86,7 +87,7 @@ public partial class MultiplayerMoreWindow : Window
     {
         var state = AutoStartManager.Query();
 
-        BtnAutoStart.Content = state.IsEnabled ? "已开启" : "已关闭";
+        BtnAutoStart.Content = state.IsEnabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnAutoStart.Tone = state.IsEnabled ? ButtonTone.Solid : ButtonTone.Outline;
 
         if (operation is not null)
@@ -98,12 +99,12 @@ public partial class MultiplayerMoreWindow : Window
         switch (state.Status)
         {
             case AutoStartStatus.Enabled:
-                SetAutoStartStatus($"自启命令：{state.Command}", warn: false);
+                SetAutoStartStatus(Loc.F("自启命令：{0}", state.Command), warn: false);
                 break;
 
             // 注册表里那条指向别的 exe（程序被挪过）：开关先按「关」显示，再点一次就改成当前位置
             case AutoStartStatus.PointsToOtherExe:
-                SetAutoStartStatus($"{state.Message}再点一次开关即可改成当前位置。", warn: true);
+                SetAutoStartStatus(Loc.F("{0}再点一次开关即可改成当前位置。", state.Message), warn: true);
                 break;
 
             case AutoStartStatus.Failed:
@@ -111,7 +112,7 @@ public partial class MultiplayerMoreWindow : Window
                 break;
 
             default:
-                SetAutoStartStatus("未设置开机自启。", warn: false);
+                SetAutoStartStatus(Loc.T("未设置开机自启。"), warn: false);
                 break;
         }
     }
@@ -137,7 +138,7 @@ public partial class MultiplayerMoreWindow : Window
         }
         else
         {
-            Log.Warn($"开机自启设置失败：{result.Message}");
+            Log.Warn(Loc.F("开机自启设置失败：{0}", result.Message));
         }
 
         RefreshAutoStart(result);

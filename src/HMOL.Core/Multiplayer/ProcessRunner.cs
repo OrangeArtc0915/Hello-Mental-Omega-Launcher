@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -77,7 +78,7 @@ internal static class ProcessRunner
             };
 
             process = Process.Start(startInfo);
-            if (process is null) return new Result(false, -1, $"无法启动进程：{exe}", false);
+            if (process is null) return new Result(false, -1, Loc.F("无法启动进程：{0}", exe), false);
 
             // 直接读原始字节再自己解码，避免 StreamReader 提前用错编码把中文变成不可逆的乱码
             var stdoutTask = ReadAllBytesAsync(process.StandardOutput.BaseStream);
@@ -156,7 +157,7 @@ internal static class ProcessRunner
         }
         catch (Exception ex)
         {
-            Log.Warn($"结束外部进程失败：{ex.Message}");
+            Log.Warn(Loc.F("结束外部进程失败：{0}", ex.Message));
         }
     }
 
@@ -165,7 +166,7 @@ internal static class ProcessRunner
         try { return await read.ConfigureAwait(false); }
         catch (Exception ex)
         {
-            Log.Warn($"读取外部进程输出失败：{ex.Message}");
+            Log.Warn(Loc.F("读取外部进程输出失败：{0}", ex.Message));
             return [];
         }
     }
@@ -225,7 +226,7 @@ internal static class ProcessRunner
         }
         catch (Exception ex)
         {
-            Log.Warn($"取系统 ANSI 代码页失败，外部命令输出将按 UTF-8 读取：{ex.Message}");
+            Log.Warn(Loc.F("取系统 ANSI 代码页失败，外部命令输出将按 UTF-8 读取：{0}", ex.Message));
             return Encoding.UTF8;
         }
     }

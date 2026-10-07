@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -73,21 +74,21 @@ public sealed class SakuraFrpcRunner : IDisposable
         try
         {
             var (url, hash, size) = await ResolveDownloadAsync(token).ConfigureAwait(false);
-            if (url.Length == 0) return SakuraResult<string>.Fail("没能从樱花FRP 接口取到 frpc 下载地址");
+            if (url.Length == 0) return SakuraResult<string>.Fail(Loc.T("没能从樱花FRP 接口取到 frpc 下载地址"));
 
             if (IsUsable(hash, size))
             {
-                LogLine($"已有可用的 frpc：{FrpcPath}");
+                LogLine(Loc.F("已有可用的 frpc：{0}", FrpcPath));
                 return SakuraResult<string>.Success(FrpcPath);
             }
 
             Directory.CreateDirectory(ToolDirectory);
 
-            LogLine($"正在下载 frpc（约 {size / 1024 / 1024.0:0.0} MB）…");
+            LogLine(Loc.F("正在下载 frpc（约 {0:0.0} MB）…", size / 1024 / 1024.0));
 
             var bytes = await Http.GetByteArrayAsync(url, token).ConfigureAwait(false);
 
-            if (bytes.Length == 0) return SakuraResult<string>.Fail("下载到的 frpc 是空文件");
+            if (bytes.Length == 0) return SakuraResult<string>.Fail(Loc.T("下载到的 frpc 是空文件"));
 
             if (hash.Length > 0)
             {
@@ -95,7 +96,7 @@ public sealed class SakuraFrpcRunner : IDisposable
                 if (!string.Equals(actual, hash, StringComparison.OrdinalIgnoreCase))
                 {
                     return SakuraResult<string>.Fail(
-                        $"frpc 校验失败：官方公布 MD5 为 {hash}，实际下载到 {actual}。已放弃使用，请稍后重试。");
+                        Loc.F("frpc 校验失败：官方公布 MD5 为 {0}，实际下载到 {1}。已放弃使用，请稍后重试。", hash, actual));
                 }
             }
 
@@ -103,16 +104,16 @@ public sealed class SakuraFrpcRunner : IDisposable
             await File.WriteAllBytesAsync(temp, bytes, token).ConfigureAwait(false);
             File.Move(temp, FrpcPath, overwrite: true);
 
-            LogLine($"frpc 已就绪（MD5 校验通过）：{FrpcPath}");
+            LogLine(Loc.F("frpc 已就绪（MD5 校验通过）：{0}", FrpcPath));
             return SakuraResult<string>.Success(FrpcPath);
         }
         catch (TaskCanceledException)
         {
-            return SakuraResult<string>.Fail("下载 frpc 超时，检查网络后重试");
+            return SakuraResult<string>.Fail(Loc.T("下载 frpc 超时，检查网络后重试"));
         }
         catch (Exception ex)
         {
-            return SakuraResult<string>.Fail($"准备 frpc 失败：{ex.Message}");
+            return SakuraResult<string>.Fail(Loc.F("准备 frpc 失败：{0}", ex.Message));
         }
     }
 
@@ -194,11 +195,11 @@ public sealed class SakuraFrpcRunner : IDisposable
     /// <summary>启动隧道。返回失败说明，不抛异常。</summary>
     public SakuraResult<bool> Start(string accessKey, int tunnelId)
     {
-        if (IsRunning) return SakuraResult<bool>.Fail("隧道已经在运行");
+        if (IsRunning) return SakuraResult<bool>.Fail(Loc.T("隧道已经在运行"));
 
-        if (string.IsNullOrWhiteSpace(accessKey)) return SakuraResult<bool>.Fail("请先填写樱花FRP 访问密钥");
-        if (tunnelId <= 0) return SakuraResult<bool>.Fail("隧道 ID 无效");
-        if (!File.Exists(FrpcPath)) return SakuraResult<bool>.Fail("还没有准备好 frpc，请先点「准备 frpc」");
+        if (string.IsNullOrWhiteSpace(accessKey)) return SakuraResult<bool>.Fail(Loc.T("请先填写樱花FRP 访问密钥"));
+        if (tunnelId <= 0) return SakuraResult<bool>.Fail(Loc.T("隧道 ID 无效"));
+        if (!File.Exists(FrpcPath)) return SakuraResult<bool>.Fail(Loc.T("还没有准备好 frpc，请先点「准备 frpc」"));
 
         try
         {
@@ -226,10 +227,10 @@ public sealed class SakuraFrpcRunner : IDisposable
             psi.ArgumentList.Add($"{accessKey.Trim()}:{tunnelId}");
             psi.ArgumentList.Add("-n");
 
-            LogLine($"正在启动 frpc（隧道 {tunnelId}）…");
+            LogLine(Loc.F("正在启动 frpc（隧道 {0}）…", tunnelId));
 
             _process = Process.Start(psi);
-            if (_process is null) return SakuraResult<bool>.Fail("frpc 启动失败");
+            if (_process is null) return SakuraResult<bool>.Fail(Loc.T("frpc 启动失败"));
 
             _ = ReadAsync(_process.StandardOutput);
             _ = ReadAsync(_process.StandardError);
@@ -238,7 +239,7 @@ public sealed class SakuraFrpcRunner : IDisposable
         }
         catch (Exception ex)
         {
-            return SakuraResult<bool>.Fail($"启动 frpc 失败：{ex.Message}");
+            return SakuraResult<bool>.Fail(Loc.F("启动 frpc 失败：{0}", ex.Message));
         }
     }
 
@@ -256,14 +257,14 @@ public sealed class SakuraFrpcRunner : IDisposable
         catch (Exception ex)
         {
             // 本类里 Log 是事件名，静态日志器得写全名
-            HMOL.Core.Logging.Log.Warn($"结束 frpc 失败：{ex.Message}");
+            HMOL.Core.Logging.Log.Warn(Loc.F("结束 frpc 失败：{0}", ex.Message));
         }
         finally
         {
             process.Dispose();
         }
 
-        LogLine("隧道已停止");
+        LogLine(Loc.T("隧道已停止"));
     }
 
     private async Task ReadAsync(StreamReader reader)
@@ -293,7 +294,7 @@ public sealed class SakuraFrpcRunner : IDisposable
         }
         catch (Exception ex)
         {
-            HMOL.Core.Logging.Log.Warn($"读取 frpc 输出失败：{ex.Message}");
+            HMOL.Core.Logging.Log.Warn(Loc.F("读取 frpc 输出失败：{0}", ex.Message));
         }
     }
 
@@ -333,7 +334,7 @@ public sealed class SakuraFrpcRunner : IDisposable
             }
         }
 
-        LogLine($"连接地址（{(isIp ? "IP" : "域名")}）：{address}");
+        LogLine(Loc.F("连接地址（{0}）：{1}", (isIp ? Loc.T("IP") : Loc.T("域名")), address));
         AddressesUpdated?.Invoke();
     }
 
@@ -346,5 +347,5 @@ public sealed class SakuraFrpcRunner : IDisposable
         return System.Net.IPAddress.TryParse(address[..colon], out _);
     }
 
-    private void LogLine(string message) => Log?.Invoke($"[樱花FRP] {message}");
+    private void LogLine(string message) => Log?.Invoke(Loc.F("[樱花FRP] {0}", message));
 }

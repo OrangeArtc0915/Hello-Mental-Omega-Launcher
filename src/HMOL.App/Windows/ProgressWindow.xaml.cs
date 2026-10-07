@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using HMOL.Core.Backup;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -39,7 +40,7 @@ public partial class ProgressWindow : Window
     private readonly bool _indeterminate;
 
     private Window? _ownerWindow;
-    private string _baseDetail = "正在处理…";
+    private string _baseDetail = Loc.T("正在处理…");
     private bool _closed;
 
     private double _fraction;
@@ -207,7 +208,7 @@ public partial class ProgressWindow : Window
         var remaining = EstimateRemaining();
 
         if (remaining is { } span)
-            text = text.Length == 0 ? $"预计剩余 {FormatDuration(span)}" : $"{text} · 预计剩余 {FormatDuration(span)}";
+            text = text.Length == 0 ? Loc.F("预计剩余 {0}", FormatDuration(span)) : Loc.F("{0} · 预计剩余 {1}", text, FormatDuration(span));
 
         if (text.Length == 0)
         {
@@ -259,10 +260,10 @@ public partial class ProgressWindow : Window
 
     private static string FormatDuration(TimeSpan span)
         => span.TotalHours >= 1
-            ? $"{(int)span.TotalHours} 小时 {span.Minutes} 分"
+            ? Loc.F("{0} 小时 {1} 分", (int)span.TotalHours, span.Minutes)
             : span.TotalMinutes >= 1
-                ? $"{span.Minutes} 分 {span.Seconds} 秒"
-                : $"{Math.Max(1, span.Seconds)} 秒";
+                ? Loc.F("{0} 分 {1} 秒", span.Minutes, span.Seconds)
+                : Loc.F("{0} 秒", Math.Max(1, span.Seconds));
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
@@ -270,11 +271,11 @@ public partial class ProgressWindow : Window
 
         CancelRequested = true;
         BtnCancel.IsEnabled = false;
-        BtnCancel.Content = "正在取消…";
-        LabDetail.Text = "正在取消，请稍候…";
+        BtnCancel.Content = Loc.T("正在取消…");
+        LabDetail.Text = Loc.T("正在取消，请稍候…");
 
         try { _cts.Cancel(); }
-        catch (Exception ex) { Log.Warn($"取消操作失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("取消操作失败：{0}", ex.Message)); }
     }
 
     protected override void OnSourceInitialized(EventArgs e)

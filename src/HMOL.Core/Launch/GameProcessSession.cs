@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Launch;
 
@@ -67,7 +68,7 @@ public sealed class GameProcessSession : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"结束游戏进程失败：{ex.Message}");
+            Log.Warn(Loc.F("结束游戏进程失败：{0}", ex.Message));
         }
     }
 
@@ -131,7 +132,7 @@ public sealed class GameProcessSession : IDisposable
         if (_disposed) return;
 
         try { Exited?.Invoke(reported); }
-        catch (Exception ex) { Log.Warn($"处理游戏退出事件失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("处理游戏退出事件失败：{0}", ex.Message)); }
     }
 
     private void FlushBuffer()
@@ -157,7 +158,7 @@ public sealed class GameProcessSession : IDisposable
         if (_disposed) return;
 
         try { LineReceived?.Invoke(new GameLogLine(DateTime.Now, level, line)); }
-        catch (Exception ex) { Log.Warn($"处理游戏日志行失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("处理游戏日志行失败：{0}", ex.Message)); }
     }
 
     /// <summary>按关键字粗判等级，只用于界面着色。</summary>
@@ -191,6 +192,6 @@ public sealed class GameProcessSession : IDisposable
         if (IsRunning) return;
 
         try { _process.Dispose(); }
-        catch (Exception ex) { Log.Warn($"释放游戏进程句柄失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("释放游戏进程句柄失败：{0}", ex.Message)); }
     }
 }

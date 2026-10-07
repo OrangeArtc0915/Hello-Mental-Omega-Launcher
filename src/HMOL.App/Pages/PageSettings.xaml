@@ -1,4 +1,4 @@
-<c:LauncherPage x:Class="HMOL.App.Pages.PageSettings"
+<c:LauncherPage xmlns:loc="clr-namespace:HMOL.App.Localization" x:Class="HMOL.App.Pages.PageSettings"
                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                 xmlns:c="clr-namespace:HMOL.App.Controls"
@@ -95,8 +95,8 @@
         <StackPanel Margin="24,20,24,16">
             <!-- 页头：与其余页面同一形态（本页没有页级操作按钮） -->
             <c:PageHeader x:Name="HeaderSettings"
-                          Title="设置"
-                          Subtitle="外观、背景与音乐；改动立即生效并自动保存"
+                          Title="{loc:T '设置'}"
+                          Subtitle="{loc:T '外观、背景与音乐；改动立即生效并自动保存'}"
                           Icon="lucide/settings" />
 
             <!--
@@ -106,89 +106,90 @@
             -->
             <Grid>
             <!-- 设置主页：停在「分组列表」这一层时显示，别让内容区空着 -->
-            <c:SurfaceCard x:Name="CardSettingsHome" Margin="0,14,0,0" Title="设置" UseShadow="False" HasHoverEffect="False">
+            <c:SurfaceCard x:Name="CardSettingsHome" Margin="0,14,0,0" Title="{loc:T '设置'}" UseShadow="False" HasHoverEffect="False">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
                                TextWrapping="Wrap"
-                               Text="左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他），点进去再看该类下的具体设置项。" />
+                               Text="{loc:T '左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他 / 语言），点进去再看该类下的具体设置项。'}" />
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="改动会立即生效并自动保存，不需要点「应用」；配置文件在 Data\Settings.json。" />
+                               Text="{loc:T '改动会立即生效并自动保存，不需要点「应用」；配置文件在 Data\Settings.json。'}" />
 
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="小贴士" />
+                               Text="{loc:T '小贴士'}" />
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="· 换主题色 / 字体 / 圆角 / 动效：个性化 →「外观」&#10;· 换主页壁纸、轮播、每页不同背景：个性化 →「主页背景」&#10;· 把主页摆成自己喜欢的样子：个性化 →「界面布局」→ 布局编辑器&#10;· 拼音昵称、游戏 HUD、樱花 Frp 面板：联机设置&#10;· 更新线路、下载加速、下载目录：更新和下载设置" />
+                               Text="{loc:T '· 换主题色 / 字体 / 圆角 / 动效：个性化 →「外观」&#10;· 换主页壁纸、轮播、每页不同背景：个性化 →「主页背景」&#10;· 把主页摆成自己喜欢的样子：个性化 →「界面布局」→ 布局编辑器&#10;· 拼音昵称、游戏 HUD、樱花 Frp 面板：联机设置&#10;· 更新线路、下载加速、下载目录：更新和下载设置'}" />
 
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="常用入口" />
+                               Text="{loc:T '常用入口'}" />
                     <WrapPanel Margin="0,8,0,0">
-                        <c:OutlineButton Content="外观与主题" Tag="0" Click="OnSettingsHomeJumpClick" />
-                        <c:OutlineButton Content="主页设置" Margin="8,0,0,0" Tag="1" Click="OnSettingsHomeJumpClick" />
-                        <c:OutlineButton Content="主页背景" Margin="8,0,0,0" Tag="2" Click="OnSettingsHomeJumpClick" />
-                        <c:OutlineButton Content="界面布局" Margin="8,0,0,0" Tag="4" Click="OnSettingsHomeJumpClick" />
-                        <c:OutlineButton Content="联机设置" Margin="8,0,0,0" Tag="9" Click="OnSettingsHomeJumpClick" />
-                        <c:OutlineButton Content="程序更新" Margin="8,0,0,0" Tag="8" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '外观与主题'}" Tag="0" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '主页设置'}" Margin="8,0,0,0" Tag="1" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '主页背景'}" Margin="8,0,0,0" Tag="2" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '界面布局'}" Margin="8,0,0,0" Tag="4" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '联机设置'}" Margin="8,0,0,0" Tag="9" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '程序更新'}" Margin="8,0,0,0" Tag="8" Click="OnSettingsHomeJumpClick" />
+                        <c:OutlineButton Content="{loc:T '语言'}" Margin="8,0,0,0" Tag="14" Click="OnSettingsHomeJumpClick" />
                     </WrapPanel>
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 外观 -->
-            <c:SurfaceCard x:Name="CardAppearance" Margin="0,14,0,0" Title="外观">
+            <c:SurfaceCard x:Name="CardAppearance" Margin="0,14,0,0" Title="{loc:T '外观'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="明暗模式" />
+                               Text="{loc:T '明暗模式'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnThemeLight"
                                          Tag="Light"
-                                         Content="浅色"
+                                         Content="{loc:T '浅色'}"
                                          Click="OnThemeModeClick" />
                         <c:OutlineButton x:Name="BtnThemeDark"
                                          Margin="8,0,0,0"
                                          Tag="Dark"
-                                         Content="深色"
+                                         Content="{loc:T '深色'}"
                                          Click="OnThemeModeClick" />
                         <c:OutlineButton x:Name="BtnThemeSystem"
                                          Margin="8,0,0,0"
                                          Tag="System"
-                                         Content="跟随系统"
+                                         Content="{loc:T '跟随系统'}"
                                          Click="OnThemeModeClick" />
                     </StackPanel>
 
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="强调色" />
+                               Text="{loc:T '强调色'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnAccentDefault"
                                          Tag="Default"
-                                         Content="默认"
+                                         Content="{loc:T '默认'}"
                                          Click="OnAccentClick" />
                         <c:OutlineButton x:Name="BtnAccentBlue"
                                          Margin="8,0,0,0"
                                          Tag="Blue"
-                                         Content="湖蓝"
+                                         Content="{loc:T '湖蓝'}"
                                          Click="OnAccentClick" />
                         <c:OutlineButton x:Name="BtnAccentGreen"
                                          Margin="8,0,0,0"
                                          Tag="Green"
-                                         Content="青绿"
+                                         Content="{loc:T '青绿'}"
                                          Click="OnAccentClick" />
                         <c:OutlineButton x:Name="BtnAccentPurple"
                                          Margin="8,0,0,0"
                                          Tag="Purple"
-                                         Content="紫罗兰"
+                                         Content="{loc:T '紫罗兰'}"
                                          Click="OnAccentClick" />
                     </StackPanel>
 
@@ -196,7 +197,7 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="自定义强调色" />
+                               Text="{loc:T '自定义强调色'}" />
 
                     <Grid Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
@@ -227,12 +228,12 @@
                                      FontSize="12.5"
                                      Foreground="{DynamicResource Text.Primary}"
                                      KeyDown="OnAccentHexKeyDown"
-                                     ToolTip="输入 #RRGGBB，回车或点「应用」生效" />
+                                     ToolTip="{loc:T '输入 #RRGGBB，回车或点「应用」生效'}" />
                         </Border>
 
                         <c:OutlineButton x:Name="BtnAccentApply"
                                          Grid.Column="2"
-                                         Content="应用"
+                                         Content="{loc:T '应用'}"
                                          Tone="Solid"
                                          Click="OnApplyCustomAccentClick" />
                     </Grid>
@@ -247,7 +248,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="色相" />
+                                   Text="{loc:T '色相'}" />
                         <Slider x:Name="SldAccentHue"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -276,7 +277,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="饱和度" />
+                                   Text="{loc:T '饱和度'}" />
                         <Slider x:Name="SldAccentSat"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -305,7 +306,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="明度" />
+                                   Text="{loc:T '明度'}" />
                         <Slider x:Name="SldAccentLight"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -326,11 +327,11 @@
 
                     <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnAccentFromBg"
-                                         Content="从背景图取色"
+                                         Content="{loc:T '从背景图取色'}"
                                          Click="OnAccentFromBackgroundClick" />
                         <c:OutlineButton x:Name="BtnAccentClear"
                                          Margin="8,0,0,0"
-                                         Content="用预设色"
+                                         Content="{loc:T '用预设色'}"
                                          Click="OnClearCustomAccentClick" />
                     </StackPanel>
                     <TextBlock x:Name="LabAccentHint"
@@ -342,7 +343,7 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="色板预览" />
+                               Text="{loc:T '色板预览'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <Border Width="34"
                                 Height="34"
@@ -379,7 +380,7 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="界面字体" />
+                               Text="{loc:T '界面字体'}" />
                     <ComboBox x:Name="CmbAppFont"
                               Margin="0,8,0,0"
                               SelectionChanged="OnAppFontChanged" />
@@ -387,7 +388,7 @@
                                Margin="0,8,0,0"
                                FontSize="13"
                                Foreground="{DynamicResource Text.Primary}"
-                               Text="字体预览：Aa 心灵终结 1234567" />
+                               Text="{loc:T '字体预览：Aa 心灵终结 1234567'}" />
 
                     <!-- 卡片圆角：整体缩放 Radius.* -->
                     <Grid Margin="0,16,0,0">
@@ -400,7 +401,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="卡片圆角" />
+                                   Text="{loc:T '卡片圆角'}" />
                         <Slider x:Name="SldCornerRadius"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -423,7 +424,7 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="界面动效" />
+                               Text="{loc:T '界面动效'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnAnimations" Click="OnToggleAnimationsClick" />
                     </StackPanel>
@@ -437,7 +438,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="动效速度" />
+                                   Text="{loc:T '动效速度'}" />
                         <Slider x:Name="SldAnimSpeed"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -459,7 +460,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="关掉动效后所有过渡 / 淡入 / 呼吸效果直接落到终态；速度只在动效开启时起作用。字体与圆角改完立即生效。" />
+                               Text="{loc:T '关掉动效后所有过渡 / 淡入 / 呼吸效果直接落到终态；速度只在动效开启时起作用。字体与圆角改完立即生效。'}" />
 
                     <!-- 窗口透明度：作用于主窗口整体，拖动即时生效 -->
                     <Grid Margin="0,16,0,0">
@@ -472,7 +473,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="窗口透明度" />
+                                   Text="{loc:T '窗口透明度'}" />
                         <Slider x:Name="SldOpacity"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -502,7 +503,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="界面缩放" />
+                                   Text="{loc:T '界面缩放'}" />
                         <Slider x:Name="SldScale"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -531,7 +532,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="卡片透明度" />
+                                   Text="{loc:T '卡片透明度'}" />
                         <Slider x:Name="SldSurfaceOpacity"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -553,16 +554,50 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="窗口透明度越低整个窗口越透（含文字，最低 50%）；卡片透明度只让卡片、侧栏与标题栏等承载面变透，文字图标保持清晰（最低 30%）；缩放会等比放大 / 缩小整个界面。均立即生效并自动保存。" />
+                               Text="{loc:T '窗口透明度越低整个窗口越透（含文字，最低 50%）；卡片透明度只让卡片、侧栏与标题栏等承载面变透，文字图标保持清晰（最低 30%）；缩放会等比放大 / 缩小整个界面。均立即生效并自动保存。'}" />
+                </StackPanel>
+            </c:SurfaceCard>
+
+            <!--
+                语言：界面语言下拉 + 「跟随系统」开关。
+                单独成一张卡片（侧栏里也是独立一项），不和「外观」那些观感设置混在一起。
+            -->
+            <c:SurfaceCard x:Name="CardLanguage" Margin="0,14,0,0" Title="{loc:T '语言'}">
+                <StackPanel>
+                    <TextBlock FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '界面语言'}" />
+                    <ComboBox x:Name="CmbLanguage"
+                              Margin="0,8,0,0"
+                              DisplayMemberPath="DisplayName"
+                              SelectionChanged="OnLanguageChanged" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '切换后立即生效并自动保存。想加别的语言，把语言包（JSON）放进数据目录的 lang 文件夹再重启即可出现在这里。'}" />
+
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '跟随系统'}" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnAutoLanguage" Click="OnToggleAutoLanguageClick" />
+                    </StackPanel>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '开启后每次启动都按系统时区与区域自动挑语言（中国时区判中文，其余看系统语言）。手动选过一次语言就会自动关掉它。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 联机设置：昵称 + 游戏内 HUD -->
-            <c:SurfaceCard x:Name="CardNickname" Margin="0,14,0,0" Title="联机设置">
+            <c:SurfaceCard x:Name="CardNickname" Margin="0,14,0,0" Title="{loc:T '联机设置'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="联机昵称（与 CnCNet 客户端的玩家名共用同一个值，留空表示还没设置）" />
+                               Text="{loc:T '联机昵称（与 CnCNet 客户端的玩家名共用同一个值，留空表示还没设置）'}" />
                     <Border Height="34"
                             Margin="0,8,0,0"
                             Padding="10,0"
@@ -581,7 +616,7 @@
                     <c:OutlineButton x:Name="BtnSaveNickname"
                                      Margin="0,8,0,0"
                                      HorizontalAlignment="Left"
-                                     Content="保存昵称"
+                                     Content="{loc:T '保存昵称'}"
                                      Tone="Solid"
                                      Click="OnSaveNicknameClick" />
                     <TextBlock x:Name="LabNicknameHint"
@@ -597,10 +632,10 @@
                     <TextBlock Margin="0,12,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="游戏内 HUD" />
+                               Text="{loc:T '游戏内 HUD'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnHudToggle"
-                                         Content="打开游戏 HUD"
+                                         Content="{loc:T '打开游戏 HUD'}"
                                          Tone="Solid"
                                          Click="OnHudToggleClick" />
                         <TextBlock x:Name="LabHudStatus"
@@ -622,7 +657,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="HUD 透明度" />
+                                   Text="{loc:T 'HUD 透明度'}" />
                         <Slider x:Name="SldHudOpacity"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -644,7 +679,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="只影响游戏内那个置顶浮窗（含文字与底色），最低 40%；与「外观」里的窗口透明度、卡片透明度互不影响。改完立即生效并自动保存。" />
+                               Text="{loc:T '只影响游戏内那个置顶浮窗（含文字与底色），最低 40%；与「外观」里的窗口透明度、卡片透明度互不影响。改完立即生效并自动保存。'}" />
 
                     <!-- 樱花FRP 内嵌面板：可选功能，依赖本机的 WebView2 运行时 -->
                     <Border Height="1"
@@ -653,10 +688,10 @@
                     <TextBlock Margin="0,12,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="樱花FRP 内嵌面板" />
+                               Text="{loc:T '樱花FRP 内嵌面板'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnSakuraPanel"
-                                         Content="未启用"
+                                         Content="{loc:T '未启用'}"
                                          Click="OnSakuraPanelToggleClick" />
                         <TextBlock x:Name="LabSakuraPanel"
                                    Margin="10,0,0,0"
@@ -669,11 +704,11 @@
             </c:SurfaceCard>
 
             <!-- 天气城市 -->
-            <c:SurfaceCard x:Name="CardWeatherCity" Margin="0,14,0,0" Title="天气城市">
+            <c:SurfaceCard x:Name="CardWeatherCity" Margin="0,14,0,0" Title="{loc:T '天气城市'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="主页天气小组件显示的城市，填城市名即可（如「北京」「上海」）" />
+                               Text="{loc:T '主页天气小组件显示的城市，填城市名即可（如「北京」「上海」）'}" />
                     <Border Height="34"
                             Margin="0,8,0,0"
                             Padding="10,0"
@@ -692,12 +727,12 @@
 
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnSaveWeatherCity"
-                                         Content="保存城市"
+                                         Content="{loc:T '保存城市'}"
                                          Tone="Solid"
                                          Click="OnSaveWeatherCityClick" />
                         <c:OutlineButton x:Name="BtnCheckWeatherCity"
                                          Margin="8,0,0,0"
-                                         Content="验证城市"
+                                         Content="{loc:T '验证城市'}"
                                          Click="OnCheckWeatherCityClick" />
                     </StackPanel>
 
@@ -710,16 +745,16 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="天气数据来自 Open-Meteo（免费、无需 Key）：城市名先由它的地理编码服务解析成经纬度，再取实时天气。主页 30 分钟内复用缓存，点天气卡右上角的刷新按钮可强制更新。" />
+                               Text="{loc:T '天气数据来自 Open-Meteo（免费、无需 Key）：城市名先由它的地理编码服务解析成经纬度，再取实时天气。主页 30 分钟内复用缓存，点天气卡右上角的刷新按钮可强制更新。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 常用网站 -->
-            <c:SurfaceCard x:Name="CardSites" Margin="0,14,0,0" Title="常用网站">
+            <c:SurfaceCard x:Name="CardSites" Margin="0,14,0,0" Title="{loc:T '常用网站'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="主页「常用网站」小组件里显示的站点，点击后用系统默认浏览器打开" />
+                               Text="{loc:T '主页「常用网站」小组件里显示的站点，点击后用系统默认浏览器打开'}" />
 
                     <ScrollViewer Margin="0,8,0,0"
                                   MaxHeight="170"
@@ -767,7 +802,7 @@
                                                                Icon="lucide/trash-2"
                                                                Tag="{Binding Index}"
                                                                Tone="Danger"
-                                                               ToolTip="移除这个网站"
+                                                               ToolTip="{loc:T '移除这个网站'}"
                                                                Click="OnRemoveSiteClick" />
                                         </Grid>
                                     </Border>
@@ -780,7 +815,7 @@
                                Margin="0,4,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
-                               Text="列表是空的，下面添加几个，或点「恢复默认列表」。"
+                               Text="{loc:T '列表是空的，下面添加几个，或点「恢复默认列表」。'}"
                                Visibility="Collapsed" />
 
                     <!-- 添加一行：名称 + 网址 -->
@@ -806,7 +841,7 @@
                                      BorderThickness="0"
                                      CaretBrush="{DynamicResource Text.Primary}"
                                      Foreground="{DynamicResource Text.Primary}"
-                                     ToolTip="显示名称" />
+                                     ToolTip="{loc:T '显示名称'}" />
                         </Border>
 
                         <Border Grid.Column="2"
@@ -822,11 +857,11 @@
                                      BorderThickness="0"
                                      CaretBrush="{DynamicResource Text.Primary}"
                                      Foreground="{DynamicResource Text.Primary}"
-                                     ToolTip="网址，http / https" />
+                                     ToolTip="{loc:T '网址，http / https'}" />
                         </Border>
 
                         <c:OutlineButton Grid.Column="4"
-                                         Content="添加"
+                                         Content="{loc:T '添加'}"
                                          Tone="Solid"
                                          Click="OnAddSiteClick" />
                     </Grid>
@@ -835,12 +870,12 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="名称与网址都填好才能添加；网址只允许 http / https（不写协议时按 https 补全）。" />
+                               Text="{loc:T '名称与网址都填好才能添加；网址只允许 http / https（不写协议时按 https 补全）。'}" />
 
                     <c:OutlineButton x:Name="BtnRestoreSites"
                                      Margin="0,10,0,0"
                                      HorizontalAlignment="Left"
-                                     Content="恢复默认列表"
+                                     Content="{loc:T '恢复默认列表'}"
                                      Click="OnRestoreSitesClick" />
 
                     <TextBlock x:Name="LabSitesHint"
@@ -852,30 +887,30 @@
             </c:SurfaceCard>
 
             <!-- 主页背景 -->
-            <c:SurfaceCard x:Name="CardBackground" Margin="0,14,0,0" Title="主页背景">
+            <c:SurfaceCard x:Name="CardBackground" Margin="0,14,0,0" Title="{loc:T '主页背景'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="当前背景" />
+                               Text="{loc:T '当前背景'}" />
                     <TextBlock x:Name="LabBackground"
                                Margin="0,6,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Primary}"
                                TextWrapping="Wrap"
-                               Text="未设置，使用主题渐变。" />
+                               Text="{loc:T '未设置，使用主题渐变。'}" />
 
                     <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnPickBackground"
-                                         Content="选择图片 / 动图 / 视频"
+                                         Content="{loc:T '选择图片 / 动图 / 视频'}"
                                          Tone="Solid"
                                          Click="OnPickBackgroundClick" />
                         <c:OutlineButton x:Name="BtnImportWallpaper"
                                          Margin="8,0,0,0"
-                                         Content="导入壁纸包"
+                                         Content="{loc:T '导入壁纸包'}"
                                          Click="OnImportWallpaperClick" />
                         <c:OutlineButton x:Name="BtnClearBackground"
                                          Margin="8,0,0,0"
-                                         Content="清除背景"
+                                         Content="{loc:T '清除背景'}"
                                          Tone="Danger"
                                          Click="OnClearBackgroundClick" />
                     </StackPanel>
@@ -884,7 +919,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="壁纸包指 Wallpaper Engine 导出的 .pkg / .mpkg，导入时会用内置工具解包并取其中的视频或图片。素材都会复制进数据目录，原文件删掉也不影响。" />
+                               Text="{loc:T '壁纸包指 Wallpaper Engine 导出的 .pkg / .mpkg，导入时会用内置工具解包并取其中的视频或图片。素材都会复制进数据目录，原文件删掉也不影响。'}" />
                     <TextBlock x:Name="LabBackgroundStatus"
                                Margin="0,8,0,0"
                                FontSize="11.5"
@@ -901,7 +936,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="模糊程度" />
+                                   Text="{loc:T '模糊程度'}" />
                         <Slider x:Name="SldBlur"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -929,7 +964,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="暗化程度" />
+                                   Text="{loc:T '暗化程度'}" />
                         <Slider x:Name="SldDim"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -951,13 +986,13 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="背景铺满整个窗口（含标题栏与侧栏），界面面板是半透明的。视频背景只做暗化、不做模糊。" />
+                               Text="{loc:T '背景铺满整个窗口（含标题栏与侧栏），界面面板是半透明的。视频背景只做暗化、不做模糊。'}" />
 
                     <!-- 轮播清单 -->
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="轮播清单" />
+                               Text="{loc:T '轮播清单'}" />
                     <ItemsControl x:Name="PanBackgroundList" Margin="0,8,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -995,12 +1030,12 @@
 
                                         <c:OutlineButton Grid.Column="1"
                                                          Margin="8,0,0,0"
-                                                         Content="使用"
+                                                         Content="{loc:T '使用'}"
                                                          Tag="{Binding FileName}"
                                                          Click="OnUseBackgroundClick" />
                                         <c:OutlineButton Grid.Column="2"
                                                          Margin="8,0,0,0"
-                                                         Content="移除"
+                                                         Content="{loc:T '移除'}"
                                                          Tone="Danger"
                                                          Tag="{Binding FileName}"
                                                          Click="OnRemoveBackgroundClick" />
@@ -1014,7 +1049,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="清单还是空的：点上面的「选择图片 / 动图 / 视频」导入，导入后会自动进来。" />
+                               Text="{loc:T '清单还是空的：点上面的「选择图片 / 动图 / 视频」导入，导入后会自动进来。'}" />
 
                     <!-- 轮播设置 -->
                     <Grid Margin="0,12,0,0">
@@ -1027,7 +1062,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="轮播间隔" />
+                                   Text="{loc:T '轮播间隔'}" />
                         <Slider x:Name="SldRotateInterval"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -1047,11 +1082,11 @@
                     </Grid>
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnRotate"
-                                         Content="已关闭"
+                                         Content="{loc:T '已关闭'}"
                                          Click="OnToggleRotateClick" />
                         <c:OutlineButton x:Name="BtnRotateShuffle"
                                          Margin="8,0,0,0"
-                                         Content="顺序"
+                                         Content="{loc:T '顺序'}"
                                          Click="OnToggleShuffleClick" />
                     </StackPanel>
 
@@ -1059,26 +1094,26 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="填充方式" />
+                               Text="{loc:T '填充方式'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnFillCover"
                                          Tag="Cover"
-                                         Content="铺满"
+                                         Content="{loc:T '铺满'}"
                                          Click="OnBackgroundFillClick" />
                         <c:OutlineButton x:Name="BtnFillFit"
                                          Margin="8,0,0,0"
                                          Tag="Fit"
-                                         Content="适应"
+                                         Content="{loc:T '适应'}"
                                          Click="OnBackgroundFillClick" />
                         <c:OutlineButton x:Name="BtnFillStretch"
                                          Margin="8,0,0,0"
                                          Tag="Fill"
-                                         Content="拉伸"
+                                         Content="{loc:T '拉伸'}"
                                          Click="OnBackgroundFillClick" />
                         <c:OutlineButton x:Name="BtnFillTile"
                                          Margin="8,0,0,0"
                                          Tag="Tile"
-                                         Content="平铺"
+                                         Content="{loc:T '平铺'}"
                                          Click="OnBackgroundFillClick" />
                     </StackPanel>
 
@@ -1086,23 +1121,23 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="鼠标视差" />
+                               Text="{loc:T '鼠标视差'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnParallax"
-                                         Content="已关闭"
+                                         Content="{loc:T '已关闭'}"
                                          Click="OnToggleParallaxClick" />
                     </StackPanel>
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="开启后背景会随光标轻微位移；「平铺」只对静态图片有效。" />
+                               Text="{loc:T '开启后背景会随光标轻微位移；「平铺」只对静态图片有效。'}" />
 
                     <!-- 每页独立背景 -->
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="每页独立背景" />
+                               Text="{loc:T '每页独立背景'}" />
                     <Grid Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="130" />
@@ -1120,18 +1155,18 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="给某个页面单独指定背景；选「跟随全局」就用上面的当前背景（含轮播）。" />
+                               Text="{loc:T '给某个页面单独指定背景；选「跟随全局」就用上面的当前背景（含轮播）。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 背景音乐 -->
-            <c:SurfaceCard x:Name="CardMusic" Margin="0,14,0,0" Title="背景音乐">
+            <c:SurfaceCard x:Name="CardMusic" Margin="0,14,0,0" Title="{loc:T '背景音乐'}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="启用背景音乐" />
+                                   Text="{loc:T '启用背景音乐'}" />
                         <c:OutlineButton x:Name="BtnBgmEnabled"
                                          Margin="10,0,0,0"
                                          Tag="Enabled"
@@ -1141,29 +1176,29 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="开启后随程序启动自动播放列表里的曲目；以开机自启方式启动时只驻留托盘，等打开主窗口后再播放。" />
+                               Text="{loc:T '开启后随程序启动自动播放列表里的曲目；以开机自启方式启动时只驻留托盘，等打开主窗口后再播放。'}" />
 
                     <TextBlock x:Name="LabBgmNow"
                                Margin="0,10,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Primary}"
                                TextWrapping="Wrap"
-                               Text="未播放" />
+                               Text="{loc:T '未播放'}" />
 
                     <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
                         <c:RoundIconButton x:Name="BtnBgmPrev"
                                            Icon="lucide/arrow-left"
-                                           ToolTip="上一首"
+                                           ToolTip="{loc:T '上一首'}"
                                            Click="OnBgmPreviousClick" />
                         <c:OutlineButton x:Name="BtnBgmPlayPause"
                                          Margin="8,0,0,0"
                                          MinWidth="76"
-                                         Content="播放"
+                                         Content="{loc:T '播放'}"
                                          Click="OnBgmPlayPauseClick" />
                         <c:RoundIconButton x:Name="BtnBgmNext"
                                            Margin="8,0,0,0"
                                            Icon="lucide/arrow-right"
-                                           ToolTip="下一首"
+                                           ToolTip="{loc:T '下一首'}"
                                            Click="OnBgmNextClick" />
                     </StackPanel>
 
@@ -1177,7 +1212,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="音量" />
+                                   Text="{loc:T '音量'}" />
                         <Slider x:Name="SldVolume"
                                 Grid.Column="1"
                                 Margin="8,0,8,0"
@@ -1208,15 +1243,15 @@
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="播放列表" />
+                               Text="{loc:T '播放列表'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnBgmAdd"
-                                         Content="添加曲目"
+                                         Content="{loc:T '添加曲目'}"
                                          Tone="Solid"
                                          Click="OnBgmAddClick" />
                         <c:OutlineButton x:Name="BtnBgmRemoveCurrent"
                                          Margin="8,0,0,0"
-                                         Content="移除当前曲目"
+                                         Content="{loc:T '移除当前曲目'}"
                                          Click="OnBgmRemoveCurrentClick" />
                     </StackPanel>
 
@@ -1267,7 +1302,7 @@
                                                                Icon="lucide/trash-2"
                                                                Tag="{Binding Index}"
                                                                Tone="Danger"
-                                                               ToolTip="移除这首"
+                                                               ToolTip="{loc:T '移除这首'}"
                                                                Click="OnBgmRemoveRowClick" />
                                         </Grid>
                                     </Border>
@@ -1285,11 +1320,11 @@
             </c:SurfaceCard>
 
             <!-- 界面布局 -->
-            <c:SurfaceCard x:Name="CardLayout" Margin="0,14,0,0" Title="界面布局">
+            <c:SurfaceCard x:Name="CardLayout" Margin="0,14,0,0" Title="{loc:T '界面布局'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="当前方案" />
+                               Text="{loc:T '当前方案'}" />
                     <TextBlock x:Name="LabLayoutScheme"
                                Margin="0,6,0,0"
                                FontSize="12"
@@ -1298,12 +1333,12 @@
 
                     <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnOpenLayoutEditor"
-                                         Content="打开布局编辑器"
+                                         Content="{loc:T '打开布局编辑器'}"
                                          Tone="Solid"
                                          Click="OnOpenLayoutEditorClick" />
                         <c:OutlineButton x:Name="BtnResetLayout"
                                          Margin="8,0,0,0"
-                                         Content="恢复默认布局"
+                                         Content="{loc:T '恢复默认布局'}"
                                          Tone="Danger"
                                          Click="OnResetLayoutClick" />
                     </StackPanel>
@@ -1312,7 +1347,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="编辑器里可调整左侧导航的顺序、显隐与名称。编辑过程不影响主界面，点「保存并应用」后立即生效；方案存在数据目录的 layouts 子目录下。" />
+                               Text="{loc:T '编辑器里可调整左侧导航的顺序、显隐与名称。编辑过程不影响主界面，点「保存并应用」后立即生效；方案存在数据目录的 layouts 子目录下。'}" />
                     <TextBlock x:Name="LabLayoutStatus"
                                Margin="0,8,0,0"
                                FontSize="11.5"
@@ -1323,7 +1358,7 @@
                     <TextBlock Margin="0,14,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="主页小组件" />
+                               Text="{loc:T '主页小组件'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnWidgetCalendar"
                                          Tag="Calendar"
@@ -1341,25 +1376,25 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="关掉的组件会从主页拿掉，空出来的位置也会一并收掉；组件自己的内容（如网站清单）仍保留在设置里，随时可以再打开。" />
+                               Text="{loc:T '关掉的组件会从主页拿掉，空出来的位置也会一并收掉；组件自己的内容（如网站清单）仍保留在设置里，随时可以再打开。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 主页设置：默认 / 简洁两种显示模式 -->
-            <c:SurfaceCard x:Name="CardHome" Margin="0,14,0,0" Title="主页设置">
+            <c:SurfaceCard x:Name="CardHome" Margin="0,14,0,0" Title="{loc:T '主页设置'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="显示模式" />
+                               Text="{loc:T '显示模式'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnHomeModeDefault"
                                          Tag="Default"
-                                         Content="默认模式"
+                                         Content="{loc:T '默认模式'}"
                                          Click="OnHomeModeClick" />
                         <c:OutlineButton x:Name="BtnHomeModeSimple"
                                          Margin="8,0,0,0"
                                          Tag="Simple"
-                                         Content="简洁模式"
+                                         Content="{loc:T '简洁模式'}"
                                          Click="OnHomeModeClick" />
                     </StackPanel>
 
@@ -1373,18 +1408,18 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="默认模式：完整主页，含欢迎横幅、当前实例卡片、切换实例与日历 / 天气 / 常用网站小组件。" />
+                               Text="{loc:T '默认模式：完整主页，含欢迎横幅、当前实例卡片、切换实例与日历 / 天气 / 常用网站小组件。'}" />
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="简洁模式：像 HMCL，主页只保留右下角一个「启动游戏」按钮，旁边的小箭头可切换实例；其余区域留空，尽可能露出背景图。此模式下「界面布局」里的自由定位与主页小组件不再生效。" />
+                               Text="{loc:T '简洁模式：像 HMCL，主页只保留右下角一个「启动游戏」按钮，旁边的小箭头可切换实例；其余区域留空，尽可能露出背景图。此模式下「界面布局」里的自由定位与主页小组件不再生效。'}" />
 
                     <!-- 附加小组件：打开后出现在主页，可在布局编辑器里自由摆放 -->
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="附加小组件（打开后可在布局编辑器里自由摆放）" />
+                               Text="{loc:T '附加小组件（打开后可在布局编辑器里自由摆放）'}" />
 
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnExtraClock"
@@ -1412,7 +1447,7 @@
                     <TextBlock Margin="0,14,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="便签标题" />
+                               Text="{loc:T '便签标题'}" />
                     <Border Height="34"
                             Margin="0,6,0,0"
                             Padding="10,0"
@@ -1432,7 +1467,7 @@
                     <TextBlock Margin="0,10,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="便签正文" />
+                               Text="{loc:T '便签正文'}" />
                     <Border MinHeight="76"
                             Margin="0,6,0,0"
                             Padding="10,6"
@@ -1454,17 +1489,17 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="时钟、便签与音乐控制都可以在「界面布局」编辑器里拖动、缩放与隐藏。" />
+                               Text="{loc:T '时钟、便签与音乐控制都可以在「界面布局」编辑器里拖动、缩放与隐藏。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 扩展模块：声明式小组件扩展的增删改、启停与目录入口 -->
-            <c:SurfaceCard x:Name="CardExtensions" Margin="0,14,0,0" Title="扩展模块">
+            <c:SurfaceCard x:Name="CardExtensions" Margin="0,14,0,0" Title="{loc:T '扩展模块'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
                                TextWrapping="Wrap"
-                               Text="扩展是一份 JSON 清单（纯声明式配置），用来描述一个主页小组件：标题、图标、文字行、可选的数据源与点击网址。它不会执行任何代码，也不会碰你电脑上的文件。" />
+                               Text="{loc:T '扩展是一份 JSON 清单（纯声明式配置），用来描述一个主页小组件：标题、图标、文字行、可选的数据源与点击网址。它不会执行任何代码，也不会碰你电脑上的文件。'}" />
 
                     <!-- 安全说明必须显眼：这是本机制的安全边界 -->
                     <Border Margin="0,8,0,0"
@@ -1489,14 +1524,14 @@
                                        FontSize="11.5"
                                        Foreground="{DynamicResource Text.Secondary}"
                                        TextWrapping="Wrap"
-                                       Text="安全说明：扩展不会被「执行」。启动器不加载任何程序集、不引入脚本引擎，只把清单里的文字画到卡片上；扩展目录只被读取，启动器也不会为扩展写缓存文件、不会改注册表。数据源仅做 http/https 的只读 GET，并有超时与内存缓存。" />
+                                       Text="{loc:T '安全说明：扩展不会被「执行」。启动器不加载任何程序集、不引入脚本引擎，只把清单里的文字画到卡片上；扩展目录只被读取，启动器也不会为扩展写缓存文件、不会改注册表。数据源仅做 http/https 的只读 GET，并有超时与内存缓存。'}" />
                         </Grid>
                     </Border>
 
                     <TextBlock Margin="0,12,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="扩展目录" />
+                               Text="{loc:T '扩展目录'}" />
                     <TextBlock x:Name="LabExtensionsPath"
                                Margin="0,4,0,0"
                                FontSize="12"
@@ -1506,20 +1541,20 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="扩展目录下的每个 .json 文件就是一个扩展（一个文件 = 一个扩展）。用「新建 / 编辑」按表单填，保存前会做同一套校验并给出可读原因；也可以直接手写清单，写完点「重新加载」。字段说明与示例见 docs/extensions.md 与 docs/extensions/示例.json。" />
+                               Text="{loc:T '扩展目录下的每个 .json 文件就是一个扩展（一个文件 = 一个扩展）。用「新建 / 编辑」按表单填，保存前会做同一套校验并给出可读原因；也可以直接手写清单，写完点「重新加载」。字段说明与示例见 docs/extensions.md 与 docs/extensions/示例.json。'}" />
 
                     <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnNewExtension"
-                                         Content="新建扩展"
+                                         Content="{loc:T '新建扩展'}"
                                          Tone="Solid"
                                          Click="OnNewExtensionClick" />
                         <c:OutlineButton x:Name="BtnReloadExtensions"
                                          Margin="8,0,0,0"
-                                         Content="重新加载"
+                                         Content="{loc:T '重新加载'}"
                                          Click="OnReloadExtensionsClick" />
                         <c:OutlineButton x:Name="BtnOpenExtensionsFolder"
                                          Margin="8,0,0,0"
-                                         Content="打开扩展目录"
+                                         Content="{loc:T '打开扩展目录'}"
                                          Click="OnOpenExtensionsFolderClick" />
                     </StackPanel>
 
@@ -1528,7 +1563,7 @@
                         <TextBlock VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="数据源联网总开关" />
+                                   Text="{loc:T '数据源联网总开关'}" />
                         <c:OutlineButton x:Name="BtnExtensionNetwork"
                                          Margin="10,0,0,0"
                                          Click="OnToggleExtensionNetworkClick" />
@@ -1536,7 +1571,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="11.5"
                                    Foreground="{DynamicResource Text.Tertiary}"
-                                   Text="关闭后扩展只显示清单里写死的静态内容。" />
+                                   Text="{loc:T '关闭后扩展只显示清单里写死的静态内容。'}" />
                     </StackPanel>
 
                     <!-- 已发现的扩展列表：名称 / 版本 / 作者 / 状态 + 启用停用 -->
@@ -1629,7 +1664,7 @@
                                                                    Icon="lucide/pencil"
                                                                    Tag="{Binding}"
                                                                    Tone="Plain"
-                                                                   ToolTip="编辑这份清单"
+                                                                   ToolTip="{loc:T '编辑这份清单'}"
                                                                    AutomationProperties.AutomationId="{Binding EditId}"
                                                                    AutomationProperties.Name="{Binding EditA11yName}"
                                                                    Click="OnEditExtensionClick" />
@@ -1649,7 +1684,7 @@
                                                                    Icon="lucide/trash-2"
                                                                    Tag="{Binding}"
                                                                    Tone="Danger"
-                                                                   ToolTip="删除这份清单"
+                                                                   ToolTip="{loc:T '删除这份清单'}"
                                                                    AutomationProperties.AutomationId="{Binding DeleteId}"
                                                                    AutomationProperties.Name="{Binding DeleteA11yName}"
                                                                    Click="OnDeleteExtensionClick" />
@@ -1667,13 +1702,13 @@
                                 Visibility="Collapsed">
                         <TextBlock FontSize="12.5"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="还没有任何扩展。"
+                                   Text="{loc:T '还没有任何扩展。'}"
                                    TextWrapping="Wrap" />
                         <TextBlock Margin="0,4,0,0"
                                    FontSize="11.5"
                                    Foreground="{DynamicResource Text.Tertiary}"
                                    TextWrapping="Wrap"
-                                   Text="点「新建扩展」用表单建一个；也可以把 docs/extensions/示例.json 复制到扩展目录里，再点「重新加载」。" />
+                                   Text="{loc:T '点「新建扩展」用表单建一个；也可以把 docs/extensions/示例.json 复制到扩展目录里，再点「重新加载」。'}" />
                     </StackPanel>
 
                     <TextBlock x:Name="LabExtensionsHint"
@@ -1685,13 +1720,13 @@
             </c:SurfaceCard>
 
             <!-- 开机自启 -->
-            <c:SurfaceCard x:Name="CardAutoStart" Margin="0,14,0,0" Title="开机自启">
+            <c:SurfaceCard x:Name="CardAutoStart" Margin="0,14,0,0" Title="{loc:T '开机自启'}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="登录系统后自动启动" />
+                                   Text="{loc:T '登录系统后自动启动'}" />
                         <c:OutlineButton x:Name="BtnAutoStart"
                                          Margin="10,0,0,0"
                                          Click="OnAutoStartClick" />
@@ -1700,7 +1735,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="自启后只驻留系统托盘，不弹出主窗口；点托盘图标或托盘菜单里的「显示主窗口」才会打开界面。" />
+                               Text="{loc:T '自启后只驻留系统托盘，不弹出主窗口；点托盘图标或托盘菜单里的「显示主窗口」才会打开界面。'}" />
                     <TextBlock x:Name="LabAutoStartStatus"
                                Margin="0,8,0,0"
                                FontSize="11.5"
@@ -1710,35 +1745,35 @@
             </c:SurfaceCard>
 
             <!-- 游戏路径：目录属于每个实例，在「游戏实例」页管理；向导可随时重跑 -->
-            <c:SurfaceCard x:Name="CardGamePath" Margin="0,14,0,0" Title="游戏路径">
+            <c:SurfaceCard x:Name="CardGamePath" Margin="0,14,0,0" Title="{loc:T '游戏路径'}">
                 <StackPanel>
                     <TextBlock FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="游戏目录属于每个游戏实例，请在「游戏实例」页新建或编辑实例时指定。" />
+                               Text="{loc:T '游戏目录属于每个游戏实例，请在「游戏实例」页新建或编辑实例时指定。'}" />
                     <TextBlock Margin="0,8,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="首次运行会出现一次配置向导，带你完成「选目录 → 检查环境 → 创建实例」。" />
+                               Text="{loc:T '首次运行会出现一次配置向导，带你完成「选目录 → 检查环境 → 创建实例」。'}" />
                     <c:OutlineButton x:Name="BtnRunWizard"
                                      Height="34"
                                      Margin="0,12,0,0"
                                      HorizontalAlignment="Left"
-                                     Content="重新运行配置向导"
+                                     Content="{loc:T '重新运行配置向导'}"
                                      Tone="Solid"
                                      Click="OnRunWizardClick" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 程序更新：检查启动器本体有没有新版本，并支持一键更新 -->
-            <c:SurfaceCard x:Name="CardUpdate" Margin="0,14,0,0" Title="程序更新">
+            <c:SurfaceCard x:Name="CardUpdate" Margin="0,14,0,0" Title="{loc:T '程序更新'}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="启动时自动检查更新" />
+                                   Text="{loc:T '启动时自动检查更新'}" />
                         <c:OutlineButton x:Name="BtnAutoCheckUpdate"
                                          Margin="10,0,0,0"
                                          Click="OnAutoCheckUpdateClick" />
@@ -1747,38 +1782,38 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="开启后每次启动都会在后台查一次新版本；检查失败只写运行日志，不会打扰你。" />
+                               Text="{loc:T '开启后每次启动都会在后台查一次新版本；检查失败只写运行日志，不会打扰你。'}" />
 
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="更新线路" />
+                               Text="{loc:T '更新线路'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnUpdateSourceAuto"
                                          Tag="Auto"
-                                         Content="自动"
+                                         Content="{loc:T '自动'}"
                                          Click="OnUpdateSourceClick" />
                         <c:OutlineButton x:Name="BtnUpdateSourceGitHub"
                                          Margin="8,0,0,0"
                                          Tag="GitHub"
-                                         Content="GitHub 优先"
+                                         Content="{loc:T 'GitHub 优先'}"
                                          Click="OnUpdateSourceClick" />
                         <c:OutlineButton x:Name="BtnUpdateSourceGitee"
                                          Margin="8,0,0,0"
                                          Tag="Gitee"
-                                         Content="Gitee 优先"
+                                         Content="{loc:T 'Gitee 优先'}"
                                          Click="OnUpdateSourceClick" />
                     </StackPanel>
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="自动：GitHub 取不到时换 Gitee。国内网络下建议选「Gitee 优先」；无论选哪个，取不到都会自动换另一个源。" />
+                               Text="{loc:T '自动：GitHub 取不到时换 Gitee。国内网络下建议选「Gitee 优先」；无论选哪个，取不到都会自动换另一个源。'}" />
 
                     <TextBlock Margin="0,16,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="下载加速（多线程）" />
+                               Text="{loc:T '下载加速（多线程）'}" />
                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnMultiThreadDownload" Click="OnMultiThreadDownloadClick" />
                     </StackPanel>
@@ -1786,7 +1821,7 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="开启后大文件会分成多段并发下载（需要服务器支持断点续传），对启动器更新、下载页文件等通常更快；个别网络下并发连接会被限速或干扰，可关闭退回单连接。" />
+                               Text="{loc:T '开启后大文件会分成多段并发下载（需要服务器支持断点续传），对启动器更新、下载页文件等通常更快；个别网络下并发连接会被限速或干扰，可关闭退回单连接。'}" />
 
                     <TextBlock x:Name="LabUpdateLastCheck"
                                Margin="0,16,0,0"
@@ -1796,7 +1831,7 @@
                     <c:OutlineButton x:Name="BtnCheckUpdate"
                                      Margin="0,10,0,0"
                                      HorizontalAlignment="Left"
-                                     Content="检查启动器更新"
+                                     Content="{loc:T '检查启动器更新'}"
                                      Tone="Solid"
                                      Click="OnCheckUpdateClick" />
                     <TextBlock x:Name="LabUpdateStatus"
@@ -1804,16 +1839,16 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="更新只会替换启动器本身：设置、缓存、实例与游戏文件都不会动。" />
+                               Text="{loc:T '更新只会替换启动器本身：设置、缓存、实例与游戏文件都不会动。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 窗口与音效：自定义标题文字、窗口图标、启动 / 关闭音效 -->
-            <c:SurfaceCard x:Name="CardLook" Margin="0,14,0,0" Title="窗口与音效">
+            <c:SurfaceCard x:Name="CardLook" Margin="0,14,0,0" Title="{loc:T '窗口与音效'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="窗口标题文字" />
+                               Text="{loc:T '窗口标题文字'}" />
                     <Border Height="34"
                             Margin="0,6,0,0"
                             Padding="10,0"
@@ -1833,20 +1868,20 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="留空表示用默认名（Hello Mental Omega Launcher）；标题栏与任务栏都会跟着改。" />
+                               Text="{loc:T '留空表示用默认名（Hello Mental Omega Launcher）；标题栏与任务栏都会跟着改。'}" />
 
                     <TextBlock Margin="0,14,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="窗口图标" />
+                               Text="{loc:T '窗口图标'}" />
                     <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnPickIcon"
-                                         Content="选择图标"
+                                         Content="{loc:T '选择图标'}"
                                          Tone="Solid"
                                          Click="OnPickIconClick" />
                         <c:OutlineButton x:Name="BtnClearIcon"
                                          Margin="8,0,0,0"
-                                         Content="用内置图标"
+                                         Content="{loc:T '用内置图标'}"
                                          Click="OnClearIconClick" />
                     </StackPanel>
                     <TextBlock x:Name="LabIconStatus"
@@ -1858,14 +1893,14 @@
                     <TextBlock Margin="0,14,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="启动音效" />
+                               Text="{loc:T '启动音效'}" />
                     <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnPickStartSound"
-                                         Content="选择音效"
+                                         Content="{loc:T '选择音效'}"
                                          Click="OnPickStartSoundClick" />
                         <c:OutlineButton x:Name="BtnClearStartSound"
                                          Margin="8,0,0,0"
-                                         Content="清除"
+                                         Content="{loc:T '清除'}"
                                          Click="OnClearStartSoundClick" />
                     </StackPanel>
                     <TextBlock x:Name="LabStartSoundStatus"
@@ -1877,14 +1912,14 @@
                     <TextBlock Margin="0,14,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="关闭音效" />
+                               Text="{loc:T '关闭音效'}" />
                     <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                         <c:OutlineButton x:Name="BtnPickStopSound"
-                                         Content="选择音效"
+                                         Content="{loc:T '选择音效'}"
                                          Click="OnPickStopSoundClick" />
                         <c:OutlineButton x:Name="BtnClearStopSound"
                                          Margin="8,0,0,0"
-                                         Content="清除"
+                                         Content="{loc:T '清除'}"
                                          Click="OnClearStopSoundClick" />
                     </StackPanel>
                     <TextBlock x:Name="LabStopSoundStatus"
@@ -1897,12 +1932,12 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="图标与音效都会复制进数据目录的 custom 子目录，原文件删掉也不影响。关闭音效会在退出前留约 0.7 秒播出来。" />
+                               Text="{loc:T '图标与音效都会复制进数据目录的 custom 子目录，原文件删掉也不影响。关闭音效会在退出前留约 0.7 秒播出来。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
             <!-- 关于与存储 -->
-            <c:SurfaceCard x:Name="CardAbout" Margin="0,14,0,0" Title="关于与存储">
+            <c:SurfaceCard x:Name="CardAbout" Margin="0,14,0,0" Title="{loc:T '关于与存储'}">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1913,7 +1948,7 @@
                                    VerticalAlignment="Center"
                                    FontSize="12"
                                    Foreground="{DynamicResource Text.Secondary}"
-                                   Text="当前版本" />
+                                   Text="{loc:T '当前版本'}" />
                         <TextBlock Grid.Column="1"
                                    VerticalAlignment="Center"
                                    FontSize="12"
@@ -1923,20 +1958,20 @@
                     <TextBlock Margin="0,12,0,0"
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
-                               Text="数据目录" />
+                               Text="{loc:T '数据目录'}" />
                     <TextBlock x:Name="LabDataPath"
                                Margin="0,4,0,0"
                                FontSize="12"
                                TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource Accent.Base}"
                                Cursor="Hand"
-                               ToolTip="点击打开数据目录"
+                               ToolTip="{loc:T '点击打开数据目录'}"
                                MouseLeftButtonUp="OnOpenDataFolderClick" />
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="设置、实例、插件包与日志都放在这里；可用环境变量 HMOL_DATA 重定向。" />
+                               Text="{loc:T '设置、实例、插件包与日志都放在这里；可用环境变量 HMOL_DATA 重定向。'}" />
                 </StackPanel>
             </c:SurfaceCard>
             </Grid>

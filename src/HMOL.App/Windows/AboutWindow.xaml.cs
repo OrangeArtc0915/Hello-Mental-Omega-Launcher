@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using HMOL.Core.App;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows;
 
@@ -14,7 +15,7 @@ namespace HMOL.App.Windows;
 /// </summary>
 public partial class AboutWindow : Window
 {
-    private const string CopyHint = "复制后可直接在 QQ 里搜索群号。";
+    private static string CopyHint => Loc.T("复制后可直接在 QQ 里搜索群号。");
 
     private readonly DispatcherTimer _hintTimer;
 
@@ -113,13 +114,13 @@ public partial class AboutWindow : Window
         try
         {
             Clipboard.SetText(number);
-            ShowHint($"已复制群号 {number}", isError: false);
+            ShowHint(Loc.F("已复制群号 {0}", number), isError: false);
         }
         catch (Exception ex)
         {
             // 剪贴板被其它程序占用时会抛异常，此时提示用户手动记录
-            ShowHint($"复制失败，请手动记录群号 {number}", isError: true);
-            Log.Warn($"复制 QQ 群号失败：{ex.Message}");
+            ShowHint(Loc.F("复制失败，请手动记录群号 {0}", number), isError: true);
+            Log.Warn(Loc.F("复制 QQ 群号失败：{0}", ex.Message));
         }
     }
 

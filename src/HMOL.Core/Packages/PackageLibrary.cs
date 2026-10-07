@@ -1,6 +1,7 @@
 using System.IO;
 using HMOL.Core.Instances;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Packages;
 
@@ -35,7 +36,7 @@ public static class PackageLibrary
         }
         catch (Exception ex)
         {
-            Log.Error($"创建包目录失败：{root}", ex);
+            Log.Error(Loc.F("创建包目录失败：{0}", root), ex);
             return result;
         }
 
@@ -123,7 +124,7 @@ public static class PackageLibrary
 
         if (string.IsNullOrWhiteSpace(sourceFile) || !File.Exists(sourceFile))
         {
-            message = $"所选文件不存在：{sourceFile}";
+            message = Loc.F("所选文件不存在：{0}", sourceFile);
             return false;
         }
 
@@ -133,7 +134,7 @@ public static class PackageLibrary
 
         if (File.Exists(target) && !overwrite)
         {
-            message = $"目标目录已存在同名文件：{target}";
+            message = Loc.F("目标目录已存在同名文件：{0}", target);
             return false;
         }
 
@@ -142,15 +143,15 @@ public static class PackageLibrary
             Directory.CreateDirectory(targetDirectory);
 
             IO.DirectoryCopier.CopyFile(sourceFile, target);
-            message = $"已成功导入：{target}";
-            Log.Info($"已导入包：{sourceFile} → {target}");
+            message = Loc.F("已成功导入：{0}", target);
+            Log.Info(Loc.F("已导入包：{0} → {1}", sourceFile, target));
 
             return true;
         }
         catch (Exception ex)
         {
-            message = $"导入失败：{ex.Message}";
-            Log.Error($"导入包失败：{sourceFile}", ex);
+            message = Loc.F("导入失败：{0}", ex.Message);
+            Log.Error(Loc.F("导入包失败：{0}", sourceFile), ex);
             return false;
         }
     }
@@ -183,7 +184,7 @@ public static class PackageLibrary
         var entry = Find(type, packageName);
         if (entry is null)
         {
-            message = $"包文件不存在：{Path.Combine(PackageTypes.DirectoryOf(type), packageName)}";
+            message = Loc.F("包文件不存在：{0}", Path.Combine(PackageTypes.DirectoryOf(type), packageName));
             return false;
         }
 
@@ -192,14 +193,14 @@ public static class PackageLibrary
             if (entry.IsDirectory) Directory.Delete(entry.FullPath, recursive: true);
             else File.Delete(entry.FullPath);
 
-            message = $"已移除：{entry.Name}";
-            Log.Info($"已移除包：{entry.FullPath}");
+            message = Loc.F("已移除：{0}", entry.Name);
+            Log.Info(Loc.F("已移除包：{0}", entry.FullPath));
             return true;
         }
         catch (Exception ex)
         {
-            message = $"移除失败：{ex.Message}\n文件可能被占用或权限不足，请关闭正在使用它的程序后重试。";
-            Log.Error($"移除包失败：{entry.FullPath}", ex);
+            message = Loc.F("移除失败：{0}\n文件可能被占用或权限不足，请关闭正在使用它的程序后重试。", ex.Message);
+            Log.Error(Loc.F("移除包失败：{0}", entry.FullPath), ex);
             return false;
         }
     }
@@ -221,7 +222,7 @@ public static class PackageLibrary
         }
         catch (Exception ex)
         {
-            Log.Warn($"检查包目录失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("检查包目录失败：{0}（{1}）", directory, ex.Message));
         }
 
         return false;

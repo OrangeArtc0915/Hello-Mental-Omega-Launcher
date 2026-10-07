@@ -29,6 +29,12 @@ public static class Paths
     /// <summary>自定义布局方案目录。</summary>
     public static string Layouts { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// 外置语言包目录：<c>Data\lang\&lt;语言代码&gt;.json</c>。
+    /// 可覆盖内嵌语言，也可直接新增语言（丢文件进去重启即生效），见 <c>HMOL.Core.Localization.Loc</c>。
+    /// </summary>
+    public static string LanguageDirectory { get; private set; } = string.Empty;
+
     /// <summary>备份根目录：<c>backup\MO</c> 放原版备份，<c>backup\game\&lt;名称&gt;</c> 放用户备份。</summary>
     public static string Backup { get; private set; } = string.Empty;
 
@@ -60,6 +66,7 @@ public static class Paths
         Backgrounds = Path.Combine(Data, "backgrounds");
         Custom = Path.Combine(Data, "custom");
         Layouts = Path.Combine(Data, "layouts");
+        LanguageDirectory = Path.Combine(Data, "lang");
         Backup = Path.Combine(Data, "backup");
         Log = Path.Combine(Data, "Log");
         Temp = Path.Combine(Path.GetTempPath(), "HMOL");
@@ -67,7 +74,7 @@ public static class Paths
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HMOL", "Downloads");
 
-        foreach (var dir in new[] { Data, Instances, Packages, Cache, Backgrounds, Custom, Layouts, Backup, Log, Temp, Downloads })
+        foreach (var dir in new[] { Data, Instances, Packages, Cache, Backgrounds, Custom, Layouts, LanguageDirectory, Backup, Log, Temp, Downloads })
         {
             try { Directory.CreateDirectory(dir); }
             catch { /* 目录不可用时由上层在使用点报错，这里不阻断启动 */ }

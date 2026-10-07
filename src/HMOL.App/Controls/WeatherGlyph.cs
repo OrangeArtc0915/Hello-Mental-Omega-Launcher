@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using HMOL.Core.Logging;
 using HMOL.Core.Weather;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Controls;
 
@@ -72,7 +73,7 @@ internal static class WeatherGlyph
         }
         catch (Exception ex)
         {
-            Log.Warn($"天气图标解析失败：{ex.Message}");
+            Log.Warn(Loc.F("天气图标解析失败：{0}", ex.Message));
             return null;
         }
     }

@@ -1,4 +1,5 @@
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Multiplayer;
 
@@ -62,7 +63,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
     private NetworkSessionOptions? _options;
 
     private SessionState _state = SessionState.Idle;
-    private string _status = "未连接";
+    private string _status = Loc.T("未连接");
     private string _lastError = string.Empty;
     private EngineNodeInfo _nodeInfo = new(null, null, null, null);
     private bool _guardEnabled = true;
@@ -169,7 +170,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         {
             _guardEnabled = value;
             try { _guard?.SetEnabled(value); }
-            catch (Exception ex) { Log.Warn($"切换进程守护失败：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("切换进程守护失败：{0}", ex.Message)); }
         }
     }
 
@@ -199,7 +200,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
                 _lastError = string.Empty;
             }
 
-            SetState(SessionState.Connecting, $"正在启动 {NetworkEngineFactory.DisplayName(kind)} 引擎…");
+            SetState(SessionState.Connecting, Loc.F("正在启动 {0} 引擎…", NetworkEngineFactory.DisplayName(kind)));
 
             var engine = NetworkEngineFactory.Create(kind, _log);
             engine.OutputReceived += OnEngineOutput;
@@ -214,7 +215,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 await TeardownAsync().ConfigureAwait(false);
-                SetState(SessionState.Idle, "连接已取消");
+                SetState(SessionState.Idle, Loc.T("连接已取消"));
                 return false;
             }
 
@@ -225,7 +226,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
                 await TeardownAsync().ConfigureAwait(false);
 
                 lock (_lock) _lastError = reason;
-                SetState(SessionState.Failed, $"连接失败：{reason}");
+                SetState(SessionState.Failed, Loc.F("连接失败：{0}", reason));
 
                 // 失败时把引擎最近输出打给日志，便于定位（旧版 _dump_engine_log）
                 if (!string.IsNullOrWhiteSpace(tail)) _log?.Invoke(tail);
@@ -258,8 +259,8 @@ public sealed class MultiplayerSession : IAsyncDisposable
             catch (Exception ex)
             {
                 await TeardownAsync().ConfigureAwait(false);
-                lock (_lock) _lastError = $"房间聊天端口 {RoomChat.RoomUdpPort} 占用：{ex.Message}";
-                SetState(SessionState.Failed, $"连接失败：房间聊天端口被占用（{ex.Message}）");
+                lock (_lock) _lastError = Loc.F("房间聊天端口 {0} 占用：{1}", RoomChat.RoomUdpPort, ex.Message);
+                SetState(SessionState.Failed, Loc.F("连接失败：房间聊天端口被占用（{0}）", ex.Message));
                 return false;
             }
 
@@ -279,15 +280,15 @@ public sealed class MultiplayerSession : IAsyncDisposable
         catch (OperationCanceledException)
         {
             await TeardownAsync().ConfigureAwait(false);
-            SetState(SessionState.Idle, "连接已取消");
+            SetState(SessionState.Idle, Loc.T("连接已取消"));
             return false;
         }
         catch (Exception ex)
         {
-            Log.Error("联机会话建立失败", ex);
+            Log.Error(Loc.T("联机会话建立失败"), ex);
             await TeardownAsync().ConfigureAwait(false);
             lock (_lock) _lastError = ex.Message;
-            SetState(SessionState.Failed, $"连接失败：{ex.Message}");
+            SetState(SessionState.Failed, Loc.F("连接失败：{0}", ex.Message));
             RaiseNotice(ex.Message);
             return false;
         }
@@ -310,13 +311,13 @@ public sealed class MultiplayerSession : IAsyncDisposable
         {
             if (_engine is null && _chat is null)
             {
-                SetState(SessionState.Idle, "未连接");
+                SetState(SessionState.Idle, Loc.T("未连接"));
                 return;
             }
 
-            SetState(SessionState.Disconnecting, "正在断开…");
+            SetState(SessionState.Disconnecting, Loc.T("正在断开…"));
             await TeardownAsync().ConfigureAwait(false);
-            SetState(SessionState.Idle, "未连接");
+            SetState(SessionState.Idle, Loc.T("未连接"));
         }
         finally
         {
@@ -382,7 +383,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                Log.Warn($"刷新对端失败：{ex.Message}");
+                Log.Warn(Loc.F("刷新对端失败：{0}", ex.Message));
             }
         }
     }
@@ -438,7 +439,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
             _hiddenForeignPeers = hidden;
 
             if (hidden > 0)
-                Log.Info($"这个公共节点不隔离房间，同小组里有 {hidden} 个对端不属于本房间，已从对端列表隐藏");
+                Log.Info(Loc.F("这个公共节点不隔离房间，同小组里有 {0} 个对端不属于本房间，已从对端列表隐藏", hidden));
         }
 
         // 房间聊天只认同引擎给出的对端 IP
@@ -492,12 +493,12 @@ public sealed class MultiplayerSession : IAsyncDisposable
     {
         if (State != SessionState.Connected)
         {
-            _log?.Invoke($"[守护] 会话已断开，忽略 {processName} 的退出");
+            _log?.Invoke(Loc.F("[守护] 会话已断开，忽略 {0} 的退出", processName));
             return;
         }
 
-        RaiseNotice($"{processName} 异常退出，正在自动重启…");
-        _log?.Invoke($"[守护] 检测到 {processName} 异常退出，正在自动重启…");
+        RaiseNotice(Loc.F("{0} 异常退出，正在自动重启…", processName));
+        _log?.Invoke(Loc.F("[守护] 检测到 {0} 异常退出，正在自动重启…", processName));
 
         try
         {
@@ -521,24 +522,24 @@ public sealed class MultiplayerSession : IAsyncDisposable
 
             if (!result.Ok)
             {
-                _log?.Invoke($"[守护] 自动重启失败：{result.Message}");
-                RaiseNotice($"引擎自动重启失败：{result.Message}");
+                _log?.Invoke(Loc.F("[守护] 自动重启失败：{0}", result.Message));
+                RaiseNotice(Loc.F("引擎自动重启失败：{0}", result.Message));
 
                 await TeardownAsync().ConfigureAwait(false);
-                SetState(SessionState.Failed, $"引擎重启失败：{result.Message}");
+                SetState(SessionState.Failed, Loc.F("引擎重启失败：{0}", result.Message));
                 return;
             }
 
             await RefreshAsync(CancellationToken.None).ConfigureAwait(false);
-            SetState(SessionState.Connected, $"已自动重连：{result.Message}");
-            _log?.Invoke($"[守护] 自动重启完成，虚拟 IP={result.LocalIp}");
+            SetState(SessionState.Connected, Loc.F("已自动重连：{0}", result.Message));
+            _log?.Invoke(Loc.F("[守护] 自动重启完成，虚拟 IP={0}", result.LocalIp));
         }
         catch (Exception ex)
         {
-            Log.Error("守护重启引擎失败", ex);
-            RaiseNotice($"引擎自动重启失败：{ex.Message}");
+            Log.Error(Loc.T("守护重启引擎失败"), ex);
+            RaiseNotice(Loc.F("引擎自动重启失败：{0}", ex.Message));
             await TeardownAsync().ConfigureAwait(false);
-            SetState(SessionState.Failed, $"引擎重启失败：{ex.Message}");
+            SetState(SessionState.Failed, Loc.F("引擎重启失败：{0}", ex.Message));
         }
         finally
         {
@@ -546,14 +547,14 @@ public sealed class MultiplayerSession : IAsyncDisposable
             catch (ObjectDisposedException) { /* 已释放 */ }
 
             // 守护自身因频繁崩溃停掉时要让用户知道
-            if (_guard is { Enabled: false }) RaiseNotice("引擎频繁崩溃，进程守护已停止自动重启");
+            if (_guard is { Enabled: false }) RaiseNotice(Loc.T("引擎频繁崩溃，进程守护已停止自动重启"));
         }
     }
 
     private void OnOwnerDemoted(string ownerIp)
     {
-        var text = $"检测到房主冲突，本机已降级为成员（房主：{ownerIp}）";
-        _log?.Invoke($"[房间] {text}");
+        var text = Loc.F("检测到房主冲突，本机已降级为成员（房主：{0}）", ownerIp);
+        _log?.Invoke(Loc.F("[房间] {0}", text));
         RaiseNotice(text);
         RaiseStateChanged();
     }
@@ -564,22 +565,22 @@ public sealed class MultiplayerSession : IAsyncDisposable
 
         if (!string.IsNullOrEmpty(self) && string.Equals(target, self, StringComparison.OrdinalIgnoreCase))
         {
-            RaiseNotice("你已被房主移出房间，将自动断开连接");
+            RaiseNotice(Loc.T("你已被房主移出房间，将自动断开连接"));
             _ = Task.Run(DisconnectAsync);
             return;
         }
 
-        RaiseNotice($"房主已将 {(string.IsNullOrEmpty(name) ? target : name)} 移出房间");
+        RaiseNotice(Loc.F("房主已将 {0} 移出房间", (string.IsNullOrEmpty(name) ? target : name)));
         RaisePeersChanged();
     }
 
     private void OnUnkicked(string target)
     {
         var text = string.Equals(target, LocalIp, StringComparison.OrdinalIgnoreCase)
-            ? "你已被房主拉回房间"
-            : $"房主已将 {target} 拉回房间";
+            ? Loc.T("你已被房主拉回房间")
+            : Loc.F("房主已将 {0} 拉回房间", target);
 
-        _log?.Invoke($"[房间] {text}");
+        _log?.Invoke(Loc.F("[房间] {0}", text));
         RaisePeersChanged();
     }
 
@@ -622,7 +623,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (chat is not null)
         {
             try { await chat.StopAsync().ConfigureAwait(false); }
-            catch (Exception ex) { Log.Warn($"停止房间聊天失败：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("停止房间聊天失败：{0}", ex.Message)); }
         }
 
         var engine = _engine;
@@ -633,7 +634,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
             engine.OutputReceived -= OnEngineOutput;
 
             try { await engine.StopAsync().ConfigureAwait(false); }
-            catch (Exception ex) { Log.Warn($"停止组网引擎失败：{ex.Message}"); }
+            catch (Exception ex) { Log.Warn(Loc.F("停止组网引擎失败：{0}", ex.Message)); }
 
             try { await engine.DisposeAsync().ConfigureAwait(false); }
             catch { /* 忽略 */ }
@@ -663,7 +664,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (handler is null) return;
 
         try { handler(line); }
-        catch (Exception ex) { Log.Warn($"引擎输出回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("引擎输出回调异常：{0}", ex.Message)); }
     }
 
     private void SetState(SessionState state, string status)
@@ -676,7 +677,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
             if (state == SessionState.Connected) _lastError = string.Empty;
         }
 
-        Log.Info($"[联机] {status}");
+        Log.Info(Loc.F("[联机] {0}", status));
         RaiseStateChanged();
     }
 
@@ -686,7 +687,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (handler is null) return;
 
         try { handler(); }
-        catch (Exception ex) { Log.Warn($"会话状态回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("会话状态回调异常：{0}", ex.Message)); }
     }
 
     private void RaisePeersChanged()
@@ -695,7 +696,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (handler is null) return;
 
         try { handler(); }
-        catch (Exception ex) { Log.Warn($"对端列表回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("对端列表回调异常：{0}", ex.Message)); }
     }
 
     private void RaiseNotice(string message)
@@ -706,7 +707,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (handler is null) return;
 
         try { handler(message); }
-        catch (Exception ex) { Log.Warn($"提示回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("提示回调异常：{0}", ex.Message)); }
     }
 
     private static void Raise<T>(Action<T>? handler, T value)
@@ -714,7 +715,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (handler is null) return;
 
         try { handler(value); }
-        catch (Exception ex) { Log.Warn($"会话回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("会话回调异常：{0}", ex.Message)); }
     }
 
     private static void Raise<T1, T2>(Action<T1, T2>? handler, T1 first, T2 second)
@@ -722,7 +723,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (handler is null) return;
 
         try { handler(first, second); }
-        catch (Exception ex) { Log.Warn($"会话回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("会话回调异常：{0}", ex.Message)); }
     }
 
     public async ValueTask DisposeAsync()
@@ -730,7 +731,7 @@ public sealed class MultiplayerSession : IAsyncDisposable
         if (_disposed) return;
 
         try { await DisconnectAsync().ConfigureAwait(false); }
-        catch (Exception ex) { Log.Warn($"释放联机会话失败：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("释放联机会话失败：{0}", ex.Message)); }
 
         _disposed = true;
 

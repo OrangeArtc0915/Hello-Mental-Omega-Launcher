@@ -2,6 +2,7 @@ using System.IO;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
 using HMOL.Core.Packages;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Updater;
 
@@ -39,7 +40,7 @@ public static class RequiredAssetDownloader
     public static async Task<DownloadResult> DownloadAsync(string fileName, string destinationPath,
         LauncherUpdateSource preferred, IProgress<double>? progress = null, CancellationToken token = default)
     {
-        if (string.IsNullOrWhiteSpace(fileName)) return new DownloadResult(false, null, 0, "文件名为空");
+        if (string.IsNullOrWhiteSpace(fileName)) return new DownloadResult(false, null, 0, Loc.T("文件名为空"));
 
         var order = preferred == LauncherUpdateSource.Gitee
             ? new[] { ("Gitee", GiteeUrl(fileName)), ("GitHub", GitHubUrl(fileName)) }
@@ -60,24 +61,24 @@ public static class RequiredAssetDownloader
             if (!result.Success)
             {
                 errors.Add($"{name}：{result.Message}");
-                Log.Warn($"从 {name} 下载 {fileName} 失败：{result.Message}");
+                Log.Warn(Loc.F("从 {0} 下载 {1} 失败：{2}", name, fileName, result.Message));
                 continue;
             }
 
             // 服务器可能用 200 页面顶替文件（路径写错时返回 HTML），落地后按文件头复核
             if (!ArchiveExtractor.IsSupportedArchive(destinationPath))
             {
-                errors.Add($"{name}：下载到的不是有效压缩包");
-                Log.Warn($"从 {name} 下载的 {fileName} 不是有效压缩包，已删除");
+                errors.Add(Loc.F("{0}：下载到的不是有效压缩包", name));
+                Log.Warn(Loc.F("从 {0} 下载的 {1} 不是有效压缩包，已删除", name, fileName));
                 TryDelete(destinationPath);
                 continue;
             }
 
-            Log.Info($"已下载 {fileName}（{name}）：{destinationPath}（{ResumableDownloader.FormatSize(LengthOf(destinationPath))}）");
+            Log.Info(Loc.F("已下载 {0}（{1}）：{2}（{3}）", fileName, name, destinationPath, ResumableDownloader.FormatSize(LengthOf(destinationPath))));
             return result;
         }
 
-        return new DownloadResult(false, null, 0, "两个线路都下载失败：" + string.Join("；", errors));
+        return new DownloadResult(false, null, 0, Loc.T("两个线路都下载失败：") + string.Join("；", errors));
     }
 
     /// <summary>把下载物解压到目标目录。压缩包内若只有一个顶层目录，则以其为内容根。</summary>
@@ -86,7 +87,7 @@ public static class RequiredAssetDownloader
     {
         try
         {
-            if (!File.Exists(archivePath)) return (false, $"压缩包不存在：{archivePath}");
+            if (!File.Exists(archivePath)) return (false, Loc.F("压缩包不存在：{0}", archivePath));
 
             var scratch = Path.Combine(Paths.ScratchFor(destinationDirectory),
                 $"req_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
@@ -96,17 +97,17 @@ public static class RequiredAssetDownloader
                 Directory.CreateDirectory(scratch);
 
                 if (!ArchiveExtractor.TryExtract(archivePath, scratch, out var error, progress, token))
-                    return (false, string.IsNullOrWhiteSpace(error) ? "解压失败" : error);
+                    return (false, string.IsNullOrWhiteSpace(error) ? Loc.T("解压失败") : error);
 
                 if (!Directory.EnumerateFileSystemEntries(scratch).Any())
-                    return (false, "压缩包内容为空");
+                    return (false, Loc.T("压缩包内容为空"));
 
                 var contentRoot = ArchiveExtractor.ResolveSingleTopDirectory(scratch);
 
                 Directory.CreateDirectory(destinationDirectory);
                 CopyContents(contentRoot, destinationDirectory);
 
-                return (true, "解压完成");
+                return (true, Loc.T("解压完成"));
             }
             finally
             {
@@ -115,11 +116,11 @@ public static class RequiredAssetDownloader
         }
         catch (OperationCanceledException)
         {
-            return (false, "操作已取消");
+            return (false, Loc.T("操作已取消"));
         }
         catch (Exception ex)
         {
-            Log.Error($"解压失败：{archivePath} → {destinationDirectory}", ex);
+            Log.Error(Loc.F("解压失败：{0} → {1}", archivePath, destinationDirectory), ex);
             return (false, ex.Message);
         }
     }
@@ -165,7 +166,7 @@ public static class RequiredAssetDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理临时文件失败：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("清理临时文件失败：{0}（{1}）", path, ex.Message));
         }
     }
 
@@ -177,7 +178,7 @@ public static class RequiredAssetDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理临时目录失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("清理临时目录失败：{0}（{1}）", directory, ex.Message));
         }
     }
 }

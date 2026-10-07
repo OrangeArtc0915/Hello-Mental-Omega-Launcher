@@ -16,6 +16,7 @@ using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 using HMOL.Core.Packages;
 using HMOL.Core.Updater;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Pages;
 
@@ -95,7 +96,7 @@ public partial class PageDownload : LauncherPage
 
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "选择下载目录",
+            Title = Loc.T("选择下载目录"),
             Multiselect = false
         };
 
@@ -112,7 +113,7 @@ public partial class PageDownload : LauncherPage
         }
         catch (Exception ex)
         {
-            ShowNotice($"下载目录不可用：{ex.Message}", isError: true);
+            ShowNotice(Loc.F("下载目录不可用：{0}", ex.Message), isError: true);
             return;
         }
 
@@ -120,7 +121,7 @@ public partial class PageDownload : LauncherPage
         SettingsStore.Save();
 
         RefreshDownloadDirectory();
-        ShowNotice($"下载目录已改为：{selected}");
+        ShowNotice(Loc.F("下载目录已改为：{0}", selected));
     }
 
     private void OnOpenDownloadDirClick(object sender, RoutedEventArgs e)
@@ -134,7 +135,7 @@ public partial class PageDownload : LauncherPage
         }
         catch (Exception ex)
         {
-            ShowNotice($"打开下载目录失败：{ex.Message}", isError: true);
+            ShowNotice(Loc.F("打开下载目录失败：{0}", ex.Message), isError: true);
         }
     }
 
@@ -148,7 +149,7 @@ public partial class PageDownload : LauncherPage
         if (_manifestLoading) return;
         _manifestLoading = true;
 
-        LabManifestHint.Text = "正在获取下载列表…";
+        LabManifestHint.Text = Loc.T("正在获取下载列表…");
         BtnManifestRefresh.IsEnabled = false;
 
         try
@@ -159,7 +160,7 @@ public partial class PageDownload : LauncherPage
             {
                 _entries = [];
                 PanGroups.Children.Clear();
-                LabManifestHint.Text = $"无法获取下载列表：{error}";
+                LabManifestHint.Text = Loc.F("无法获取下载列表：{0}", error);
                 return;
             }
 
@@ -167,10 +168,10 @@ public partial class PageDownload : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Error("获取下载列表失败", ex);
+            Log.Error(Loc.T("获取下载列表失败"), ex);
             _entries = [];
             PanGroups.Children.Clear();
-            LabManifestHint.Text = $"无法获取下载列表：{ex.Message}";
+            LabManifestHint.Text = Loc.F("无法获取下载列表：{0}", ex.Message);
         }
         finally
         {
@@ -204,13 +205,13 @@ public partial class PageDownload : LauncherPage
         if (others.Count == 0)
         {
             LabManifestHint.Text = runtimeItems.Count > 0
-                ? "没有其它可下载条目。"
-                : "下载列表暂无条目：在仓库 survive 分支的 download.json 里加一条即可"
-                  + "（{\"group\":\"分组\",\"name\":\"名称\",\"url\":\"下载地址\"}）。";
+                ? Loc.T("没有其它可下载条目。")
+                : Loc.T("下载列表暂无条目：在仓库 survive 分支的 download.json 里加一条即可")
+                  + Loc.T("（{\"group\":\"分组\",\"name\":\"名称\",\"url\":\"下载地址\"}）。");
             return;
         }
 
-        LabManifestHint.Text = $"共 {others.Count} 项，来自 survive 分支的 download.json。";
+        LabManifestHint.Text = Loc.F("共 {0} 项，来自 survive 分支的 download.json。", others.Count);
 
         foreach (var group in others.GroupBy(GroupNameOf))
         {
@@ -234,10 +235,10 @@ public partial class PageDownload : LauncherPage
         var missing = runtimeItems.Count(entry => !IsRuntimeInstalled(entry));
 
         LabRuntimeHint.Text = missing == 0
-            ? $"共 {runtimeItems.Count} 个运行时组件，都已就绪。"
-            : $"共 {runtimeItems.Count} 个运行时组件，还缺 {missing} 个；点「一键补全」按需下载并安装。";
+            ? Loc.F("共 {0} 个运行时组件，都已就绪。", runtimeItems.Count)
+            : Loc.F("共 {0} 个运行时组件，还缺 {1} 个；点「一键补全」按需下载并安装。", runtimeItems.Count, missing);
 
-        BtnCompleteRuntime.Content = missing == 0 ? "全部重装" : $"一键补全（{missing}）";
+        BtnCompleteRuntime.Content = missing == 0 ? Loc.T("全部重装") : Loc.F("一键补全（{0}）", missing);
         BtnCompleteRuntime.IsEnabled = !_busy;
 
         for (var index = 0; index < runtimeItems.Count; index++)
@@ -262,9 +263,9 @@ public partial class PageDownload : LauncherPage
     private void UpdateRuntimeToggleText(bool expanded)
     {
         var count = PanRuntimeItems.Children.Count;
-        var suffix = count > 0 ? $"（{count} 项）" : string.Empty;
+        var suffix = count > 0 ? Loc.F("（{0} 项）", count) : string.Empty;
 
-        BtnToggleRuntime.Content = expanded ? $"收起组件列表{suffix}" : $"展开组件列表{suffix}";
+        BtnToggleRuntime.Content = expanded ? Loc.F("收起组件列表{0}", suffix) : Loc.F("展开组件列表{0}", suffix);
     }
 
     /// <summary>条目属于哪一组：优先用它自己声明的 group，没写就按 target 归类。</summary>
@@ -272,12 +273,12 @@ public partial class PageDownload : LauncherPage
     {
         if (!string.IsNullOrWhiteSpace(entry.Group)) return entry.Group.Trim();
 
-        if (entry.IsRuntimeTarget) return "组网与运行组件";
-        if (entry.IsInstanceTarget) return "游戏补丁";
-        if (entry.IsLinkOnly) return "运行库（官网下载）";
-        if (entry.IsPluginTarget) return "插件包";
+        if (entry.IsRuntimeTarget) return Loc.T("组网与运行组件");
+        if (entry.IsInstanceTarget) return Loc.T("游戏补丁");
+        if (entry.IsLinkOnly) return Loc.T("运行库（官网下载）");
+        if (entry.IsPluginTarget) return Loc.T("插件包");
 
-        return "其它下载";
+        return Loc.T("其它下载");
     }
 
     /// <summary>一组 = 一张卡片：默认收起，点一下展开；展开状态在会话内保留。</summary>
@@ -325,7 +326,7 @@ public partial class PageDownload : LauncherPage
     }
 
     private static string GroupToggleText(string title, int count, bool expanded)
-        => expanded ? $"收起「{title}」（{count} 项）" : $"展开「{title}」（{count} 项）";
+        => expanded ? Loc.F("收起「{0}」（{1} 项）", title, count) : Loc.F("展开「{0}」（{1} 项）", title, count);
 
     /// <summary>一条目一行：名称 + 说明 + 状态（runtime 组件）+ 下载 / 打开链接。</summary>
     private FrameworkElement BuildEntryRow(ManifestEntry entry)
@@ -359,7 +360,7 @@ public partial class PageDownload : LauncherPage
                 Margin = new Thickness(0, 4, 0, 0),
                 Cursor = Cursors.Hand,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = "点击用浏览器打开官网"
+                ToolTip = Loc.T("点击用浏览器打开官网")
             };
             link.SetResourceReference(TextBlock.ForegroundProperty, "Accent.Base");
             link.MouseLeftButtonUp += (_, _) => OpenManifestEntry(entry);
@@ -376,7 +377,7 @@ public partial class PageDownload : LauncherPage
 
             var status = new TextBlock
             {
-                Text = installed ? "已安装" : "未安装",
+                Text = installed ? Loc.T("已安装") : Loc.T("未安装"),
                 FontSize = 11.5,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0)
@@ -392,7 +393,7 @@ public partial class PageDownload : LauncherPage
         {
             var open = new OutlineButton
             {
-                Content = "打开链接",
+                Content = Loc.T("打开链接"),
                 Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -412,7 +413,7 @@ public partial class PageDownload : LauncherPage
 
         var button = new OutlineButton
         {
-            Content = entry.Urls.Count > 1 ? $"下载（{entry.Urls.Count} 卷）" : installed ? "重新下载" : "下载",
+            Content = entry.Urls.Count > 1 ? Loc.F("下载（{0} 卷）", entry.Urls.Count) : installed ? Loc.T("重新下载") : Loc.T("下载"),
             Tone = ButtonTone.Solid,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -442,7 +443,7 @@ public partial class PageDownload : LauncherPage
         }
         catch (Exception ex)
         {
-            ShowNotice($"打开链接失败：{ex.Message}", isError: true);
+            ShowNotice(Loc.F("打开链接失败：{0}", ex.Message), isError: true);
         }
     }
 
@@ -477,7 +478,7 @@ public partial class PageDownload : LauncherPage
 
         var target = Path.Combine(directory, ManifestFileName(entry));
         var total = entry.Urls.Count;
-        var progress = ProgressWindow.Open(OwnerWindow, "下载", $"正在下载 {entry.Name}…", canCancel: true);
+        var progress = ProgressWindow.Open(OwnerWindow, Loc.T("下载"), Loc.F("正在下载 {0}…", entry.Name), canCancel: true);
 
         try
         {
@@ -489,7 +490,7 @@ public partial class PageDownload : LauncherPage
                     entry.PrimaryUrl, target, progress.Progress, progress.Token);
 
                 if (single.Success) ShowNotice(DescribeManifestDownload(entry, single.FilePath ?? target));
-                else ShowNotice($"下载失败：{single.Message}", isError: true);
+                else ShowNotice(Loc.F("下载失败：{0}", single.Message), isError: true);
 
                 return;
             }
@@ -499,7 +500,7 @@ public partial class PageDownload : LauncherPage
 
             for (var index = 0; index < total; index++)
             {
-                progress.SetDetail($"正在下载 {entry.Name}（第 {index + 1}/{total} 卷）…");
+                progress.SetDetail(Loc.F("正在下载 {0}（第 {1}/{2} 卷）…", entry.Name, index + 1, total));
 
                 var partPath = $"{target}.part{index + 1:000}";
                 var result = await ResumableDownloader.DownloadAsync(
@@ -507,14 +508,14 @@ public partial class PageDownload : LauncherPage
 
                 if (!result.Success)
                 {
-                    ShowNotice($"第 {index + 1}/{total} 卷下载失败：{result.Message}", isError: true);
+                    ShowNotice(Loc.F("第 {0}/{1} 卷下载失败：{2}", index + 1, total, result.Message), isError: true);
                     return;
                 }
 
                 parts.Add(partPath);
             }
 
-            progress.SetDetail($"正在合并 {total} 个分卷…");
+            progress.SetDetail(Loc.F("正在合并 {0} 个分卷…", total));
 
             await using (var output = File.Create(target))
             {
@@ -532,13 +533,13 @@ public partial class PageDownload : LauncherPage
             }
 
             ShowNotice(entry.IsPluginTarget
-                ? $"已放进插件包：{target}（{total} 个分卷已合并，可在「包管理 → 插件」里安装）"
-                : $"已下载并合并 {total} 个分卷：{target}");
+                ? Loc.F("已放进插件包：{0}（{1} 个分卷已合并，可在「包管理 → 插件」里安装）", target, total)
+                : Loc.F("已下载并合并 {0} 个分卷：{1}", total, target));
         }
         catch (Exception ex)
         {
-            Log.Error($"下载条目失败：{entry.Name}", ex);
-            ShowNotice($"下载失败：{ex.Message}", isError: true);
+            Log.Error(Loc.F("下载条目失败：{0}", entry.Name), ex);
+            ShowNotice(Loc.F("下载失败：{0}", ex.Message), isError: true);
         }
         finally
         {
@@ -552,13 +553,13 @@ public partial class PageDownload : LauncherPage
     {
         if (string.IsNullOrWhiteSpace(entry.Folder) || string.IsNullOrWhiteSpace(entry.Marker))
         {
-            ShowNotice($"{entry.Name} 的配置不完整（缺 folder 或 marker），无法自动安装。", isError: true);
+            ShowNotice(Loc.F("{0} 的配置不完整（缺 folder 或 marker），无法自动安装。", entry.Name), isError: true);
             return;
         }
 
         if (entry.Urls.Count > 1)
         {
-            ShowNotice($"{entry.Name} 是多分卷条目，暂不支持自动安装，请点「打开链接」手动下载。", isError: true);
+            ShowNotice(Loc.F("{0} 是多分卷条目，暂不支持自动安装，请点「打开链接」手动下载。", entry.Name), isError: true);
             return;
         }
 
@@ -566,7 +567,7 @@ public partial class PageDownload : LauncherPage
         RebuildGroups();
 
         var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
-        var progress = ProgressWindow.Open(OwnerWindow, "下载组件", $"正在下载 {entry.Name}…", canCancel: true);
+        var progress = ProgressWindow.Open(OwnerWindow, Loc.T("下载组件"), Loc.F("正在下载 {0}…", entry.Name), canCancel: true);
 
         try
         {
@@ -575,11 +576,11 @@ public partial class PageDownload : LauncherPage
 
             if (!download.Success)
             {
-                ShowNotice($"下载失败：{download.Message}", isError: true);
+                ShowNotice(Loc.F("下载失败：{0}", download.Message), isError: true);
                 return;
             }
 
-            progress.SetDetail($"正在解压到 runtime\\{entry.Folder}\\…");
+            progress.SetDetail(Loc.F("正在解压到 runtime\\{0}\\…", entry.Folder));
 
             var directory = RuntimeInstallDirectory(entry);
 
@@ -589,13 +590,13 @@ public partial class PageDownload : LauncherPage
 
             if (!ok)
             {
-                ShowNotice($"安装失败：{message}", isError: true);
+                ShowNotice(Loc.F("安装失败：{0}", message), isError: true);
                 return;
             }
 
             if (!IsRuntimeInstalled(entry))
             {
-                ShowNotice($"{entry.Name} 解压完成，但没找到标志文件 {entry.Marker}，请确认压缩包内容。", isError: true);
+                ShowNotice(Loc.F("{0} 解压完成，但没找到标志文件 {1}，请确认压缩包内容。", entry.Name, entry.Marker), isError: true);
                 return;
             }
 
@@ -603,16 +604,16 @@ public partial class PageDownload : LauncherPage
             if (string.Equals(entry.Folder.Trim(), "7zip", StringComparison.OrdinalIgnoreCase))
                 SevenZipTool.ResetCache();
 
-            ShowNotice($"{entry.Name} 已安装到 runtime\\{entry.Folder}\\。");
+            ShowNotice(Loc.F("{0} 已安装到 runtime\\{1}\\。", entry.Name, entry.Folder));
         }
         catch (OperationCanceledException)
         {
-            ShowNotice("下载已取消。", isError: true);
+            ShowNotice(Loc.T("下载已取消。"), isError: true);
         }
         catch (Exception ex)
         {
-            Log.Error($"安装组件失败：{entry.Name}", ex);
-            ShowNotice($"安装失败：{ex.Message}", isError: true);
+            Log.Error(Loc.F("安装组件失败：{0}", entry.Name), ex);
+            ShowNotice(Loc.F("安装失败：{0}", ex.Message), isError: true);
         }
         finally
         {
@@ -640,7 +641,7 @@ public partial class PageDownload : LauncherPage
 
         if (pending.Count == 0)
         {
-            ShowNotice("运行时组件都已就绪，无需补全。");
+            ShowNotice(Loc.T("运行时组件都已就绪，无需补全。"));
             return;
         }
 
@@ -649,7 +650,7 @@ public partial class PageDownload : LauncherPage
 
         var issues = new List<string>();
         var installed = 0;
-        var progress = ProgressWindow.Open(OwnerWindow, "一键补全运行环境", "正在准备…", canCancel: true);
+        var progress = ProgressWindow.Open(OwnerWindow, Loc.T("一键补全运行环境"), Loc.T("正在准备…"), canCancel: true);
 
         try
         {
@@ -659,17 +660,17 @@ public partial class PageDownload : LauncherPage
 
                 if (string.IsNullOrWhiteSpace(entry.Folder) || string.IsNullOrWhiteSpace(entry.Marker))
                 {
-                    issues.Add($"{entry.Name}：缺 folder 或 marker");
+                    issues.Add(Loc.F("{0}：缺 folder 或 marker", entry.Name));
                     continue;
                 }
 
                 if (entry.Urls.Count > 1)
                 {
-                    issues.Add($"{entry.Name}：多分卷条目暂不支持自动安装");
+                    issues.Add(Loc.F("{0}：多分卷条目暂不支持自动安装", entry.Name));
                     continue;
                 }
 
-                progress.SetDetail($"正在下载 {entry.Name}（{index + 1}/{pending.Count}）…");
+                progress.SetDetail(Loc.F("正在下载 {0}（{1}/{2}）…", entry.Name, index + 1, pending.Count));
 
                 var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
 
@@ -682,7 +683,7 @@ public partial class PageDownload : LauncherPage
                     continue;
                 }
 
-                progress.SetDetail($"正在解压 {entry.Name}…");
+                progress.SetDetail(Loc.F("正在解压 {0}…", entry.Name));
 
                 var (ok, message) = await Task.Run(
                     () => RequiredAssetDownloader.ExtractInto(archive, RuntimeInstallDirectory(entry), progress.Sample, progress.Token),
@@ -695,7 +696,7 @@ public partial class PageDownload : LauncherPage
 
                 if (!IsRuntimeInstalled(entry))
                 {
-                    issues.Add($"{entry.Name}：解压完成但没找到 {entry.Marker}");
+                    issues.Add(Loc.F("{0}：解压完成但没找到 {1}", entry.Name, entry.Marker));
                     continue;
                 }
 
@@ -704,13 +705,13 @@ public partial class PageDownload : LauncherPage
         }
         catch (OperationCanceledException)
         {
-            ShowNotice($"补全已取消（已完成 {installed} 个）。", isError: true);
+            ShowNotice(Loc.F("补全已取消（已完成 {0} 个）。", installed), isError: true);
             return;
         }
         catch (Exception ex)
         {
-            Log.Error("一键补全运行环境失败", ex);
-            ShowNotice($"补全失败：{ex.Message}", isError: true);
+            Log.Error(Loc.T("一键补全运行环境失败"), ex);
+            ShowNotice(Loc.F("补全失败：{0}", ex.Message), isError: true);
             return;
         }
         finally
@@ -723,15 +724,15 @@ public partial class PageDownload : LauncherPage
         // 7-Zip 组件的定位结果有缓存，补全后让下一次查找重新找
         SevenZipTool.ResetCache();
 
-        if (issues.Count == 0) ShowNotice($"运行环境已补全（{installed} 个组件）。");
-        else ShowNotice($"补全完成：成功 {installed} 个，失败 {issues.Count} 个 —— {string.Join("；", issues)}", isError: true);
+        if (issues.Count == 0) ShowNotice(Loc.F("运行环境已补全（{0} 个组件）。", installed));
+        else ShowNotice(Loc.F("补全完成：成功 {0} 个，失败 {1} 个 —— {2}", installed, issues.Count, string.Join(Loc.T("；"), issues)), isError: true);
     }
 
     /// <summary>下载成功后的提示：进插件包的条目说明它能在「包管理 → 插件」里安装。</summary>
     private static string DescribeManifestDownload(ManifestEntry entry, string path)
         => entry.IsPluginTarget
-            ? $"已放进插件包：{path}（可在「包管理 → 插件」里安装）"
-            : $"已下载：{path}";
+            ? Loc.F("已放进插件包：{0}（可在「包管理 → 插件」里安装）", path)
+            : Loc.F("已下载：{0}", path);
 
     /// <summary>
     /// 「黑屏补丁」这类条目：下载到缓存，让用户选一个游戏实例，把压缩包解压到它的游戏根目录，
@@ -743,22 +744,22 @@ public partial class PageDownload : LauncherPage
 
         if (instances.Count == 0)
         {
-            ShowNotice("还没有游戏实例：请先在「游戏实例」页创建实例，再回来安装。", isError: true);
+            ShowNotice(Loc.T("还没有游戏实例：请先在「游戏实例」页创建实例，再回来安装。"), isError: true);
             return;
         }
 
         if (entry.Urls.Count > 1)
         {
-            ShowNotice($"{entry.Name} 是多分卷条目，暂不支持直接安装，请点「打开链接」手动下载。", isError: true);
+            ShowNotice(Loc.F("{0} 是多分卷条目，暂不支持直接安装，请点「打开链接」手动下载。", entry.Name), isError: true);
             return;
         }
 
         var items = instances
             .Select(instance => new PickItem(instance.Id, instance.Name,
-                string.IsNullOrWhiteSpace(instance.GameDir) ? "（未设置游戏目录）" : instance.GameDir))
+                string.IsNullOrWhiteSpace(instance.GameDir) ? Loc.T("（未设置游戏目录）") : instance.GameDir))
             .ToList();
 
-        var picked = PickWindow.Pick(OwnerWindow, entry.Name, "选择要安装到哪个游戏实例：", items, PickMode.Single);
+        var picked = PickWindow.Pick(OwnerWindow, entry.Name, Loc.T("选择要安装到哪个游戏实例："), items, PickMode.Single);
 
         if (picked is null || picked.Count == 0) return;
 
@@ -769,7 +770,7 @@ public partial class PageDownload : LauncherPage
 
         if (string.IsNullOrWhiteSpace(target.GameDir) || !Directory.Exists(target.GameDir))
         {
-            ShowNotice($"实例「{target.Name}」的游戏目录不可用：{target.GameDir}", isError: true);
+            ShowNotice(Loc.F("实例「{0}」的游戏目录不可用：{1}", target.Name, target.GameDir), isError: true);
             return;
         }
 
@@ -777,7 +778,7 @@ public partial class PageDownload : LauncherPage
         RebuildGroups();
 
         var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
-        var progress = ProgressWindow.Open(OwnerWindow, "安装到实例", $"正在下载 {entry.Name}…", canCancel: true);
+        var progress = ProgressWindow.Open(OwnerWindow, Loc.T("安装到实例"), Loc.F("正在下载 {0}…", entry.Name), canCancel: true);
 
         try
         {
@@ -786,11 +787,11 @@ public partial class PageDownload : LauncherPage
 
             if (!download.Success)
             {
-                ShowNotice($"下载失败：{download.Message}", isError: true);
+                ShowNotice(Loc.F("下载失败：{0}", download.Message), isError: true);
                 return;
             }
 
-            progress.SetDetail($"正在解压到「{target.Name}」的游戏目录…");
+            progress.SetDetail(Loc.F("正在解压到「{0}」的游戏目录…", target.Name));
 
             var (ok, message) = await Task.Run(
                 () => RequiredAssetDownloader.ExtractInto(archive, target.GameDir, progress.Sample, progress.Token),
@@ -798,22 +799,22 @@ public partial class PageDownload : LauncherPage
 
             if (!ok)
             {
-                ShowNotice($"安装失败：{message}", isError: true);
+                ShowNotice(Loc.F("安装失败：{0}", message), isError: true);
                 return;
             }
 
-            ShowNotice($"{entry.Name} 已安装到「{target.Name}」，正在打开它自带的程序。");
+            ShowNotice(Loc.F("{0} 已安装到「{1}」，正在打开它自带的程序。", entry.Name, target.Name));
 
             LaunchArchiveExe(archive, target.GameDir);
         }
         catch (OperationCanceledException)
         {
-            ShowNotice("安装已取消。", isError: true);
+            ShowNotice(Loc.T("安装已取消。"), isError: true);
         }
         catch (Exception ex)
         {
-            Log.Error($"安装到实例失败：{entry.Name}", ex);
-            ShowNotice($"安装失败：{ex.Message}", isError: true);
+            Log.Error(Loc.F("安装到实例失败：{0}", entry.Name), ex);
+            ShowNotice(Loc.F("安装失败：{0}", ex.Message), isError: true);
         }
         finally
         {
@@ -840,7 +841,7 @@ public partial class PageDownload : LauncherPage
 
             if (!File.Exists(path))
             {
-                Log.Warn($"补丁内的 exe 没找到：{path}");
+                Log.Warn(Loc.F("补丁内的 exe 没找到：{0}", path));
                 return;
             }
 
@@ -850,11 +851,11 @@ public partial class PageDownload : LauncherPage
                 WorkingDirectory = Path.GetDirectoryName(path) ?? gameDirectory
             });
 
-            Log.Info($"已打开补丁内的程序：{path}");
+            Log.Info(Loc.F("已打开补丁内的程序：{0}", path));
         }
         catch (Exception ex)
         {
-            Log.Warn($"打开补丁内的 exe 失败：{ex.Message}");
+            Log.Warn(Loc.F("打开补丁内的 exe 失败：{0}", ex.Message));
         }
     }
 

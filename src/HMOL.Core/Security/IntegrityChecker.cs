@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Security;
 
@@ -76,21 +77,21 @@ public static class IntegrityChecker
 
             if (!File.Exists(file))
             {
-                problems.Add($"{file}（文件缺失）");
+                problems.Add(Loc.F("{0}（文件缺失）", file));
                 continue;
             }
 
             var digest = HexDigestOfFile(file, key);
             if (digest.Length == 0)
             {
-                problems.Add($"{file}（无法读取）");
+                problems.Add(Loc.F("{0}（无法读取）", file));
                 continue;
             }
 
             var sigPath = file + SignatureSuffix;
             if (!File.Exists(sigPath))
             {
-                notConfigured.Add($"{Path.GetFileName(file)} 未配置校验文件，跳过比对");
+                notConfigured.Add(Loc.F("{0} 未配置校验文件，跳过比对", Path.GetFileName(file)));
                 continue;
             }
 
@@ -101,11 +102,11 @@ public static class IntegrityChecker
             }
             catch (Exception)
             {
-                notConfigured.Add($"{Path.GetFileName(file)} 的校验文件读取失败，跳过比对");
+                notConfigured.Add(Loc.F("{0} 的校验文件读取失败，跳过比对", Path.GetFileName(file)));
                 continue;
             }
 
-            if (!FixedTimeEquals(digest, expected)) problems.Add($"{file}（HMAC 不匹配）");
+            if (!FixedTimeEquals(digest, expected)) problems.Add(Loc.F("{0}（HMAC 不匹配）", file));
         }
 
         return new TamperReport(problems.Count == 0, problems, notConfigured);

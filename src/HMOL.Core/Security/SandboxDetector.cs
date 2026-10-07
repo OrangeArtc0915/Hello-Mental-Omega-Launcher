@@ -1,3 +1,5 @@
+
+using HMOL.Core.Localization;
 namespace HMOL.Core.Security;
 
 /// <summary>
@@ -30,13 +32,13 @@ public static class SandboxDetector
         var user = Environment.GetEnvironmentVariable("USERNAME")
                    ?? Environment.GetEnvironmentVariable("USER");
         if (!string.IsNullOrEmpty(user) && SandboxUsers.Contains(user))
-            suspicions.Add($"沙箱用户名：{user}");
+            suspicions.Add(Loc.F("沙箱用户名：{0}", user));
 
         // 2. 常见沙箱环境变量
         foreach (var name in SandboxEnvVars)
         {
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
-                suspicions.Add($"沙箱环境变量：{name}");
+                suspicions.Add(Loc.F("沙箱环境变量：{0}", name));
         }
 
         // 3. 开机时间过短。旧版用的是 time.CLOCK_UPTIME_RAW / CLOCK_UPTIME / CLOCK_BOOTTIME，
@@ -44,13 +46,13 @@ public static class SandboxDetector
         //    这里用 Windows 上等价的 GetTickCount64（BCL 封装为 Environment.TickCount64）补上。
         var uptimeMs = Environment.TickCount64;
         if (uptimeMs < ShortUptimeMs)
-            suspicions.Add($"系统刚启动（{uptimeMs / 1000.0:F1} 秒）");
+            suspicions.Add(Loc.F("系统刚启动（{0:F1} 秒）", uptimeMs / 1000.0));
 
         // 4. 异常 CPU 数（虚拟机常见，旧版条件为 0 < cpu_count <= 1）。
         //    旧版依赖 psutil，没装就静默跳过；这里用 BCL 的等价实现。
         var cpuCount = Environment.ProcessorCount;
         if (cpuCount <= 1)
-            suspicions.Add($"异常 CPU 数：{cpuCount}");
+            suspicions.Add(Loc.F("异常 CPU 数：{0}", cpuCount));
 
         return suspicions;
     }

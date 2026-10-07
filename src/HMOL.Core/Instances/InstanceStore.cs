@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using System.Text.Unicode;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Instances;
 
@@ -51,7 +52,7 @@ public static class InstanceStore
 
                     if (instance is null)
                     {
-                        Log.Warn($"实例文件解析失败，已跳过：{Path.GetFileName(file)}（{error}）");
+                        Log.Warn(Loc.F("实例文件解析失败，已跳过：{0}（{1}）", Path.GetFileName(file), error));
                         continue;
                     }
 
@@ -61,14 +62,14 @@ public static class InstanceStore
         }
         catch (Exception ex)
         {
-            Log.Error("读取实例列表失败", ex);
+            Log.Error(Loc.T("读取实例列表失败"), ex);
         }
 
         var lastId = SettingsStore.Current.LastInstanceId;
         Current = Items.FirstOrDefault(item => string.Equals(item.Id, lastId, StringComparison.OrdinalIgnoreCase))
                   ?? Items.FirstOrDefault();
 
-        Log.Info($"已载入 {Items.Count} 个实例，当前实例：{Current?.Name ?? "无"}");
+        Log.Info(Loc.F("已载入 {0} 个实例，当前实例：{1}", Items.Count, Current?.Name ?? Loc.T("无")));
         Changed?.Invoke();
     }
 
@@ -81,20 +82,20 @@ public static class InstanceStore
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
-                error = "文件不存在";
+                error = Loc.T("文件不存在");
                 return null;
             }
 
             var instance = JsonSerializer.Deserialize<GameInstance>(File.ReadAllText(filePath), Options);
             if (instance is null)
             {
-                error = "内容为空";
+                error = Loc.T("内容为空");
                 return null;
             }
 
             if (string.IsNullOrWhiteSpace(instance.Id))
             {
-                error = "缺少实例 Id";
+                error = Loc.T("缺少实例 Id");
                 return null;
             }
 
@@ -124,7 +125,7 @@ public static class InstanceStore
         }
         catch (Exception ex)
         {
-            Log.Error($"实例保存失败：{instance.Name}", ex);
+            Log.Error(Loc.F("实例保存失败：{0}", instance.Name), ex);
             return false;
         }
     }
@@ -155,7 +156,7 @@ public static class InstanceStore
         }
         catch (Exception ex)
         {
-            error = $"实例配置删除失败：{ex.Message}";
+            error = Loc.F("实例配置删除失败：{0}", ex.Message);
         }
 
         try
@@ -165,13 +166,13 @@ public static class InstanceStore
         }
         catch (Exception ex)
         {
-            error = error is null ? $"实例数据目录删除失败：{ex.Message}" : error;
+            error = error is null ? Loc.F("实例数据目录删除失败：{0}", ex.Message) : error;
         }
 
         if (ReferenceEquals(Current, instance)) SetCurrent(Items.FirstOrDefault());
         else Changed?.Invoke();
 
-        if (error is null) Log.Info($"已删除实例「{instance.Name}」");
+        if (error is null) Log.Info(Loc.F("已删除实例「{0}」", instance.Name));
         return error is null;
     }
 
@@ -184,6 +185,6 @@ public static class InstanceStore
         SettingsStore.Save();
 
         Changed?.Invoke();
-        Log.Info($"当前实例切换为：{instance?.Name ?? "无"}");
+        Log.Info(Loc.F("当前实例切换为：{0}", instance?.Name ?? Loc.T("无")));
     }
 }

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Updater;
 
@@ -84,7 +85,7 @@ public static class LauncherUpdater
             }
             catch (Exception ex)
             {
-                Log.Warn($"取当前进程路径失败：{ex.Message}");
+                Log.Warn(Loc.F("取当前进程路径失败：{0}", ex.Message));
             }
 
             return Path.Combine(AppContext.BaseDirectory, ExePrefix + ".exe");
@@ -130,7 +131,7 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            Log.Warn($"枚举同名进程失败：{ex.Message}");
+            Log.Warn(Loc.F("枚举同名进程失败：{0}", ex.Message));
         }
 
         return null;
@@ -169,12 +170,12 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            Log.Warn($"读取更新失败标记失败：{ex.Message}");
+            Log.Warn(Loc.F("读取更新失败标记失败：{0}", ex.Message));
             return null;
         }
 
         TryDeleteFile(note);
-        Log.Warn($"上次自动更新失败，标记为「{marker}」");
+        Log.Warn(Loc.F("上次自动更新失败，标记为「{0}」", marker));
 
         return TranslateFailureMarker(marker);
     }
@@ -206,7 +207,7 @@ public static class LauncherUpdater
             if (!probe.Reachable)
             {
                 errors.Add($"{name}：{probe.Error}");
-                Log.Warn($"从 {name} 获取更新信息失败（{probe.Error}），换另一个线路试试");
+                Log.Warn(Loc.F("从 {0} 获取更新信息失败（{1}），换另一个线路试试", name, probe.Error));
                 continue;
             }
 
@@ -219,9 +220,9 @@ public static class LauncherUpdater
 
             if (!SemVer.IsNewer(version, AppInfo.Version))
             {
-                Log.Info($"{name} 上最新版本为 {version}，不比当前 {AppInfo.Version} 新");
+                Log.Info(Loc.F("{0} 上最新版本为 {1}，不比当前 {2} 新", name, version, AppInfo.Version));
                 return new UpdateCheckResult(UpdateCheckStatus.UpToDate,
-                    $"当前已是最新版本（{AppInfo.VersionDisplay}）。");
+                    Loc.F("当前已是最新版本（{0}）。", AppInfo.VersionDisplay));
             }
 
             var asset = PickAsset(probe.Assets);
@@ -229,27 +230,27 @@ public static class LauncherUpdater
             if (asset is null)
             {
                 // 有新版本，但没找到能自动更新的文件：让用户去发布页，这不属于检查失败
-                Log.Warn($"{name} 的 {probe.Tag} 里没有以 {ExePrefix} 开头的 exe / zip 资产");
+                Log.Warn(Loc.F("{0} 的 {1} 里没有以 {2} 开头的 exe / zip 资产", name, probe.Tag, ExePrefix));
                 return new UpdateCheckResult(UpdateCheckStatus.Available,
-                    $"发现新版本 {version}，但这个版本没有可自动更新的文件，请到发布页手动下载。",
+                    Loc.F("发现新版本 {0}，但这个版本没有可自动更新的文件，请到发布页手动下载。", version),
                     new LauncherUpdateInfo(version, probe.Tag, probe.ReleasePageUrl, null, name));
             }
 
-            Log.Info($"{name} 上发现新版本 {version}，候选资产 {asset.Name}");
+            Log.Info(Loc.F("{0} 上发现新版本 {1}，候选资产 {2}", name, version, asset.Name));
             return new UpdateCheckResult(UpdateCheckStatus.Available,
-                $"发现新版本 {version}（来自 {name}）。",
+                Loc.F("发现新版本 {0}（来自 {1}）。", version, name),
                 new LauncherUpdateInfo(version, probe.Tag, probe.ReleasePageUrl, asset, name));
         }
 
         // 两个源都联系上了，但都没有发布版本
         if (reachedAny)
             return new UpdateCheckResult(UpdateCheckStatus.UpToDate,
-                $"当前已是最新版本（{AppInfo.VersionDisplay}）。");
+                Loc.F("当前已是最新版本（{0}）。", AppInfo.VersionDisplay));
 
-        foreach (var error in errors) Log.Warn($"检查更新失败：{error}");
+        foreach (var error in errors) Log.Warn(Loc.F("检查更新失败：{0}", error));
 
         return new UpdateCheckResult(UpdateCheckStatus.Failed,
-            "无法获取更新信息，请检查网络或改用其它线路。详细原因见运行日志。");
+            Loc.T("无法获取更新信息，请检查网络或改用其它线路。详细原因见运行日志。"));
     }
 
     /// <summary>从候选资产里挑一个。先找裸 exe，再退一步用整包 zip；两者都必须以约定前缀开头。</summary>
@@ -272,13 +273,13 @@ public static class LauncherUpdater
     private static async Task<SourceProbe> ProbeGitHubAsync(CancellationToken token)
     {
         var repo = RepoPathOf(AppInfo.GitHubUrl);
-        if (repo is null) return SourceProbe.Unreachable("仓库地址无法解析");
+        if (repo is null) return SourceProbe.Unreachable(Loc.T("仓库地址无法解析"));
 
         var location = await HttpDownloader
             .GetRedirectLocationAsync($"https://github.com/{repo}/releases/latest", UserAgent, token)
             .ConfigureAwait(false);
 
-        if (string.IsNullOrWhiteSpace(location)) return SourceProbe.Unreachable("没有取到跳转地址");
+        if (string.IsNullOrWhiteSpace(location)) return SourceProbe.Unreachable(Loc.T("没有取到跳转地址"));
 
         var tag = ExtractTag(location);
 
@@ -286,7 +287,7 @@ public static class LauncherUpdater
         // 这是正常状态，不是错误
         if (string.IsNullOrWhiteSpace(tag))
         {
-            Log.Info($"GitHub 上还没有发布版本（releases/latest 跳到 {location}）");
+            Log.Info(Loc.F("GitHub 上还没有发布版本（releases/latest 跳到 {0}）", location));
             return SourceProbe.Released(null, AppInfo.GitHubReleasesUrl, []);
         }
 
@@ -296,7 +297,7 @@ public static class LauncherUpdater
             .ConfigureAwait(false);
 
         // 资产页读不到就当作这个源不可用，交给另一个源兜底
-        if (html is null) return SourceProbe.Unreachable($"资产列表页读取失败（{tag}）");
+        if (html is null) return SourceProbe.Unreachable(Loc.F("资产列表页读取失败（{0}）", tag));
 
         return SourceProbe.Released(tag, page, ParseGitHubAssets(html));
     }
@@ -305,14 +306,14 @@ public static class LauncherUpdater
     private static async Task<SourceProbe> ProbeGiteeAsync(CancellationToken token)
     {
         var repo = RepoPathOf(AppInfo.GiteeUrl);
-        if (repo is null) return SourceProbe.Unreachable("仓库地址无法解析");
+        if (repo is null) return SourceProbe.Unreachable(Loc.T("仓库地址无法解析"));
 
         var json = await HttpDownloader
             .GetStringAsync($"https://gitee.com/api/v5/repos/{repo}/releases/latest", UserAgent, token)
             .ConfigureAwait(false);
 
         // 仓库还没有发布版本时这个接口返回 404，和网络不通在结果上无法区分
-        if (json is null) return SourceProbe.Unreachable("接口不可用（仓库可能还没有发布版本，或网络不通）");
+        if (json is null) return SourceProbe.Unreachable(Loc.T("接口不可用（仓库可能还没有发布版本，或网络不通）"));
 
         string? tag;
         string? id;
@@ -322,32 +323,32 @@ public static class LauncherUpdater
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
 
-            if (root.ValueKind != JsonValueKind.Object) return SourceProbe.Unreachable("返回内容不是预期格式");
+            if (root.ValueKind != JsonValueKind.Object) return SourceProbe.Unreachable(Loc.T("返回内容不是预期格式"));
 
             tag = ReadString(root, "tag_name");
             id = ReadScalar(root, "id");
         }
         catch (Exception ex)
         {
-            return SourceProbe.Unreachable($"返回内容解析失败（{ex.Message}）");
+            return SourceProbe.Unreachable(Loc.F("返回内容解析失败（{0}）", ex.Message));
         }
 
-        if (string.IsNullOrWhiteSpace(tag)) return SourceProbe.Unreachable("返回内容里没有 tag_name");
-        if (string.IsNullOrWhiteSpace(id)) return SourceProbe.Unreachable("返回内容里没有发布 id");
+        if (string.IsNullOrWhiteSpace(tag)) return SourceProbe.Unreachable(Loc.T("返回内容里没有 tag_name"));
+        if (string.IsNullOrWhiteSpace(id)) return SourceProbe.Unreachable(Loc.T("返回内容里没有发布 id"));
 
         var page = $"{AppInfo.GiteeReleasesUrl}/tag/{tag}";
         var filesJson = await HttpDownloader
             .GetStringAsync($"https://gitee.com/api/v5/repos/{repo}/releases/{id}/attach_files", UserAgent, token)
             .ConfigureAwait(false);
 
-        if (filesJson is null) return SourceProbe.Unreachable($"附件列表读取失败（{tag}）");
+        if (filesJson is null) return SourceProbe.Unreachable(Loc.F("附件列表读取失败（{0}）", tag));
 
         try
         {
             using var document = JsonDocument.Parse(filesJson);
             var root = document.RootElement;
 
-            if (root.ValueKind != JsonValueKind.Array) return SourceProbe.Unreachable("附件列表不是预期格式");
+            if (root.ValueKind != JsonValueKind.Array) return SourceProbe.Unreachable(Loc.T("附件列表不是预期格式"));
 
             var assets = new List<UpdateAsset>();
 
@@ -364,7 +365,7 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            return SourceProbe.Unreachable($"附件列表解析失败（{ex.Message}）");
+            return SourceProbe.Unreachable(Loc.F("附件列表解析失败（{0}）", ex.Message));
         }
     }
 
@@ -437,16 +438,16 @@ public static class LauncherUpdater
         IProgress<double>? progress = null, CancellationToken token = default)
     {
         if (info.Asset is null)
-            return new UpdateInstallResult(false, "这个版本没有可自动更新的文件，请到发布页手动下载。");
+            return new UpdateInstallResult(false, Loc.T("这个版本没有可自动更新的文件，请到发布页手动下载。"));
 
         var target = ExecutablePath;
         if (string.IsNullOrWhiteSpace(target))
-            return new UpdateInstallResult(false, "无法确定当前程序的位置，请到发布页手动下载。");
+            return new UpdateInstallResult(false, Loc.T("无法确定当前程序的位置，请到发布页手动下载。"));
 
         var other = OtherInstanceRunning();
         if (other is not null)
             return new UpdateInstallResult(false,
-                $"检测到另一个启动器进程（PID {other}）还在运行，Windows 不允许覆盖正在运行的程序。请先把它关掉再更新。");
+                Loc.F("检测到另一个启动器进程（PID {0}）还在运行，Windows 不允许覆盖正在运行的程序。请先把它关掉再更新。", other));
 
         // 残留存在时「下载成功」可能只是假象，先清干净
         CleanupStaleFiles();
@@ -456,19 +457,19 @@ public static class LauncherUpdater
             var zipResult = await ResumableDownloader
                 .DownloadAsync(info.Asset.Url, StagedZipPath, progress, token).ConfigureAwait(false);
 
-            if (!zipResult.Success) return new UpdateInstallResult(false, $"下载失败：{zipResult.Message}");
+            if (!zipResult.Success) return new UpdateInstallResult(false, Loc.F("下载失败：{0}", zipResult.Message));
 
             var extracted = TryExtractExecutable(StagedZipPath, StagedPath, out var extractError);
             TryDeleteFile(StagedZipPath);
 
-            if (!extracted) return new UpdateInstallResult(false, $"从压缩包里取出启动器失败：{extractError}");
+            if (!extracted) return new UpdateInstallResult(false, Loc.F("从压缩包里取出启动器失败：{0}", extractError));
         }
         else
         {
             var result = await ResumableDownloader
                 .DownloadAsync(info.Asset.Url, StagedPath, progress, token).ConfigureAwait(false);
 
-            if (!result.Success) return new UpdateInstallResult(false, $"下载失败：{result.Message}");
+            if (!result.Success) return new UpdateInstallResult(false, Loc.F("下载失败：{0}", result.Message));
         }
 
         if (!ValidateStaged(out var invalid)) return new UpdateInstallResult(false, invalid);
@@ -481,15 +482,15 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            Log.Error("生成替换脚本失败", ex);
-            return new UpdateInstallResult(false, $"生成替换脚本失败：{ex.Message}");
+            Log.Error(Loc.T("生成替换脚本失败"), ex);
+            return new UpdateInstallResult(false, Loc.F("生成替换脚本失败：{0}", ex.Message));
         }
 
         if (!StartScript(scriptPath, out var startError))
-            return new UpdateInstallResult(false, $"无法启动替换脚本：{startError}");
+            return new UpdateInstallResult(false, Loc.F("无法启动替换脚本：{0}", startError));
 
-        Log.Info($"已交棒给替换脚本 {scriptPath}，准备退出进程");
-        return new UpdateInstallResult(true, $"已开始更新到 {info.Version}，程序会自动重启。");
+        Log.Info(Loc.F("已交棒给替换脚本 {0}，准备退出进程", scriptPath));
+        return new UpdateInstallResult(true, Loc.F("已开始更新到 {0}，程序会自动重启。", info.Version));
     }
 
     /// <summary>校验两条：体积不能明显偏小，文件头必须是 PE 可执行文件的 MZ。</summary>
@@ -503,13 +504,13 @@ public static class LauncherUpdater
 
             if (!file.Exists)
             {
-                reason = "下载到的文件不见了，已中止更新。";
+                reason = Loc.T("下载到的文件不见了，已中止更新。");
                 return false;
             }
 
             if (file.Length < MinExecutableBytes)
             {
-                reason = $"下载到的文件只有 {ResumableDownloader.FormatSize(file.Length)}，不像是启动器（可能是错误页），已中止更新。";
+                reason = Loc.F("下载到的文件只有 {0}，不像是启动器（可能是错误页），已中止更新。", ResumableDownloader.FormatSize(file.Length));
                 return false;
             }
 
@@ -518,7 +519,7 @@ public static class LauncherUpdater
 
             if (stream.Read(header, 0, 2) < 2 || header[0] != (byte)'M' || header[1] != (byte)'Z')
             {
-                reason = "下载到的文件不是可执行文件（缺少 MZ 文件头），已中止更新。";
+                reason = Loc.T("下载到的文件不是可执行文件（缺少 MZ 文件头），已中止更新。");
                 return false;
             }
 
@@ -526,7 +527,7 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            reason = $"校验下载文件失败：{ex.Message}";
+            reason = Loc.F("校验下载文件失败：{0}", ex.Message);
             return false;
         }
     }
@@ -545,12 +546,12 @@ public static class LauncherUpdater
 
             if (entry is null)
             {
-                error = $"压缩包里没有以 {ExePrefix} 开头的 exe";
+                error = Loc.F("压缩包里没有以 {0} 开头的 exe", ExePrefix);
                 return false;
             }
 
             entry.ExtractToFile(destinationPath, overwrite: true);
-            Log.Info($"已从压缩包取出 {entry.FullName}");
+            Log.Info(Loc.F("已从压缩包取出 {0}", entry.FullName));
             return true;
         }
         catch (Exception ex)
@@ -683,7 +684,7 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            Log.Error("启动替换脚本失败", ex);
+            Log.Error(Loc.T("启动替换脚本失败"), ex);
             error = ex.Message;
             return false;
         }
@@ -692,12 +693,12 @@ public static class LauncherUpdater
     /// <summary>把脚本写的 ASCII 标记翻译成给用户看的中文。</summary>
     private static string TranslateFailureMarker(string marker) => marker.ToLowerInvariant() switch
     {
-        "locked" => "上一次自动更新没能替换文件：启动器被其它程序占着（常见是杀毒软件正在扫描）。"
-                    + "旧版本已经还原，可以重启电脑后再试一次。",
-        "timeout" => "上一次自动更新等待超时：启动器在 90 秒内没有退出，本次没有改动任何文件。"
-                     + "可以重启电脑后再试一次。",
-        "broken" => "上一次自动更新失败，旧版本也没能还原。请到发布页手动下载最新版本，覆盖原来的启动器。",
-        _ => $"上一次自动更新失败（标记：{marker}）。请到发布页手动下载最新版本。"
+        "locked" => Loc.T("上一次自动更新没能替换文件：启动器被其它程序占着（常见是杀毒软件正在扫描）。")
+                    + Loc.T("旧版本已经还原，可以重启电脑后再试一次。"),
+        "timeout" => Loc.T("上一次自动更新等待超时：启动器在 90 秒内没有退出，本次没有改动任何文件。")
+                     + Loc.T("可以重启电脑后再试一次。"),
+        "broken" => Loc.T("上一次自动更新失败，旧版本也没能还原。请到发布页手动下载最新版本，覆盖原来的启动器。"),
+        _ => Loc.F("上一次自动更新失败（标记：{0}）。请到发布页手动下载最新版本。", marker)
     };
 
     /// <summary>从仓库地址里取「owner/repo」。</summary>
@@ -732,7 +733,7 @@ public static class LauncherUpdater
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理文件失败：{path}（{ex.Message}）");
+            Log.Warn(Loc.F("清理文件失败：{0}（{1}）", path, ex.Message));
         }
     }
 

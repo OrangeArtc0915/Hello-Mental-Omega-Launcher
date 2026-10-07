@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using HMOL.Core.Multiplayer;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Windows.Multiplayer;
 
@@ -37,7 +38,7 @@ public partial class MultiplayerPingWindow : Window
         var host = TxtTarget.Text.Trim();
         if (host.Length == 0)
         {
-            LabStatus.Text = "请输入目标 IP 或主机名。";
+            LabStatus.Text = Loc.T("请输入目标 IP 或主机名。");
             return;
         }
 
@@ -47,24 +48,24 @@ public partial class MultiplayerPingWindow : Window
         _running = true;
         BtnGo.IsEnabled = false;
         BtnCancel.IsEnabled = true;
-        LabStatus.Text = $"正在 PING {host} × {count} …";
+        LabStatus.Text = Loc.F("正在 PING {0} × {1} …", host, count);
 
         try
         {
             var result = await NetworkToolkit.PingAsync(host, count, 2.0, _cts.Token);
-            var text = $"PING {host}：成功 {result.Ok}/{result.Total}，平均延迟 {result.AvgMs} ms";
+            var text = Loc.F("PING {0}：成功 {1}/{2}，平均延迟 {3} ms", host, result.Ok, result.Total, result.AvgMs);
             LabStatus.Text = text;
             Append(text);
         }
         catch (OperationCanceledException)
         {
-            LabStatus.Text = "已取消";
-            Append("已取消");
+            LabStatus.Text = Loc.T("已取消");
+            Append(Loc.T("已取消"));
         }
         catch (Exception ex)
         {
-            LabStatus.Text = $"PING 失败：{ex.Message}";
-            Append($"失败：{ex.Message}");
+            LabStatus.Text = Loc.F("PING 失败：{0}", ex.Message);
+            Append(Loc.F("失败：{0}", ex.Message));
         }
         finally
         {
@@ -95,6 +96,6 @@ public partial class MultiplayerPingWindow : Window
         try { _cts.Cancel(); }
         catch { /* 已释放 */ }
 
-        LabStatus.Text = "正在取消…";
+        LabStatus.Text = Loc.T("正在取消…");
     }
 }

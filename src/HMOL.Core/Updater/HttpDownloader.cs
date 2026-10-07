@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Updater;
 
@@ -81,12 +82,12 @@ public static class HttpDownloader
             }
             catch (OperationCanceledException)
             {
-                Log.Warn($"请求已取消：{url}");
+                Log.Warn(Loc.F("请求已取消：{0}", url));
                 return null;
             }
             catch (Exception ex)
             {
-                Log.Warn($"请求失败（第 {attempt + 1} 次）：{url}（{ex.Message}）");
+                Log.Warn(Loc.F("请求失败（第 {0} 次）：{1}（{2}）", attempt + 1, url, ex.Message));
 
                 if (attempt >= RetryDelaysMs.Length) return null;
 
@@ -125,7 +126,7 @@ public static class HttpDownloader
         }
         catch (Exception ex)
         {
-            Log.Warn($"探测重定向失败：{url}（{ex.Message}）");
+            Log.Warn(Loc.F("探测重定向失败：{0}（{1}）", url, ex.Message));
             return null;
         }
     }

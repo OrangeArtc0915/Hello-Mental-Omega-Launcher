@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Interop;
 
@@ -120,7 +121,7 @@ internal sealed class TrayIcon : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"创建托盘消息窗口失败：{ex.Message}");
+            Log.Warn(Loc.F("创建托盘消息窗口失败：{0}", ex.Message));
 
             try { source?.Dispose(); }
             catch { /* 忽略 */ }
@@ -150,7 +151,7 @@ internal sealed class TrayIcon : IDisposable
 
         if (!Shell_NotifyIcon(NimAdd, ref _data))
         {
-            Log.Warn("系统托盘图标注册失败（可能被系统策略禁用）");
+            Log.Warn(Loc.T("系统托盘图标注册失败（可能被系统策略禁用）"));
             _data = default;
             IsAvailable = false;
         }
@@ -173,7 +174,7 @@ internal sealed class TrayIcon : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"更新托盘提示失败：{ex.Message}");
+            Log.Warn(Loc.F("更新托盘提示失败：{0}", ex.Message));
         }
     }
 
@@ -205,13 +206,13 @@ internal sealed class TrayIcon : IDisposable
     private static void Invoke(Action? handler)
     {
         try { handler?.Invoke(); }
-        catch (Exception ex) { Log.Warn($"托盘回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("托盘回调异常：{0}", ex.Message)); }
     }
 
     private static void Invoke(Action<Point>? handler, Point point)
     {
         try { handler?.Invoke(point); }
-        catch (Exception ex) { Log.Warn($"托盘回调异常：{ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Loc.F("托盘回调异常：{0}", ex.Message)); }
     }
 
     /// <summary>取程序图标：优先从自身 exe 里抠（app.manifest 已设 ApplicationIcon），失败退回系统默认图标。</summary>
@@ -229,7 +230,7 @@ internal sealed class TrayIcon : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"提取程序图标失败：{ex.Message}");
+            Log.Warn(Loc.F("提取程序图标失败：{0}", ex.Message));
         }
 
         try { return (LoadIcon(IntPtr.Zero, IdiApplication), false); }
@@ -257,7 +258,7 @@ internal sealed class TrayIcon : IDisposable
             }
             catch (Exception ex)
             {
-                Log.Warn($"移除托盘图标失败：{ex.Message}");
+                Log.Warn(Loc.F("移除托盘图标失败：{0}", ex.Message));
             }
         }
 

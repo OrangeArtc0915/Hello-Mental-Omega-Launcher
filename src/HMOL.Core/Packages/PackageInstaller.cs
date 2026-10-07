@@ -6,6 +6,7 @@ using HMOL.Core.Games;
 using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Packages;
 
@@ -93,17 +94,17 @@ public static class PackageInstaller
 
         try
         {
-            if (instance is null) return Fail("未指定实例");
-            if (string.IsNullOrWhiteSpace(packageName)) return Fail("包名为空");
+            if (instance is null) return Fail(Loc.T("未指定实例"));
+            if (string.IsNullOrWhiteSpace(packageName)) return Fail(Loc.T("包名为空"));
 
             if (!Directory.Exists(instance.GameDir))
-                return Fail($"当前实例的游戏目录已不存在或被移动：{instance.GameDir}\n" +
-                            "请检查游戏是否还在原位置，或更新实例路径。");
+                return Fail(Loc.F("当前实例的游戏目录已不存在或被移动：{0}\n", instance.GameDir) +
+                            Loc.T("请检查游戏是否还在原位置，或更新实例路径。"));
 
             var target = Describe(instance, type, packageName);
 
             if (!File.Exists(target.SourcePath) && !Directory.Exists(target.SourcePath))
-                return Fail($"包文件不存在：{target.SourcePath}");
+                return Fail(Loc.F("包文件不存在：{0}", target.SourcePath));
 
             // 解压暂存与隔离区都放在游戏目录所在分区：
             // 跨盘时 GB 级内容要先写到系统盘再复制过来（白写一遍，还可能写满系统盘），
@@ -124,19 +125,19 @@ public static class PackageInstaller
                 extractDirectory = Path.Combine(scratch, $"install_{DateTime.Now:yyyyMMdd_HHmmss_fff}");
                 Directory.CreateDirectory(extractDirectory);
 
-                Log.Info($"正在解压：{target.SourcePath} → {extractDirectory}");
+                Log.Info(Loc.F("正在解压：{0} → {1}", target.SourcePath, extractDirectory));
 
                 if (!ArchiveExtractor.TryExtract(target.SourcePath, extractDirectory, out var error,
                         progress is null ? null : new ProgressSpan(progress, 0, 0.85), token))
                 {
                     TryDeleteDirectory(extractDirectory);
-                    return Fail($"解压失败：{error}");
+                    return Fail(Loc.F("解压失败：{0}", error));
                 }
 
                 if (!Directory.EnumerateFileSystemEntries(extractDirectory).Any())
                 {
                     TryDeleteDirectory(extractDirectory);
-                    return Fail("压缩包内容为空，未解压到任何文件");
+                    return Fail(Loc.T("压缩包内容为空，未解压到任何文件"));
                 }
 
                 contentRoot = ArchiveExtractor.ResolveSingleTopDirectory(extractDirectory);
@@ -152,7 +153,7 @@ public static class PackageInstaller
 
             // 3) 目录级替换：目标目录已存在时整体搬进隔离区，再铺新内容
             if (ShouldReplaceWholeDirectory(target, policy) && journal.MoveToQuarantine(target.TargetDirectory) is null)
-                return Fail($"目标目录已存在且无法替换：{target.TargetDirectory}");
+                return Fail(Loc.F("目标目录已存在且无法替换：{0}", target.TargetDirectory));
 
             // 4) 铺到游戏目录（覆盖前留 .bak，未覆盖的登记为新建）。
             // 压缩包的内容是刚解压出来的暂存副本，同分区时逐文件改名就位，不再复制一遍字节。
@@ -160,33 +161,33 @@ public static class PackageInstaller
                 progress is null ? null : new ProgressSpan(progress, target.IsArchive ? 0.85 : 0, 0.97), token,
                 consumeSource: target.IsArchive);
 
-            Log.Info($"安装耗时：解压 {extractMs} ms，铺入 {watch.ElapsedMilliseconds} ms" +
-                     $"（{summary.Total} 个文件，{BackupService.FormatSize(summary.BytesCopied)}）");
+            Log.Info(Loc.F("安装耗时：解压 {0} ms，铺入 {1} ms", extractMs, watch.ElapsedMilliseconds) +
+                     Loc.F("（{0} 个文件，{1}）", summary.Total, BackupService.FormatSize(summary.BytesCopied)));
 
             if (summary.Total == 0)
             {
                 journal.Rollback();
-                return Fail("安装源中没有可复制的文件");
+                return Fail(Loc.T("安装源中没有可复制的文件"));
             }
 
             if (summary.AllFailed)
             {
                 journal.Rollback();
-                return Fail($"安装失败：所有 {summary.Total} 个文件均无法复制");
+                return Fail(Loc.F("安装失败：所有 {0} 个文件均无法复制", summary.Total));
             }
 
             if (token.IsCancellationRequested)
             {
                 journal.Rollback();
                 return new InstallOutcome(false, true, true, summary.Total, summary.Failed, summary.Skipped,
-                    "安装已取消，已回滚本次改动");
+                    Loc.T("安装已取消，已回滚本次改动"));
             }
 
             // 5) 校验落点非空（对应旧版 _dir_file_count(target) == 0）
             if (DirectoryCopier.CountFiles(target.TargetDirectory) == 0)
             {
                 journal.Rollback();
-                return Fail("安装后目标目录为空，可能复制失败");
+                return Fail(Loc.T("安装后目标目录为空，可能复制失败"));
             }
 
             // 6) 记录安装结果
@@ -209,31 +210,31 @@ public static class PackageInstaller
             journal.Commit();
             progress?.Report(new ProgressSample(1));
 
-            var message = $"已安装：{recordName}\n共处理 {summary.Total} 个文件" +
-                          (summary.Skipped > 0 ? $"（跳过已存在 {summary.Skipped} 个）" : string.Empty) +
-                          (summary.Failed > 0 ? $"\n其中 {summary.Failed} 个文件复制失败，已跳过" : string.Empty);
+            var message = Loc.F("已安装：{0}\n共处理 {1} 个文件", recordName, summary.Total) +
+                          (summary.Skipped > 0 ? Loc.F("（跳过已存在 {0} 个）", summary.Skipped) : string.Empty) +
+                          (summary.Failed > 0 ? Loc.F("\n其中 {0} 个文件复制失败，已跳过", summary.Failed) : string.Empty);
 
             if (!saved)
             {
-                message += "\n\n⚠️ 文件已装到游戏目录，但安装记录写入失败：" +
-                           "重启后「已安装」列表可能不显示该包，也无法精确卸载。";
+                message += Loc.T("\n\n⚠️ 文件已装到游戏目录，但安装记录写入失败：") +
+                           Loc.T("重启后「已安装」列表可能不显示该包，也无法精确卸载。");
             }
 
-            Log.Info($"安装完成：{recordName}（{PackageTypes.DirectoryNameOf(type)}），" +
-                     $"{summary.Total} 个文件，失败 {summary.Failed}");
+            Log.Info(Loc.F("安装完成：{0}（{1}），", recordName, PackageTypes.DirectoryNameOf(type)) +
+                     Loc.F("{0} 个文件，失败 {1}", summary.Total, summary.Failed));
 
             return new InstallOutcome(true, false, false, summary.Total, summary.Failed, summary.Skipped, message);
         }
         catch (OperationCanceledException)
         {
             journal?.Rollback();
-            return new InstallOutcome(false, true, true, 0, 0, 0, "安装已取消，已回滚本次改动");
+            return new InstallOutcome(false, true, true, 0, 0, 0, Loc.T("安装已取消，已回滚本次改动"));
         }
         catch (Exception ex)
         {
             journal?.Rollback();
-            Log.Error($"安装失败：{packageName}", ex);
-            return Fail($"安装失败：{ex.Message}");
+            Log.Error(Loc.F("安装失败：{0}", packageName), ex);
+            return Fail(Loc.F("安装失败：{0}", ex.Message));
         }
         finally
         {
@@ -255,11 +256,11 @@ public static class PackageInstaller
     {
         try
         {
-            if (instance is null) return FailUninstall("未指定实例");
-            if (string.IsNullOrWhiteSpace(packageName)) return FailUninstall("包名为空");
+            if (instance is null) return FailUninstall(Loc.T("未指定实例"));
+            if (string.IsNullOrWhiteSpace(packageName)) return FailUninstall(Loc.T("包名为空"));
 
             if (!Directory.Exists(instance.GameDir))
-                return FailUninstall($"当前实例的游戏目录已不存在或被移动：{instance.GameDir}");
+                return FailUninstall(Loc.F("当前实例的游戏目录已不存在或被移动：{0}", instance.GameDir));
 
             var isArchive = PackageTypes.IsArchiveExtension(Path.GetExtension(packageName));
 
@@ -267,9 +268,9 @@ public static class PackageInstaller
                 return UninstallMap(instance, packageName, progress, token);
 
             if (!Directory.Exists(BackupService.OriginalBackupPath))
-                return FailUninstall("未找到原版游戏备份。请先执行「备份原版游戏」，把原版游戏备份到：\n" +
+                return FailUninstall(Loc.T("未找到原版游戏备份。请先执行「备份原版游戏」，把原版游戏备份到：\n") +
                                      BackupService.OriginalBackupPath +
-                                     "\n\n原版备份是按包卸载、恢复原版状态的必要条件。");
+                                     Loc.T("\n\n原版备份是按包卸载、恢复原版状态的必要条件。"));
 
             var record = FindRecord(instance, type, packageName);
 
@@ -277,18 +278,18 @@ public static class PackageInstaller
                 return UninstallSelective(instance, type, packageName, record, progress, token);
 
             if (!allowFullRestore)
-                return FailUninstall("未找到该包的精确安装记录，且当前不允许全量恢复原版。");
+                return FailUninstall(Loc.T("未找到该包的精确安装记录，且当前不允许全量恢复原版。"));
 
             return UninstallFull(instance, progress, token);
         }
         catch (OperationCanceledException)
         {
-            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, "卸载已取消，已回滚本次改动");
+            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, Loc.T("卸载已取消，已回滚本次改动"));
         }
         catch (Exception ex)
         {
-            Log.Error($"卸载失败：{packageName}", ex);
-            return FailUninstall($"卸载失败：{ex.Message}");
+            Log.Error(Loc.F("卸载失败：{0}", packageName), ex);
+            return FailUninstall(Loc.F("卸载失败：{0}", ex.Message));
         }
     }
 
@@ -314,17 +315,17 @@ public static class PackageInstaller
     {
         try
         {
-            if (instance is null) return FailUninstall("未指定实例");
-            if (string.IsNullOrWhiteSpace(packageName)) return FailUninstall("包名为空");
-            if (files is null || files.Count == 0) return FailUninstall("没有勾选任何文件");
+            if (instance is null) return FailUninstall(Loc.T("未指定实例"));
+            if (string.IsNullOrWhiteSpace(packageName)) return FailUninstall(Loc.T("包名为空"));
+            if (files is null || files.Count == 0) return FailUninstall(Loc.T("没有勾选任何文件"));
 
             if (!Directory.Exists(instance.GameDir))
-                return FailUninstall($"当前实例的游戏目录已不存在或被移动：{instance.GameDir}");
+                return FailUninstall(Loc.F("当前实例的游戏目录已不存在或被移动：{0}", instance.GameDir));
 
             var record = FindRecord(instance, type, packageName);
 
             if (record is not { Files.Count: > 0 })
-                return FailUninstall("这个包没有精确安装记录，无法按文件删除。请改用「按包卸载」或「全量恢复原版」。");
+                return FailUninstall(Loc.T("这个包没有精确安装记录，无法按文件删除。请改用「按包卸载」或「全量恢复原版」。"));
 
             // 只认记录里确实存在的文件：界面传来的路径一律不当依据
             var wanted = files
@@ -337,18 +338,18 @@ public static class PackageInstaller
                 .ToList();
 
             if (selected.Count == 0)
-                return FailUninstall("勾选的文件都不在该包的安装记录里，已取消。");
+                return FailUninstall(Loc.T("勾选的文件都不在该包的安装记录里，已取消。"));
 
             return RunSelective(instance, type, packageName, record, selected, progress, token);
         }
         catch (OperationCanceledException)
         {
-            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, "卸载已取消，已回滚本次改动");
+            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, Loc.T("卸载已取消，已回滚本次改动"));
         }
         catch (Exception ex)
         {
-            Log.Error($"按文件卸载失败：{packageName}", ex);
-            return FailUninstall($"按文件卸载失败：{ex.Message}");
+            Log.Error(Loc.F("按文件卸载失败：{0}", packageName), ex);
+            return FailUninstall(Loc.F("按文件卸载失败：{0}", ex.Message));
         }
     }
 
@@ -383,7 +384,7 @@ public static class PackageInstaller
         }
         catch (Exception ex)
         {
-            Log.Warn($"扫描可回退时间点失败：{ex.Message}");
+            Log.Warn(Loc.F("扫描可回退时间点失败：{0}", ex.Message));
             return result;
         }
 
@@ -408,11 +409,11 @@ public static class PackageInstaller
     {
         try
         {
-            if (instance is null) return FailUninstall("未指定实例");
-            if (string.IsNullOrWhiteSpace(stamp)) return FailUninstall("未指定要回退的时间点");
+            if (instance is null) return FailUninstall(Loc.T("未指定实例"));
+            if (string.IsNullOrWhiteSpace(stamp)) return FailUninstall(Loc.T("未指定要回退的时间点"));
 
             if (!Directory.Exists(instance.GameDir))
-                return FailUninstall($"当前实例的游戏目录已不存在或被移动：{instance.GameDir}");
+                return FailUninstall(Loc.F("当前实例的游戏目录已不存在或被移动：{0}", instance.GameDir));
 
             var root = PathGuard.NormalizeRoot(instance.GameDir);
             var pairs = new List<(string Backup, string Target)>();
@@ -428,7 +429,7 @@ public static class PackageInstaller
             }
 
             if (pairs.Count == 0)
-                return FailUninstall("这个时间点已经没有可回退的备份文件了（可能已被清理或恢复过）。");
+                return FailUninstall(Loc.T("这个时间点已经没有可回退的备份文件了（可能已被清理或恢复过）。"));
 
             var journal = new OperationJournal(Paths.ScratchFor(instance.GameDir));
             var restored = 0;
@@ -458,7 +459,7 @@ public static class PackageInstaller
                             if (File.Exists(target))
                             {
                                 failed++;
-                                Log.Warn($"回退时无法移走现有文件，已跳过：{target}");
+                                Log.Warn(Loc.F("回退时无法移走现有文件，已跳过：{0}", target));
                                 continue;
                             }
                         }
@@ -471,14 +472,14 @@ public static class PackageInstaller
                     catch (Exception ex)
                     {
                         failed++;
-                        Log.Error($"回退文件失败：{target}", ex);
+                        Log.Error(Loc.F("回退文件失败：{0}", target), ex);
                     }
                 }
 
                 if (token.IsCancellationRequested)
                 {
                     journal.Rollback();
-                    return new UninstallOutcome(false, true, true, 0, 0, restored, failed, 0, "回退已取消，已回滚本次改动");
+                    return new UninstallOutcome(false, true, true, 0, 0, restored, failed, 0, Loc.T("回退已取消，已回滚本次改动"));
                 }
 
                 journal.Commit();
@@ -488,18 +489,18 @@ public static class PackageInstaller
                 // 顺手把它新建的文件删掉，并从「已安装」列表与安装记录里移除，避免列表与实际不符。
                 var revertedPackages = MarkRevertedPackagesUninstalled(instance, restoredTargets);
 
-                Log.Info($"按时间点回退完成：{stamp}，恢复 {restored} 个文件，失败 {failed}，撤销 {revertedPackages} 个包");
+                Log.Info(Loc.F("按时间点回退完成：{0}，恢复 {1} 个文件，失败 {2}，撤销 {3} 个包", stamp, restored, failed, revertedPackages));
 
                 var warning = instance.IsValid
                     ? string.Empty
-                    : "\n⚠️ 回退后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件。";
+                    : Loc.T("\n⚠️ 回退后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件。");
 
                 return new UninstallOutcome(failed == 0, false, false, 0, 0, restored, failed, 0,
-                    $"已回退到 {FormatStamp(stamp)}\n恢复文件：{restored} 个（失败 {failed}）\n" +
+                    Loc.F("已回退到 {0}\n恢复文件：{1} 个（失败 {2}）\n", FormatStamp(stamp), restored, failed) +
                     (revertedPackages > 0
-                        ? $"该时间点安装的 {revertedPackages} 个包已被整体撤销：已从「已安装」列表移除并删除安装记录。\n"
+                        ? Loc.F("该时间点安装的 {0} 个包已被整体撤销：已从「已安装」列表移除并删除安装记录。\n", revertedPackages)
                         : string.Empty) +
-                    "备份文件仍保留在游戏目录里（.bak- 开头的文件），确认没问题后可以自行删除。" + warning);
+                    Loc.T("备份文件仍保留在游戏目录里（.bak- 开头的文件），确认没问题后可以自行删除。") + warning);
             }
             catch
             {
@@ -509,12 +510,12 @@ public static class PackageInstaller
         }
         catch (OperationCanceledException)
         {
-            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, "回退已取消，已回滚本次改动");
+            return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, Loc.T("回退已取消，已回滚本次改动"));
         }
         catch (Exception ex)
         {
-            Log.Error($"按时间点回退失败：{stamp}", ex);
-            return FailUninstall($"按时间点回退失败：{ex.Message}");
+            Log.Error(Loc.F("按时间点回退失败：{0}", stamp), ex);
+            return FailUninstall(Loc.F("按时间点回退失败：{0}", ex.Message));
         }
     }
 
@@ -577,7 +578,7 @@ public static class PackageInstaller
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn($"回退时删除新建文件失败：{full}（{ex.Message}）");
+                    Log.Warn(Loc.F("回退时删除新建文件失败：{0}（{1}）", full, ex.Message));
                 }
             }
 
@@ -585,7 +586,7 @@ public static class PackageInstaller
             InstallRecordStore.Delete(instance, type.Value, record.PackageName);
             removed++;
 
-            Log.Info($"回退已撤销该时间点安装的包：{record.PackageName}（{record.PackageType}）");
+            Log.Info(Loc.F("回退已撤销该时间点安装的包：{0}（{1}）", record.PackageName, record.PackageType));
         }
 
         return removed;
@@ -628,7 +629,7 @@ public static class PackageInstaller
                 if (!PathGuard.TryResolve(targetRoot, normalized, out var full) ||
                     !PathGuard.IsInside(targetRoot, full))
                 {
-                    Log.Warn($"安装记录里的路径不合法，已跳过：{relative}");
+                    Log.Warn(Loc.F("安装记录里的路径不合法，已跳过：{0}", relative));
                     continue;
                 }
 
@@ -674,7 +675,7 @@ public static class PackageInstaller
                 catch (Exception ex)
                 {
                     restoreFailed++;
-                    Log.Error($"还原原版文件失败：{relative}", ex);
+                    Log.Error(Loc.F("还原原版文件失败：{0}", relative), ex);
                 }
             }
 
@@ -682,7 +683,7 @@ public static class PackageInstaller
             {
                 journal.Rollback();
                 return new UninstallOutcome(false, true, true, deleted, deleteFailed, restored, restoreFailed,
-                    cleaned, "卸载已取消，已回滚本次改动");
+                    cleaned, Loc.T("卸载已取消，已回滚本次改动"));
             }
 
             // 4) 更新已安装列表与安装记录：只删了一部分就缩减记录，全删完才整条清掉
@@ -707,17 +708,17 @@ public static class PackageInstaller
 
             var warning = instance.IsValid
                 ? string.Empty
-                : "\n⚠️ 卸载后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件。";
+                : Loc.T("\n⚠️ 卸载后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件。");
 
-            Log.Info($"精确卸载完成：{packageName}，删除 {deleted}（失败 {deleteFailed}），" +
-                     $"还原原版 {restored}（失败 {restoreFailed}），清理空目录 {cleaned}");
+            Log.Info(Loc.F("精确卸载完成：{0}，删除 {1}（失败 {2}），", packageName, deleted, deleteFailed) +
+                     Loc.F("还原原版 {0}（失败 {1}），清理空目录 {2}", restored, restoreFailed, cleaned));
 
             return new UninstallOutcome(deleteFailed == 0 && restoreFailed == 0, false, false,
                 deleted, deleteFailed, restored, restoreFailed, cleaned,
-                $"精确卸载完成\n包名：{packageName}\n删除文件：{deleted} 个（失败 {deleteFailed}）\n" +
-                $"还原原版：{restored} 个（失败 {restoreFailed}）\n清理空目录：{cleaned} 个" +
+                Loc.F("精确卸载完成\n包名：{0}\n删除文件：{1} 个（失败 {2}）\n", packageName, deleted, deleteFailed) +
+                Loc.F("还原原版：{0} 个（失败 {1}）\n清理空目录：{2} 个", restored, restoreFailed, cleaned) +
                 (remaining.Count > 0
-                    ? $"\n\n该包仍有 {remaining.Count} 个文件留在游戏目录，安装记录已保留，随时可以再卸。"
+                    ? Loc.F("\n\n该包仍有 {0} 个文件留在游戏目录，安装记录已保留，随时可以再卸。", remaining.Count)
                     : string.Empty) + warning);
         }
         catch
@@ -744,7 +745,7 @@ public static class PackageInstaller
                 token.ThrowIfCancellationRequested();
 
                 if (journal.MoveToQuarantine(entry) is null)
-                    throw new IOException($"无法移走现有内容：{entry}");
+                    throw new IOException(Loc.F("无法移走现有内容：{0}", entry));
             }
 
             // 2) 从 MO 备份复制
@@ -757,14 +758,14 @@ public static class PackageInstaller
                 journal.Rollback();
 
                 return FailUninstall(summary.Total == 0
-                    ? "原版备份为空，未恢复任何文件"
-                    : $"卸载失败：所有 {summary.Total} 个文件均无法复制");
+                    ? Loc.T("原版备份为空，未恢复任何文件")
+                    : Loc.F("卸载失败：所有 {0} 个文件均无法复制", summary.Total));
             }
 
             if (token.IsCancellationRequested)
             {
                 journal.Rollback();
-                return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, "卸载已取消，已回滚本次改动");
+                return new UninstallOutcome(false, true, true, 0, 0, 0, 0, 0, Loc.T("卸载已取消，已回滚本次改动"));
             }
 
             // 3) 清空已安装列表与安装记录
@@ -777,13 +778,13 @@ public static class PackageInstaller
 
             var warning = instance.IsValid
                 ? string.Empty
-                : "\n⚠️ 恢复后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件是否完整。";
+                : Loc.T("\n⚠️ 恢复后未能识别为有效的心灵终结游戏目录，请手动检查游戏文件是否完整。");
 
-            Log.Info($"全量恢复完成：{instance.Name}，恢复 {summary.Total} 个文件，失败 {summary.Failed}");
+            Log.Info(Loc.F("全量恢复完成：{0}，恢复 {1} 个文件，失败 {2}", instance.Name, summary.Total, summary.Failed));
 
             return new UninstallOutcome(true, false, false, 0, 0, summary.Total, summary.Failed, 0,
-                $"卸载完成，实例已恢复为原版游戏状态。\n目标实例：{instance.Name}\n恢复文件数：{summary.Total}" +
-                (summary.Failed > 0 ? $"\n（其中 {summary.Failed} 个文件复制失败）" : string.Empty) + warning);
+                Loc.F("卸载完成，实例已恢复为原版游戏状态。\n目标实例：{0}\n恢复文件数：{1}", instance.Name, summary.Total) +
+                (summary.Failed > 0 ? Loc.F("\n（其中 {0} 个文件复制失败）", summary.Failed) : string.Empty) + warning);
         }
         catch
         {
@@ -835,7 +836,7 @@ public static class PackageInstaller
                 else
                 {
                     deleted++;
-                    Log.Info($"已删除地图文件：{file}");
+                    Log.Info(Loc.F("已删除地图文件：{0}", file));
                 }
             }
 
@@ -846,8 +847,8 @@ public static class PackageInstaller
             progress?.Report(new ProgressSample(1));
 
             var message = deleted == 0
-                ? $"在 Maps\\Custom 中未找到与「{packageName}」匹配的文件，可能已被手动删除，仅清除了安装记录。"
-                : $"已删除 {deleted} 个地图文件" + (failed > 0 ? $"（{failed} 个失败）" : string.Empty);
+                ? Loc.F("在 Maps\\Custom 中未找到与「{0}」匹配的文件，可能已被手动删除，仅清除了安装记录。", packageName)
+                : Loc.F("已删除 {0} 个地图文件", deleted) + (failed > 0 ? Loc.F("（{0} 个失败）", failed) : string.Empty);
 
             return new UninstallOutcome(failed == 0, false, false, deleted, failed, 0, 0, 0, message);
         }
@@ -952,19 +953,19 @@ public static class PackageInstaller
         }
         catch (Exception ex)
         {
-            Log.Warn($"清理临时目录失败：{directory}（{ex.Message}）");
+            Log.Warn(Loc.F("清理临时目录失败：{0}（{1}）", directory, ex.Message));
         }
     }
 
     private static InstallOutcome Fail(string message)
     {
-        Log.Warn($"安装失败：{message}");
+        Log.Warn(Loc.F("安装失败：{0}", message));
         return new InstallOutcome(false, false, false, 0, 0, 0, message);
     }
 
     private static UninstallOutcome FailUninstall(string message)
     {
-        Log.Warn($"卸载失败：{message}");
+        Log.Warn(Loc.F("卸载失败：{0}", message));
         return new UninstallOutcome(false, false, false, 0, 0, 0, 0, 0, message);
     }
 }

@@ -16,13 +16,14 @@ using HMOL.Core.Instances;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using Microsoft.Win32;
+using HMOL.Core.Localization;
 
 namespace HMOL.App.Pages;
 
 /// <summary>实例卡片的数据。体积要后台算，所以只有它带变更通知。</summary>
 public sealed class InstanceCardItem : INotifyPropertyChanged
 {
-    private string _sizeText = "占用体积：计算中…";
+    private string _sizeText = Loc.T("占用体积：计算中…");
 
     public InstanceCardItem(GameInstance instance)
     {
@@ -80,7 +81,7 @@ public sealed class BackupRowItem
 
     public bool IsSelected { get; }
 
-    public string Title => Entry.Kind == BackupKind.Original ? "原版游戏（MO）" : Entry.Name;
+    public string Title => Entry.Kind == BackupKind.Original ? Loc.T("原版游戏（MO）") : Entry.Name;
 
     public string KindText => Entry.KindText;
 
@@ -90,10 +91,10 @@ public sealed class BackupRowItem
     {
         get
         {
-            var created = Entry.CreatedAt is null ? "时间未知" : Entry.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm");
-            var source = string.IsNullOrWhiteSpace(Entry.SourceInstance) ? string.Empty : $" · 来源：{Entry.SourceInstance}";
+            var created = Entry.CreatedAt is null ? Loc.T("时间未知") : Entry.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm");
+            var source = string.IsNullOrWhiteSpace(Entry.SourceInstance) ? string.Empty : Loc.F(" · 来源：{0}", Entry.SourceInstance);
 
-            return $"{Entry.FileCount} 个文件 · {BackupService.FormatSize(Entry.SizeBytes)} · {created}{source}";
+            return Loc.F("{0} 个文件 · {1} · {2}{3}", Entry.FileCount, BackupService.FormatSize(Entry.SizeBytes), created, source);
         }
     }
 }
@@ -201,7 +202,7 @@ public partial class PageInstances : LauncherPage
             var directory = item.GameDir;
             if (!Directory.Exists(directory))
             {
-                item.SizeText = "占用体积：—（目录不存在）";
+                item.SizeText = Loc.T("占用体积：—（目录不存在）");
                 continue;
             }
 
@@ -214,13 +215,13 @@ public partial class PageInstances : LauncherPage
             }
             catch (Exception ex)
             {
-                Log.Warn($"统计实例体积失败：{directory}（{ex.Message}）");
+                Log.Warn(Loc.F("统计实例体积失败：{0}（{1}）", directory, ex.Message));
                 size = 0;
             }
 
             if (!ReferenceEquals(items, _items)) return;
 
-            item.SizeText = $"占用体积：{BackupService.FormatSize(size)}";
+            item.SizeText = Loc.F("占用体积：{0}", BackupService.FormatSize(size));
         }
     }
 
@@ -238,7 +239,7 @@ public partial class PageInstances : LauncherPage
 
         if (!result.Success)
         {
-            Notify(result.Message, "新建实例", MessageBoxImage.Warning);
+            Notify(result.Message, Loc.T("新建实例"), MessageBoxImage.Warning);
             return;
         }
 
@@ -259,11 +260,11 @@ public partial class PageInstances : LauncherPage
 
         if (!result.Success)
         {
-            Notify(result.Message, "编辑实例", MessageBoxImage.Warning);
+            Notify(result.Message, Loc.T("编辑实例"), MessageBoxImage.Warning);
             return;
         }
 
-        ShowNotice($"实例「{instance.Name}」已更新", false);
+        ShowNotice(Loc.F("实例「{0}」已更新", instance.Name), false);
         RefreshAll();
     }
 
@@ -273,10 +274,10 @@ public partial class PageInstances : LauncherPage
 
         var name = TextInputWindow.Ask(
             Window.GetWindow(this),
-            "重命名实例",
-            $"为实例「{instance.Name}」输入新名称：",
+            Loc.T("重命名实例"),
+            Loc.F("为实例「{0}」输入新名称：", instance.Name),
             instance.Name,
-            "名称不能为空，也不能与其它实例重名。",
+            Loc.T("名称不能为空，也不能与其它实例重名。"),
             value => ValidateName(instance, value));
 
         if (name is null) return;
@@ -285,7 +286,7 @@ public partial class PageInstances : LauncherPage
 
         if (!result.Success)
         {
-            Notify(result.Message, "重命名实例", MessageBoxImage.Warning);
+            Notify(result.Message, Loc.T("重命名实例"), MessageBoxImage.Warning);
             return;
         }
 
@@ -295,13 +296,13 @@ public partial class PageInstances : LauncherPage
 
     private static string? ValidateName(GameInstance instance, string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "实例名称不能为空。";
+        if (string.IsNullOrWhiteSpace(value)) return Loc.T("实例名称不能为空。");
 
         var duplicated = InstanceManager.All.Any(item =>
             !string.Equals(item.Id, instance.Id, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(item.Name, value, StringComparison.OrdinalIgnoreCase));
 
-        return duplicated ? $"实例名称「{value}」已存在。" : null;
+        return duplicated ? Loc.F("实例名称「{0}」已存在。", value) : null;
     }
 
     private void OnDeleteClick(object sender, RoutedEventArgs e)
@@ -312,23 +313,23 @@ public partial class PageInstances : LauncherPage
         var gameInsideInstance = PathGuard.IsInside(instance.InstanceDirectory, instance.GameDir);
 
         var detail = gameInsideInstance
-            ? $"⚠️ 该实例的游戏目录位于实例数据目录内，其中的游戏文件会被一并删除：\n{instance.GameDir}"
-            : $"游戏目录本身不会被删除：\n{instance.GameDir}\n\n会删除实例数据目录：\n{instance.InstanceDirectory}";
+            ? Loc.F("⚠️ 该实例的游戏目录位于实例数据目录内，其中的游戏文件会被一并删除：\n{0}", instance.GameDir)
+            : Loc.F("游戏目录本身不会被删除：\n{0}\n\n会删除实例数据目录：\n{1}", instance.GameDir, instance.InstanceDirectory);
 
         var choice = ChoiceWindow.Ask(
             Window.GetWindow(this),
-            "删除实例",
-            $"确定删除实例「{instance.Name}」吗？此操作不可撤销。",
+            Loc.T("删除实例"),
+            Loc.F("确定删除实例「{0}」吗？此操作不可撤销。", instance.Name),
             detail,
-            new ChoiceOption("删除实例", "delete", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+            new ChoiceOption(Loc.T("删除实例"), "delete", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "delete") return;
 
         var result = InstanceManager.Remove(instance.Id);
 
         ShowNotice(result.Message, !result.Success);
-        if (!result.Success) Notify(result.Message, "删除实例", MessageBoxImage.Warning);
+        if (!result.Success) Notify(result.Message, Loc.T("删除实例"), MessageBoxImage.Warning);
 
         RefreshAll();
     }
@@ -341,7 +342,7 @@ public partial class PageInstances : LauncherPage
 
         if (!Directory.Exists(directory))
         {
-            Notify($"实例目录不存在：\n{directory}", "打开实例目录", MessageBoxImage.Information);
+            Notify(Loc.F("实例目录不存在：\n{0}", directory), Loc.T("打开实例目录"), MessageBoxImage.Information);
             return;
         }
 
@@ -355,7 +356,7 @@ public partial class PageInstances : LauncherPage
 
         var isCurrent = ReferenceEquals(instance, InstanceStore.Current);
 
-        button.Content = isCurrent ? "正在使用" : "设为当前";
+        button.Content = isCurrent ? Loc.T("正在使用") : Loc.T("设为当前");
         button.Tone = isCurrent ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
@@ -365,7 +366,7 @@ public partial class PageInstances : LauncherPage
         if (ReferenceEquals(instance, InstanceStore.Current)) return;
 
         InstanceManager.SetCurrent(instance.Id);
-        ShowNotice($"已切换当前实例为「{instance.Name}」", false);
+        ShowNotice(Loc.F("已切换当前实例为「{0}」", instance.Name), false);
         RefreshInstances();
     }
 
@@ -375,19 +376,19 @@ public partial class PageInstances : LauncherPage
 
         if (GameSessionHub.IsRunning)
         {
-            ShowNotice("游戏已经在运行中，请先关闭游戏。", true);
+            ShowNotice(Loc.T("游戏已经在运行中，请先关闭游戏。"), true);
             return;
         }
 
         if (!GameSessionHub.TryLaunch(instance, out var error))
         {
-            ShowNotice(error ?? "启动失败：未知原因", true);
-            Notify(error ?? "启动失败：未知原因", "启动游戏", MessageBoxImage.Warning);
+            ShowNotice(error ?? Loc.T("启动失败：未知原因"), true);
+            Notify(error ?? Loc.T("启动失败：未知原因"), Loc.T("启动游戏"), MessageBoxImage.Warning);
             return;
         }
 
-        ShowNotice($"已启动实例「{instance.Name}」，游戏输出见「运行日志」页。", false);
-        Log.Info($"界面：已启动实例「{instance.Name}」");
+        ShowNotice(Loc.F("已启动实例「{0}」，游戏输出见「运行日志」页。", instance.Name), false);
+        Log.Info(Loc.F("界面：已启动实例「{0}」", instance.Name));
     }
 
     // ————— 实例：导入 / 导出 —————
@@ -412,13 +413,13 @@ public partial class PageInstances : LauncherPage
         var owner = Window.GetWindow(this);
         var dialog = new SaveFileDialog
         {
-            Title = "导出实例",
+            Title = Loc.T("导出实例"),
             FileName = $"{PathGuard.SanitizeFileName(instance.Name)}.zip",
             DefaultExt = ".zip",
             // 后缀由下面的 EnsureExportExtension 按所选格式决定；开着自动补后缀会把 7z 补成 .zip
             AddExtension = false,
-            Filter = $"HMOL 实例包 ({ArchiveFormats.ExportPickPattern})|{ArchiveFormats.ExportPickPattern}|" +
-                     "ZIP 压缩包 (*.zip)|*.zip|7z 压缩包 (*.7z)|*.7z"
+            Filter = Loc.F("HMOL 实例包 ({0})|{1}|", ArchiveFormats.ExportPickPattern, ArchiveFormats.ExportPickPattern) +
+                     Loc.T("ZIP 压缩包 (*.zip)|*.zip|7z 压缩包 (*.7z)|*.7z")
         };
 
         var confirmed = owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner);
@@ -429,11 +430,11 @@ public partial class PageInstances : LauncherPage
         // Core 不会覆盖已存在的文件，这里先让用户明确选择再删，避免导出到一半才报错
         if (File.Exists(target))
         {
-            var choice = ChoiceWindow.Ask(owner, "文件已存在",
-                $"目标文件已存在：\n{target}",
-                "覆盖会先删除该文件，然后重新导出。",
-                new ChoiceOption("覆盖", "overwrite", ButtonTone.Danger),
-                new ChoiceOption("取消", "cancel"));
+            var choice = ChoiceWindow.Ask(owner, Loc.T("文件已存在"),
+                Loc.F("目标文件已存在：\n{0}", target),
+                Loc.T("覆盖会先删除该文件，然后重新导出。"),
+                new ChoiceOption(Loc.T("覆盖"), "overwrite", ButtonTone.Danger),
+                new ChoiceOption(Loc.T("取消"), "cancel"));
 
             if (choice != "overwrite") return;
 
@@ -443,24 +444,24 @@ public partial class PageInstances : LauncherPage
             }
             catch (Exception ex)
             {
-                Notify($"无法删除已有文件：{ex.Message}", "导出实例", MessageBoxImage.Warning);
+                Notify(Loc.F("无法删除已有文件：{0}", ex.Message), Loc.T("导出实例"), MessageBoxImage.Warning);
                 return;
             }
         }
 
         // 压缩力度让用户定：GB 级实例上 Deflate 的 CPU 开销能差好几倍，而包大小通常只差几个百分点
-        var levelChoice = ChoiceWindow.Ask(owner, "导出压缩级别",
-            "选择导出时的压缩力度。",
-            "「快速」耗时明显更短，包会略大几个百分点——游戏资源大多本身已压过，实际差距通常很小；" +
-            "「最小」更省空间，但在大实例上会慢不少。",
-            new ChoiceOption("快速", "fast", ButtonTone.Solid),
-            new ChoiceOption("最小", "small"));
+        var levelChoice = ChoiceWindow.Ask(owner, Loc.T("导出压缩级别"),
+            Loc.T("选择导出时的压缩力度。"),
+            Loc.T("「快速」耗时明显更短，包会略大几个百分点——游戏资源大多本身已压过，实际差距通常很小；") +
+            Loc.T("「最小」更省空间，但在大实例上会慢不少。"),
+            new ChoiceOption(Loc.T("快速"), "fast", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("最小"), "small"));
 
         if (levelChoice is null) return;
 
         var level = levelChoice == "fast" ? CompressionLevel.Fastest : CompressionLevel.Optimal;
 
-        var progress = ProgressWindow.Open(owner, "导出实例", $"正在导出「{instance.Name}」…");
+        var progress = ProgressWindow.Open(owner, Loc.T("导出实例"), Loc.F("正在导出「{0}」…", instance.Name));
 
         try
         {
@@ -470,14 +471,14 @@ public partial class PageInstances : LauncherPage
 
             progress.Finish();
 
-            if (result.Success) Notify(result.Message, "导出完成", MessageBoxImage.Information);
+            if (result.Success) Notify(result.Message, Loc.T("导出完成"), MessageBoxImage.Information);
             ShowNotice(result.Message, !result.Success);
         }
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"导出实例失败：{instance.Name}", ex);
-            ShowNotice($"导出失败：{ex.Message}", true);
+            Log.Error(Loc.F("导出实例失败：{0}", instance.Name), ex);
+            ShowNotice(Loc.F("导出失败：{0}", ex.Message), true);
         }
     }
 
@@ -487,8 +488,8 @@ public partial class PageInstances : LauncherPage
 
         var dialog = new OpenFileDialog
         {
-            Title = "导入实例",
-            Filter = $"HMOL 实例包 ({ArchiveFormats.PickPattern})|{ArchiveFormats.PickPattern}|所有文件 (*.*)|*.*",
+            Title = Loc.T("导入实例"),
+            Filter = Loc.F("HMOL 实例包 ({0})|{1}|所有文件 (*.*)|*.*", ArchiveFormats.PickPattern, ArchiveFormats.PickPattern),
             CheckFileExists = true,
             Multiselect = false
         };
@@ -498,15 +499,15 @@ public partial class PageInstances : LauncherPage
 
         var source = dialog.FileName;
 
-        var choice = ChoiceWindow.Ask(owner, "导入实例",
-            $"将从此文件导入一个新实例：\n{source}",
-            "导入会解压其中的游戏文件并复制到数据目录，可能耗时较久；同名实例会自动改名。",
-            new ChoiceOption("开始导入", "import", ButtonTone.Solid),
-            new ChoiceOption("取消", "cancel"));
+        var choice = ChoiceWindow.Ask(owner, Loc.T("导入实例"),
+            Loc.F("将从此文件导入一个新实例：\n{0}", source),
+            Loc.T("导入会解压其中的游戏文件并复制到数据目录，可能耗时较久；同名实例会自动改名。"),
+            new ChoiceOption(Loc.T("开始导入"), "import", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "import") return;
 
-        var progress = ProgressWindow.Open(owner, "导入实例", "正在解压并复制游戏文件…");
+        var progress = ProgressWindow.Open(owner, Loc.T("导入实例"), Loc.T("正在解压并复制游戏文件…"));
 
         try
         {
@@ -519,12 +520,12 @@ public partial class PageInstances : LauncherPage
             {
                 if (instanceId is not null) InstanceManager.SetCurrent(instanceId);
 
-                Notify(result.Message, "导入完成", MessageBoxImage.Information);
+                Notify(result.Message, Loc.T("导入完成"), MessageBoxImage.Information);
                 RefreshAll();
             }
             else
             {
-                Notify(result.Message, "导入失败", MessageBoxImage.Warning);
+                Notify(result.Message, Loc.T("导入失败"), MessageBoxImage.Warning);
             }
 
             ShowNotice(result.Message, !result.Success);
@@ -532,8 +533,8 @@ public partial class PageInstances : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"导入实例失败：{source}", ex);
-            ShowNotice($"导入失败：{ex.Message}", true);
+            Log.Error(Loc.F("导入实例失败：{0}", source), ex);
+            ShowNotice(Loc.F("导入失败：{0}", ex.Message), true);
         }
     }
 
@@ -547,8 +548,8 @@ public partial class PageInstances : LauncherPage
         var ready = instance is not null;
 
         LabBackupTarget.Text = ready
-            ? $"备份对象 = 当前实例「{instance!.Name}」\n{instance.GameDir}"
-            : "还没有当前实例：请先把某个实例设为当前实例，再创建备份或还原。";
+            ? Loc.F("备份对象 = 当前实例「{0}」\n{1}", instance!.Name, instance.GameDir)
+            : Loc.T("还没有当前实例：请先把某个实例设为当前实例，再创建备份或还原。");
 
         BtnBackup.IsEnabled = ready;
         BtnBackupOriginal.IsEnabled = ready;
@@ -570,8 +571,8 @@ public partial class PageInstances : LauncherPage
         }
         catch (Exception ex)
         {
-            Log.Error("枚举备份失败", ex);
-            ShowNotice($"读取备份列表失败：{ex.Message}", true);
+            Log.Error(Loc.T("枚举备份失败"), ex);
+            ShowNotice(Loc.F("读取备份列表失败：{0}", ex.Message), true);
             return;
         }
 
@@ -617,10 +618,10 @@ public partial class PageInstances : LauncherPage
         var owner = Window.GetWindow(this);
         var defaultName = $"{instance.Name}_{DateTime.Now:yyyyMMdd_HHmmss}";
 
-        var name = TextInputWindow.Ask(owner, "创建备份",
-            $"为当前实例「{instance.Name}」创建备份：",
+        var name = TextInputWindow.Ask(owner, Loc.T("创建备份"),
+            Loc.F("为当前实例「{0}」创建备份：", instance.Name),
             defaultName,
-            "备份名称不能使用 MO / mo / Mo / mO / MO.mo.mO / 原版 / 原版游戏 等保留名，最多 100 字符。",
+            Loc.T("备份名称不能使用 MO / mo / Mo / mO / MO.mo.mO / 原版 / 原版游戏 等保留名，最多 100 字符。"),
             value => BackupService.IsValidName(value, out var error) ? null : error);
 
         if (name is null) return;
@@ -630,17 +631,17 @@ public partial class PageInstances : LauncherPage
 
         if (Directory.Exists(target))
         {
-            var choice = ChoiceWindow.Ask(owner, "备份已存在",
-                $"已存在同名备份：\n{target}",
-                "覆盖会删除原备份后重新备份，原备份不可恢复。",
-                new ChoiceOption("覆盖", "overwrite", ButtonTone.Danger),
-                new ChoiceOption("取消", "cancel"));
+            var choice = ChoiceWindow.Ask(owner, Loc.T("备份已存在"),
+                Loc.F("已存在同名备份：\n{0}", target),
+                Loc.T("覆盖会删除原备份后重新备份，原备份不可恢复。"),
+                new ChoiceOption(Loc.T("覆盖"), "overwrite", ButtonTone.Danger),
+                new ChoiceOption(Loc.T("取消"), "cancel"));
 
             if (choice != "overwrite") return;
             overwrite = true;
         }
 
-        var progress = ProgressWindow.Open(owner, "备份游戏", $"正在备份「{instance.Name}」…");
+        var progress = ProgressWindow.Open(owner, Loc.T("备份游戏"), Loc.F("正在备份「{0}」…", instance.Name));
 
         try
         {
@@ -653,7 +654,7 @@ public partial class PageInstances : LauncherPage
 
             progress.Finish();
 
-            if (outcome.Success) Notify(outcome.Message, "备份完成", MessageBoxImage.Information);
+            if (outcome.Success) Notify(outcome.Message, Loc.T("备份完成"), MessageBoxImage.Information);
             ShowNotice(outcome.Message, !outcome.Success);
 
             await RefreshBackupsAsync();
@@ -661,8 +662,8 @@ public partial class PageInstances : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"备份失败：{name}", ex);
-            ShowNotice($"备份失败：{ex.Message}", true);
+            Log.Error(Loc.F("备份失败：{0}", name), ex);
+            ShowNotice(Loc.F("备份失败：{0}", ex.Message), true);
         }
     }
 
@@ -676,25 +677,25 @@ public partial class PageInstances : LauncherPage
 
         if (Directory.Exists(BackupService.OriginalBackupPath))
         {
-            var existing = ChoiceWindow.Ask(owner, "原版备份已存在",
-                $"已存在原版游戏备份：\n{BackupService.OriginalBackupPath}",
-                "原版备份是按包卸载、恢复原版状态的必要条件；覆盖会删除现有原版备份。",
-                new ChoiceOption("覆盖", "overwrite", ButtonTone.Danger),
-                new ChoiceOption("取消", "cancel"));
+            var existing = ChoiceWindow.Ask(owner, Loc.T("原版备份已存在"),
+                Loc.F("已存在原版游戏备份：\n{0}", BackupService.OriginalBackupPath),
+                Loc.T("原版备份是按包卸载、恢复原版状态的必要条件；覆盖会删除现有原版备份。"),
+                new ChoiceOption(Loc.T("覆盖"), "overwrite", ButtonTone.Danger),
+                new ChoiceOption(Loc.T("取消"), "cancel"));
 
             if (existing != "overwrite") return;
             overwrite = true;
         }
 
-        var choice = ChoiceWindow.Ask(owner, "备份原版游戏",
-            $"将把当前实例的游戏目录备份为原版游戏：\n{instance.GameDir}",
-            "请确认该实例当前是原版状态（未安装任何插件包）。原版备份固定放在 backup\\MO，名称不可改。",
-            new ChoiceOption("开始备份", "backup", ButtonTone.Solid),
-            new ChoiceOption("取消", "cancel"));
+        var choice = ChoiceWindow.Ask(owner, Loc.T("备份原版游戏"),
+            Loc.F("将把当前实例的游戏目录备份为原版游戏：\n{0}", instance.GameDir),
+            Loc.T("请确认该实例当前是原版状态（未安装任何插件包）。原版备份固定放在 backup\\MO，名称不可改。"),
+            new ChoiceOption(Loc.T("开始备份"), "backup", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "backup") return;
 
-        var progress = ProgressWindow.Open(owner, "备份原版游戏", "正在复制原版游戏文件…");
+        var progress = ProgressWindow.Open(owner, Loc.T("备份原版游戏"), Loc.T("正在复制原版游戏文件…"));
 
         try
         {
@@ -704,7 +705,7 @@ public partial class PageInstances : LauncherPage
 
             progress.Finish();
 
-            if (outcome.Success) Notify(outcome.Message, "原版备份完成", MessageBoxImage.Information);
+            if (outcome.Success) Notify(outcome.Message, Loc.T("原版备份完成"), MessageBoxImage.Information);
             ShowNotice(outcome.Message, !outcome.Success);
 
             await RefreshBackupsAsync();
@@ -712,8 +713,8 @@ public partial class PageInstances : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error("备份原版游戏失败", ex);
-            ShowNotice($"备份原版游戏失败：{ex.Message}", true);
+            Log.Error(Loc.T("备份原版游戏失败"), ex);
+            ShowNotice(Loc.F("备份原版游戏失败：{0}", ex.Message), true);
         }
     }
 
@@ -729,20 +730,20 @@ public partial class PageInstances : LauncherPage
         // 导入出来的实例，游戏目录就是实例数据目录，安装记录也在里面，替换后会被一并清掉
         var recordsInsideGameDir = PathGuard.IsInside(instance.GameDir, instance.InstallRecordsDirectory);
 
-        var detail = "目标目录中的所有现有文件与子目录都会被替换，此操作不可撤销。" +
+        var detail = Loc.T("目标目录中的所有现有文件与子目录都会被替换，此操作不可撤销。") +
                      (recordsInsideGameDir
-                         ? "\n\n⚠️ 该实例的安装记录就位于游戏目录内，还原后会被清除。"
+                         ? Loc.T("\n\n⚠️ 该实例的安装记录就位于游戏目录内，还原后会被清除。")
                          : string.Empty);
 
-        var choice = ChoiceWindow.Ask(owner, "⚠️ 还原确认",
-            $"将把备份「{backup.Title}」还原到当前实例「{instance.Name}」：\n{instance.GameDir}",
+        var choice = ChoiceWindow.Ask(owner, Loc.T("⚠️ 还原确认"),
+            Loc.F("将把备份「{0}」还原到当前实例「{1}」：\n{2}", backup.Title, instance.Name, instance.GameDir),
             detail,
-            new ChoiceOption("确认还原", "restore", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+            new ChoiceOption(Loc.T("确认还原"), "restore", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "restore") return;
 
-        var progress = ProgressWindow.Open(owner, "还原备份", $"正在从「{backup.Title}」还原…");
+        var progress = ProgressWindow.Open(owner, Loc.T("还原备份"), Loc.F("正在从「{0}」还原…", backup.Title));
 
         try
         {
@@ -754,7 +755,7 @@ public partial class PageInstances : LauncherPage
 
             progress.Finish();
 
-            if (outcome.Success) Notify(outcome.Message, "还原完成", MessageBoxImage.Information);
+            if (outcome.Success) Notify(outcome.Message, Loc.T("还原完成"), MessageBoxImage.Information);
             ShowNotice(outcome.Message, !outcome.Success);
 
             RefreshInstances();
@@ -762,8 +763,8 @@ public partial class PageInstances : LauncherPage
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"还原备份失败：{backup.Entry.Path}", ex);
-            ShowNotice($"还原失败：{ex.Message}", true);
+            Log.Error(Loc.F("还原备份失败：{0}", backup.Entry.Path), ex);
+            ShowNotice(Loc.F("还原失败：{0}", ex.Message), true);
         }
     }
 
@@ -775,19 +776,19 @@ public partial class PageInstances : LauncherPage
         var owner = Window.GetWindow(this);
 
         var detail = backup.Entry.Kind == BackupKind.Original
-            ? "原版备份被删除后，按包卸载与「恢复原版状态」都不可用，需要重新执行「备份原版游戏」。"
-            : "备份目录会被整个删除，备份里的游戏文件无法找回。";
+            ? Loc.T("原版备份被删除后，按包卸载与「恢复原版状态」都不可用，需要重新执行「备份原版游戏」。")
+            : Loc.T("备份目录会被整个删除，备份里的游戏文件无法找回。");
 
-        var choice = ChoiceWindow.Ask(owner, "删除备份",
-            $"确定删除备份「{backup.Title}」吗？",
+        var choice = ChoiceWindow.Ask(owner, Loc.T("删除备份"),
+            Loc.F("确定删除备份「{0}」吗？", backup.Title),
             detail,
-            new ChoiceOption("删除备份", "delete", ButtonTone.Danger),
-            new ChoiceOption("取消", "cancel"));
+            new ChoiceOption(Loc.T("删除备份"), "delete", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
 
         if (choice != "delete") return;
 
         // 目录删除本身无法中断，因此这个操作不给「取消」按钮，避免给出无效的取消承诺
-        var progress = ProgressWindow.Open(owner, "删除备份", $"正在删除「{backup.Title}」…", canCancel: false);
+        var progress = ProgressWindow.Open(owner, Loc.T("删除备份"), Loc.F("正在删除「{0}」…", backup.Title), canCancel: false);
 
         try
         {
@@ -799,13 +800,13 @@ public partial class PageInstances : LauncherPage
             });
 
             progress.Finish();
-            ShowNotice($"备份「{backup.Title}」已删除", false);
+            ShowNotice(Loc.F("备份「{0}」已删除", backup.Title), false);
         }
         catch (Exception ex)
         {
             progress.Finish();
-            Log.Error($"删除备份失败：{backup.Entry.Path}", ex);
-            Notify($"删除备份失败：{ex.Message}", "删除备份", MessageBoxImage.Warning);
+            Log.Error(Loc.F("删除备份失败：{0}", backup.Entry.Path), ex);
+            Notify(Loc.F("删除备份失败：{0}", ex.Message), Loc.T("删除备份"), MessageBoxImage.Warning);
         }
 
         _selectedBackup = null;

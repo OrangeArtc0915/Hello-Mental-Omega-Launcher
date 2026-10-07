@@ -19,6 +19,7 @@ using HMOL.Core.App;
 using HMOL.Core.Appearance;
 using HMOL.Core.Instances;
 using HMOL.Core.Layout;
+using HMOL.Core.Localization;
 using HMOL.Core.Logging;
 
 namespace HMOL.App.Windows;
@@ -80,7 +81,7 @@ public partial class MainWindow : Window
         _ready = true;
 
         // 设置分类项按 Tag 顺序抓成表：切分类时按下标同步选中态，不必写一堆 if
-        // 顺序 = 侧栏里的排列（分组标题不参与）：个性化 → 更新与下载 → 联机 → 其他
+        // 顺序 = 侧栏里的排列（分组标题不参与）：个性化 → 更新与下载 → 联机 → 其他 → 语言
         _setupCategories =
         [
             SetupCatAppearance,
@@ -97,6 +98,7 @@ public partial class MainWindow : Window
             SetupCatAutoStart,
             SetupCatGamePath,
             SetupCatAbout,
+            SetupCatLanguage,
         ];
 
         _setupGroups =
@@ -105,6 +107,7 @@ public partial class MainWindow : Window
             SetupGroupUpdate,
             SetupGroupMultiplayer,
             SetupGroupOther,
+            SetupGroupLanguage,
         ];
 
         // 联机分类项按 Tag 顺序抓成表，理由与设置分类栏相同
@@ -117,7 +120,7 @@ public partial class MainWindow : Window
         ];
 
         // 图标是资源引用，写错只会静默不显示；这里记一条自检日志，便于确认真的加载到了
-        Log.Info($"主窗口图标：{(Icon is null ? "未设置" : $"{Icon.Width:0}×{Icon.Height:0}")}");
+        Log.Info(Loc.F("主窗口图标：{0}", (Icon is null ? Loc.T("未设置") : Loc.F("{0:0}×{1:0}", Icon.Width, Icon.Height))));
 
         // 侧栏搭好之后按启用方案落位（等价旧版 _apply_sidebar_state_to_widget）
         CollectLayoutTargets();
@@ -146,10 +149,18 @@ public partial class MainWindow : Window
             QueueFirstRunWizard();
         };
 
-        Closed += (_, _) => ThemeService.ThemeChanged -= ApplyBackground;
+        Closed += (_, _) =>
+        {
+            ThemeService.ThemeChanged -= ApplyBackground;
+            Loc.Changed -= OnLanguageChanged;
+        };
 
         // 关闭按钮按托盘策略走：托盘可用时只收起窗口，真正退出由托盘菜单决定
         Closing += OnClosing;
+
+        // 换语言：页面文案分两类——XAML 绑定（{loc:T}）能自己刷新，代码里取过一次的（列表行、状态标签）刷不回来。
+        // 统一清掉页面缓存、重建当前页最省心，页面本来就支持随时重建。
+        Loc.Changed += OnLanguageChanged;
 
         // 最小化时停掉背景里的动图与视频，别白烧 CPU
         StateChanged += (_, _) => BackgroundView.SetPaused(WindowState == WindowState.Minimized);
@@ -203,7 +214,7 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
         Activate();
-        Log.Info("已从系统托盘恢复主窗口");
+        Log.Info(Loc.T("已从系统托盘恢复主窗口"));
     }
 
     /// <summary>真正退出程序（托盘菜单「退出程序」）。</summary>
@@ -264,7 +275,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         Hide();
-        Log.Info("主窗口已收起到系统托盘（要退出请用托盘菜单）");
+        Log.Info(Loc.T("主窗口已收起到系统托盘（要退出请用托盘菜单）"));
     }
 
     /// <summary>页面编号 → 每页独立背景用的标识。</summary>
@@ -339,7 +350,7 @@ public partial class MainWindow : Window
         foreach (var info in LayoutElements.All)
         {
             if (FindName(info.ControlName) is NavItem item) _layoutTargets[info.Id] = item;
-            else Log.Warn($"布局元素「{info.Id}」找不到控件 {info.ControlName}，本次跳过");
+            else Log.Warn(Loc.F("布局元素「{0}」找不到控件 {1}，本次跳过", info.Id, info.ControlName));
         }
     }
 
@@ -423,14 +434,14 @@ public partial class MainWindow : Window
             // 渲染层允许 Alpha 通道通过，外圈留白才能透出桌面并显示自绘投影
             var source = HwndSource.FromHwnd(handle);
             if (source is not null) source.CompositionTarget.BackgroundColor = Colors.Transparent;
-            Log.Info("窗口已启用玻璃化，边缘投影正常显示");
+            Log.Info(Loc.T("窗口已启用玻璃化，边缘投影正常显示"));
         }
         else
         {
             // 无法玻璃化时退化为纯色窗口并去掉留白，避免出现黑边
             PanBack.Margin = new Thickness(0);
             RootGrid.SetResourceReference(Panel.BackgroundProperty, "Surface.Window");
-            Log.Warn("系统未启用 DWM 合成，窗口退化为纯色模式");
+            Log.Warn(Loc.T("系统未启用 DWM 合成，窗口退化为纯色模式"));
         }
     }
 
@@ -465,8 +476,8 @@ public partial class MainWindow : Window
         if (previous is not null)
         {
             var leftover = string.Join(", ", AnimationEngine.RunningKeys);
-            Log.Info($"页面自检：离开「{previous.GetType().Name}」后仍在运行的动画" +
-                     (leftover.Length == 0 ? "：无" : $"：{leftover}"));
+            Log.Info(Loc.F("页面自检：离开「{0}」后仍在运行的动画", previous.GetType().Name) +
+                     (leftover.Length == 0 ? Loc.T("：无") : $"：{leftover}"));
         }
 #endif
 
@@ -484,7 +495,7 @@ public partial class MainWindow : Window
         // 每个页面可以有自己的背景（设置 → 主页背景 → 每页独立背景）
         ApplyBackground();
 
-        Log.Info($"切换到页面 {page}");
+        Log.Info(Loc.F("切换到页面 {0}", page));
 
         target.Visibility = Visibility.Visible;
         target.OnEnter();
@@ -521,6 +532,38 @@ public partial class MainWindow : Window
         return created;
     }
 
+    /// <summary>语言切换在别的线程上也安全：统一排到界面线程再重建。</summary>
+    private void OnLanguageChanged()
+        => Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(RebuildForLanguage));
+
+    /// <summary>
+    /// 换语言后重建全部页面：不少文案是在页面创建时取过一次的（列表行、状态标签、按钮提示），
+    /// 刷新不到已建好的实例上；清掉缓存重建最省事——页面本来就支持随时重建。
+    /// </summary>
+    private void RebuildForLanguage()
+    {
+        // 关于窗口是会话内复用的一份实例，关掉让用户要用时按新语言重开
+        if (_aboutWindow is { IsLoaded: true }) _aboutWindow.Close();
+        _aboutWindow = null;
+
+        var page = _currentPage < 0 ? NavPages.Home : _currentPage;
+
+        foreach (var cached in _pages.Values)
+        {
+            // 补一次 OnLeave：让页面按约定把自己的动画收干净，动画键都带页面前缀
+            cached.OnLeave();
+            PanContent.Children.Remove(cached);
+        }
+
+        _pages.Clear();
+
+        // SwitchToPage 对「已经停在当前页」直接返回，这里先把游标清掉，强制它整条流程重走一遍
+        _currentPage = -1;
+        SwitchToPage(page);
+
+        Log.Info(Loc.F("界面语言已切到 {0}，页面已重建", Loc.Current));
+    }
+
     /// <summary>把侧栏选中态同步到当前页面。</summary>
     private void SyncNavSelection(int page)
     {
@@ -539,13 +582,14 @@ public partial class MainWindow : Window
 
     // ————— 设置页的分类侧栏（两级：分组 → 分类） —————
 
-    /// <summary>每一组包含哪些分类（下标与侧栏 Tag 一致）：个性化 / 更新与下载 / 联机 / 其他。</summary>
+    /// <summary>每一组包含哪些分类（下标与侧栏 Tag 一致）：个性化 / 更新与下载 / 联机 / 其他 / 语言。</summary>
     private static readonly int[][] SetupGroupCategories =
     [
         [0, 1, 2, 3, 4, 5, 6, 7, 10],
         [8],
         [9],
-        [11, 12, 13]
+        [11, 12, 13],
+        [14]
     ];
 
     /// <summary>侧栏当前停在哪一层：0 = 分组列表，1 = 某一组的分类列表。</summary>
@@ -563,12 +607,13 @@ public partial class MainWindow : Window
         8 => 1,
         9 => 2,
         10 => 0,
+        14 => 4,
         _ => 3
     };
 
     /// <summary>
     /// 在设置页 / 联机页用各自的分类栏顶替主导航栏，切到别的页面再换回来。
-    /// 设置页分两级：先只列四个分组，点进某组才显示该组的分类。
+    /// 设置页分两级：先只列五个分组，点进某组才显示该组的分类。
     /// </summary>
     private void ApplySidebarMode(int page)
     {
@@ -586,7 +631,7 @@ public partial class MainWindow : Window
         SyncSetupCategorySelection();
 
         // 内容区永远只留一张卡可见：停在分组层时显示「设置」小主页（小贴士 + 常用入口），
-        // 否则 14 张卡会叠着全部显示（又长又卡，这就是之前那个显示问题）。
+        // 否则 15 张卡会叠着全部显示（又长又卡，这就是之前那个显示问题）。
         var settings = GetPage(NavPages.Settings) as PageSettings;
 
         if (_setupLevel == 0) settings?.ShowHome();
@@ -850,6 +895,6 @@ public partial class MainWindow : Window
         _aboutWindow = new AboutWindow { Owner = this };
         _aboutWindow.Closed += (_, _) => _aboutWindow = null;
         _aboutWindow.Show();
-        Log.Info("已打开关于窗口");
+        Log.Info(Loc.T("已打开关于窗口"));
     }
 }

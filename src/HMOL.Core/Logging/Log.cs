@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Threading.Channels;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.Logging;
 
@@ -107,7 +108,7 @@ public sealed class Logger : IAsyncDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            try { Flush(new List<string> { $"[FATAL] 日志写入线程异常：{ex}" }); } catch { }
+            try { Flush(new List<string> { Loc.F("[FATAL] 日志写入线程异常：{0}", ex) }); } catch { }
         }
     }
 

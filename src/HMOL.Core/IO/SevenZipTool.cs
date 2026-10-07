@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using HMOL.Core.App;
+using HMOL.Core.Localization;
 
 namespace HMOL.Core.IO;
 
@@ -24,8 +25,8 @@ public static class SevenZipTool
     /// <summary>组件相对 exe 目录的位置。</summary>
     private const string RelativePath = "runtime/7zip/7za.exe";
 
-    /// <summary>组件缺失时的提示文案。</summary>
-    public const string MissingMessage = "缺少 7-Zip 组件（runtime\\7zip\\7za.exe），请重新解压完整发行包";
+    /// <summary>组件缺失时的提示文案（属性而非常量：随界面语言变化）。</summary>
+    public static string MissingMessage => Loc.T("缺少 7-Zip 组件（runtime\\7zip\\7za.exe），请重新解压完整发行包");
 
     /// <summary>把 <see cref="System.IO.Compression.CompressionLevel"/> 折算成 7-Zip 的 -mx 等级。</summary>
     public const int LevelStore = 0;
@@ -61,7 +62,7 @@ public static class SevenZipTool
         var exe = ExePath;
         if (exe is null) return (false, MissingMessage);
 
-        if (!Directory.Exists(sourceDirectory)) return (false, $"待打包目录不存在：{sourceDirectory}");
+        if (!Directory.Exists(sourceDirectory)) return (false, Loc.F("待打包目录不存在：{0}", sourceDirectory));
 
         string[] entries;
         try
@@ -74,10 +75,10 @@ public static class SevenZipTool
         }
         catch (Exception ex)
         {
-            return (false, $"无法读取待打包目录：{ex.Message}");
+            return (false, Loc.F("无法读取待打包目录：{0}", ex.Message));
         }
 
-        if (entries.Length == 0) return (false, "待打包目录为空");
+        if (entries.Length == 0) return (false, Loc.T("待打包目录为空"));
 
         var startInfo = new ProcessStartInfo(exe)
         {
@@ -110,7 +111,7 @@ public static class SevenZipTool
         var exe = ExePath;
         if (exe is null) return (false, MissingMessage);
 
-        if (!File.Exists(archivePath)) return (false, $"压缩包不存在：{archivePath}");
+        if (!File.Exists(archivePath)) return (false, Loc.F("压缩包不存在：{0}", archivePath));
 
         try
         {
@@ -118,7 +119,7 @@ public static class SevenZipTool
         }
         catch (Exception ex)
         {
-            return (false, $"无法创建解压目录：{ex.Message}");
+            return (false, Loc.F("无法创建解压目录：{0}", ex.Message));
         }
 
         var startInfo = new ProcessStartInfo(exe)
@@ -177,7 +178,7 @@ public static class SevenZipTool
         }
         catch (Exception ex)
         {
-            return (false, $"无法启动 7-Zip：{ex.Message}");
+            return (false, Loc.F("无法启动 7-Zip：{0}", ex.Message));
         }
 
         process.BeginOutputReadLine();
@@ -197,7 +198,7 @@ public static class SevenZipTool
 
         if (process.ExitCode is 0 or 1) return (true, string.Empty);   // 7-Zip：1 是"有警告但成功"
 
-        return (false, $"7-Zip 返回错误码 {process.ExitCode}：{LastLines(output.ToString())}");
+        return (false, Loc.F("7-Zip 返回错误码 {0}：{1}", process.ExitCode, LastLines(output.ToString())));
     }
 
     /// <summary>解析 7-Zip 的进度行（形如 " 45% 12 + file.txt"）。</summary>
