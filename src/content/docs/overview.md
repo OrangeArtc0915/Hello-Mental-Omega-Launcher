@@ -21,7 +21,7 @@ order: 10
 | **技术栈**   | C# / .NET 8 / WPF                                               |
 | **运行方式** | 自包含单文件 `HMOL.exe`（内置 .NET 8 运行时，无需另装运行库）   |
 | **目标平台** | Windows 10 1809+ / Windows 11（x64）                            |
-| **许可证**   | **保留所有权利**（专有软件，非开源）                            |
+| **许可证**   | **PolyForm Noncommercial 1.0.0**（免费非商业使用；源码可见，非开源） |
 | **GitHub**  | <https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher> |
 | **Gitee**   | <https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher> |
 
@@ -83,9 +83,9 @@ order: 10
 
 ## ⚖️ 法律声明
 
-本项目为**专有软件，保留所有权利（All Rights Reserved）**，**并非开源软件**，也不以任何开源许可证发布。
+本项目以 **[PolyForm Noncommercial License 1.0.0](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE)** 授权：**免费用于一切非商业用途**，在遵守许可条款的前提下可以使用、复制、修改与分发；**禁止任何商业用途**（需另行取得授权）。
 
-未经版权人事先书面许可，不得复制、修改、改编、翻译、分发、再许可、上传至任何分发平台，或用于任何商业用途。
+它不是 OSI 认可的开源许可证，属于「源码可见」（source-available）。分发任何副本时需随附许可条款原文。
 
 完整条款请参见仓库根目录的 [LICENSE](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE) 文件；随包分发的第三方组件（7-Zip、RePKG、EasyTier、n2n、TAP 驱动、WinIPBroadcast、lucide、NAudio、SharpCompress、MQTTnet）受其各自许可证约束，详见仓库 `docs/third-party.md`。
 

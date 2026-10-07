@@ -84,7 +84,7 @@ HMOL (Hello Mental Omega Launcher) 是一款为心灵终结玩家打造的独立
 1. 仅从 Gitee 或 GitHub Releases 下载，拒绝一切二次封包版本。
 2. 核对发行包的 SHA-256 校验值是否与 Release 页面公布的一致。
 3. 发行包只需**完整解压**后再运行；组网组件与 7-Zip 首次使用联机时会在「下载」页提示获取，`runtime\` 缺失只影响联机与 `.7z` 导出。
-4. 本程序为专有软件、保留所有权利，禁止用于商业用途与二次分发。
+4. 本程序以 PolyForm Noncommercial License 1.0.0 授权：免费用于非商业用途，禁止商用；分发时需随附许可条款。
 
 ### QQ 交流群
 

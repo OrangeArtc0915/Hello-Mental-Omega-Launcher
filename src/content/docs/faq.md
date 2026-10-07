@@ -260,7 +260,7 @@ n2n 依赖 TAP 虚拟网卡。在联机页的 n2n 工具里点「安装 TAP 驱�
 
 ### Q: 我能修改 / 分发 HMOL 吗？
 
-**不能。** 本项目为**专有软件，保留所有权利**，**并非开源软件**。未经版权人书面许可，不得复制、修改、改编、翻译、分发、再许可，或用于商业用途。详见仓库根目录 [LICENSE](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE)。
+**非商业用途可以。** 本项目以 **PolyForm Noncommercial License 1.0.0** 授权：在**非商业用途**下，你可以使用、复制、修改并分发它，但分发时必须随附许可条款原文；**任何商业用途都需要另行取得授权**。它不是 OSI 认可的开源许可证，属于「源码可见」（source-available）。完整条款见仓库根目录 [LICENSE](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE)。
 
 ### Q: HMOL 与 EA / Mental Omega 是什么关系？
 

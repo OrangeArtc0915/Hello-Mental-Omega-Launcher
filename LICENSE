@@ -1,123 +1,205 @@
 Hello Mental Omega Launcher（HMOL 启动器）许可声明
-保留所有权利 / All Rights Reserved
+PolyForm Noncommercial License 1.0.0
 ================================================================================
 
-Copyright (c) 2026 mmm. 保留所有权利（All Rights Reserved）。
+Copyright (c) 2026 mmm
+Required Notice: Copyright (c) 2026 mmm (https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher)
 
-本文件是 Hello Mental Omega Launcher（以下简称「本软件」）的许可声明。
-下载、安装、复制或以任何方式使用本软件，即表示您已阅读、理解并同意受本声明
+本软件以 PolyForm Noncommercial License 1.0.0 授权（以下简称「本许可」）。
+官方原文：https://polyformproject.org/licenses/noncommercial/1.0.0
+
+下载、安装、复制或以任何方式使用本软件，即表示您已阅读、理解并同意受本许可
 全部条款约束；若您不同意，请立即停止使用并删除本软件及其全部副本。
 
-
---------------------------------------------------------------------------------
-一、权利归属（Ownership）
---------------------------------------------------------------------------------
-
-本软件的源代码、界面设计、文档、图标编排、算法与整体架构，其著作权及其他
-一切知识产权均归版权人 mmm 所有，并受《中华人民共和国著作权法》《计算机软件
-保护条例》及相关国际条约保护。
-
-本软件是专有软件（Proprietary Software），并非开源软件（Open Source
-Software），也不以任何开源许可证发布。
+下面这段中文是【非正式导读】，只为方便阅读，不构成本许可条款的一部分，也不
+具有法律效力；一切以本文档后半部分的英文许可正文为准。
 
 
 --------------------------------------------------------------------------------
-二、许可范围（License Grant）
+导读：你可以做什么、不可以做什么
 --------------------------------------------------------------------------------
 
-在遵守本声明全部条款的前提下，版权人仅授予您一项有限的、不可转让的、
-非排他性的、可撤销的权利：在您本人持有或合法控制的设备上安装并运行本软件。
+【可以】
 
-除上述明确授予的权利外，版权人未授予您任何其他权利，所有未明示授予的权利
-均由版权人保留。
+  · 免费下载、安装、运行本软件，用于任何非商业目的；
+  · 个人研究、学习、实验、私人娱乐、业余爱好、宗教活动等；
+  · 慈善机构、教育机构、公共研究机构、公共安全与卫生机构、环境保护组织、
+    政府机构使用（不受其经费来源或附带义务影响）；
+  · 为非商业目的复制、分发本软件（含你自己的修改版）—— 但必须把本许可全文
+    （或上面的官方链接）与 Required Notice 版权声明一并原样带给收到的人；
+  · 为非商业目的修改本软件，或基于本软件创作新作品；
+  · 依法律享有的「合理使用」（fair use）权利，不受本许可限制。
+
+【不可以】
+
+  · 任何商业用途 —— 包括出售、收费分发、付费下载、捆绑销售，或用于你经营的业务；
+  · 去掉、隐藏或篡改本许可、版权声明与 Required Notice 之后再分发；
+  · 再许可（sublicense），或把本许可授予你的权利转让给他人；
+  · 宣称本软件由你开发，或暗示与本软件作者存在关联、得到其认可。
+
+【一句话】
+
+  不赚钱、不删署名 —— 随便用；一旦涉及盈利或抹掉出处，就不行。
+
+【性质说明】
+
+  本许可【不是】开源许可证（不属于 OSI 认可的开源许可，也不是 GPL / MIT 那类
+  许可证）。它允许非商业的复制、修改与分发，同时【禁止一切商业使用】，并要求
+  署名与许可文本随作品一同传播。
 
 
 --------------------------------------------------------------------------------
-三、使用限制（Restrictions）
---------------------------------------------------------------------------------
-
-未经版权人事先书面许可，您不得：
-
-  1. 复制本软件的全部或任何部分（仅为个人备份目的而完整复制一份除外）；
-  2. 修改、改编、翻译、演绎本软件，或基于本软件创建衍生作品；
-  3. 分发、发布、出租、出借、销售本软件或其任何部分；
-  4. 再许可（sublicense）本软件，或将其全部/部分权利转让、转授予第三方；
-  5. 将本软件上传至任何软件分发平台或代码托管平台；
-  6. 对本软件进行反向工程、反编译、反汇编，或绕过、移除、篡改本软件的
-     版权声明、许可声明、版本号、完整性校验等任何保护机制；
-  7. 将本软件用于任何商业目的，或用于任何违法、侵权用途。
-
-
---------------------------------------------------------------------------------
-四、第三方组件（Third-Party Components）
+第三方组件（Third-Party Components）
 --------------------------------------------------------------------------------
 
 本软件使用了若干遵循其各自许可证的第三方组件，例如图标库 lucide（ISC）、
 音频库 NAudio（MIT）、压缩库 SharpCompress（MIT）、MQTT 客户端 MQTTnet（MIT），
 以及随包分发的 7-Zip（LGPL）等。
 
-这些第三方组件受其各自许可证约束，其著作权与许可条款**不受本声明影响**，
-也不因本声明而被限制、变更或取代。第三方组件的清单与许可说明详见
-docs\third-party.md。
+这些第三方组件受其各自许可证约束，其著作权与许可条款不受本声明影响，也不因
+本声明而被限制、变更或取代。第三方组件的清单与许可说明详见 docs\third-party.md。
 
 
 --------------------------------------------------------------------------------
-五、免责声明与责任限制（Disclaimer of Warranty / Limitation of Liability）
+免责（No Liability）
 --------------------------------------------------------------------------------
 
-本软件按「现状」（AS IS）及「现有」（AS AVAILABLE）提供，不提供任何形式的
-明示或默示担保，包括但不限于对适销性、特定用途适用性及不侵权的担保。
-
-在任何情况下，版权人及其关联方均不对因使用或无法使用本软件而产生的任何直接、
-间接、附带、特殊、惩罚性或后果性损害（包括但不限于数据丢失、设备损坏、业务
-中断等）承担责任，即使已被告知此类损害发生的可能性。
-
-
---------------------------------------------------------------------------------
-六、其他（Miscellaneous）
---------------------------------------------------------------------------------
-
-  · 本声明以中文文本为准，英文译文仅供参考；两者如有不一致，以中文文本为准；
-  · 本声明的任何条款被认定为无效或不可执行时，不影响其余条款的效力。
+本软件按「现状」（AS IS）提供，不提供任何形式的明示或默示担保。在适用法律允许
+的最大范围内，作者不对因使用或无法使用本软件而产生的任何损害承担责任。
 
 
 ================================================================================
-English Translation (For Reference Only)
+以下为许可正文（英文）/ Official License Text
 ================================================================================
 
-Copyright (c) 2026 mmm. All Rights Reserved.
+# PolyForm Noncommercial License 1.0.0
 
-This software, Hello Mental Omega Launcher (the "Software"), is proprietary
-software. It is NOT open-source software and is not released under any
-open-source license.
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-Subject to this notice, you are granted only a limited, non-transferable,
-non-exclusive, revocable right to install and run the Software on devices
-that you own or lawfully control. All rights not expressly granted are
-reserved by the copyright holder.
+## Acceptance
 
-Without the prior written permission of the copyright holder, you may NOT:
-(1) copy the Software or any part of it, except a single full copy for
-personal backup; (2) modify, adapt, translate, or create derivative works
-based on the Software; (3) distribute, publish, rent, lend, or sell the
-Software or any part of it; (4) sublicense the Software or transfer any of
-its rights to a third party; (5) upload the Software to any software
-distribution or code-hosting platform; (6) reverse engineer, decompile, or
-disassemble the Software, or bypass, remove, or alter any copyright, license,
-version, or integrity-protection notices; (7) use the Software for any
-commercial or unlawful purpose.
+In order to get any license under these terms, you must agree
+to them as both strict obligations and conditions to all
+your licenses.
 
-Third-Party Components: the Software uses third-party components licensed
-under their own respective licenses (e.g. lucide under ISC, NAudio under MIT,
-SharpCompress under MIT, MQTTnet under MIT, and the bundled 7-Zip under LGPL).
-Those licenses are NOT affected by this notice. See docs\third-party.md for
-details.
+## Copyright License
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+The licensor grants you a copyright license for the
+software to do everything you might do with the software
+that would otherwise infringe the licensor's copyright
+in it for any permitted purpose.  However, you may
+only distribute the software according to [Distribution
+License](#distribution-license) and make changes or new works
+based on the software according to [Changes and New Works
+License](#changes-and-new-works-license).
 
-The Chinese text shall prevail over this English translation.
+## Distribution License
+
+The licensor grants you an additional copyright license
+to distribute copies of the software.  Your license
+to distribute covers distributing the software with
+changes and new works permitted by [Changes and New Works
+License](#changes-and-new-works-license).
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of
+the software from you also gets a copy of these terms or the
+URL for them above, as well as copies of any plain-text lines
+beginning with `Required Notice:` that the licensor provided
+with the software.  For example:
+
+> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+
+## Changes and New Works License
+
+The licensor grants you an additional copyright license to
+make changes and new works based on the software for any
+permitted purpose.
+
+## Patent License
+
+The licensor grants you a patent license for the software that
+covers patent claims the licensor can license, or becomes able
+to license, that you would infringe by using the software.
+
+## Noncommercial Purposes
+
+Any noncommercial purpose is a permitted purpose.
+
+## Personal Uses
+
+Personal use for research, experiment, and testing for
+the benefit of public knowledge, personal study, private
+entertainment, hobby projects, amateur pursuits, or religious
+observance, without any anticipated commercial application,
+is use for a permitted purpose.
+
+## Noncommercial Organizations
+
+Use by any charitable organization, educational institution,
+public research organization, public safety or health
+organization, environmental protection organization,
+or government institution is use for a permitted purpose
+regardless of the source of funding or obligations resulting
+from the funding.
+
+## Fair Use
+
+You may have "fair use" rights for the software under the
+law. These terms do not limit them.
+
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of
+your licenses to anyone else, or prevent the licensor from
+granting licenses to anyone else.  These terms do not imply
+any other licenses.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or
+contributes to infringement of any patent, your patent license
+for the software granted under these terms ends immediately. If
+your company makes such a claim, your patent license ends
+immediately for work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have
+violated any of these terms, or done anything with the software
+not covered by your licenses, your licenses can nonetheless
+continue if you come into full compliance with these terms,
+and take practical steps to correct past violations, within
+32 days of receiving notice.  Otherwise, all your licenses
+end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without
+any warranty or condition, and the licensor will not be liable
+to you for any damages arising out of these terms or the use
+or nature of the software, under any kind of legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or entity offering these
+terms, and the **software** is the software the licensor makes
+available under these terms.
+
+**You** refers to the individual or entity agreeing to these
+terms.
+
+**Your company** is any legal entity, sole proprietorship,
+or other kind of organization that you work for, plus all
+organizations that have control over, are under the control of,
+or are under common control with that organization.  **Control**
+means ownership of substantially all the assets of an entity,
+or the power to direct its management and policies by vote,
+contract, or otherwise.  Control can be direct or indirect.
+
+**Your licenses** are all the licenses granted to you for the
+software under these terms.
+
+**Use** means anything you do with the software requiring one
+of your licenses.

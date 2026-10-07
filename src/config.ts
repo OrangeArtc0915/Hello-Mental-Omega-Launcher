@@ -274,7 +274,7 @@ export const commentConfig: CommentConfig = {
 
 export const announcementConfig: AnnouncementConfig = {
 	title: "HMOL",
-	content: `当前版本 ${HMOL.versionDisplay}（${HMOL.name}）。本软件为专有软件，保留所有权利；请仅从官方渠道下载。`,
+	content: `当前版本 ${HMOL.versionDisplay}（${HMOL.name}）。本软件以 PolyForm Noncommercial License 1.0.0 授权：免费用于非商业用途、禁止商用；请仅从官方渠道下载。`,
 	closable: false,
 	link: {
 		enable: true,

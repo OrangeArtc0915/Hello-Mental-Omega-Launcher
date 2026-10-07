@@ -1,9 +1,9 @@
 # Hello Mental Omega Launcher (HMOL)
 
-> 本项目为**专有软件，保留所有权利（All Rights Reserved）**，并非开源软件。任何形式的修改、衍生、二次封装与再分发均被禁止，详见 [LICENSE](LICENSE)。
+> 本项目以 **PolyForm Noncommercial License 1.0.0** 授权：免费用于一切**非商业**用途，禁止商用；属于「源码可见」（source-available），**不是**开源许可证。详见 [LICENSE](LICENSE)。
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](LICENSE)
-[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-orange.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
 本仓库包含 **HMOL 启动器（C# / .NET 8 版）的源码**，以及它的**官网与文档站**（`Web/`）。
@@ -140,10 +140,10 @@ corepack pnpm build        :: = astro build + pagefind
 
 ## 📜 许可 / License
 
-本项目为**专有软件，保留所有权利（All Rights Reserved）**，**并非开源软件**，也不以任何开源许可证发布。
+本项目以 **PolyForm Noncommercial License 1.0.0** 授权：免费用于一切**非商业**用途，**禁止任何商业用途**。它**不是** OSI 认可的开源许可证，属于「源码可见」（source-available）。
 
-- ✅ **允许**：在您本人持有或合法控制的设备上安装并运行本软件；仅为个人备份目的而完整复制一份。
-- ❌ **禁止**（未经版权人事先书面许可）：复制、修改 / 改编 / 翻译 / 演绎、创建衍生作品、分发 / 发布 / 出租 / 销售、再许可或转让权利、上传至任何分发平台或代码托管平台、反向工程 / 反编译 / 反汇编、绕过或移除任何保护机制、用于任何商业或违法用途。
+- ✅ **允许**：免费下载、安装、运行本软件用于任何非商业目的；为非商业目的复制、修改、创作新作品与分发——但分发时必须把许可条款（或官方链接）与 `Required Notice` 版权声明原样带给收到的人。
+- ❌ **禁止**：任何商业用途（出售、收费分发、付费下载、捆绑销售，或用于你经营的业务）；去掉或篡改许可与版权声明后再分发；再许可（sublicense）或把权利转让给他人；宣称本软件由你开发，或暗示与作者存在关联、获得其认可。
 
 完整条款请参见 [LICENSE](LICENSE) 文件。
 
@@ -157,6 +157,6 @@ corepack pnpm build        :: = astro build + pagefind
 
 ---
 
-**© 2026 mmm. 保留所有权利（All Rights Reserved）。**
+**© 2026 mmm. 以 PolyForm Noncommercial License 1.0.0 授权。**
 
 **Made with ❤️ for the Mental Omega community.**

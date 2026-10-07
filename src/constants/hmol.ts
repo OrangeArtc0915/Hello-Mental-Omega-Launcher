@@ -3,7 +3,7 @@
  *
  * 取值来源（不要臆造，改动前请同步核对）：
  * - 版本号 / 作者 / 仓库 / QQ 群：`src/HMOL.Core/App/AppInfo.cs`
- * - 许可口径：仓库根 `LICENSE`（专有软件，保留所有权利）
+ * - 许可口径：仓库根 `LICENSE`（PolyForm Noncommercial 1.0.0）
  * - 第三方组件清单：`docs/third-party.md`
  *
  * 站点配置（src/config.ts）、导航、页脚、首页都从这里取值，
@@ -25,7 +25,7 @@ export const HMOL = {
 	/** 作者，对应 AppInfo.Author */
 	author: "mmm",
 	/** 许可摘要，对应 AppInfo.License 与仓库根 LICENSE */
-	license: "保留所有权利",
+	license: "PolyForm Noncommercial 1.0.0",
 	/** 一句话简介（官网首页与页脚共用） */
 	tagline: "为心灵终结玩家打造的轻量级启动器",
 	/** 站点描述，用于 meta description */

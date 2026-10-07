@@ -1,6 +1,6 @@
 # 安全政策 / Security Policy
 
-> 本软件为**专有软件，保留所有权利（All Rights Reserved）**，详见 [LICENSE](LICENSE)。
+> 本软件以 **PolyForm Noncommercial License 1.0.0** 授权（免费非商业使用、禁止商用），详见 [LICENSE](LICENSE)。
 
 ***
 
@@ -92,4 +92,4 @@
 
 ***
 
-**© 2026 mmm. 保留所有权利（All Rights Reserved）。**
+**© 2026 mmm. 以 PolyForm Noncommercial License 1.0.0 授权。**

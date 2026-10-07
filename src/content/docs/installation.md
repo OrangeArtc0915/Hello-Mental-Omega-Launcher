@@ -47,7 +47,7 @@ order: 20
 
 ```
 HMOL.exe          ← 自包含单文件程序（内置 .NET 8 运行时）
-LICENSE           ← 许可声明（保留所有权利）
+LICENSE           ← 许可声明（PolyForm Noncommercial 1.0.0）
 README.md / NOTICE
 runtime\          ← 组网组件（联机功能所需）
   ├─ 7zip\        ← 7za.exe（实例导出 .7z 用）
