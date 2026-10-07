@@ -2541,6 +2541,7 @@
     "安装第三方包属于对游戏副本的自行改动，风险自担；通过本启动器安装的内容，MO 官方不提供支持。": "Installing third-party packages modifies your own copy of the game at your own risk; content installed through this launcher is not supported by the Mental Omega team.",
     "非官方声明：本程序为玩家自制的第三方启动器，与《心灵终结》开发组 Mentalmeisters 无关联，也未获其授权或认证；本程序不提供游戏本体或官方补丁的下载。": "Unofficial notice: this is a third-party launcher made by players. It is not affiliated with Mentalmeisters, the Mental Omega development team, and is neither authorized nor endorsed by them. It does not offer downloads of the game itself or of official patches.",
     "动图背景里没有可播放的帧，回退主题渐变": "The animated background has no playable frames; falling back to the theme gradient.",
-    "背景：动图 {0}（{1} 帧，画布 {2}×{3}）": "Background: animated image {0} ({1} frames, canvas {2}x{3})"
+    "背景：动图 {0}（{1} 帧，画布 {2}×{3}）": "Background: animated image {0} ({1} frames, canvas {2}x{3})",
+    "缺少 7-Zip 组件（runtime\\7zip\\7za.exe），请到左侧「下载」页补全运行环境": "Missing the 7-Zip component (runtime\\7zip\\7za.exe). Please complete the runtime environment from the \"Download\" page on the left."
   }
 }

@@ -26,7 +26,7 @@ public static class SevenZipTool
     private const string RelativePath = "runtime/7zip/7za.exe";
 
     /// <summary>组件缺失时的提示文案（属性而非常量：随界面语言变化）。</summary>
-    public static string MissingMessage => Loc.T("缺少 7-Zip 组件（runtime\\7zip\\7za.exe），请重新解压完整发行包");
+    public static string MissingMessage => Loc.T("缺少 7-Zip 组件（runtime\\7zip\\7za.exe），请到左侧「下载」页补全运行环境");
 
     /// <summary>把 <see cref="System.IO.Compression.CompressionLevel"/> 折算成 7-Zip 的 -mx 等级。</summary>
     public const int LevelStore = 0;
