@@ -24,7 +24,7 @@ export interface HmolInfo {
 	versionDisplay: string;
 	/** AppInfo.Author */
 	author: string;
-	/** AppInfo.License（许可声明摘要：保留所有权利） */
+	/** AppInfo.License（许可声明摘要：PolyForm Noncommercial 1.0.0） */
 	license: string;
 	githubUrl: string;
 	githubIssuesUrl: string;
@@ -47,10 +47,10 @@ const LTS_SERIES = "1.5";
 /** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（2026-10 快照） */
 const FALLBACK: HmolInfo = {
 	name: "Hello Mental Omega Launcher",
-	version: "1.5.10",
-	versionDisplay: "v1.5.10",
+	version: "1.5.11",
+	versionDisplay: "v1.5.11",
 	author: "mmm",
-	license: "保留所有权利",
+	license: "PolyForm Noncommercial 1.0.0",
 	githubUrl:
 		"https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher",
 	githubIssuesUrl:
@@ -62,7 +62,7 @@ const FALLBACK: HmolInfo = {
 		"https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases",
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
-	zipName: "HMOL-v1.5.10-win-x64.zip",
+	zipName: "HMOL-v1.5.11-win-x64.zip",
 	isLts: true,
 	ltsSeries: LTS_SERIES,
 };
@@ -154,5 +154,5 @@ export const systemRequirements = [
  */
 export const packageContents = [
 	{ name: "HMOL.exe", desc: "启动器本体，自包含 .NET 8 单文件" },
-	{ name: "LICENSE", desc: "许可声明（保留所有权利）" },
+	{ name: "LICENSE", desc: "许可声明（PolyForm Noncommercial 1.0.0）" },
 ] as const;
