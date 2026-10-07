@@ -6,7 +6,7 @@
 官网 / 文档：<https://orangeartc0915.github.io/Hello-Mental-Omega-Launcher/>
 
 - 作者：mmm
-- 许可：保留所有权利（专有软件），条款见仓库根 [LICENSE](LICENSE)
+- 许可：[PolyForm Noncommercial License 1.0.0](LICENSE) —— 免费，可自由用于一切**非商业**用途；禁止商用，并要求署名与许可随作品传播
 - 官方 QQ 群：1034243331
 
 ---
@@ -29,7 +29,7 @@
 1. 到 [Releases](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/releases) 下载最新的 `HMOL-v<版本>-win-x64.zip`。
 2. **完整解压**到任意目录（绿色便携；设置、实例、插件包与日志都留在该目录内）。
 3. 双击目录内的 `HMOL.exe` 启动。
-4. 组网组件（EasyTier / n2n / TAP / WinIPBroadcast）、7-Zip 与联机补丁**不随包分发**：首次使用联机时在程序内「下载」页按需获取。
+4. 组网组件（EasyTier / n2n / TAP / WinIPBroadcast）与 7-Zip**不随包分发**：首次使用联机时在程序内「下载」页按需获取。
 
 `HMOL.exe` 已带**代码签名**（自签证书 `CN=mmm`，含 DigiCert 时间戳）。该证书由发布方自建、并非公共 CA
 签发，因此没把证书装进本机「受信任的根证书颁发机构 / 受信任的发布者」的机器上，SmartScreen 仍可能拦

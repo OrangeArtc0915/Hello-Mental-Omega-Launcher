@@ -1,7 +1,7 @@
 # 第三方组件
 
-本程序（Hello Mental Omega Launcher）自身为专有软件、保留所有权利（见仓库根
-`LICENSE`）。本程序使用的第三方组件分两类：**随包分发的二进制**（运行时被调用）
+本程序（Hello Mental Omega Launcher）自身以 PolyForm Noncommercial License 1.0.0
+授权（见仓库根 `LICENSE`）。本程序使用的第三方组件分两类：**随包分发的二进制**（运行时被调用）
 与**编译期引用的库**。这些组件受其各自许可证约束，其许可**不受本程序许可声明影响**。
 
 ## 7-Zip（独立命令行 7za.exe）
