@@ -17,7 +17,7 @@ order: 180
 
 - 联机功能是启动器的**内置页面**（左侧导航「🌐 联机」）；
 - 配置保存在数据目录下的 **`Data\multiplayer.json`**；
-- 组网二进制放在发行包的 **`runtime\`** 目录（EasyTier / n2n / TAP / WinIPBroadcast），不内嵌进 exe。
+- 组网二进制（EasyTier / n2n / TAP / WinIPBroadcast）不内嵌进 exe，首次使用联机时在「下载」页按需下载到 `runtime\` 目录。
 
 ### 方案
 
@@ -38,4 +38,4 @@ order: 180
 ### 其它
 
 - 游戏 HUD 为状态卡片；
-- `runtime\winipbroadcast\` 里随包分发的 WinIPBroadcast，源码有安装能力但**未接到界面按钮**。
+- `runtime\winipbroadcast\` 里的 WinIPBroadcast（按需下载），源码有安装能力但**未接到界面按钮**。

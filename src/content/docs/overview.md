@@ -87,7 +87,7 @@ order: 10
 
 它不是 OSI 认可的开源许可证，属于「源码可见」（source-available）。分发任何副本时需随附许可条款原文。
 
-完整条款请参见仓库根目录的 [LICENSE](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE) 文件；随包分发的第三方组件（7-Zip、RePKG、EasyTier、n2n、TAP 驱动、WinIPBroadcast、lucide、NAudio、SharpCompress、MQTTnet）受其各自许可证约束，详见仓库 `docs/third-party.md`。
+完整条款请参见仓库根目录的 [LICENSE](https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/blob/main/LICENSE) 文件；使用的第三方组件（7-Zip、RePKG、EasyTier、n2n、TAP 驱动、WinIPBroadcast、lucide、NAudio、SharpCompress、MQTTnet）受其各自许可证约束，详见仓库 `docs/third-party.md`。
 
 ***
 
