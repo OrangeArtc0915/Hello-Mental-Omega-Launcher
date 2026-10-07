@@ -47,8 +47,8 @@ const LTS_SERIES = "1.5";
 /** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（2026-10 快照） */
 const FALLBACK: HmolInfo = {
 	name: "Hello Mental Omega Launcher",
-	version: "1.5.11",
-	versionDisplay: "v1.5.11",
+	version: "1.5.12",
+	versionDisplay: "v1.5.12",
 	author: "mmm",
 	license: "PolyForm Noncommercial 1.0.0",
 	githubUrl:
@@ -62,7 +62,7 @@ const FALLBACK: HmolInfo = {
 		"https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases",
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
-	zipName: "HMOL-v1.5.11-win-x64.zip",
+	zipName: "HMOL-v1.5.12-win-x64.zip",
 	isLts: true,
 	ltsSeries: LTS_SERIES,
 };
