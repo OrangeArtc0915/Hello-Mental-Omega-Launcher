@@ -45,6 +45,19 @@ public enum BackgroundFill
     Tile = 3
 }
 
+/// <summary>点主窗口右上角的 ×（或按 Alt+F4）时的行为。</summary>
+public enum CloseAction
+{
+    /// <summary>每次弹窗让用户选「最小化到托盘」还是「直接退出」（默认）。</summary>
+    Ask = 0,
+
+    /// <summary>直接退出程序（会播放关闭音效）。</summary>
+    Exit = 1,
+
+    /// <summary>最小化到系统托盘，程序继续在后台运行。</summary>
+    MinimizeToTray = 2
+}
+
 /// <summary>主页背景设置。素材文件会被复制进 Paths.Backgrounds，避免用户原图被移走后背景失效。</summary>
 public sealed class BackgroundSettings
 {
@@ -364,4 +377,25 @@ public sealed class Settings
     /// 避免他们之后把实例删空又被向导打扰。见 <c>MainWindow.QueueFirstRunWizard</c>。
     /// </summary>
     public bool FirstRunCompleted { get; set; }
+
+    /// <summary>
+    /// 「同文件夹多实例」：允许同一个游戏目录被多个实例共用。
+    ///
+    /// <para>
+    /// 打开后可以给同一目录里的不同主程序各建一个实例（相当于「一个文件夹里的多个版本」），
+    /// 启动游戏时再选启动哪个版本。这些实例**共用同一个游戏目录与备份**，
+    /// 各自的「已安装包」记录相互独立——在其中一个里装的包，另一个不会知道。
+    /// 默认关闭，此时同一个目录只能建一个实例（与旧版一致）。
+    /// </para>
+    /// </summary>
+    public bool AllowSharedGameDir { get; set; }
+
+    /// <summary>「新手教程」的运行期提示是否已经出现过（只提示一次，点开或忽略都会置位）。</summary>
+    public bool TutorialHintShown { get; set; }
+
+    /// <summary>
+    /// 点主窗口右上角 ×（或按 Alt+F4）时的行为。默认 <see cref="CloseAction.Ask"/>：每次弹窗让用户
+    /// 自己选「最小化到托盘」还是「直接退出」。老配置文件里没有这个字段时按默认（每次询问）处理。
+    /// </summary>
+    public CloseAction CloseAction { get; set; } = CloseAction.Ask;
 }

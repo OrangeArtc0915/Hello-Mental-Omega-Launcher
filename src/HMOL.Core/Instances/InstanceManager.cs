@@ -12,7 +12,8 @@ public sealed record InstanceResult(bool Success, string Message);
 
 /// <summary>
 /// 实例的增删改查与导入导出。校验规则完全按旧版 <c>InstanceManager</c>：
-/// 名称非空且唯一、路径必须是有效的心灵终结目录、同一路径不能被两个实例共用。
+/// 名称非空且唯一、路径必须是有效的心灵终结目录、同一路径不能被两个实例共用
+/// （打开「同文件夹多实例」后这条放开，见 <see cref="Settings.AllowSharedGameDir"/>）。
 /// </summary>
 public static class InstanceManager
 {
@@ -26,7 +27,8 @@ public static class InstanceManager
 
     /// <summary>新增实例（对应旧版 add_instance）。</summary>
     public static InstanceResult Add(string name, string? path, string note = "",
-        GameKind kind = GameKind.MentalOmega, string? executable = null)
+        GameKind kind = GameKind.MentalOmega, string? executable = null,
+        IReadOnlyList<InstanceVersion>? versions = null)
     {
         var instanceName = (name ?? string.Empty).Trim();
         var gameDir = GameLocator.NormalizePath(path);
@@ -37,10 +39,28 @@ public static class InstanceManager
         if (All.Any(item => string.Equals(item.Name, instanceName, StringComparison.OrdinalIgnoreCase)))
             return new InstanceResult(false, Loc.T("实例名称已存在"));
 
-        if (!GameLocator.IsGameDirectory(gameDir, kind, executable))
-            return new InstanceResult(false, InvalidDirectoryMessage(kind, executable));
+        // 配了版本时目录按第一个版本的主程序校验（与单独指定主程序同一套放宽规则）
+        var checkExecutable = !string.IsNullOrWhiteSpace(executable)
+            ? executable
+            : versions?.FirstOrDefault(item => item is not null && !string.IsNullOrWhiteSpace(item.Executable))?.Executable;
 
-        if (All.Any(item => GameLocator.IsSamePath(item.GameDir, gameDir)))
+        if (!GameLocator.IsGameDirectory(gameDir, kind, checkExecutable))
+            return new InstanceResult(false, InvalidDirectoryMessage(kind, checkExecutable));
+
+        if (versions is not null)
+        {
+            foreach (var version in versions)
+            {
+                if (version is null || string.IsNullOrWhiteSpace(version.Executable)) continue;
+
+                if (GameLocator.ResolveExecutable(gameDir, version.Executable) is null)
+                    return new InstanceResult(false, Loc.F("版本「{0}」的主程序不存在：{1}", version.DisplayName, version.Executable));
+            }
+        }
+
+        // 同一目录多实例：默认禁止；打开「同文件夹多实例」后放行（各实例绑定不同主程序，启动时选版本）
+        if (!SettingsStore.Current.AllowSharedGameDir &&
+            All.Any(item => GameLocator.IsSamePath(item.GameDir, gameDir)))
             return new InstanceResult(false, Loc.T("该游戏路径已被其他实例使用"));
 
         var instance = new GameInstance
@@ -52,6 +72,8 @@ public static class InstanceManager
             Executable = NormalizeExecutable(gameDir, executable)
         };
 
+        ApplyVersions(instance, versions);
+
         EnsureDirectories(instance);
         InstanceStore.Upsert(instance);
 
@@ -61,9 +83,35 @@ public static class InstanceManager
         return new InstanceResult(true, Loc.F("实例「{0}」创建成功", instanceName));
     }
 
-    /// <summary>编辑实例：名称 / 路径 / 备注 / 游戏类型 / 主程序可以只改其中一部分（对应旧版 update_instance）。</summary>
+    /// <summary>
+    /// 把版本列表写进实例：每个可执行文件按同一套规则规整（目录内相对、目录外绝对），
+    /// 并让 <see cref="GameInstance.Executable"/> 跟着第一个版本走——只认 Executable 的旧路径也就照样能用。
+    /// </summary>
+    private static void ApplyVersions(GameInstance instance, IReadOnlyList<InstanceVersion>? versions)
+    {
+        if (versions is null) return;
+
+        var normalized = versions
+            .Where(item => item is not null && !string.IsNullOrWhiteSpace(item.Executable))
+            .Select(item => new InstanceVersion
+            {
+                Name = (item.Name ?? string.Empty).Trim(),
+                Executable = NormalizeExecutable(instance.GameDir, item.Executable)
+            })
+            .ToList();
+
+        instance.Versions = normalized;
+
+        if (normalized.Count > 0) instance.Executable = normalized[0].Executable;
+    }
+
+    /// <summary>
+    /// 编辑实例：名称 / 路径 / 备注 / 游戏类型 / 主程序 / 版本列表可以只改其中一部分（对应旧版 update_instance）。
+    /// 传了 <paramref name="newVersions"/> 就整份替换版本列表（空列表表示恢复成「按类型自动探测」）。
+    /// </summary>
     public static InstanceResult Update(string instanceId, string? newName = null, string? newPath = null,
-        string? newNote = null, GameKind? newKind = null, string? newExecutable = null)
+        string? newNote = null, GameKind? newKind = null, string? newExecutable = null,
+        IReadOnlyList<InstanceVersion>? newVersions = null)
     {
         var instance = InstanceStore.FindById(instanceId);
         if (instance is null) return new InstanceResult(false, Loc.T("实例不存在"));
@@ -83,6 +131,25 @@ public static class InstanceManager
         var targetKind = newKind ?? instance.Kind;
         var targetExecutable = newExecutable is null ? instance.Executable : newExecutable;
 
+        // 传了版本列表时，目录校验按第一个版本的主程序走（与单独指定主程序同一套放宽规则）
+        var versionsChanged = newVersions is not null;
+
+        if (versionsChanged)
+        {
+            var first = newVersions!.FirstOrDefault(item => item is not null && !string.IsNullOrWhiteSpace(item.Executable));
+            if (first is not null) targetExecutable = first.Executable;
+
+            foreach (var version in newVersions!)
+            {
+                if (version is null || string.IsNullOrWhiteSpace(version.Executable)) continue;
+
+                // 目录可能同时被改：按新目录解析
+                var checkDir = GameLocator.NormalizePath(newPath ?? instance.GameDir);
+                if (GameLocator.ResolveExecutable(checkDir, version.Executable) is null)
+                    return new InstanceResult(false, Loc.F("版本「{0}」的主程序不存在：{1}", version.DisplayName, version.Executable));
+            }
+        }
+
         var pathChanged = newPath is not null && !GameLocator.IsSamePath(newPath, instance.GameDir);
         var kindChanged = newKind is not null && newKind.Value != instance.Kind;
         var executableChanged = newExecutable is not null &&
@@ -91,18 +158,23 @@ public static class InstanceManager
 
         var targetDir = pathChanged ? GameLocator.NormalizePath(newPath) : instance.GameDir;
 
-        // 只有目录 / 类型 / 主程序真的变了才重新校验，避免「只改备注」也被坏目录挡住
-        if (pathChanged || kindChanged || executableChanged)
+        // 只有目录 / 类型 / 主程序 / 版本真的变了才重新校验，避免「只改备注」也被坏目录挡住
+        if (pathChanged || kindChanged || executableChanged || versionsChanged)
         {
             if (!GameLocator.IsGameDirectory(targetDir, targetKind, targetExecutable))
                 return new InstanceResult(false, InvalidDirectoryMessage(targetKind, targetExecutable));
 
-            if (pathChanged && All.Any(item => !ReferenceEquals(item, instance) &&
-                                               GameLocator.IsSamePath(item.GameDir, targetDir)))
+            if (pathChanged && !SettingsStore.Current.AllowSharedGameDir &&
+                All.Any(item => !ReferenceEquals(item, instance) &&
+                                GameLocator.IsSamePath(item.GameDir, targetDir)))
                 return new InstanceResult(false, Loc.T("该游戏路径已被其他实例使用"));
 
             instance.GameDir = targetDir;
             instance.Kind = targetKind;
+
+            // 先落版本（它会把 Executable 对齐到第一个版本），再按目标主程序收尾
+            if (versionsChanged) ApplyVersions(instance, newVersions);
+
             instance.Executable = NormalizeExecutable(targetDir, targetExecutable);
         }
 

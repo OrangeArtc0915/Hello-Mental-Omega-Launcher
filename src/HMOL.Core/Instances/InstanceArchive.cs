@@ -46,6 +46,9 @@ public sealed class InstanceArchiveInfo
 
     /// <summary>用户指定的主程序（游戏目录内时是相对路径）。旧版包没有这个键，按自动探测处理。</summary>
     [JsonPropertyName("executable")] public string Executable { get; set; } = string.Empty;
+
+    /// <summary>多版本列表（旧归档里没有这个字段时为空）。</summary>
+    [JsonPropertyName("versions")] public List<InstanceVersion>? Versions { get; set; }
 }
 
 /// <summary>
@@ -127,7 +130,12 @@ public static class InstanceArchive
                 TotalSizeBytes = totalSize,
                 InstalledPackages = instance.InstalledPackages.ToDictionary(pair => pair.Key, pair => pair.Value.ToList()),
                 Kind = instance.Kind,
-                Executable = instance.Executable
+                Executable = instance.Executable,
+                Versions = [.. instance.Versions.Select(item => new InstanceVersion
+                {
+                    Name = item.Name,
+                    Executable = item.Executable
+                })]
             };
 
             if (File.Exists(partial)) File.Delete(partial);
@@ -351,7 +359,13 @@ public static class InstanceArchive
                 CreatedAt = info.CreatedAt == default ? DateTime.Now : info.CreatedAt,
                 Kind = info.Kind,
                 // 游戏文件已复制到新实例目录，相对主程序名照旧可用；绝对路径在导入后失效时会退回自动探测
-                Executable = info.Executable
+                Executable = info.Executable,
+                // 多版本列表跟着一起搬（旧归档没有这个字段，导入后就是空列表）
+                Versions = [.. (info.Versions ?? []).Select(item => new InstanceVersion
+                {
+                    Name = item.Name,
+                    Executable = item.Executable
+                })]
             };
 
             instance.InstalledPackages = info.InstalledPackages;

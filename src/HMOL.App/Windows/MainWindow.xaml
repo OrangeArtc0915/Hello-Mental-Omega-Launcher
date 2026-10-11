@@ -407,6 +407,12 @@
                                         Grid.Row="1"
                                         Margin="0,0,0,12"
                                         VerticalAlignment="Bottom">
+                                <!-- 新手教程与「关于」一样弹独立窗口，不参与页面切换；放在「关于」上面 -->
+                                <c:NavItem x:Name="NavTutorial"
+                                           GroupName="TutorialNav"
+                                           Icon="lucide/book-marked"
+                                           Text="{loc:T '新手教程'}"
+                                           Click="OnTutorialNavClick" />
                                 <!-- 单独分组，避免与主页面导航互斥；点击后弹独立窗口，不参与页面切换 -->
                                 <c:NavItem x:Name="NavAbout"
                                            GroupName="AboutNav"

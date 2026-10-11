@@ -1763,6 +1763,20 @@
                                      Content="{loc:T '重新运行配置向导'}"
                                      Tone="Solid"
                                      Click="OnRunWizardClick" />
+
+                    <!-- 同文件夹多实例：一个游戏目录里的多个主程序各建一个实例，启动时选版本 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '同文件夹多实例'}" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton x:Name="BtnAllowSharedGameDir" Click="OnToggleAllowSharedGameDirClick" />
+                    </StackPanel>
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '打开后允许同一个游戏目录被两个实例共用（一般只在「两套不同的包组合要共用同一目录」时才需要）。如果只是同一个文件夹里的两个版本，直接在实例里「添加版本」更简单。共用的实例会共用同一目录与备份，但各自的「已安装包」记录相互独立。'}" />
                 </StackPanel>
             </c:SurfaceCard>
 
@@ -1847,6 +1861,20 @@
             <c:SurfaceCard x:Name="CardLook" Margin="0,14,0,0" Title="{loc:T '窗口与音效'}">
                 <StackPanel>
                     <TextBlock FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '点右上角 × 时'}" />
+                    <ComboBox x:Name="CmbCloseAction"
+                              Margin="0,6,0,0"
+                              DisplayMemberPath="DisplayName"
+                              SelectionChanged="OnCloseActionChanged" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '默认每次都问你是要最小化到托盘还是直接退出；也可以固定成其中一种，之后点 ×（或按 Alt+F4）就直接执行，不再询问。'}" />
+
+                    <TextBlock Margin="0,14,0,0"
+                               FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:T '窗口标题文字'}" />
                     <Border Height="34"

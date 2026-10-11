@@ -23,7 +23,7 @@ public sealed record LayoutElementInfo(
 public sealed record HomeDefaultRect(double XPercent, double YPercent, double WidthPercent, double HeightPercent);
 
 /// <summary>
-/// 可自定义的左侧导航元素清单（主窗口侧栏 = 6 个页面 + 底部「关于」）。
+/// 可自定义的左侧导航元素清单（主窗口侧栏 = 6 个页面 + 底部「新手教程」「关于」）。
 /// 侧栏是固定布局：只支持顺序 / 显隐 / 改名，不参与自由定位。
 /// </summary>
 public static class LayoutElements
@@ -51,6 +51,7 @@ public static class LayoutElements
         new("nav_log", Loc.T("运行日志"), "lucide/scroll-text", GroupNav, "NavLog", ContainerNav),
         // 设置页是布局编辑器的唯一入口，允许隐藏等于把用户锁在外面，因此不可隐藏
         new("nav_settings", Loc.T("设置"), "lucide/settings", GroupNav, "NavSettings", ContainerNav, CanHide: false),
+        new("nav_tutorial", Loc.T("新手教程"), "lucide/book-marked", GroupFooter, "NavTutorial", ContainerFooter),
         new("nav_about", Loc.T("关于"), "lucide/info", GroupFooter, "NavAbout", ContainerFooter),
     ];
 

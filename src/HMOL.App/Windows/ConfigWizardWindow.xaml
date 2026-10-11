@@ -73,6 +73,15 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- 新手教程入口：与左下角「新手教程」是同一个窗口，第一次进来就能先看一遍 -->
+                    <c:OutlineButton x:Name="BtnTutorial"
+                                     Margin="0,0,0,14"
+                                     Padding="14,6"
+                                     HorizontalAlignment="Left"
+                                     FontSize="12.5"
+                                     Content="{loc:T '先看看新手教程'}"
+                                     Click="OnTutorialClick" />
+
                     <TextBlock FontSize="17"
                                FontWeight="SemiBold"
                                TextWrapping="Wrap"

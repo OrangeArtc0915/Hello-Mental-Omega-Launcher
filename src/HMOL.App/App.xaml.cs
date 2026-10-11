@@ -176,8 +176,13 @@ public partial class App : Application
 
             // 自动检查启动器更新：让出一轮消息循环再弹窗，那时弹窗才有 owner，位置和焦点才正常。
             // 自启驻留托盘时不检查（上面那个分支），截图自检模式也不打扰。
-            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
-                _ = LauncherUpdateFlow.StartupCheckAsync(window, updateFailure, silenced: quiet)));
+            // 「新手教程」的一次性提示排在更新检查之后：两个窗口不会叠在一起（首次运行向导那条路见 MainWindow）。
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(async () =>
+            {
+                await LauncherUpdateFlow.StartupCheckAsync(window, updateFailure, silenced: quiet);
+
+                if (!quiet) window.ShowTutorialHintOnce();
+            }));
 
 #if DEBUG
             // 调试期自动截图（--capture-home <png 路径> [--capture-size 宽x高]）：等界面渲染、动效收敛后截一帧，截完直接退出

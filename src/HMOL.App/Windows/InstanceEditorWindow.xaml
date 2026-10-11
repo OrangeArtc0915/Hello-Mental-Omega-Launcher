@@ -109,40 +109,97 @@
                                  Click="OnKindClick" />
             </WrapPanel>
 
-            <!-- 游戏主程序（可选） -->
-            <TextBlock Margin="0,10,0,0"
-                       FontSize="12"
-                       Foreground="{DynamicResource Text.Secondary}"
-                       Text="{loc:T '游戏主程序（可选）'}" />
-            <Grid Margin="0,6,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <!-- 游戏主程序（可选）：默认只显示这一个输入框；点「多版本…」才切到下面的多版本列表 -->
+            <StackPanel x:Name="PanSingleExe" Margin="0,10,0,0">
+                <TextBlock FontSize="12"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:T '游戏主程序（可选）'}" />
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0"
-                        Height="38"
-                        Padding="10,0"
-                        Background="{DynamicResource Surface.Sunken}"
-                        BorderBrush="{DynamicResource Border.Default}"
-                        BorderThickness="1"
-                        CornerRadius="{DynamicResource Radius.Button}">
-                    <TextBox x:Name="TxtExe"
-                             VerticalContentAlignment="Center"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             CaretBrush="{DynamicResource Text.Primary}"
-                             Foreground="{DynamicResource Text.Primary}"
-                             TextChanged="OnExecutableChanged" />
-                </Border>
+                    <Border Grid.Column="0"
+                            Height="38"
+                            Padding="10,0"
+                            Background="{DynamicResource Surface.Sunken}"
+                            BorderBrush="{DynamicResource Border.Default}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource Radius.Button}">
+                        <TextBox x:Name="TxtExe"
+                                 VerticalContentAlignment="Center"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{DynamicResource Text.Primary}"
+                                 Foreground="{DynamicResource Text.Primary}"
+                                 TextChanged="OnExecutableChanged" />
+                    </Border>
 
-                <c:OutlineButton Grid.Column="2"
-                                 Height="38"
-                                 Padding="14,0"
-                                 Content="{loc:T '浏览…'}"
-                                 Click="OnBrowseExeClick" />
-            </Grid>
+                    <c:OutlineButton Grid.Column="2"
+                                     Height="38"
+                                     Padding="14,0"
+                                     Content="{loc:T '浏览…'}"
+                                     Click="OnBrowseExeClick" />
+                </Grid>
+                <c:OutlineButton Margin="0,8,0,0"
+                                 HorizontalAlignment="Left"
+                                 Padding="12,5"
+                                 FontSize="12.5"
+                                 Content="{loc:T '多版本…'}"
+                                 Click="OnEnableVersionsClick" />
+            </StackPanel>
+
+            <!-- 游戏版本（可选）：点「多版本…」后显示，同一目录里的多个 exe 各加一行，启动时按名字选 -->
+            <StackPanel x:Name="PanVersionSection" Visibility="Collapsed">
+                <TextBlock Margin="0,10,0,0"
+                           FontSize="12"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:T '游戏版本（可选）'}" />
+                <TextBlock Margin="0,6,0,0"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource Text.Tertiary}"
+                           TextWrapping="Wrap"
+                           Text="{loc:T '留空则按游戏类型自动找主程序。同一个文件夹里有两个版本时，点「添加版本」一次选中 2 个 exe，再分别起名；启动游戏时会先让你选版本。'}" />
+                <StackPanel x:Name="PanVersions" Margin="0,8,0,0" />
+                <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                    <c:OutlineButton Padding="12,5"
+                                     FontSize="12.5"
+                                     Content="{loc:T '添加版本…'}"
+                                     Click="OnAddVersionsClick" />
+                    <c:OutlineButton x:Name="BtnAddDetected"
+                                     Margin="8,0,0,0"
+                                     Padding="12,5"
+                                     FontSize="12.5"
+                                     Content="{loc:T '加入目录里的主程序'}"
+                                     Click="OnAddDetectedClick"
+                                     Visibility="Collapsed" />
+                    <c:OutlineButton Margin="8,0,0,0"
+                                     Padding="12,5"
+                                     FontSize="12.5"
+                                     Content="{loc:T '回到单版本'}"
+                                     Click="OnBackToSingleClick" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 同文件夹多实例：同一目录里的另一个版本各建一个实例（默认关闭） -->
+            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:T '同文件夹多实例'}" />
+                <c:OutlineButton x:Name="BtnSharedDir"
+                                 Margin="10,0,0,0"
+                                 Padding="12,5"
+                                 FontSize="12.5"
+                                 Click="OnToggleSharedDirClick" />
+            </StackPanel>
+            <TextBlock Margin="0,6,0,0"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource Text.Tertiary}"
+                       TextWrapping="Wrap"
+                       Text="{loc:T '打开后允许同一个游戏目录再建一个实例（一般只在两套不同的包组合要共用同一目录时才需要）；同一个文件夹里的两个版本请用上面的「添加版本」，更直接。共用的实例会共用同一目录与备份，但各自的「已安装包」记录相互独立。'}" />
 
             <!-- 备注 -->
             <TextBlock Margin="0,16,0,0"

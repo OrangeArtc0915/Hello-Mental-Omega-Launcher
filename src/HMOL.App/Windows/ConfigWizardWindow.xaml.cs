@@ -131,6 +131,13 @@ public partial class ConfigWizardWindow : Window
         }
     }
 
+    /// <summary>
+    /// 第 1 步里的「先看看新手教程」：与左下角「新手教程」是同一个窗口，
+    /// 以向导为 Owner 模态打开，看完关掉继续配置。
+    /// </summary>
+    private void OnTutorialClick(object sender, RoutedEventArgs e)
+        => new TutorialWindow { Owner = this }.ShowDialog();
+
     // ————— 步骤机 —————
 
     private void SwitchStep(int step)
@@ -319,9 +326,12 @@ public partial class ConfigWizardWindow : Window
             return false;
         }
 
-        if (InstanceManager.All.Any(item => GameLocator.IsSamePath(item.GameDir, normalized)))
+        if (InstanceManager.All.Any(item => GameLocator.IsSamePath(item.GameDir, normalized)) &&
+            !SettingsStore.Current.AllowSharedGameDir)
         {
-            SetDirectoryState(Loc.T("这个目录已经被其它实例使用了，请在「游戏实例」页查看，或换一个目录。"), "Status.Danger");
+            SetDirectoryState(Loc.T("这个目录已经被其它实例使用了，请在「游戏实例」页查看，或换一个目录。") +
+                              Loc.T("如果这确实是「同一个文件夹里的两个版本」，可以到「设置 → 游戏路径」打开「同文件夹多实例」，再把另一个版本单独建成实例。"),
+                "Status.Danger");
             return false;
         }
 
@@ -339,13 +349,39 @@ public partial class ConfigWizardWindow : Window
         _resolvedExecutable = GameLocator.ResolveExecutable(normalized, executable)
                               ?? GameLocator.FindExecutable(normalized, _kind);
 
-        SetDirectoryState(
-            _resolvedExecutable is null
-                ? Loc.T("目录有效，但没有找到游戏主程序；可以继续，启动前请确认游戏文件完整。")
-                : Loc.F("已找到主程序：{0}", Path.GetFileName(_resolvedExecutable)),
-            _resolvedExecutable is null ? "Status.Warn" : "Status.Success");
+        var state = _resolvedExecutable is null
+            ? Loc.T("目录有效，但没有找到游戏主程序；可以继续，启动前请确认游戏文件完整。")
+            : Loc.F("已找到主程序：{0}", Path.GetFileName(_resolvedExecutable));
+
+        // 该目录已经有别的实例：把共用关系讲清楚，免得用户以为两个实例互不影响
+        var shared = SettingsStore.Current.AllowSharedGameDir &&
+                     InstanceManager.All.Any(item => GameLocator.IsSamePath(item.GameDir, normalized));
+
+        if (shared)
+            state += "\n" + Loc.T("这个目录已经有其它实例：「同文件夹多实例」让它们共用同一游戏目录与备份，但各自的「已安装包」记录相互独立。");
+
+        // 目录里有多个可执行文件：提前告诉用户「一个文件夹两个版本」可以建成多版本实例
+        var exeCount = CountExecutables(normalized);
+
+        if (exeCount > 1)
+            state += "\n" + Loc.F("这个目录里有 {0} 个可执行文件：创建实例后可以在实例里「添加版本」，一次选中 2 个并分别命名，启动时再选版本。", exeCount);
+
+        SetDirectoryState(state, shared || _resolvedExecutable is null ? "Status.Warn" : "Status.Success");
 
         return true;
+    }
+
+    /// <summary>目录里可执行文件的个数（读不了就当 0，不影响校验）。</summary>
+    private static int CountExecutables(string directory)
+    {
+        try
+        {
+            return Directory.Exists(directory) ? Directory.GetFiles(directory, "*.exe").Length : 0;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private void SetDirectoryState(string text, string brushKey)

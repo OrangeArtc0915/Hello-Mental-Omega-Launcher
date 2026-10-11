@@ -1540,9 +1540,12 @@ public partial class PageHome : LauncherPage
         try
         {
             // 启动成功时 GameSessionHub 会把「上次启动时间」写进实例并落盘
-            if (!GameSessionHub.TryLaunch(instance, out var error))
+            // 同文件夹多实例时这里会先弹「选哪个版本」，用户取消则 error 为空
+            if (!GameSessionHub.TryLaunchPicked(Window.GetWindow(this), instance, out var error))
             {
-                Notify(error ?? Loc.T("启动失败：未知原因"), Loc.T("启动游戏"), MessageBoxImage.Warning);
+                if (error is null) return;
+
+                Notify(error, Loc.T("启动游戏"), MessageBoxImage.Warning);
                 Log.Warn(Loc.F("启动游戏失败：{0}", error));
                 return;
             }

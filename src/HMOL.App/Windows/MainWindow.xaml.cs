@@ -40,6 +40,9 @@ public partial class MainWindow : Window
     /// <summary>关于窗口。会话内只创建一次，重复点击时把已有窗口拉到前面。</summary>
     private AboutWindow? _aboutWindow;
 
+    /// <summary>新手教程窗口。与关于窗口同样是会话内复用的一份实例。</summary>
+    private TutorialWindow? _tutorialWindow;
+
     /// <summary>设置页的分类项，下标与 <c>Tag</c> 里的分类序号一一对应。</summary>
     private readonly NavItem[] _setupCategories;
 
@@ -202,6 +205,9 @@ public partial class MainWindow : Window
             await RequiredFilesFlow.EnsureSevenZipOnStartupAsync(this);
 
             new ConfigWizardWindow { Owner = this }.ShowDialog();
+
+            // 向导结束后再提一次教程入口（向导走完才会记下 FirstRunCompleted，见 ShowTutorialHintOnce）
+            ShowTutorialHintOnce();
         }));
 
     // ————— 关闭与托盘 —————
@@ -273,10 +279,66 @@ public partial class MainWindow : Window
             return;
         }
 
-        e.Cancel = true;
+        switch (SettingsStore.Current.CloseAction)
+        {
+            case CloseAction.Exit:
+                e.Cancel = true;
+                ScheduleExitWithSound();
+                break;
+
+            case CloseAction.MinimizeToTray:
+                e.Cancel = true;
+                MinimizeToTray();
+                break;
+
+            default: // CloseAction.Ask：每次问用户一次，不默认最小化
+                e.Cancel = true;
+                AskThenApplyCloseAction();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 弹窗问用户这次要「最小化到托盘」还是「直接退出」。
+    /// 关掉弹窗（点右上角 × 或 Esc）视为取消，主窗口保持打开。
+    /// </summary>
+    private void AskThenApplyCloseAction()
+    {
+        var choice = ChoiceWindow.Ask(this,
+            Loc.T("关闭 HMOL"),
+            Loc.T("要把 HMOL 最小化到系统托盘（继续在后台运行），还是直接退出？"),
+            Loc.T("不想每次都问，可在「设置 → 窗口与音效」里把这一项固定成其中一种。"),
+            DialogIcon.Question,
+            new ChoiceOption(Loc.T("最小化到托盘"), "tray"),
+            new ChoiceOption(Loc.T("直接退出"), "exit", ButtonTone.Solid));
+
+        switch (choice)
+        {
+            case "tray":
+                MinimizeToTray();
+                break;
+
+            case "exit":
+                ScheduleExitWithSound();
+                break;
+
+            // null（关掉弹窗）→ 取消，什么都不做
+        }
+    }
+
+    /// <summary>收起到系统托盘：取消本次关闭，只把窗口藏起来，程序继续在后台运行。</summary>
+    private void MinimizeToTray()
+    {
         Hide();
         Log.Info(Loc.T("主窗口已收起到系统托盘（要退出请用托盘菜单）"));
     }
+
+    /// <summary>
+    /// 走「带关闭音效的退出」路径。<see cref="RequestExit"/> 会再调一次 <c>Close()</c>，
+    /// 若直接在当前 Closing 处理里调就重入了，所以挪到下一轮消息循环再执行。
+    /// </summary>
+    private void ScheduleExitWithSound()
+        => Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(RequestExit));
 
     /// <summary>页面编号 → 每页独立背景用的标识。</summary>
     internal static string PageKey(int page) => page switch
@@ -385,29 +447,54 @@ public partial class MainWindow : Window
 
             host.Children.Clear();
 
+            // 清单里的顺序 = 默认顺序。
+            // 方案里的顺序 = 用户在布局编辑器里调过的顺序，优先照它摆；
+            // 方案里没有的项（例如升级后新加进来的「新手教程」）按默认顺序插回它该在的位置——
+            // 不能一律丢到末尾，否则「新手教程」会跑到「关于」下面去。
+            var canonical = LayoutElements.All
+                .Where(info => string.Equals(info.ContainerName, containerName, StringComparison.Ordinal))
+                .Select(info => info.Id)
+                .ToList();
+
+            var planned = new List<(LayoutElementInfo Info, LayoutItem? Layout)>();
             var placed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var layoutItem in scheme.Items)
             {
                 var info = LayoutElements.Find(layoutItem.ElementId);
                 if (info is null || !string.Equals(info.ContainerName, containerName, StringComparison.Ordinal)) continue;
-                if (!_layoutTargets.TryGetValue(info.Id, out var item)) continue;
                 if (!placed.Add(info.Id)) continue;
+
+                planned.Add((info, layoutItem));
+            }
+
+            foreach (var info in LayoutElements.All)
+            {
+                if (!string.Equals(info.ContainerName, containerName, StringComparison.Ordinal)) continue;
+                if (!placed.Add(info.Id)) continue;
+
+                var index = canonical.IndexOf(info.Id);
+                var at = planned.FindIndex(entry => canonical.IndexOf(entry.Info.Id) > index);
+
+                planned.Insert(at < 0 ? planned.Count : at, (info, null));
+            }
+
+            foreach (var (info, layoutItem) in planned)
+            {
+                if (!_layoutTargets.TryGetValue(info.Id, out var item)) continue;
 
                 ApplyItem(item, info, layoutItem);
                 host.Children.Add(item);
             }
 
-            // 方案里缺项时也不能把控件弄丢，按清单顺序补在末尾
-            foreach (var info in LayoutElements.All)
-            {
-                if (!string.Equals(info.ContainerName, containerName, StringComparison.Ordinal)) continue;
-                if (!placed.Add(info.Id)) continue;
-                if (!_layoutTargets.TryGetValue(info.Id, out var item)) continue;
-
-                ApplyItem(item, info, layoutItem: null);
-                host.Children.Add(item);
-            }
+#if DEBUG
+            // 自检：这里会把容器的子项清空重建，任何「写进了 XAML 却忘了登记进 LayoutElements」的项
+            // 都会在启动时被静默删掉。把最终落位的项记进日志，漏登记时一眼能看出来。
+            Log.Info(Loc.F("侧栏自检：{0} = {1}", containerName,
+                string.Join(", ", host.Children.OfType<NavItem>()
+                    .Select(child => _layoutTargets.FirstOrDefault(pair => ReferenceEquals(pair.Value, child)).Key ?? "?")
+                    .Where(key => key != "?"))));
+#endif
         }
     }
 
@@ -545,6 +632,10 @@ public partial class MainWindow : Window
         // 关于窗口是会话内复用的一份实例，关掉让用户要用时按新语言重开
         if (_aboutWindow is { IsLoaded: true }) _aboutWindow.Close();
         _aboutWindow = null;
+
+        // 教程窗口同理
+        if (_tutorialWindow is { IsLoaded: true }) _tutorialWindow.Close();
+        _tutorialWindow = null;
 
         var page = _currentPage < 0 ? NavPages.Home : _currentPage;
 
@@ -896,5 +987,58 @@ public partial class MainWindow : Window
         _aboutWindow.Closed += (_, _) => _aboutWindow = null;
         _aboutWindow.Show();
         Log.Info(Loc.T("已打开关于窗口"));
+    }
+
+    /// <summary>打开新手教程窗口（与关于窗口同一套「会话内复用 + 关闭即置空」的写法）。</summary>
+    private void OnTutorialNavClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is NavItem item) item.IsChecked = false;
+
+        OpenTutorial();
+    }
+
+    /// <summary>打开（或把已有的拉到前面）新手教程窗口。</summary>
+    internal void OpenTutorial()
+    {
+        if (_tutorialWindow is { IsLoaded: true })
+        {
+            if (_tutorialWindow.WindowState == WindowState.Minimized)
+                _tutorialWindow.WindowState = WindowState.Normal;
+
+            _tutorialWindow.Activate();
+            return;
+        }
+
+        _tutorialWindow = new TutorialWindow { Owner = this };
+        _tutorialWindow.Closed += (_, _) => _tutorialWindow = null;
+        _tutorialWindow.Show();
+        Log.Info(Loc.T("已打开新手教程窗口"));
+    }
+
+    /// <summary>
+    /// 「新手教程」的运行期提示，**只在没提示过时弹一次**（点开或忽略都会记下，之后不再弹）。
+    ///
+    /// <para>
+    /// 调用点排在启动时的更新检查、以及首次运行向导之后：避免几个窗口叠在一起。
+    /// 首次运行向导还没走完时直接返回且不记标记——那种情况下向导本身就是引导，
+    /// 这次不打扰，留给向导结束（会再调一次）或下次启动。
+    /// </para>
+    /// </summary>
+    internal void ShowTutorialHintOnce()
+    {
+        var settings = SettingsStore.Current;
+
+        if (settings.TutorialHintShown || !settings.FirstRunCompleted) return;
+
+        settings.TutorialHintShown = true;
+        SettingsStore.Save();
+
+        var choice = ChoiceWindow.Ask(this, Loc.T("新手教程"),
+            Loc.T("第一次用 HMOL？"),
+            Loc.T("左下角有一个「新手教程」，逐个页面讲清了每个功能是干什么的，想加「一个文件夹里的两个版本」这类用法也在里面。随时可以从那里再打开。"),
+            new ChoiceOption(Loc.T("看看教程"), "open", ButtonTone.Solid),
+            new ChoiceOption(Loc.T("以后再说"), "later"));
+
+        if (choice == "open") OpenTutorial();
     }
 }

@@ -235,7 +235,7 @@ public partial class PageInstances : LauncherPage
         if (dialog.ShowDialog() != true) return;
 
         var result = InstanceManager.Add(dialog.InstanceName, dialog.GameDirectory, dialog.InstanceNote,
-            dialog.Kind, dialog.Executable);
+            dialog.Kind, dialog.Executable, dialog.Versions);
 
         if (!result.Success)
         {
@@ -256,7 +256,7 @@ public partial class PageInstances : LauncherPage
         if (dialog.ShowDialog() != true) return;
 
         var result = InstanceManager.Update(instance.Id, dialog.InstanceName, dialog.GameDirectory, dialog.InstanceNote,
-            dialog.Kind, dialog.Executable);
+            dialog.Kind, dialog.Executable, dialog.Versions);
 
         if (!result.Success)
         {
@@ -380,10 +380,13 @@ public partial class PageInstances : LauncherPage
             return;
         }
 
-        if (!GameSessionHub.TryLaunch(instance, out var error))
+        // 同文件夹多实例时这里会先弹「选哪个版本」；用户取消时 error 为空，不当失败处理
+        if (!GameSessionHub.TryLaunchPicked(Window.GetWindow(this), instance, out var error))
         {
-            ShowNotice(error ?? Loc.T("启动失败：未知原因"), true);
-            Notify(error ?? Loc.T("启动失败：未知原因"), Loc.T("启动游戏"), MessageBoxImage.Warning);
+            if (error is null) return;
+
+            ShowNotice(error, true);
+            Notify(error, Loc.T("启动游戏"), MessageBoxImage.Warning);
             return;
         }
 

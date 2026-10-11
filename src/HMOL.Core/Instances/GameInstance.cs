@@ -41,6 +41,26 @@ public sealed class GameInstance
     /// </summary>
     public string Executable { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 多版本：同一个游戏目录里的多个可执行文件，各带一个用户起的名字（如「3.3.6」「3.3.5」）。
+    ///
+    /// <para>
+    /// 空表示不是多版本实例——按 <see cref="Executable"/> 或按类型自动探测启动。
+    /// 配了 2 个以上时，点「启动游戏」会先让用户选启动哪个版本。
+    /// </para>
+    /// </summary>
+    public List<InstanceVersion> Versions
+    {
+        get => _versions;
+        set => _versions = NormalizeVersions(value);
+    }
+
+    private List<InstanceVersion> _versions = [];
+
+    /// <summary>是不是配了多个版本（启动时要先选版本）。</summary>
+    [JsonIgnore]
+    public bool HasMultipleVersions => Versions.Count > 1;
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     /// <summary>
@@ -72,17 +92,27 @@ public sealed class GameInstance
     [JsonIgnore]
     public string InstallRecordsDirectory => Path.Combine(InstanceDirectory, "install_records");
 
-    /// <summary>游戏目录当前是否仍可用（用户指定了主程序时放宽，见 <see cref="GameLocator.IsGameDirectory"/>）。</summary>
+    /// <summary>游戏目录当前是否仍可用（用户指定了主程序或配了版本时放宽，见 <see cref="GameLocator.IsGameDirectory"/>）。</summary>
     [JsonIgnore]
-    public bool IsValid => GameLocator.IsGameDirectory(GameDir, Kind, Executable);
+    public bool IsValid => GameLocator.IsGameDirectory(GameDir, Kind, EffectiveExecutable);
+
+    /// <summary>校验用的主程序：配了版本用第一个版本，否则用 <see cref="Executable"/>。</summary>
+    [JsonIgnore]
+    public string EffectiveExecutable => Versions.Count > 0 ? Versions[0].Executable : Executable;
 
     /// <summary>用户指定的主程序解析后的绝对路径；未指定或文件已不存在为 null。</summary>
     [JsonIgnore]
     public string? CustomExecutablePath => GameLocator.ResolveExecutable(GameDir, Executable);
 
-    /// <summary>游戏主程序路径：优先用用户指定的，其次按类型自动探测；都找不到为 null。</summary>
+    /// <summary>第一个版本的可执行文件解析后的绝对路径（没配版本时为 null）。</summary>
     [JsonIgnore]
-    public string? ExecutablePath => CustomExecutablePath ?? GameLocator.FindExecutable(GameDir, Kind);
+    public string? FirstVersionPath
+        => Versions.Count > 0 ? GameLocator.ResolveExecutable(GameDir, Versions[0].Executable) : null;
+
+    /// <summary>游戏主程序路径：优先用第一个版本，其次用户指定的，最后按类型自动探测；都找不到为 null。</summary>
+    [JsonIgnore]
+    public string? ExecutablePath
+        => FirstVersionPath ?? CustomExecutablePath ?? GameLocator.FindExecutable(GameDir, Kind);
 
     /// <summary>界面上的一句摘要。</summary>
     [JsonIgnore]
@@ -92,7 +122,10 @@ public sealed class GameInstance
         {
             if (!Directory.Exists(GameDir)) return Loc.T("游戏目录不可用");
             if (!IsValid) return Loc.T("未找到主程序，可在「编辑」里指定可执行文件");
-            return ExecutablePath is null ? Loc.T("游戏目录有效，但未找到主程序") : Loc.T("就绪");
+
+            if (ExecutablePath is null) return Loc.T("游戏目录有效，但未找到主程序");
+
+            return HasMultipleVersions ? Loc.F("就绪（{0} 个版本）", Versions.Count) : Loc.T("就绪");
         }
     }
 
@@ -206,4 +239,31 @@ public sealed class GameInstance
 
         return result;
     }
+
+    /// <summary>版本列表重建：丢掉没有可执行文件的项（旧数据里可能留着空行）。</summary>
+    private static List<InstanceVersion> NormalizeVersions(List<InstanceVersion>? source)
+        => source is null
+            ? []
+            : [.. source.Where(item => item is not null && !string.IsNullOrWhiteSpace(item.Executable))];
+}
+
+/// <summary>
+/// 实例里的一个「版本」：一个可执行文件 + 用户给它起的名字。
+/// 同一个游戏目录里有两个可执行文件（两个版本）时靠它区分，启动游戏时按名字选。
+/// </summary>
+public sealed class InstanceVersion
+{
+    /// <summary>用户给这个版本起的名字（如「3.3.6」）；留空时界面退回显示可执行文件名。</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 可执行文件。位于游戏目录内时存相对文件名（换目录 / 导入后仍可用），否则存绝对路径——
+    /// 与 <see cref="GameInstance.Executable"/> 同一套规则。
+    /// </summary>
+    public string Executable { get; set; } = string.Empty;
+
+    /// <summary>界面上显示的名字：用户起的名字，没起就用可执行文件名。</summary>
+    [JsonIgnore]
+    public string DisplayName
+        => string.IsNullOrWhiteSpace(Name) ? Path.GetFileName(Executable) : Name.Trim();
 }

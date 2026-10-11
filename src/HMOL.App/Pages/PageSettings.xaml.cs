@@ -49,6 +49,9 @@ public sealed class BgmTrackRow
     public bool IsCurrent { get; }
 }
 
+/// <summary>「点右上角 × 时」下拉框里的一项：把 <see cref="CloseAction"/> 包一层，好挂本地化文案。</summary>
+public sealed record CloseActionOption(CloseAction Action, string DisplayName);
+
 /// <summary>设置页「常用网站」列表里的一行。列表每次刷新时整份重建，因此不需要变更通知。</summary>
 public sealed class SiteLinkSettingRow
 {
@@ -191,6 +194,9 @@ public partial class PageSettings : LauncherPage
     /// <summary>刷新语言下拉框选中项时不触发切换事件。</summary>
     private bool _suppressLanguageChanged;
 
+    /// <summary>刷新「点右上角 × 时」下拉框选中项时不触发切换事件。</summary>
+    private bool _suppressCloseAction;
+
     private bool _suppressNicknameChanged;
 
     /// <summary>构造期与刷新期不让 HUD 透明度滑块的事件回写到配置。</summary>
@@ -255,9 +261,11 @@ public partial class PageSettings : LauncherPage
         RefreshExtraWidgets();
         RefreshLook();
         RefreshAutoStart();
+        RefreshAllowSharedGameDir();
         BuildFontList();
         RefreshLanguage();
         RefreshAutoLanguage();
+        RefreshCloseAction();
         BuildBackgroundPageList();
         RefreshExtensions();
         RefreshUpdate();
@@ -294,6 +302,7 @@ public partial class PageSettings : LauncherPage
         RefreshExtraWidgets();
         RefreshLook();
         RefreshAutoStart();
+        RefreshCloseAction();
 
         // 扩展列表：只读一遍扩展目录（不执行任何扩展内容、不写盘）
         RefreshExtensions();
@@ -778,6 +787,70 @@ public partial class PageSettings : LauncherPage
 
         BtnAutoLanguage.Content = enabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnAutoLanguage.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
+    }
+
+    /// <summary>「同文件夹多实例」开关的文案与状态。</summary>
+    private void RefreshAllowSharedGameDir()
+    {
+        if (BtnAllowSharedGameDir is null) return;
+
+        var enabled = SettingsStore.Current.AllowSharedGameDir;
+
+        BtnAllowSharedGameDir.Content = enabled ? Loc.T("已开启") : Loc.T("已关闭");
+        BtnAllowSharedGameDir.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
+    }
+
+    /// <summary>「点右上角 × 时」下拉框：填入三个选项并选中当前值。</summary>
+    private void RefreshCloseAction()
+    {
+        if (CmbCloseAction is null) return;
+
+        _suppressCloseAction = true;
+
+        CmbCloseAction.ItemsSource = new[]
+        {
+            new CloseActionOption(CloseAction.Ask, Loc.T("每次询问")),
+            new CloseActionOption(CloseAction.MinimizeToTray, Loc.T("最小化到托盘")),
+            new CloseActionOption(CloseAction.Exit, Loc.T("直接退出"))
+        };
+
+        CmbCloseAction.SelectedIndex = SettingsStore.Current.CloseAction switch
+        {
+            CloseAction.Exit => 2,
+            CloseAction.MinimizeToTray => 1,
+            _ => 0
+        };
+
+        _suppressCloseAction = false;
+    }
+
+    /// <summary>切换「点右上角 × 时」的行为并保存。</summary>
+    private void OnCloseActionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressCloseAction) return;
+        if (CmbCloseAction.SelectedItem is not CloseActionOption option) return;
+        if (SettingsStore.Current.CloseAction == option.Action) return;
+
+        SettingsStore.Current.CloseAction = option.Action;
+        SettingsStore.Save();
+
+        Log.Info(Loc.F("点右上角 × 时的行为已改为 {0}", option.DisplayName));
+    }
+
+    /// <summary>
+    /// 「同文件夹多实例」开关：打开后同一个游戏目录可以再建实例（用于一个文件夹里的多个版本）。
+    /// 只改开关本身，已有实例一概不动。
+    /// </summary>
+    private void OnToggleAllowSharedGameDirClick(object sender, RoutedEventArgs e)
+    {
+        var enabled = !SettingsStore.Current.AllowSharedGameDir;
+
+        SettingsStore.Current.AllowSharedGameDir = enabled;
+        SettingsStore.Save();
+
+        RefreshAllowSharedGameDir();
+
+        Log.Info(Loc.F("同文件夹多实例已{0}", enabled ? Loc.T("开启") : Loc.T("关闭")));
     }
 
     /// <summary>
