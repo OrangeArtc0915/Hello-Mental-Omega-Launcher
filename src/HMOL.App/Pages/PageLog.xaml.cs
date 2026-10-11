@@ -24,6 +24,12 @@ public partial class PageLog : LauncherPage
     /// <summary>单个磁盘日志文件最多渲染的行数，避免打开超大文件时卡住界面。</summary>
     private const int MaxFileLines = 2000;
 
+    /// <summary>
+    /// 等宽字体只建一份并复用：以前每渲染一行都 new 一个 FontFamily，
+    /// 打开磁盘日志（最多 2000 行）时会做 2000 次字体族解析，白白拖慢渲染。
+    /// </summary>
+    private static readonly FontFamily LogFont = new("Consolas, Microsoft YaHei UI");
+
     /// <summary>清理旧日志时保留最近几天的文件。</summary>
     private const int CleanupKeepDays = 7;
 
@@ -190,7 +196,7 @@ public partial class PageLog : LauncherPage
     {
         var block = new TextBlock
         {
-            FontFamily = new FontFamily("Consolas, Microsoft YaHei UI"),
+            FontFamily = LogFont,
             FontSize = 11.5,
             TextWrapping = TextWrapping.Wrap,
             Text = $"{row.Time}  [{row.Level}] {row.Text}"

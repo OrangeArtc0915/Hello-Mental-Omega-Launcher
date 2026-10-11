@@ -248,7 +248,14 @@ public partial class PageHome : LauncherPage
         RefreshCalendar();
         RefreshSites();
 
-        _clockTimer.Tick += (_, _) => RefreshClock();
+        _clockTimer.Tick += (_, _) =>
+        {
+            // 窗口最小化 / 隐藏时没人看时钟，别每秒白刷一次文本（会连带触发一次重排与合成）
+            var host = Window.GetWindow(this);
+            if (host is null || !host.IsVisible || host.WindowState == WindowState.Minimized) return;
+
+            RefreshClock();
+        };
 
         // 窗口缩放时百分比坐标要重算一次，不然会停在旧尺寸上
         PanHomeStage.SizeChanged += (_, _) => RefreshFreeRects();
@@ -265,7 +272,10 @@ public partial class PageHome : LauncherPage
         RefreshCalendar();
         RefreshSites();
 
-        _clockTimer.Start();
+        // 时钟小组件默认是关的：以前无论开不开都每秒刷新一次，等于空转重绘。
+        // 现在按开关与页面可见性决定要不要走这个 1Hz 定时器。
+        RefreshClock();
+        SyncClockTimer();
 
         // 日期与站点都用不着动画，只有天气要联网；命中 30 分钟缓存时这一步不发请求。
         // 天气块被隐藏时整段跳过，省一次没必要的请求（下次进主页时若已重新显示再补上）。
@@ -763,6 +773,7 @@ public partial class PageHome : LauncherPage
         var extras = SettingsStore.Current.ExtraWidgets;
 
         RefreshClock();
+        SyncClockTimer();
 
         LabMemoTitle.Text = string.IsNullOrWhiteSpace(extras.MemoTitle) ? Loc.T("便签") : extras.MemoTitle;
         LabMemoText.Text = string.IsNullOrWhiteSpace(extras.MemoText)
@@ -770,6 +781,16 @@ public partial class PageHome : LauncherPage
             : extras.MemoText;
 
         RefreshMusicWidget();
+    }
+
+    /// <summary>
+    /// 时钟小组件开着、且主页可见时才需要每秒刷新；关掉就停表。
+    /// 默认配置里时钟是关的，这样空闲时就不会每秒触发一次无谓的文本重绘。
+    /// </summary>
+    private void SyncClockTimer()
+    {
+        if (SettingsStore.Current.ExtraWidgets.Clock && IsVisible) _clockTimer.Start();
+        else _clockTimer.Stop();
     }
 
     private void RefreshClock()

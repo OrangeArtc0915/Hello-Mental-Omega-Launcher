@@ -102,6 +102,11 @@ public partial class App : Application
 
         InitializeLogging();
 
+        // 门锁要联网校验（国内访问 GitHub 常见 1~3 秒），而它后面的本地初始化与它互不依赖。
+        // 先把校验丢到后台线程开跑，本地初始化在同一段时间里并行做完，最后再等结论——
+        // 启动耗时由「网络 + 本地」变成「两者取大」，等于把本地那一段省掉。
+        var gateTask = Task.Run(SurviveGate.Verify);
+
         RunSecuritySelfCheck();
 
         // 上一次自动更新的收尾：清掉残留的 .new / .new.zip / .old，再把失败标记读走并翻译成中文。
@@ -112,19 +117,8 @@ public partial class App : Application
         // 注册表里的自启项指向旧路径（程序被挪过目录）时顺手改正，已经正确就一个字节都不动
         AutoStartManager.RepairIfStale();
 
-        // 门锁（严格模式）：必须联网校验通过才放行——读到 false 拦住，**读不到（断网 / 被墙 / 超时）也拦住**。
-        // 读不到时会自动再试一轮，最坏等待 = 轮数 × 单次超时（见 SurviveGate.Verify）。
-        var verdict = SurviveGate.Verify();
-
-        if (!verdict.Allowed)
-        {
-            BlockOnSurviveGate(verdict, talkative: !autoStart);
-            Shutdown();
-            return;
-        }
-
-        Log.Info(Loc.T("门锁校验通过，继续启动"));
-
+        // 下面全是本地初始化：读配置、铺主题与字体资源、读联机配置、扫扩展目录。
+        // 既不联网也不建窗口，正好塞进等门锁的这段时间里并行完成。
         ThemeService.Initialize(SettingsStore.Current.ThemeMode, SettingsStore.Current.Accent);
 
         // 字体与圆角也走资源覆盖：界面用 DynamicResource 引用，改设置时能实时生效
@@ -137,6 +131,19 @@ public partial class App : Application
         // 真正渲染在主页 / 设置页进入时再各取一次快照。
         ExtensionIcons.RegisterAvailable(SvgIconLoader.AvailableKeys());
         ExtensionStore.Reload();
+
+        // 门锁（严格模式）：必须联网校验通过才放行——读到 false 拦住，**读不到（断网 / 被墙 / 超时）也拦住**。
+        // 读不到时会自动再试一轮，最坏等待 = 轮数 × 单次超时（见 SurviveGate.Verify）。
+        var verdict = gateTask.GetAwaiter().GetResult();
+
+        if (!verdict.Allowed)
+        {
+            BlockOnSurviveGate(verdict, talkative: !autoStart);
+            Shutdown();
+            return;
+        }
+
+        Log.Info(Loc.T("门锁校验通过，继续启动"));
 
         // 未处理异常写进日志并提示，不让界面直接崩掉
         DispatcherUnhandledException += OnUnhandledException;

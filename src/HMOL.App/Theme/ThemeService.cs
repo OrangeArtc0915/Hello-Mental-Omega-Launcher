@@ -54,7 +54,7 @@ public static class ThemeService
         Accent = accent;
         _systemWasDark = IsSystemInDarkMode();
         Apply();
-        EnsureSystemWatcher();
+        SyncSystemWatcher();
     }
 
     public static void SetTheme(ThemeMode mode, AccentTheme accent)
@@ -64,6 +64,7 @@ public static class ThemeService
         SettingsStore.Current.ThemeMode = mode;
         SettingsStore.Current.Accent = accent;
         Apply();
+        SyncSystemWatcher();
     }
 
     /// <summary>切换预设强调色（会清掉自定义色）。</summary>
@@ -193,6 +194,22 @@ public static class ThemeService
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// 只有「跟随系统」才需要盯着系统明暗切换；显式浅色 / 深色下这个 5 秒轮询永远只会空转，
+    /// 索性不起（切回「跟随系统」时再建回来）。
+    /// </summary>
+    private static void SyncSystemWatcher()
+    {
+        if (Mode == ThemeMode.System)
+        {
+            EnsureSystemWatcher();
+            return;
+        }
+
+        _systemWatcher?.Stop();
+        _systemWatcher = null;
     }
 
     private static void EnsureSystemWatcher()

@@ -21,13 +21,16 @@ public sealed record DownloadResult(bool Success, string? FilePath, long BytesRe
 /// </summary>
 public static class ResumableDownloader
 {
-    private const int BufferSize = 81920;
+    private const int BufferSize = 128 * 1024;
 
     /// <summary>分片下载时每片的目标大小（字节）。</summary>
     private const long SegmentUnitSize = 4L * 1024 * 1024;
 
-    /// <summary>分片下载的最大并发路数。</summary>
-    private const int MaxSegments = 4;
+    /// <summary>
+    /// 分片下载的最大并发路数。拉到 8 路后，大文件（启动器本体上百兆）在本就支持 Range 的
+    /// GitHub / Gitee 上能明显吃到带宽；片数仍受 <see cref="SegmentUnitSize"/> 约束，小文件不会被切碎。
+    /// </summary>
+    private const int MaxSegments = 8;
 
     /// <summary>小于这个大小的文件不值得分片，直接单连接下载。</summary>
     private const long MultiThreadThreshold = 8L * 1024 * 1024;
@@ -40,7 +43,12 @@ public static class ResumableDownloader
 
     private static readonly HttpClient Client = new()
     {
-        Timeout = TimeSpan.FromMinutes(10)
+        Timeout = TimeSpan.FromMinutes(10),
+
+        // 优先走 HTTP/2（GitHub 等支持，能多路复用连接、少一轮 TLS/队头阻塞）；
+        // 服务器只支持 1.1 时自动回落，不影响 Gitee 或自建源。
+        DefaultRequestVersion = HttpVersion.Version20,
+        DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
     };
 
     /// <summary>
