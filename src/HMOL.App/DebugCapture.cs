@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -128,6 +129,10 @@ internal static class DebugCapture
         return -1;
     }
 
+    /// <summary>读一个不带值的开关参数，例如 <c>--capture-transparent</c>。</summary>
+    private static bool ReadFlag(IReadOnlyList<string> args, string name)
+        => args.Any(arg => string.Equals(arg, name, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>读 <c>--capture-size 宽x高</c>（形如 940x580）：先把窗口改成这个尺寸再截，用来检查小窗口下的排版。</summary>
     private static (double Width, double Height)? ReadSize(IReadOnlyList<string> args)
     {
@@ -164,6 +169,7 @@ internal static class DebugCapture
 
         // 指定了页面就先切过去，等动效收敛再截（不要的话截的就是主页，与原来一致）
         var setupCategory = ReadSetupCategory(args);
+        var transparent = ReadFlag(args, "--capture-transparent");
         var page = setupCategory >= 0 ? NavPages.Settings : ReadPage(args);
         if (page != NavPages.Home) window.SwitchToPage(page);
 
@@ -182,16 +188,25 @@ internal static class DebugCapture
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            window.Dispatcher.InvokeAsync(() => Capture(window, path), DispatcherPriority.ContextIdle);
+            window.Dispatcher.InvokeAsync(() => Capture(window, path, transparent), DispatcherPriority.ContextIdle);
         };
 
         timer.Start();
     }
 
-    private static void Capture(MainWindow window, string path)
+    private static void Capture(MainWindow window, string path, bool transparent)
     {
         try
         {
+            // 透明 UI 截图：去掉窗口底色、投影与背景层，只留界面本身。
+            // 这样后期可以把动态壁纸视频垫在下面，让启动器窗口里的背景真的在动。
+            if (transparent)
+            {
+                if (window.FindName("PanBack") is Border back) back.Effect = null;
+                if (window.FindName("PanForm") is Grid form) form.Background = Brushes.Transparent;
+                if (window.FindName("BackgroundView") is UIElement background) background.Visibility = Visibility.Collapsed;
+            }
+
             var content = window.Content as FrameworkElement ?? window;
             content.UpdateLayout();
 

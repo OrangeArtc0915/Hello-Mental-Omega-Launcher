@@ -68,13 +68,41 @@ public static class BackgroundService
     // ————— 路径 —————
 
     /// <summary>
-    /// 把设置里存的素材名解析成素材目录下的绝对路径。
-    /// 只取文件名部分：设置文件是纯文本，手改出一个 <c>..\..</c> 也不该让程序去读目录外的文件。
+    /// 把设置里存的素材名解析成绝对路径。
+    /// 普通素材是纯文件名，落在 <see cref="Paths.Backgrounds"/>；
+    /// 壁纸包素材是 <c>wallpapers/&lt;id&gt;/media/&lt;file&gt;</c>，落在 <see cref="Paths.Data"/> 下。
+    /// 两种都拒绝绝对路径和 <c>..</c>，避免手改设置把程序引到数据目录外。
     /// </summary>
     public static string ResolvePath(string? fileName)
     {
-        var name = Path.GetFileName(fileName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(fileName)) return string.Empty;
+
+        var raw = fileName.Trim().Replace('\\', '/');
+
+        if (IsPackageMedia(raw))
+        {
+            var relative = raw.TrimStart('/');
+            var root = Path.GetFullPath(Paths.Data);
+            var full = Path.GetFullPath(Path.Combine(root, relative));
+
+            return full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                ? full
+                : string.Empty;
+        }
+
+        if (raw.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(raw)) return string.Empty;
+
+        var name = Path.GetFileName(raw);
         return string.IsNullOrEmpty(name) ? string.Empty : Path.Combine(StorageDirectory, name);
+    }
+
+    /// <summary>这个素材是不是来自 <c>Data\wallpapers</c> 里的壁纸包。</summary>
+    public static bool IsPackageMedia(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName)) return false;
+
+        var normalized = fileName.Trim().Replace('\\', '/').TrimStart('/');
+        return normalized.StartsWith("wallpapers/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>素材文件存在时返回绝对路径，否则返回 null。</summary>
@@ -154,18 +182,29 @@ public static class BackgroundService
         }
     }
 
-    /// <summary>素材库里可当背景的文件名（排序后），给轮播清单与列表用。</summary>
+    /// <summary>
+    /// 素材库里可当背景的全部条目（排序后），给轮播清单与切换列表用。
+    /// 普通素材返回纯文件名；壁纸包素材返回 <c>wallpapers/&lt;id&gt;/media/&lt;file&gt;</c>。
+    /// </summary>
     public static IReadOnlyList<string> ListLibrary()
     {
         try
         {
-            if (!Directory.Exists(StorageDirectory)) return [];
+            var list = new List<string>();
 
-            return Directory.EnumerateFiles(StorageDirectory)
-                .Where(IsSupportedMedia)
-                .Select(Path.GetFileName)
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Select(name => name!)
+            if (Directory.Exists(StorageDirectory))
+            {
+                list.AddRange(Directory.EnumerateFiles(StorageDirectory)
+                    .Where(IsSupportedMedia)
+                    .Select(Path.GetFileName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Select(name => name!));
+            }
+
+            list.AddRange(WallpaperPackageService.ListMedia().Select(media => media.RelativePath));
+
+            return list
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
@@ -176,9 +215,14 @@ public static class BackgroundService
         }
     }
 
-    /// <summary>删掉一张素材。正在播放的视频可能被占用删不掉，这时返回 false。</summary>
+    /// <summary>
+    /// 删掉一张普通素材。正在播放的视频可能被占用删不掉，这时返回 false。
+    /// 壁纸包素材由包管理，这里只返回 true，不删文件。
+    /// </summary>
     public static bool Delete(string? fileName)
     {
+        if (IsPackageMedia(fileName)) return true;
+
         var path = ResolvePath(fileName);
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
 

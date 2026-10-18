@@ -4265,7 +4265,7 @@
                                                 <TextBlock HorizontalAlignment="Right"
                                                            FontSize="11.5"
                                                            Foreground="{DynamicResource Text.Primary}"
-                                                           Text="v1.5.13" />
+                                                           Text="v1.5.15" />
                                             </Grid>
                                             <Grid Margin="0,6,0,0">
                                                 <TextBlock FontSize="11.5"

@@ -23,6 +23,9 @@ public static class Paths
     /// <summary>主页背景素材目录。导入的图片 / GIF / 视频都复制到这里。</summary>
     public static string Backgrounds { get; private set; } = string.Empty;
 
+    /// <summary>壁纸包目录：<c>Data\wallpapers\&lt;id&gt;</c>，保留原始 mpkg 与解出的全部可用素材。</summary>
+    public static string Wallpapers { get; private set; } = string.Empty;
+
     /// <summary>个性化素材目录：自定义窗口图标与启动 / 关闭音效都放这里。</summary>
     public static string Custom { get; private set; } = string.Empty;
 
@@ -64,6 +67,7 @@ public static class Paths
         Packages = Path.Combine(Data, "packages");
         Cache = Path.Combine(Data, "Cache");
         Backgrounds = Path.Combine(Data, "backgrounds");
+        Wallpapers = Path.Combine(Data, "wallpapers");
         Custom = Path.Combine(Data, "custom");
         Layouts = Path.Combine(Data, "layouts");
         LanguageDirectory = Path.Combine(Data, "lang");
@@ -74,7 +78,7 @@ public static class Paths
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "HMOL", "Downloads");
 
-        foreach (var dir in new[] { Data, Instances, Packages, Cache, Backgrounds, Custom, Layouts, LanguageDirectory, Backup, Log, Temp, Downloads })
+        foreach (var dir in new[] { Data, Instances, Packages, Cache, Backgrounds, Wallpapers, Custom, Layouts, LanguageDirectory, Backup, Log, Temp, Downloads })
         {
             try { Directory.CreateDirectory(dir); }
             catch { /* 目录不可用时由上层在使用点报错，这里不阻断启动 */ }

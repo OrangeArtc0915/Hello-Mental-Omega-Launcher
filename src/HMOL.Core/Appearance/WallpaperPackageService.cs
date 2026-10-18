@@ -4,6 +4,8 @@ using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using HMOL.Core.App;
 using HMOL.Core.Logging;
 using HMOL.Core.Localization;
@@ -12,6 +14,39 @@ namespace HMOL.Core.Appearance;
 
 /// <summary>壁纸包导入结果。Ok 为 false 时 Message 是可以直接展示给用户的中文原因。</summary>
 public sealed record WallpaperImport(bool Ok, string Message, BackgroundKind Kind, string FileName);
+
+/// <summary>壁纸包里的一个可用素材。<see cref="RelativePath"/> 是相对 Data 的路径。</summary>
+public sealed record WallpaperMedia(
+    string RelativePath,
+    string Title,
+    BackgroundKind Kind,
+    string PackageId,
+    string PackageName,
+    long Size);
+
+/// <summary>一个已保存的壁纸包，包含原包与解出的全部可用素材。</summary>
+public sealed record WallpaperPackageInfo(
+    string Id,
+    string Name,
+    string OriginalFile,
+    DateTime ImportedAt,
+    IReadOnlyList<WallpaperMedia> Media);
+
+/// <summary>写在 <c>Data\wallpapers\&lt;id&gt;\package.json</c> 里的清单。</summary>
+internal sealed class WallpaperPackageManifest
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string OriginalFile { get; set; } = string.Empty;
+    public DateTime ImportedAt { get; set; }
+    public List<WallpaperMediaManifest> Media { get; set; } = [];
+}
+
+internal sealed class WallpaperMediaManifest
+{
+    public string File { get; set; } = string.Empty;
+    public long Size { get; set; }
+}
 
 /// <summary>
 /// Wallpaper Engine 壁纸包（<c>.pkg</c> / <c>.mpkg</c>）的导入。
@@ -29,12 +64,14 @@ public static class WallpaperPackageService
 
     private static readonly string[] PackageExtensions = [".pkg", ".mpkg"];
 
-    private static readonly string[] PackageVideoExtensions = [".mp4", ".webm", ".mkv", ".mov", ".avi", ".wmv"];
-
-    private static readonly string[] PackageImageExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"];
-
     /// <summary>解包最长等 5 分钟，超时就掐掉（旧版同样是 300 秒）。</summary>
     private static readonly TimeSpan ExtractTimeout = TimeSpan.FromSeconds(300);
+
+    private static readonly JsonSerializerOptions ManifestJson = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     /// <summary>工具落盘位置：<c>Data\Cache\RePKG.exe</c>。</summary>
     public static string ToolPath => Path.Combine(Paths.Cache, ToolFileName);
@@ -118,7 +155,8 @@ public static class WallpaperPackageService
     // ————— 导入 —————
 
     /// <summary>
-    /// 导入壁纸包：解包 → 找素材 → 收进素材目录。整个过程在后台线程跑，不阻塞界面。
+    /// 导入壁纸包：原包与解出的全部可用素材都保存到 <c>Data\wallpapers\&lt;id&gt;</c>。
+    /// 导入后当前背景会指向包内第一个素材（视频优先），之后可以在设置里随时切换。
     /// </summary>
     public static async Task<WallpaperImport> ImportAsync(string packagePath, CancellationToken cancellationToken = default)
     {
@@ -135,15 +173,42 @@ public static class WallpaperPackageService
         }
 
         var displayName = Path.GetFileName(packagePath);
-        var extractDir = Path.Combine(Paths.Cache, "wallpaper", BuildCacheFolderName(displayName));
+        var packageId = BuildPackageId(displayName, packagePath);
+        var packageDir = Path.Combine(Paths.Wallpapers, packageId);
+        var mediaDir = Path.Combine(packageDir, "media");
+        var extractDir = Path.Combine(Paths.Cache, "wallpaper", packageId + "_extract");
+
+        // 同名包重复导入：先清掉旧目录；如果旧素材正被播放占用，换个带时间戳的目录，避免影响当前背景。
+        if (Directory.Exists(packageDir))
+        {
+            try
+            {
+                Directory.Delete(packageDir, recursive: true);
+            }
+            catch
+            {
+                packageId = $"{packageId}_{DateTime.Now:yyyyMMdd_HHmmss}";
+                packageDir = Path.Combine(Paths.Wallpapers, packageId);
+                mediaDir = Path.Combine(packageDir, "media");
+                extractDir = Path.Combine(Paths.Cache, "wallpaper", packageId + "_extract");
+            }
+        }
 
         // 旧版会先把 .mpkg 复制成临时 .pkg：早期 RePKG 只看扩展名，.mpkg 会被拒。
-        // 0.2.2 的用法说明里输入是任意路径，但沿用旧版做法更稳妥，代价只是多复制一份。
         string input = packagePath;
         string? tempPkg = null;
 
         try
         {
+            Directory.CreateDirectory(Paths.Wallpapers);
+            Directory.CreateDirectory(mediaDir);
+
+            var extension = Path.GetExtension(packagePath).ToLowerInvariant();
+            var packageCopy = Path.Combine(packageDir, "package" + extension);
+
+            if (!string.Equals(Path.GetFullPath(packagePath), Path.GetFullPath(packageCopy), StringComparison.OrdinalIgnoreCase))
+                File.Copy(packagePath, packageCopy, overwrite: true);
+
             if (Directory.Exists(extractDir)) Directory.Delete(extractDir, recursive: true);
             Directory.CreateDirectory(extractDir);
 
@@ -162,23 +227,53 @@ public static class WallpaperPackageService
 
             if (exitCode != 0)
             {
-                // 输出常常是一整段异常堆栈：界面只放第一行，完整内容写进日志
                 Log.Warn(Loc.F("RePKG 解包失败（退出码 {0}）：{1}", exitCode, output));
-
                 return Fail(Loc.F("RePKG 解包失败（退出码 {0}）：{1}", exitCode, FirstLine(output)));
             }
 
-            var media = FindBackgroundMedia(extractDir);
-            if (media is null) return Fail(Loc.T("解包完成，但包内没有可用的视频 / 图片文件，无法作为背景。"));
+            var mediaFiles = FindAllMedia(extractDir);
+            var manifest = new WallpaperPackageManifest
+            {
+                Id = packageId,
+                Name = Path.GetFileNameWithoutExtension(displayName),
+                OriginalFile = Path.GetFileName(packageCopy),
+                ImportedAt = DateTime.Now
+            };
 
-            Log.Info(Loc.F("壁纸包已解出可用素材：{0}", media));
+            var index = 0;
+            foreach (var media in mediaFiles)
+            {
+                var targetName = BuildMediaFileName(media, ++index);
+                var targetPath = Path.Combine(mediaDir, targetName);
 
-            var imported = BackgroundService.ImportFile(media, moveSource: true);
-            if (!imported.Ok) return new WallpaperImport(false, imported.Message, BackgroundKind.None, string.Empty);
+                File.Copy(media, targetPath, overwrite: true);
+
+                manifest.Media.Add(new WallpaperMediaManifest
+                {
+                    File = targetName,
+                    Size = new FileInfo(targetPath).Length
+                });
+            }
+
+            File.WriteAllText(Path.Combine(packageDir, "package.json"),
+                JsonSerializer.Serialize(manifest, ManifestJson));
+
+            if (manifest.Media.Count == 0)
+            {
+                Log.Warn(Loc.F("壁纸包已保存，但包内没有可用的视频 / 图片：{0}", packagePath));
+                return Fail(Loc.T("壁纸包已保存到 Data 文件夹，但包内没有可用的视频 / 图片，暂不能作为背景。"));
+            }
+
+            var first = manifest.Media[0];
+            var kind = BackgroundService.DetectKind(first.File);
+            var relativePath = $"wallpapers/{packageId}/media/{first.File}";
+
+            Log.Info(Loc.F("壁纸包已保存：{0}（{1} 个素材）→ {2}", displayName, manifest.Media.Count, packageDir));
 
             return new WallpaperImport(true,
-                Loc.F("已导入壁纸包 {0}，当前背景：{1}（{2}）", displayName, Path.GetFileName(media), BackgroundService.DescribeKind(imported.Kind)),
-                imported.Kind, imported.FileName);
+                Loc.F("已保存壁纸包 {0}（{1} 个素材），当前背景：{2}（{3}）",
+                    displayName, manifest.Media.Count, first.File, BackgroundService.DescribeKind(kind)),
+                kind, relativePath);
         }
         catch (OperationCanceledException)
         {
@@ -193,7 +288,7 @@ public static class WallpaperPackageService
         {
             TryDeleteFile(tempPkg);
 
-            // 解包目录只是中转：素材已经收进 Data\backgrounds，剩下的贴图等没用了
+            // 解包目录只是中转：可用素材已经复制进 Data\wallpapers，贴图等无关内容不保留
             TryDeleteDirectory(extractDir);
         }
 
@@ -268,38 +363,164 @@ public static class WallpaperPackageService
         return line.Length <= maxLength ? line : line[..maxLength] + "…";
     }
 
-    /// <summary>
-    /// 在解包目录里挑一个能当背景的文件：先找视频，再找图片 / 动图。
-    /// 与旧版 _find_bg_media_in_dir 的偏好一致（视频优先）。
-    /// </summary>
-    private static string? FindBackgroundMedia(string folder)
-    {
-        if (!Directory.Exists(folder)) return null;
+    // ————— 素材库 —————
 
-        var files = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
-            .OrderBy(file => file, StringComparer.OrdinalIgnoreCase)
+    /// <summary>枚举已保存的壁纸包（新导入的在前）。</summary>
+    public static IReadOnlyList<WallpaperPackageInfo> ListPackages()
+    {
+        try
+        {
+            if (!Directory.Exists(Paths.Wallpapers)) return [];
+
+            var result = new List<WallpaperPackageInfo>();
+
+            foreach (var dir in Directory.EnumerateDirectories(Paths.Wallpapers))
+            {
+                var id = Path.GetFileName(dir);
+                var manifest = ReadManifest(dir);
+                var name = string.IsNullOrWhiteSpace(manifest?.Name) ? id : manifest!.Name;
+                var media = new List<WallpaperMedia>();
+
+                if (manifest?.Media is { Count: > 0 })
+                {
+                    foreach (var entry in manifest.Media)
+                    {
+                        var relative = entry.File.Replace('\\', '/');
+                        var full = Path.Combine(dir, "media", relative.Replace('/', Path.DirectorySeparatorChar));
+
+                        if (!File.Exists(full)) continue;
+
+                        var kind = BackgroundService.DetectKind(relative);
+                        if (kind == BackgroundKind.None) continue;
+
+                        media.Add(new WallpaperMedia(
+                            $"wallpapers/{id}/media/{relative}",
+                            Path.GetFileName(relative),
+                            kind, id, name, entry.Size));
+                    }
+                }
+                else
+                {
+                    // 兼容没有 package.json 的手工目录
+                    var mediaDir = Path.Combine(dir, "media");
+
+                    if (Directory.Exists(mediaDir))
+                    {
+                        foreach (var file in Directory.EnumerateFiles(mediaDir, "*", SearchOption.AllDirectories)
+                                     .Where(BackgroundService.IsSupportedMedia)
+                                     .Where(file => !IsPreviewFile(file)))
+                        {
+                            var relative = Path.GetRelativePath(mediaDir, file).Replace('\\', '/');
+                            media.Add(new WallpaperMedia(
+                                $"wallpapers/{id}/media/{relative}",
+                                Path.GetFileName(file),
+                                BackgroundService.DetectKind(file),
+                                id, name, new FileInfo(file).Length));
+                        }
+                    }
+                }
+
+                result.Add(new WallpaperPackageInfo(
+                    id, name, manifest?.OriginalFile ?? string.Empty,
+                    manifest?.ImportedAt ?? Directory.GetCreationTime(dir), media));
+            }
+
+            return result.OrderByDescending(package => package.ImportedAt).ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("枚举壁纸包失败：{0}", ex.Message));
+            return [];
+        }
+    }
+
+    /// <summary>把全部壁纸包素材摊平，给设置页的切换列表用。</summary>
+    public static IReadOnlyList<WallpaperMedia> ListMedia()
+        => ListPackages()
+            .SelectMany(package => package.Media)
+            .OrderBy(media => media.PackageName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(media => media.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return files.FirstOrDefault(IsVideo) ?? files.FirstOrDefault(IsImage);
+    /// <summary>删除一个壁纸包及其全部素材。正在播放的视频被占用时返回 false。</summary>
+    public static bool DeletePackage(string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(packageId) ||
+            packageId.Contains("..", StringComparison.Ordinal) ||
+            packageId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return false;
+        }
 
-        static bool IsVideo(string file) =>
-            PackageVideoExtensions.Contains(Path.GetExtension(file).ToLowerInvariant());
+        var dir = Path.Combine(Paths.Wallpapers, packageId);
 
-        static bool IsImage(string file) =>
-            PackageImageExtensions.Contains(Path.GetExtension(file).ToLowerInvariant());
+        try
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            Log.Info(Loc.F("已删除壁纸包：{0}", packageId));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("删除壁纸包失败（可能正被占用）：{0}", ex.Message));
+            return false;
+        }
     }
 
-    /// <summary>缓存目录名：把包名洗干净再加 8 位摘要，避免同名包互相覆盖、也避免非法字符。</summary>
-    private static string BuildCacheFolderName(string displayName)
+    private static WallpaperPackageManifest? ReadManifest(string packageDir)
     {
-        var raw = Path.GetFileNameWithoutExtension(displayName);
-        var safe = new string(raw.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
+        var path = Path.Combine(packageDir, "package.json");
+        if (!File.Exists(path)) return null;
 
+        try
+        {
+            return JsonSerializer.Deserialize<WallpaperPackageManifest>(File.ReadAllText(path));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("读取壁纸包清单失败：{0}", ex.Message));
+            return null;
+        }
+    }
+
+    /// <summary>在解包目录里找全部可当背景的文件，视频优先，排除预览图。</summary>
+    private static IReadOnlyList<string> FindAllMedia(string folder)
+    {
+        if (!Directory.Exists(folder)) return [];
+
+        return Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+            .Where(BackgroundService.IsSupportedMedia)
+            .Where(file => !IsPreviewFile(file))
+            .OrderBy(file => BackgroundService.DetectKind(file) == BackgroundKind.Video ? 0 : 1)
+            .ThenBy(file => file, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool IsPreviewFile(string path)
+        => Path.GetFileNameWithoutExtension(path).Equals("preview", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildMediaFileName(string source, int index)
+    {
+        var stem = SanitizeFileName(Path.GetFileNameWithoutExtension(source));
+        if (string.IsNullOrWhiteSpace(stem)) stem = "media";
+        if (stem.Length > 40) stem = stem[..40];
+
+        return $"{index:00}_{stem}{Path.GetExtension(source).ToLowerInvariant()}";
+    }
+
+    /// <summary>包目录名：把包名洗干净再加 8 位摘要，避免同名包互相覆盖、也避免非法字符。</summary>
+    private static string BuildPackageId(string displayName, string packagePath)
+    {
+        var safe = SanitizeFileName(Path.GetFileNameWithoutExtension(displayName));
         if (safe.Length > 24) safe = safe[..24];
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(displayName)))[..8];
+        var length = new FileInfo(packagePath).Length;
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{displayName}|{length}")))[..8];
         return $"{safe}_{hash}".ToLowerInvariant();
     }
+
+    private static string SanitizeFileName(string raw)
+        => new string(raw.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray()).Trim();
 
     private static void TryKill(Process process)
     {

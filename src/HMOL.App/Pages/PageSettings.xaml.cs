@@ -163,6 +163,26 @@ public sealed class BackgroundRow
     public bool IsCurrent { get; }
 }
 
+/// <summary>「已导入壁纸」列表里的一行：可以是普通素材，也可以是壁纸包里的素材。</summary>
+public sealed class WallpaperLibraryRow
+{
+    public WallpaperLibraryRow(string fileName, string title, string kind, bool isCurrent)
+    {
+        FileName = fileName;
+        Title = title;
+        Kind = kind;
+        IsCurrent = isCurrent;
+    }
+
+    public string FileName { get; }
+
+    public string Title { get; }
+
+    public string Kind { get; }
+
+    public bool IsCurrent { get; }
+}
+
 /// <summary>
 /// 设置页。只做 <see cref="Settings"/> 里已有的字段：主题模式、强调色、窗口透明度、界面缩放、
 /// 联机设置（昵称与游戏内 HUD）、天气城市、常用网站、主页背景、背景音乐。
@@ -1618,13 +1638,16 @@ public partial class PageSettings : LauncherPage
     {
         if (sender is not FrameworkElement { Tag: string fileName }) return;
 
-        SettingsStore.Current.Background.FileName = fileName;
+        var background = SettingsStore.Current.Background;
+
+        background.FileName = fileName;
+        background.FromWallpaperPackage = BackgroundService.IsPackageMedia(fileName);
         SettingsStore.Save();
 
         RefreshBackground();
         ApplyBackgroundToWindow();
 
-        SetBackgroundStatus(Loc.F("已切换背景：{0}", fileName), warn: false);
+        SetBackgroundStatus(Loc.F("已切换背景：{0}", Path.GetFileName(fileName)), warn: false);
     }
 
     /// <summary>从轮播清单与素材库里移除一张。</summary>
@@ -1645,7 +1668,7 @@ public partial class PageSettings : LauncherPage
         if (wasCurrent)
         {
             background.FileName = background.Playlist.FirstOrDefault();
-            background.FromWallpaperPackage = false;
+            background.FromWallpaperPackage = BackgroundService.IsPackageMedia(background.FileName);
         }
 
         SettingsStore.Save();
@@ -1846,6 +1869,35 @@ public partial class PageSettings : LauncherPage
             .ToList();
 
         LabBackgroundListEmpty.Visibility = playlist.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        // 已导入壁纸：普通素材 + 壁纸包里解出的全部素材，统一在这里切换
+        var library = new List<WallpaperLibraryRow>();
+
+        foreach (var name in BackgroundService.ListLibrary())
+        {
+            if (BackgroundService.IsPackageMedia(name)) continue;
+
+            var libraryPath = BackgroundService.ResolveExistingFile(name);
+            if (libraryPath is null) continue;
+
+            library.Add(new WallpaperLibraryRow(
+                name,
+                Path.GetFileName(name),
+                BackgroundService.DescribeKind(BackgroundService.DetectKind(libraryPath)),
+                string.Equals(name, background.FileName, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        foreach (var media in WallpaperPackageService.ListMedia())
+        {
+            library.Add(new WallpaperLibraryRow(
+                media.RelativePath,
+                $"{media.PackageName} / {media.Title}",
+                BackgroundService.DescribeKind(media.Kind),
+                string.Equals(media.RelativePath, background.FileName, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        PanWallpaperLibrary.ItemsSource = library;
+        LabWallpaperLibraryEmpty.Visibility = library.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         BtnRotate.Content = background.RotateEnabled ? Loc.T("已开启") : Loc.T("已关闭");
         BtnRotate.Tone = background.RotateEnabled ? ButtonTone.Solid : ButtonTone.Outline;

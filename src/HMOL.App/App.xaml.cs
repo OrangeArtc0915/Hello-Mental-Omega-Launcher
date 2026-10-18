@@ -83,8 +83,16 @@ public partial class App : Application
         // 开机自启拉起：注册表里的命令行带 --autostart，启动后只驻留托盘、不显示主窗口
         var autoStart = AutoStartManager.IsAutoStartLaunch(e.Args);
 
-        // 单实例判定必须最先做：重复双击时第二个进程只提示一下然后退出，不显示窗口
-        _singleInstanceMutex = new Mutex(true, MutexName, out var createdNew);
+        // 单实例判定必须最先做：重复双击时第二个进程只提示一下然后退出，不显示窗口。
+        // Debug 构建允许用环境变量加后缀，这样截图进程可以和用户正在用的正式实例并存。
+#if DEBUG
+        var mutexName = Environment.GetEnvironmentVariable("HMOL_MUTEX_SUFFIX") is { Length: > 0 } suffix
+            ? MutexName + "." + suffix
+            : MutexName;
+#else
+        const string mutexName = MutexName;
+#endif
+        _singleInstanceMutex = new Mutex(true, mutexName, out var createdNew);
         if (!createdNew)
         {
             InitializeLogging();

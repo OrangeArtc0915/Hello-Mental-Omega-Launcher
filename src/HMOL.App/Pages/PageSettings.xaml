@@ -919,12 +919,70 @@
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
-                               Text="{loc:T '壁纸包指 Wallpaper Engine 导出的 .pkg / .mpkg，导入时会用内置工具解包并取其中的视频或图片。素材都会复制进数据目录，原文件删掉也不影响。'}" />
+                               Text="{loc:T '壁纸包指 Wallpaper Engine 导出的 .pkg / .mpkg。导入后原包与包内可用的视频 / 图片都会保存到 Data\wallpapers，之后可以在下面随时切换。'}" />
                     <TextBlock x:Name="LabBackgroundStatus"
                                Margin="0,8,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap" />
+
+                    <!-- 已导入素材：图片 / GIF / 视频 + 壁纸包解出的全部素材 -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '已导入壁纸'}" />
+                    <TextBlock Margin="0,4,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '图片、动图、视频和壁纸包素材都保存在 Data 文件夹；点「使用」即可切换，删掉原文件也不影响。'}" />
+                    <ItemsControl x:Name="PanWallpaperLibrary" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,5"
+                                        Padding="9,6"
+                                        CornerRadius="{DynamicResource Radius.Item}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource Accent.Faint}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource Text.Primary}"
+                                                       Text="{Binding Title}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,2,0,0"
+                                                       FontSize="10.5"
+                                                       Foreground="{DynamicResource Text.Tertiary}"
+                                                       Text="{Binding Kind}" />
+                                        </StackPanel>
+                                        <c:OutlineButton Grid.Column="1"
+                                                         Margin="8,0,0,0"
+                                                         Content="{loc:T '使用'}"
+                                                         Tag="{Binding FileName}"
+                                                         Click="OnUseBackgroundClick" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="LabWallpaperLibraryEmpty"
+                               Margin="0,6,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '还没有导入素材：点上面的按钮导入图片 / 动图 / 视频，或直接导入壁纸包。'}" />
 
                     <Grid Margin="0,14,0,0">
                         <Grid.ColumnDefinitions>
