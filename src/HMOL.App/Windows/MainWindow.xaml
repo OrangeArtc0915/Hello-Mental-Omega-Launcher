@@ -206,8 +206,8 @@
                                     </StackPanel>
 
                                     <!--
-                                        设置分组栏：进设置页时先只列「个性化 / 更新与下载 / 联机 / 其他」四个大类，
-                                        点进去再换成该类的分类列表（PanSetupNav）。这样侧栏一次不会堆十几个入口。
+                                        设置分组栏：进设置页时先列「菜单」+「个性化 / 更新与下载 / 联机 / 其他 / 语言」，
+                                        点进某组再换成该类的分类列表（PanSetupNav）。这样侧栏一次不会堆十几个入口。
                                     -->
                                     <StackPanel x:Name="PanSetupGroups"
                                                 Margin="0,12,0,0"
@@ -218,6 +218,12 @@
                                                    Icon="lucide/arrow-left"
                                                    Text="{loc:T '返回'}"
                                                    Click="OnSetupBackClick" />
+                                        <!-- 菜单：设置页的小主页（小贴士 + 常用入口），进入设置页时默认选中 -->
+                                        <c:NavItem x:Name="SetupGroupMenu"
+                                                   GroupName="SetupGroupNav"
+                                                   Icon="lucide/list"
+                                                   Text="{loc:T '菜单'}"
+                                                   Checked="OnSetupGroupMenuChecked" />
                                         <c:NavItem x:Name="SetupGroupPersonal"
                                                    GroupName="SetupGroupNav"
                                                    Icon="lucide/palette"

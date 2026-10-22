@@ -49,6 +49,9 @@ public partial class MainWindow : Window
     /// <summary>设置分组项（个性化 / 更新与下载 / 联机 / 其他），按下标与 <see cref="SetupGroupCategories"/> 对齐。</summary>
     private readonly NavItem[] _setupGroups;
 
+    /// <summary>设置分组栏顶部的「菜单」项，对应右侧的设置小主页。</summary>
+    private readonly NavItem _setupGroupMenu;
+
     /// <summary>联机页的分类项（组网 / 大厅 / 对端 / 引擎日志），下标与 <c>Tag</c> 一一对应。</summary>
     private readonly NavItem[] _mpCategories;
 
@@ -112,6 +115,8 @@ public partial class MainWindow : Window
             SetupGroupOther,
             SetupGroupLanguage,
         ];
+
+        _setupGroupMenu = SetupGroupMenu;
 
         // 联机分类项按 Tag 顺序抓成表，理由与设置分类栏相同
         _mpCategories =
@@ -760,6 +765,15 @@ public partial class MainWindow : Window
         EnterSetupGroup(group, null);
     }
 
+    /// <summary>分组栏的「菜单」：回到设置页的小主页，不离开设置页。</summary>
+    private void OnSetupGroupMenuChecked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || _suppressSetupGroup) return;
+
+        _setupLevel = 0;
+        ApplySidebarMode(NavPages.Settings);
+    }
+
     /// <summary>分类列表里的「返回」：退回分组列表，不离开设置页。</summary>
     private void OnSetupCategoryBackClick(object sender, RoutedEventArgs e)
     {
@@ -807,8 +821,10 @@ public partial class MainWindow : Window
     {
         _suppressSetupGroup = true;
 
+        _setupGroupMenu.IsChecked = _setupLevel == 0;
+
         for (var i = 0; i < _setupGroups.Length; i++)
-            _setupGroups[i].IsChecked = i == _setupGroup;
+            _setupGroups[i].IsChecked = _setupLevel == 1 && i == _setupGroup;
 
         _suppressSetupGroup = false;
     }
