@@ -3,7 +3,8 @@
 
         补丁1-中文输入 = 安装器（对 Resources\Binaries\Windows\MonoGame.Framework.dll 打 ime）
         补丁2-联机     = 安装器（对三个 exe 打 lanip → relay → relaysend → relayhost
-                                  → lobbyfix → kick → mention → tab）
+                                  → lobbyfix → kick → mention → tab → preflight → verlabel）
+                         + 隐藏 MainMenu.ini 里的 CnCNet 线上大厅入口
                          + 工具\MoLanRelay.dll（我们自己编译的中继）
 
     ── 为什么不再产出成品 exe ──
@@ -27,9 +28,11 @@
 #>
 [CmdletBinding()]
 param(
-    # ---- 输入：原版（未打补丁）文件，只用于端到端自检 ----
-    [string]$OriginalExeDir = "d:\F\MO\CNC\_lanipbak",                                        # clientdx/ogl/xna.exe
-    [string]$OriginalMono    = "d:\F\MO\CNC\Mental Omega\backup-original\Windows\MonoGame.Framework.dll",
+    # ---- 输入：原版（未打补丁）文件，只用于端到端自检与编译中继 ----
+    #      _orig 是"客户端自动更新时留下的 .bak"整理出来的，等价于原始文件
+    [string]$OriginalExeDir = "d:\MO\CNC\_orig",                                           # clientdx/ogl/xna.exe
+    [string]$OriginalMono    = "d:\MO\CNC\_orig\MonoGame.Framework.dll",
+    [string]$OriginalMainMenu = "d:\MO\CNC\Mental Omega\Resources\MainMenu.ini",              # 原版主菜单（补丁2 要改它）
 
     # ---- 输入：源码 ----
     [string]$RootDir     = "",       # 默认 ..（源码根，README/LICENSE 从这里拿）
@@ -37,25 +40,27 @@ param(
     [string]$NotesDir    = "",       # 默认 ..\说明文本
 
     # ---- 工具链 ----
-    [string]$DotNet       = "d:\F\MO\CNC\.dotnet10\dotnet.exe",
-    [string]$Csc          = "d:\F\MO\CNC\.dotnet10\sdk\10.0.100\Roslyn\bincore\csc.dll",
+    [string]$DotNet       = "d:\MO\CNC\.dotnet10\dotnet.exe",
+    [string]$Csc          = "d:\MO\CNC\.dotnet10\sdk\10.0.100\Roslyn\bincore\csc.dll",
     [string]$FxDir        = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319",
-    [string]$RelayRefDir  = "d:\F\MO\CNC\Mental Omega\Resources\Binaries\Windows",
+    [string]$RelayRefDir  = "d:\MO\CNC\Mental Omega\Resources\Binaries\Windows",
     [string]$DnlibNet45   = "$env:USERPROFILE\.nuget\packages\dnlib\4.4.0\lib\net45\dnlib.dll",
 
     # ---- 输出 ----
-    [string]$OutDir = "",            # 默认 ..\..\_build
+    [string]$OutDir = "",            # 默认 ..\_build（即源码目录的上一级）
 
     # ---- 端到端自检：把原版文件铺成一个假游戏目录，跑一遍"就地安装"，
-    #      再和这些已验证过的成品逐个比 SHA256。传不存在的路径则跳过。 ----
-    [string]$VerifyAgainst = "d:\F\MO\CNC\Mental Omega\Resources"
+    #      再和这些已验证过的成品逐个比 SHA256。留空则只跑安装/还原、不比对。 ----
+    [string]$VerifyAgainst = "",
+    # 客户端正开着（文件被锁）时跑不了安装自检，先出包就加这个开关
+    [switch]$SkipSelfTest = $false
 )
 
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrEmpty($RootDir))     { $RootDir     = Resolve-Path (Join-Path $PSScriptRoot '..') }
 if ([string]::IsNullOrEmpty($RelaySource)) { $RelaySource = Join-Path $RootDir '中继\MoLanRelay.cs' }
 if ([string]::IsNullOrEmpty($NotesDir))    { $NotesDir    = Join-Path $RootDir '说明文本' }
-if ([string]::IsNullOrEmpty($OutDir))      { $OutDir      = Join-Path $RootDir '..\..\_build' }
+if ([string]::IsNullOrEmpty($OutDir))      { $OutDir      = Join-Path $RootDir '..\_build' }
 
 $ExeNames = @('clientdx.exe', 'clientogl.exe', 'clientxna.exe')
 
@@ -173,7 +178,7 @@ Compress-Archive -Path (Join-Path $p2 '*') -DestinationPath $z2 -Force
 # ------------------------------------------------------------------
 # 6) 端到端自检：假游戏目录 + 真跑安装器 + 比 SHA256（再测一次还原）
 # ------------------------------------------------------------------
-if ($VerifyAgainst -and (Test-Path $VerifyAgainst)) {
+if (!$SkipSelfTest) {
     Write-Host ''
     Write-Host '[6/6] 端到端自检：铺一个假游戏目录，真跑一遍安装器'
     $fake = Join-Path $OutDir '_selftest\Game'
@@ -181,6 +186,8 @@ if ($VerifyAgainst -and (Test-Path $VerifyAgainst)) {
     New-Item -ItemType Directory -Force -Path (Join-Path $fake 'Resources\Binaries\Windows') | Out-Null
     foreach ($n in $ExeNames) { Copy-Item (Join-Path $OriginalExeDir $n) (Join-Path $fake 'Resources') -Force }
     Copy-Item $OriginalMono (Join-Path $fake 'Resources\Binaries\Windows') -Force
+    if (!(Test-Path $OriginalMainMenu)) { throw ('端到端自检需要原版 MainMenu.ini: ' + $OriginalMainMenu) }
+    Copy-Item $OriginalMainMenu (Join-Path $fake 'Resources\MainMenu.ini') -Force
 
     foreach ($set in @('1', '2')) {
         $pkg = if ($set -eq '1') { $p1 } else { $p2 }
@@ -188,21 +195,24 @@ if ($VerifyAgainst -and (Test-Path $VerifyAgainst)) {
         if ($LASTEXITCODE -ne 0) { throw ('自检失败：补丁' + $set + ' 的就地安装脚本返回 ' + $LASTEXITCODE) }
     }
 
-    $pairs = @(
-        @((Join-Path $fake 'Resources\Binaries\Windows\MonoGame.Framework.dll'), (Join-Path $VerifyAgainst 'Binaries\Windows\MonoGame.Framework.dll')),
-        @((Join-Path $fake 'Resources\MoLanRelay.dll'),        (Join-Path $VerifyAgainst 'MoLanRelay.dll')),
-        @((Join-Path $fake 'Resources\Binaries\MoLanRelay.dll'), (Join-Path $VerifyAgainst 'Binaries\MoLanRelay.dll'))
-    )
-    foreach ($n in $ExeNames) { $pairs += ,@((Join-Path $fake ('Resources\' + $n)), (Join-Path $VerifyAgainst $n)) }
-
     $bad = 0
-    foreach ($pr in $pairs) {
-        $a = $pr[0]; $b = $pr[1]
-        if (!(Test-Path $a)) { Write-Host ("  [缺失] {0}" -f (Split-Path $a -Leaf)); $bad++; continue }
-        if (!(Test-Path $b)) { Write-Host ("  [跳过] {0}（成品不存在）" -f (Split-Path $a -Leaf)); continue }
-        $ha = (Get-FileHash $a).Hash; $hb = (Get-FileHash $b).Hash
-        if ($ha -eq $hb) { Write-Host ("  {0,-32} 一致" -f (Split-Path $a -Leaf)) }
-        else { Write-Host ("  {0,-32} 不一致 <-- 注意" -f (Split-Path $a -Leaf)); $bad++ }
+    if ($VerifyAgainst) {
+        $pairs = @(
+            @((Join-Path $fake 'Resources\Binaries\Windows\MonoGame.Framework.dll'), (Join-Path $VerifyAgainst 'Binaries\Windows\MonoGame.Framework.dll')),
+            @((Join-Path $fake 'Resources\MoLanRelay.dll'),        (Join-Path $VerifyAgainst 'MoLanRelay.dll')),
+            @((Join-Path $fake 'Resources\Binaries\MoLanRelay.dll'), (Join-Path $VerifyAgainst 'Binaries\MoLanRelay.dll')),
+            @((Join-Path $fake 'Resources\MainMenu.ini'),           (Join-Path $VerifyAgainst 'MainMenu.ini'))
+        )
+        foreach ($n in $ExeNames) { $pairs += ,@((Join-Path $fake ('Resources\' + $n)), (Join-Path $VerifyAgainst $n)) }
+
+        foreach ($pr in $pairs) {
+            $a = $pr[0]; $b = $pr[1]
+            if (!(Test-Path $a)) { Write-Host ("  [缺失] {0}" -f (Split-Path $a -Leaf)); $bad++; continue }
+            if (!(Test-Path $b)) { Write-Host ("  [跳过] {0}（成品不存在）" -f (Split-Path $a -Leaf)); continue }
+            $ha = (Get-FileHash $a).Hash; $hb = (Get-FileHash $b).Hash
+            if ($ha -eq $hb) { Write-Host ("  {0,-32} 一致" -f (Split-Path $a -Leaf)) }
+            else { Write-Host ("  {0,-32} 不一致 <-- 注意" -f (Split-Path $a -Leaf)); $bad++ }
+        }
     }
 
     # 还原：跑一遍 restore，确认文件回到原版
@@ -216,8 +226,9 @@ if ($VerifyAgainst -and (Test-Path $VerifyAgainst)) {
         if ((Get-FileHash (Join-Path $fake ('Resources\' + $n))).Hash -ne (Get-FileHash (Join-Path $OriginalExeDir $n)).Hash) { $restoreOk = $false }
     }
     if ((Get-FileHash (Join-Path $fake 'Resources\Binaries\Windows\MonoGame.Framework.dll')).Hash -ne (Get-FileHash $OriginalMono).Hash) { $restoreOk = $false }
+    if ((Get-FileHash (Join-Path $fake 'Resources\MainMenu.ini')).Hash -ne (Get-FileHash $OriginalMainMenu).Hash) { $restoreOk = $false }
     if (Test-Path (Join-Path $fake 'Resources\MoLanRelay.dll')) { $restoreOk = $false }
-    Write-Host ('  还原自检: ' + $(if ($restoreOk) { '三个 exe + MonoGame 都回到原版，新增的 MoLanRelay.dll 已删除  [OK]' } else { '失败 <-- 注意' }))
+    Write-Host ('  还原自检: ' + $(if ($restoreOk) { '三个 exe + MonoGame + MainMenu.ini 都回到原版，新增的 MoLanRelay.dll 已删除  [OK]' } else { '失败 <-- 注意' }))
     if (!$restoreOk) { $bad++ }
 
     if ($bad -gt 0) { Write-Host ('自检有 ' + $bad + ' 项不一致，请检查。') }

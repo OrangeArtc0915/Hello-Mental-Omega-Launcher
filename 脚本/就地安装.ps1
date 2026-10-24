@@ -54,10 +54,11 @@ Say '本项目与 Mental Omega（MO）开发组、MO 客户端官方没有任何
 Say '源码（patch 分支）: https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/tree/patch'
 Say '许可与第三方组件: 见本包 README.md / NOTICE.md / LICENSE / LICENSE-CnCNet-Client.md'
 Say ''
-Say '修改日期: 2026-10-06'
+Say '修改日期: 2026-10-24'
 Say '将被修改的文件（都在 <游戏根>\Resources\ 下，改动前会自动备份）:'
 if ($PatchSet -eq '2') {
     Say '  clientdx.exe / clientogl.exe / clientxna.exe'
+    Say '  MainMenu.ini（隐藏 CnCNet 线上大厅入口，局域网入口上移）'
 } else {
     Say '  Binaries\Windows\MonoGame.Framework.dll'
 }
@@ -94,7 +95,7 @@ if (!(Test-Path $dnlib)) { throw ('缺文件: ' + $dnlib) }
 # ------------------------------------------------------------------
 # 2) 本次要改哪些文件
 # ------------------------------------------------------------------
-$exeModes = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'mention', 'tab')
+$exeModes = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'mention', 'tab', 'preflight', 'verlabel')
 
 # 键 = 相对游戏根的路径；值 = 依次执行的 dnlibpatch 模式
 $jobs = @{}
@@ -116,6 +117,9 @@ if ($PatchSet -eq '2') {
 # 3) 前置检查：目标文件都在、且都还是原版（没被改过）
 # ------------------------------------------------------------------
 $backupDir = Join-Path $root '_MO补丁备份'
+$iniRel = 'Resources\MainMenu.ini'
+$iniFull = Join-Path $root $iniRel
+$iniBak = Join-Path $backupDir $iniRel
 
 foreach ($rel in $jobs.Keys) {
     $full = Join-Path $root $rel
@@ -127,6 +131,18 @@ foreach ($rel in $jobs.Keys) {
         $h2 = (Get-FileHash $bak).Hash
         if ($h1 -ne $h2) {
             throw ($rel + ' 已经不是原版了（和备份不一致）——它可能已经打过补丁或被你改过。' + "`r`n" +
+                   '请先运行 还原.bat 把它恢复成原版，再重新安装。')
+        }
+    }
+}
+
+if ($PatchSet -eq '2') {
+    if (!(Test-Path $iniFull)) { throw ('缺文件: ' + $iniFull + '（游戏版本不对？本补丁对应 MO 客户端 2.6.10.3）') }
+    if (Test-Path $iniBak) {
+        $h1 = (Get-FileHash $iniFull).Hash
+        $h2 = (Get-FileHash $iniBak).Hash
+        if ($h1 -ne $h2) {
+            throw ($iniRel + ' 已经不是原版了（和备份不一致）——它可能已经打过补丁或被你改过。' + "`r`n" +
                    '请先运行 还原.bat 把它恢复成原版，再重新安装。')
         }
     }
@@ -148,6 +164,80 @@ function Restore-Done {
             Copy-Item $bak (Join-Path $root $rel) -Force -ErrorAction SilentlyContinue
         }
     }
+}
+
+# 在指定 [section] 里设置一行 key=value：有就替换，没有就加在段尾。
+# 用逐行处理而不是正则回调，避免 PowerShell 5.1 里闭包变量取不到。
+function Set-IniSectionValue([string]$text, [string]$section, [string]$key, [string]$value) {
+    $nl = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $lines = $text -split '\r?\n', -1
+    $result = New-Object System.Collections.Generic.List[string]
+    $inSection = $false
+    $done = $false
+
+    foreach ($line in $lines) {
+        $trim = $line.Trim()
+
+        if ($trim -match '^\[(.+)\]$') {
+            if ($inSection -and -not $done) {
+                $result.Add($key + '=' + $value)
+                $done = $true
+            }
+
+            $inSection = ($matches[1] -ieq $section)
+            $result.Add($line)
+            continue
+        }
+
+        if ($inSection) {
+            if ($trim -match ('^' + [regex]::Escape($key) + '\s*=')) {
+                $result.Add($key + '=' + $value)
+                $done = $true
+                continue
+            }
+        }
+
+        $result.Add($line)
+    }
+
+    if ($inSection -and -not $done) { $result.Add($key + '=' + $value) }
+
+    return ($result -join $nl)
+}
+
+# 读取指定 [section] 里某个键的值（同名键取最后一个，和客户端的解析顺序一致）
+function Get-IniValue([string]$text, [string]$section, [string]$key) {
+    $lines = $text -split '\r?\n', -1
+    $inSection = $false
+    $value = ''
+    foreach ($line in $lines) {
+        $trim = $line.Trim()
+        if ($trim -match '^\[(.+)\]$') { $inSection = ($matches[1] -ieq $section); continue }
+        if ($inSection -and $trim -match ('^' + [regex]::Escape($key) + '\s*=\s*(.*)$')) { $value = $matches[1].Trim() }
+    }
+    return $value
+}
+
+# 隐藏 CnCNet 线上入口：按**当前**按钮坐标把下面的按钮整体上移 42 像素，
+# 而不是写死坐标 —— 原版布局和第三方主题（例如 Bt Theme Pack 的 x=13）都不会被弄乱。
+# 如果 [btnCnCNet] 已经是 Visible=0（重复安装），就不再上移，避免二次位移。
+function Hide-CnCNetEntry([string]$text) {
+    $shift = 42
+    $anchors = @('btnLan', 'btnLoadGame', 'btnOptions', 'btnMapEditor', 'btnStatistics', 'btnExit')
+
+    if ((Get-IniValue $text 'btnCnCNet' 'Visible') -ne '0') {
+        foreach ($sec in $anchors) {
+            $loc = Get-IniValue $text $sec 'Location'
+            if ($loc -match '^\s*(-?\d+)\s*,\s*(-?\d+)\s*$') {
+                $text = Set-IniSectionValue $text $sec 'Location' ($matches[1] + ',' + ([int]$matches[2] - $shift))
+            }
+        }
+    }
+
+    $text = Set-IniSectionValue $text 'btnCnCNet' 'Visible' '0'
+    $text = Set-IniSectionValue $text 'lblCnCNetStatus' 'Visible' '0'
+    $text = Set-IniSectionValue $text 'lblCnCNetPlayerCount' 'Visible' '0'
+    return $text
 }
 
 try {
@@ -182,6 +272,22 @@ try {
         Say ('  完成: ' + $rel + '  （' + ($modes -join ' → ') + '）')
     }
 
+    # 隐藏客户端主菜单的 CnCNet 线上大厅入口，并把下面的按钮整体上移 42 像素
+    if ($PatchSet -eq '2') {
+        if (!(Test-Path $iniBak)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $iniBak -Parent) | Out-Null
+            Copy-Item $iniFull $iniBak -Force
+            Say ('  备份: ' + $iniRel)
+        }
+
+        $iniText = [IO.File]::ReadAllText($iniFull, [Text.Encoding]::UTF8)
+        $iniText = Hide-CnCNetEntry $iniText
+        [IO.File]::WriteAllText($iniFull, $iniText, (New-Object Text.UTF8Encoding($false)))
+
+        [void]$done.Add($iniRel)
+        Say ('  完成: ' + $iniRel + '（隐藏 CnCNet 线上入口，局域网按钮上移）')
+    }
+
     # 放入中继 DLL（我们的代码）
     foreach ($rel in $addFiles) {
         $full = Join-Path $root $rel
@@ -212,6 +318,12 @@ foreach ($rel in $jobs.Keys) {
     Say ('  ' + $(if ($ok) { '[OK]  ' } else { '[失败]' }) + ' ' + $rel + '  ' + (Get-Item $full).Length + ' 字节  SHA256=' + (Get-FileHash $full).Hash.Substring(0, 16) + '…')
 }
 foreach ($rel in $addFiles) { Say ('  [OK]  ' + $rel) }
+
+if ($PatchSet -eq '2') {
+    $iniText = [IO.File]::ReadAllText($iniFull, [Text.Encoding]::UTF8)
+    $okIni = (Get-IniValue $iniText 'btnCnCNet' 'Visible') -eq '0'
+    Say ('  ' + $(if ($okIni) { '[OK]  ' } else { '[失败]' }) + ' ' + $iniRel + '（CnCNet 线上入口已隐藏；btnLan=' + (Get-IniValue $iniText 'btnLan' 'Location') + '）')
+}
 
 Say ''
 Say '安装完成。原文件已备份到: ' + $backupDir

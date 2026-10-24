@@ -1,0 +1,43 @@
+MO 补丁 1+2（直接覆盖版）
+适用客户端：Mental Omega 的 XNA CnCNet 客户端 2.6.10.3
+
+一、怎么用（不需要运行任何脚本）
+  1. 完全关掉 MO 客户端和游戏（任务管理器里确认 clientdx.exe 已经没了）
+  2. 建议先把下面几个原文件复制到别处备份：
+        Resources\clientdx.exe
+        Resources\clientogl.exe
+        Resources\clientxna.exe
+        Resources\Binaries\Windows\MonoGame.Framework.dll
+  3. 把本压缩包里的 Resources 文件夹整个复制到游戏根目录
+     （就是有 MentalOmegaClient.exe 的那一层），提示「是否替换」时选「是」
+  4. 启动客户端。主菜单右下角出现
+        Patch v0.1.6  |  HMOL v1.5.16
+     就说明补丁生效了
+
+二、包里是什么
+  Resources\clientdx.exe / clientogl.exe / clientxna.exe
+      联机补丁：局域网直连、游戏内中继、踢人、聊天 @ 高亮 + 提示音、
+                开赛前 3 秒检查、隐藏 CnCNet 线上入口、主菜单右下角版本号
+  Resources\Binaries\Windows\MonoGame.Framework.dll
+      中文输入补丁（只对应 clientdx.exe 用的 Windows 渲染器；
+      OpenGL / XNA 渲染器的 MonoGame 不是同一套构建，本补丁不适用）
+  Resources\MoLanRelay.dll
+  Resources\Binaries\MoLanRelay.dll
+      游戏内 UDP 中继（两个位置都放，客户端会从 Resources\ 加载）
+
+三、主菜单的改动
+  CnCNet 线上大厅入口由中继在启动后自动隐藏，下面的按钮整体上移 42 像素。
+  所以本包不带 MainMenu.ini，你自己的主题不会被覆盖。
+
+四、怎么还原
+  用第一步备份的原文件覆盖回去，再删掉这两个文件：
+      Resources\MoLanRelay.dll
+      Resources\Binaries\MoLanRelay.dll
+
+五、注意
+  · 参与联机的每一台机器都要用同一个包。主菜单右下角对一下 Patch 版本
+    （`Patch v0.1.6`），MoLanRelay.log 第一行也会写同一个号。
+  · 开赛前 3 秒检查需要从新版 HMOL 启动游戏才会生效；直接双击客户端时，
+    主菜单会显示 `HMOL not running`，不影响开局。
+  · 客户端本体来自开源的 XNA CnCNet Client（GPL-3.0-or-later），
+    许可原文见本包 LICENSE / LICENSE-CnCNet-Client.md。

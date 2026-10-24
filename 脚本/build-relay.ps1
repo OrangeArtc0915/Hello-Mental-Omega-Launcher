@@ -16,13 +16,13 @@
 param(
     [string]$Out      = "",
     # 原版（未打补丁）的客户端 exe，用来提供 LANPlayerInfo 的类型引用
-    [string]$RefExe   = "d:\F\MO\CNC\_lanipbak\clientxna.exe",
+    [string]$RefExe   = "D:\MO\Mental Omega\原版备份\Resources\clientxna.exe",
     # 编译期引用的框架程序集目录
     [string]$FxDir    = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319",
     # 其余引用（SharpDX / MonoGame / XNAUI 等），只取这个目录可以避免重复程序集报 CS1704
-    [string]$RefExtra = "d:\F\MO\CNC\Mental Omega\Resources\Binaries\Windows",
-    [string]$DotNet   = "d:\F\MO\CNC\.dotnet10\dotnet.exe",
-    [string]$Csc      = "d:\F\MO\CNC\.dotnet10\sdk\10.0.100\Roslyn\bincore\csc.dll"
+    [string]$RefExtra = "d:\MO\CNC\Mental Omega\Resources\Binaries\Windows",
+    [string]$DotNet   = "d:\MO\CNC\.dotnet10\dotnet.exe",
+    [string]$Csc      = "d:\MO\CNC\.dotnet10\sdk\10.0.100\Roslyn\bincore\csc.dll"
 )
 
 $ErrorActionPreference = 'Stop'

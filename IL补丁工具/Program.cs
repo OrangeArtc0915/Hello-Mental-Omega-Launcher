@@ -1511,6 +1511,155 @@ class Program
         }
 
         // ──────────────────────────────────────────────────────────────
+        // preflight：房主点「开始游戏」后先等 3 秒核对双方信息
+        //   (a) LANGameLobby::Update 开头插 Relay.Tick（每帧等回信、到点继续开始）
+        //   (b) HandleClientMessage / HandleMessageFromServer 开头插 MO-CTRL 识别
+        //   (c) MultiplayerGameLobby::StartGame 开头插 Relay.BeforeStart(this)，
+        //       返回 true 就先 return，3 秒后由 Tick 反射再调一次 StartGame
+        //   （tab / shot 模式里对 Update / OnCtrl 有同一处插入，这里都做了"已插过就跳过"）
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "preflight")
+        {
+            var lglP = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglP == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+
+            var relayAsmP = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeP = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmP);
+
+            // ---- (a) Update：每帧驱动检查状态机 ----
+            var updP = lglP.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (updP == null || !updP.HasBody) Console.WriteLine("  SKIP: 找不到 LANGameLobby::Update");
+            else
+            {
+                bool doneP1 = false;
+                foreach (var i in updP.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "Tick" && im.DeclaringType != null
+                        && (string)im.DeclaringType.Name == "Relay") { doneP1 = true; break; }
+                }
+                if (doneP1) Console.WriteLine("  Update: 已改过，跳过");
+                else
+                {
+                    var tickCallP = new MemberRefUser(mod, "Tick",
+                        MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Object), relayTypeP);
+                    var uinsP = updP.Body.Instructions;
+                    uinsP.Insert(0, Instruction.Create(OpCodes.Call, tickCallP));
+                    uinsP.Insert(0, Instruction.Create(OpCodes.Ldarg_1));
+                    uinsP.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                    if (updP.Body.MaxStack < 8) updP.Body.MaxStack = 8;
+                    Console.WriteLine("  Update: 已挂 Relay.Tick（开赛前检查）");
+                }
+                CheckStack(updP);
+            }
+
+            // ---- (b) 控制帧识别：接收 PREQ / PMETA ----
+            var isCtrlCallP = new MemberRefUser(mod, "IsCtrlMessage",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.String), relayTypeP);
+            var onCtrlCallP = new MemberRefUser(mod, "OnCtrl",
+                MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.String), relayTypeP);
+
+            foreach (string mnP in new string[] { "HandleClientMessage", "HandleMessageFromServer" })
+            {
+                var mP = lglP.Methods.FirstOrDefault(x => x.Name == mnP);
+                if (mP == null || !mP.HasBody) { Console.WriteLine("  SKIP: 找不到 " + mnP); continue; }
+                bool doneP2 = false;
+                foreach (var i in mP.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "IsCtrlMessage") { doneP2 = true; break; }
+                }
+                if (doneP2) { Console.WriteLine("  " + mnP + ": 已改过，跳过"); continue; }
+
+                var skipP = Instruction.Create(OpCodes.Nop);
+                var seqP = new System.Collections.Generic.List<Instruction>();
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_1));
+                seqP.Add(Instruction.Create(OpCodes.Call, isCtrlCallP));
+                seqP.Add(Instruction.Create(OpCodes.Brfalse, skipP));
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_0));
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_1));
+                seqP.Add(Instruction.Create(OpCodes.Call, onCtrlCallP));
+                seqP.Add(skipP);
+                var pinsP = mP.Body.Instructions;
+                for (int k = 0; k < seqP.Count; k++) pinsP.Insert(k, seqP[k]);
+                if (mP.Body.MaxStack < 16) mP.Body.MaxStack = 16;
+                Console.WriteLine("  " + mnP + ": 已挂 MO-CTRL 识别（开赛前检查）");
+                CheckStack(mP);
+            }
+
+            // ---- (c) 房主点开始游戏：先扣住，3 秒后继续 ----
+            var mglP = mod.GetTypes().FirstOrDefault(t => t.Name == "MultiplayerGameLobby");
+            if (mglP == null) { Console.WriteLine("  SKIP: 找不到 MultiplayerGameLobby"); return 0; }
+
+            var sgp = mglP.Methods.FirstOrDefault(m => m.Name == "StartGame" && m.MethodSig != null
+                                                       && m.MethodSig.Params.Count == 0);
+            if (sgp == null || !sgp.HasBody) { Console.WriteLine("  SKIP: 找不到 MultiplayerGameLobby::StartGame"); return 0; }
+
+            bool doneP3 = false;
+            foreach (var i in sgp.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "BeforeStart" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneP3 = true; break; }
+            }
+            if (doneP3) Console.WriteLine("  StartGame: 已改过，跳过");
+            else
+            {
+                var beforeCallP = new MemberRefUser(mod, "BeforeStart",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.Object), relayTypeP);
+
+                var firstP = sgp.Body.Instructions[0];
+                var seqP3 = new System.Collections.Generic.List<Instruction>();
+                seqP3.Add(Instruction.Create(OpCodes.Ldarg_0));
+                seqP3.Add(Instruction.Create(OpCodes.Call, beforeCallP));
+                seqP3.Add(Instruction.Create(OpCodes.Brfalse, firstP));
+                seqP3.Add(Instruction.Create(OpCodes.Ret));
+                for (int k = 0; k < seqP3.Count; k++) sgp.Body.Instructions.Insert(k, seqP3[k]);
+                if (sgp.Body.MaxStack < 8) sgp.Body.MaxStack = 8;
+                Console.WriteLine("  MultiplayerGameLobby::StartGame: 已挂 Relay.BeforeStart（3 秒检查）");
+                CheckStack(sgp);
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // verlabel：主菜单右下角显示「补丁版本 + HMOL 版本」
+        //   MainMenu::Update 开头插 Relay.MainMenuTick(this)。
+        //   文本与位置都由中继算（改写 [lblVersion]，再按控件尺寸贴到右下角），
+        //   所以既不用改 MainMenu.ini 的坐标，也不怕客户端自己重写这个标签。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "verlabel")
+        {
+            var mmT = mod.GetTypes().FirstOrDefault(t => t.Name == "MainMenu");
+            if (mmT == null) { Console.WriteLine("SKIP: 找不到 MainMenu"); return 0; }
+            var mmUpd = mmT.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (mmUpd == null || !mmUpd.HasBody) { Console.WriteLine("SKIP: 找不到 MainMenu::Update"); return 0; }
+            if (mmUpd.MethodSig == null || mmUpd.MethodSig.Params.Count != 1) { Console.WriteLine("SKIP: MainMenu::Update 签名不是 (GameTime)"); return 0; }
+
+            bool doneV = false;
+            foreach (var i in mmUpd.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "MainMenuTick" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneV = true; break; }
+            }
+            if (doneV) Console.WriteLine("  MainMenu::Update: 已改过，跳过");
+            else
+            {
+                var relayAsmV = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeV = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmV);
+                var tickCallV = new MemberRefUser(mod, "MainMenuTick",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object), relayTypeV);
+
+                var vins = mmUpd.Body.Instructions;
+                vins.Insert(0, Instruction.Create(OpCodes.Call, tickCallV));
+                vins.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                if (mmUpd.Body.MaxStack < 8) mmUpd.Body.MaxStack = 8;
+                Console.WriteLine("  MainMenu::Update: 已挂 Relay.MainMenuTick（版本号显示）");
+                CheckStack(mmUpd);
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // hashcheck：把"游戏文件是否一致"讲清楚
         //   LANGameLobby::HandleFileHashCommand(sender, fileHash) 开头插一次调用，
         //   把 (大厅, 发送者, 对方哈希) 交给 Relay.FileHashResult：
@@ -1771,7 +1920,6 @@ class Program
                 kpeCtor = new MemberRefUser(mod, ".ctor", ctorSig, kpeType);
                 Console.WriteLine("    自建 KeyPressEventArgs(char) 引用");
             }
-        refsReady:
 
             // this.OnKeyPress(KeyPressEventArgs) 的方法引用
             var kpeSig = MethodSig.CreateInstance(mod.CorLibTypes.Void, kpeType.ToTypeSig());

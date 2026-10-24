@@ -20,6 +20,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -41,7 +42,8 @@ namespace MoLanRelay
         public const string Tag = "MO-RELAY";
         // 每次改动都改这个号：日志开头的 "MoLanRelay vX" 就是它。
         // 三台机器版本不一致会导致"有的能收不能发"这类诡异现象，先看这个号。
-        public const string Version = "2026-10-06.3";
+        // 语义化版本 vX.Y.Z，主菜单右下角显示的也是它。
+        public const string Version = "0.1.6";
         const int MaxPeers = 8;
 
         class Peer
@@ -390,8 +392,6 @@ namespace MoLanRelay
         // 房主自己的发言也会走这里（经过自连接绕回来），所以两边行为一致。
         // ------------------------------------------------------------------
 
-        static bool loggedMention;
-
         /// <summary>由 Player_HandleChatCommand 的补丁调用。
         /// 注意：参数/返回值故意用 object（装箱的 Color），避免 DLL 与 exe 之间
         /// 对 MonoGame 的 Color 类型产生跨程序集签名依赖 —— 那种依赖一旦版本对不齐，
@@ -726,6 +726,300 @@ namespace MoLanRelay
         /// </summary>
         internal static readonly bool FeaturesEnabled = false;
 
+        // ==================================================================
+        // 主菜单右下角：补丁版本 + HMOL 版本
+        //
+        // 由 MainMenu::Update 的 IL 钩子每帧调用。显示内容形如：
+        //     Patch v0.1.6  |  HMOL v1.5.16
+        //     Patch v0.1.6  |  HMOL not running      （不是从 HMOL 启动的）
+        // 直接改写主菜单 [lblVersion]（原版把它放在屏幕外 2048,663），
+        // 并按控件实际尺寸贴到右下角，所以不依赖 MainMenu.ini 里的坐标。
+        // ==================================================================
+
+        static object versionLabel;          // MainMenu 上的 lblVersion 控件
+        static object versionLabelOwner;     // 它所属的 MainMenu（重建时重新取）
+        static PropertyInfo versionLabelText; // 缓存的 Text 属性（每帧要读，别反复查类型链）
+        static string versionLabelHmol;      // 缓存的 HMOL 版本（"" = 没有会话信息）
+        static bool versionLabelHmolRead;
+        static bool versionLabelPlaced;      // 是否已成功贴到右下角（窗口尺寸就绪前会重试）
+        static bool versionLabelMissing;     // 只在第一次找不到控件时写日志，之后安静重试
+        static bool positionLogged;          // 位置诊断只写一次日志
+        static string versionLineCache;      // 版本行只拼一次（每帧比较用，避免反复分配字符串）
+        static object mainMenuLayoutOwner;   // 已经调整过布局的那个 MainMenu 实例
+        static bool mainMenuShifted;         // 该实例的按钮是否已上移过（只做一次，避免累积位移）
+        static object cncnetButton;          // 缓存找到的 CnCNet 按钮（避免每帧遍历控件树）
+        static bool cncnetLabelsHidden;      // 两个 CnCNet 标签是否已隐藏
+
+        /// <summary>由 MainMenu::Update 的补丁每帧调用。</summary>
+        public static void MainMenuTick(object mainMenu)
+        {
+            if (mainMenu == null) return;
+
+            // 隐藏 CnCNet 线上入口。放进中继做，安装器就不用改 MainMenu.ini，
+            // 成品包直接覆盖文件即可生效，第三方主题的 ini 也不会被覆盖。
+            try { ApplyMainMenuLayout(mainMenu); }
+            catch (Exception ex) { Log("verlabel: 调整主菜单布局失败: " + ex.Message); }
+
+            try
+            {
+                if (versionLabel == null || !ReferenceEquals(versionLabelOwner, mainMenu))
+                {
+                    object label = GetMember(mainMenu, "lblVersion");
+                    if (label == null)
+                    {
+                        // 理论上 Initialize 已经建好控件；拿不到就安静地下一帧再试，不要永久放弃
+                        if (!versionLabelMissing)
+                        {
+                            versionLabelMissing = true;
+                            Log("verlabel: 还没找到 MainMenu.lblVersion，稍后重试");
+                        }
+                        return;
+                    }
+                    versionLabelMissing = false;
+                    versionLabelOwner = mainMenu;
+                    versionLabel = label;
+                    versionLabelText = FindProperty(label.GetType(), "Text");
+                    versionLabelPlaced = false;
+                    positionLogged = false;
+                }
+
+                string want = versionLineCache;
+                if (want == null) want = versionLineCache = BuildVersionLine();
+                string current = versionLabelText == null ? null : versionLabelText.GetValue(versionLabel, null) as string;
+                if (!string.Equals(current, want, StringComparison.Ordinal))
+                {
+                    // 客户端在更新检查等场景会重写这个标签，所以每帧都对一次，不一致就改回来
+                    SetMember(versionLabel, "Text", want);
+                    versionLabelPlaced = false;
+                    Log("verlabel: " + want);
+                }
+
+                // 第一次可能还没拿到窗口尺寸（Update 早于布局），没贴上就下一帧接着试
+                if (!versionLabelPlaced) versionLabelPlaced = PlaceBottomRight(mainMenu, versionLabel);
+            }
+            catch (Exception ex)
+            {
+                // 单次异常不永久关闭功能（可能是某一帧控件状态异常），下一帧会继续尝试
+                if (!versionLabelMissing)
+                {
+                    versionLabelMissing = true;
+                    Log("verlabel error: " + ex.Message);
+                }
+            }
+        }
+
+        static PropertyInfo FindProperty(Type type, string name)
+        {
+            while (type != null)
+            {
+                PropertyInfo p = type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (p != null) return p;
+                type = type.BaseType;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 隐藏主菜单的 CnCNet 线上大厅入口，并把下面的按钮整体上移 42 像素。
+        /// 只在「按钮当前还是可见」时上移 —— 旧版安装器改过 MainMenu.ini（Visible=0 且已上移）
+        /// 的情况会跳过，不会二次位移。
+        /// </summary>
+        static void ApplyMainMenuLayout(object mainMenu)
+        {
+            // 换了一个 MainMenu 实例（客户端重建主菜单）就重新按新实例判断，
+            // 否则新控件的按钮停在原位、CnCNet 却被隐藏，会多出一个空位。
+            if (!ReferenceEquals(mainMenuLayoutOwner, mainMenu))
+            {
+                mainMenuLayoutOwner = mainMenu;
+                mainMenuShifted = false;
+                cncnetButton = null;
+                cncnetLabelsHidden = false;
+            }
+
+            if (cncnetButton == null)
+            {
+                cncnetButton = FindControl(mainMenu, "btnCnCNet");
+                if (cncnetButton == null) return;   // 布局还没建好，下一帧再试
+            }
+
+            bool hidden = GetMember(cncnetButton, "Visible") is bool v && !v;
+
+            if (!mainMenuShifted)
+            {
+                if (!hidden)
+                {
+                    foreach (string name in MenuButtons)
+                    {
+                        object button = FindControl(mainMenu, name);
+                        if (button == null) continue;
+                        object y = GetMember(button, "Y");
+                        if (y == null) continue;
+                        SetMember(button, "Y", Convert.ToInt32(y) - MenuButtonShift);
+                    }
+                    Log("verlabel: 已隐藏 CnCNet 入口，下方按钮上移 " + MenuButtonShift + "px");
+                }
+                mainMenuShifted = true;
+            }
+
+            if (!hidden) SetMember(cncnetButton, "Visible", false);
+
+            if (!cncnetLabelsHidden)
+            {
+                HideControl(mainMenu, "lblCnCNetStatus");
+                HideControl(mainMenu, "lblCnCNetPlayerCount");
+                cncnetLabelsHidden = true;
+            }
+        }
+
+        static readonly string[] MenuButtons =
+            { "btnLan", "btnLoadGame", "btnOptions", "btnMapEditor", "btnStatistics", "btnExit" };
+
+        const int MenuButtonShift = 42;
+
+        static void HideControl(object root, string name)
+        {
+            object control = FindControl(root, name);
+            if (control == null) return;
+            if (GetMember(control, "Visible") is bool v && !v) return;
+            SetMember(control, "Visible", false);
+        }
+
+        /// <summary>先按字段名找（MainMenu 里大部分控件都是字段），找不到再按 Name 在子控件树里搜。</summary>
+        static object FindControl(object root, string name)
+        {
+            object direct = GetMember(root, name);
+            if (direct != null) return direct;
+            return FindChildByName(root, name, 0);
+        }
+
+        static object FindChildByName(object parent, string name, int depth)
+        {
+            if (parent == null || depth > 4) return null;
+
+            IList children = GetMember(parent, "Children") as IList;
+            if (children == null) return null;
+
+            foreach (object child in children)
+            {
+                if (child == null) continue;
+                if (GetMember(child, "Name") is string childName
+                    && string.Equals(childName, name, StringComparison.OrdinalIgnoreCase))
+                    return child;
+
+                object found = FindChildByName(child, name, depth + 1);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        static string BuildVersionLine()
+        {
+            if (!versionLabelHmolRead)
+            {
+                versionLabelHmolRead = true;
+                try { versionLabelHmol = ReadHmolVersion(); }
+                catch { versionLabelHmol = ""; }
+            }
+
+            string hmol = string.IsNullOrEmpty(versionLabelHmol)
+                ? "HMOL not running"
+                : "HMOL v" + versionLabelHmol;
+
+            return "Patch v" + Version + "  |  " + hmol;
+        }
+
+        /// <summary>读 HMOL 启动前写的会话标记；不是这次启动留下的旧文件就算"没在跑"。</summary>
+        static string ReadHmolVersion()
+        {
+            try
+            {
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, SessionStampFileName);
+                if (!File.Exists(path)) return "";
+                if (!SessionStampIsFresh(path)) return "";
+
+                string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+                foreach (string raw in lines)
+                {
+                    string line = raw == null ? "" : raw.Trim();
+                    if (line.StartsWith("HMOL=", StringComparison.OrdinalIgnoreCase))
+                        return SanitizeToken(line.Substring(5));
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("verlabel: 读取 HMOL 版本失败: " + ex.Message);
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// 按控件实际宽高贴到右下角。贴上返回 true。
+        /// 尺寸优先取 WindowManager.RenderResolutionX/Y —— 控件坐标用的是**渲染分辨率**，
+        /// 不是 MainMenu.ini 里写的 Size（那是 1280x768，实际常见 1280x720，
+        /// 直接用它会算出屏幕外的 y，看起来就像"版本号没显示"）。
+        /// </summary>
+        static bool PlaceBottomRight(object fallback, object label)
+        {
+            try
+            {
+                int w = 0, h = 0;
+
+                object wm = GetMember(label, "WindowManager");
+                if (wm != null)
+                {
+                    w = Convert.ToInt32(GetMember(wm, "RenderResolutionX"));
+                    h = Convert.ToInt32(GetMember(wm, "RenderResolutionY"));
+                }
+
+                if (w <= 0 || h <= 0)
+                {
+                    object container = GetMember(label, "Parent") ?? fallback;
+                    w = Convert.ToInt32(GetMember(container, "Width"));
+                    h = Convert.ToInt32(GetMember(container, "Height"));
+                }
+
+                int lw = Convert.ToInt32(GetMember(label, "Width"));
+                int lh = Convert.ToInt32(GetMember(label, "Height"));
+                if (w <= 0 || h <= 0 || lw <= 0) return false;
+
+                int x = w - lw - 10;
+                int y = h - lh - 6;
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+
+                SetMember(label, "X", x);
+                SetMember(label, "Y", y);
+
+                // 读回确认真的设进去了（X/Y 是属性，若只读会写失败）
+                int rx = Convert.ToInt32(GetMember(label, "X"));
+                int ry = Convert.ToInt32(GetMember(label, "Y"));
+
+                if (!positionLogged)
+                {
+                    positionLogged = true;
+                    object parent = GetMember(label, "Parent");
+                    string parentName = parent == null
+                        ? "<null>"
+                        : ((GetMember(parent, "Name") as string) ?? "<noname>");
+                    Log("verlabel: 位置 x=" + rx + " y=" + ry
+                        + "（控件 " + lw + "x" + lh + "，渲染分辨率 " + w + "x" + h
+                        + "，parent=" + parentName + "，visible=" + GetMember(label, "Visible") + "）");
+                }
+
+                return rx == x && ry == y;
+            }
+            catch (Exception ex)
+            {
+                if (!positionLogged)
+                {
+                    positionLogged = true;
+                    Log("verlabel: 定位失败: " + ex.Message);
+                }
+                return false;
+            }
+        }
+
+
         /// <summary>由 LANGameLobby::Update 的补丁每帧调用 —— 热键轮询 / 版本自检 / 语音。</summary>
         public static void Tick(object lobby, object gameTime)
         {
@@ -736,6 +1030,10 @@ namespace MoLanRelay
             // （那个开关管的是"回到加新功能之前"那批：截图/语音/F5/F6/版本自检）
             try { TabTick(lobby, front); }
             catch (Exception ex) { Log("tab tick error: " + ex.Message); }
+
+            // 开赛前检查：本轮新加的功能，同样不受 FeaturesEnabled 总开关影响
+            try { PreflightTick(lobby); }
+            catch (Exception ex) { Log("preflight tick error: " + ex.Message); }
 
             if (!FeaturesEnabled) return;
 
@@ -914,6 +1212,437 @@ namespace MoLanRelay
             SendChat(lobby, msg);
         }
 
+        // ---- 开赛前检查：HMOL 版本 + 当前实例已装包 ----
+
+        const string PreflightRequestKind = "PREQ";
+        const string PreflightInfoKind = "PMETA";
+        const string PreflightUnknown = "?";
+        const string SessionStampFileName = "HMOL.session.txt";
+
+        /// <summary>房主等待对端回信的时长（需求就是 3 秒）。</summary>
+        const double PreflightWaitSeconds = 3.0;
+
+        static object preflightLobby;
+        static DateTime preflightDeadline = DateTime.MinValue;
+        static DateTime preflightLastTick = DateTime.MinValue;
+        static bool preflightResuming;
+        static readonly Dictionary<string, PreflightInfo> preflightPeers =
+            new Dictionary<string, PreflightInfo>(StringComparer.OrdinalIgnoreCase);
+
+        sealed class PreflightInfo
+        {
+            public string Version = "";
+            public List<string> Packages = new List<string>();
+            public bool HasInfo;
+            public bool Responded;
+        }
+
+        /// <summary>
+        /// 由 MultiplayerGameLobby::StartGame 的补丁调用。
+        /// 房主第一次调用返回 true（先别开始），3 秒后由 Tick 继续；
+        /// 客机不额外等待，直接放行（否则会比房主晚 3 秒进游戏）。
+        /// </summary>
+        public static bool BeforeStart(object lobby)
+        {
+            try
+            {
+                if (preflightResuming || lobby == null) return false;
+                if (!IsHostOf(lobby)) return false;
+
+                // 还在同一轮的 3 秒等待里（界面重复点了开始）：继续按住
+                if (preflightLobby != null && ReferenceEquals(preflightLobby, lobby)
+                    && DateTime.Now < preflightDeadline) return true;
+
+                if (ConnectedPeerCount(lobby) < 1) return false;
+
+                lock (preflightPeers) preflightPeers.Clear();
+
+                preflightLobby = lobby;
+                preflightDeadline = DateTime.Now.AddSeconds(PreflightWaitSeconds);
+                preflightLastTick = DateTime.Now;
+                SendPreflightRequest(lobby);
+                Notice(lobby, "正在核对双方 HMOL 版本与已安装包（3 秒）…", true);
+                Log("preflight: 房主开始 3 秒检查");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log("preflight: 启动检查失败，直接开始: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>由 LANGameLobby::Update 的补丁每帧调用；时间到就汇总并继续原来的 StartGame。</summary>
+        static void PreflightTick(object lobby)
+        {
+            object target = preflightLobby;
+            if (target == null || !ReferenceEquals(target, lobby)) return;
+
+            DateTime now = DateTime.Now;
+
+            // Update 每帧都会跑；中途断了半秒以上，说明窗口被隐藏/游戏被暂停（比如退出了大厅），
+            // 这时绝不能"回来就自己开局"，直接取消这一轮，等用户重新点开始。
+            if (preflightLastTick != DateTime.MinValue
+                && (now - preflightLastTick).TotalSeconds > 0.5)
+            {
+                CancelPreflight(lobby, "等待期间大厅被中断");
+                return;
+            }
+
+            preflightLastTick = now;
+            if (now < preflightDeadline) return;
+
+            preflightLobby = null;
+            preflightDeadline = DateTime.MinValue;
+            preflightLastTick = DateTime.MinValue;
+            preflightResuming = true;
+
+            try
+            {
+                string summary = BuildPreflightSummary(target);
+                if (summary.Length > 0)
+                {
+                    bool good = summary.StartsWith("检查通过", StringComparison.Ordinal);
+                    Notice(target, summary, good);
+                    SendChat(target, summary);
+                }
+
+                MethodInfo start = FindMethod(target.GetType(), "StartGame", 0);
+                if (start == null)
+                {
+                    Log("preflight: 找不到 StartGame，无法继续开始");
+                    return;
+                }
+
+                start.Invoke(target, null);
+                Log("preflight: 检查结束，继续开始游戏");
+            }
+            catch (Exception ex)
+            {
+                Log("preflight: 继续开始失败: " + ex.Message);
+            }
+            finally
+            {
+                preflightResuming = false;
+            }
+        }
+
+        /// <summary>放弃这一轮检查（大厅中途被关掉/隐藏时用），避免"回到大厅就自己开局"。</summary>
+        static void CancelPreflight(object lobby, string reason)
+        {
+            preflightLobby = null;
+            preflightDeadline = DateTime.MinValue;
+            preflightLastTick = DateTime.MinValue;
+            lock (preflightPeers) preflightPeers.Clear();
+
+            Log("preflight: 已取消（" + reason + "）");
+            Notice(lobby, "已取消联机前检查，请重新点击开始游戏", false);
+        }
+
+        /// <summary>房主向所有已连接的对端要一份检查信息。</summary>
+        static void SendPreflightRequest(object lobby)
+        {
+            try
+            {
+                string me = Clean(MyPlayerName());
+                string frame = CtrlTag + CtrlSep + PreflightRequestKind + CtrlSep + me + CtrlSep + "";
+                IList players = GetMember(lobby, "Players") as IList;
+                if (players == null) return;
+
+                foreach (object o in players)
+                {
+                    LANPlayerInfo lp = o as LANPlayerInfo;
+                    if (lp == null || lp.TcpClient == null) continue;
+                    if (SameName(Clean(lp.Name), me)) continue;
+                    SendLocked(lp, frame);
+                }
+
+                Log("preflight: 已向对端请求检查信息");
+            }
+            catch (Exception ex)
+            {
+                Log("preflight: 请求检查信息失败: " + ex.Message);
+            }
+        }
+
+        /// <summary>把本机的 HMOL 版本 + 已装包清单发给房主（房主自己不回）。</summary>
+        static void SendPreflightInfo(object lobby)
+        {
+            try
+            {
+                PreflightInfo mine = ReadLocalPreflightInfo();
+                string payload = mine.HasInfo ? BuildPayload(mine) : PreflightUnknown;
+
+                string me = Clean(MyPlayerName());
+                string frame = CtrlTag + CtrlSep + PreflightInfoKind + CtrlSep + me + CtrlSep
+                             + Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
+
+                // 正常只有客机会收到 PREQ；房主收到就直接广播本机信息，不往回发。
+                MethodInfo send = FindMethod(lobby.GetType(), "SendMessageToHost", 1);
+                if (send != null && !IsHostOf(lobby))
+                {
+                    send.Invoke(lobby, new object[] { frame });
+                    Log("preflight: 已回复本机检查信息");
+                    return;
+                }
+
+                IList players = GetMember(lobby, "Players") as IList;
+                if (players == null) return;
+                foreach (object o in players)
+                {
+                    LANPlayerInfo lp = o as LANPlayerInfo;
+                    if (lp == null || lp.TcpClient == null) continue;
+                    if (SameName(Clean(lp.Name), me)) continue;
+                    SendLocked(lp, frame);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("preflight: 发送本机检查信息失败: " + ex.Message);
+            }
+        }
+
+        /// <summary>收到对端的检查信息。</summary>
+        static void OnPreflight(object lobby, string from, string b64)
+        {
+            try
+            {
+                PreflightInfo info = new PreflightInfo();
+                info.Responded = true;
+
+                if (!string.IsNullOrEmpty(b64))
+                {
+                    string payload = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                    string[] lines = payload.Split('\n');
+                    if (lines.Length > 0) info.Version = SanitizeToken(lines[0]);
+                    for (int i = 1; i < lines.Length; i++)
+                    {
+                        string package = SanitizeToken(lines[i]);
+                        if (package.Length > 0) info.Packages.Add(package);
+                    }
+                }
+
+                info.HasInfo = info.Version.Length > 0 &&
+                               !string.Equals(info.Version, PreflightUnknown, StringComparison.Ordinal);
+
+                string who = from.Length == 0 ? "?" : from;
+                lock (preflightPeers) preflightPeers[who] = info;
+
+                Log("preflight: 收到 " + who + " 的检查信息：HMOL "
+                    + (info.HasInfo ? "v" + info.Version : "未检测到")
+                    + "，包 " + info.Packages.Count + " 个");
+            }
+            catch (Exception ex)
+            {
+                Log("preflight: 解析对端检查信息失败: " + ex.Message);
+            }
+        }
+
+        /// <summary>房主汇总；返回空串表示不需要提示。</summary>
+        static string BuildPreflightSummary(object lobby)
+        {
+            PreflightInfo mine = ReadLocalPreflightInfo();
+            if (!mine.HasInfo)
+                return "⚠ 未检测到 HMOL 会话信息（可能不是从 HMOL 启动），已跳过 HMOL 版本/已装包检查";
+
+            string me = Clean(MyPlayerName());
+            List<string> issues = new List<string>();
+            int checkedCount = 0;
+
+            IList players = GetMember(lobby, "Players") as IList;
+            if (players == null) return "";
+
+            foreach (object o in players)
+            {
+                LANPlayerInfo lp = o as LANPlayerInfo;
+                if (lp == null || lp.TcpClient == null) continue;
+
+                string name = Clean(lp.Name);
+                if (name.Length == 0 || SameName(name, me)) continue;
+
+                PreflightInfo theirs = null;
+                lock (preflightPeers) preflightPeers.TryGetValue(name, out theirs);
+
+                if (theirs == null || !theirs.Responded)
+                {
+                    issues.Add("未收到 " + name + " 的检查信息（对方可能未装新补丁）");
+                    continue;
+                }
+
+                if (!theirs.HasInfo)
+                {
+                    issues.Add(name + " 不是从 HMOL 启动（未检测到 HMOL 会话信息）");
+                    continue;
+                }
+
+                checkedCount++;
+
+                if (!string.Equals(theirs.Version, mine.Version, StringComparison.OrdinalIgnoreCase))
+                    issues.Add(name + " 的 HMOL 版本是 v" + theirs.Version + "，我的是 v" + mine.Version);
+
+                List<string> missing = Diff(mine.Packages, theirs.Packages);
+                List<string> extra = Diff(theirs.Packages, mine.Packages);
+                if (missing.Count > 0 || extra.Count > 0)
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append(name).Append(" 的已装包与我不一致");
+                    if (missing.Count > 0) sb.Append("；缺少 ").Append(JoinLimited(missing));
+                    if (extra.Count > 0) sb.Append("；多出 ").Append(JoinLimited(extra));
+                    issues.Add(sb.ToString());
+                }
+            }
+
+            if (issues.Count == 0)
+                return "检查通过：双方 HMOL 版本与已安装包一致（已核对 " + checkedCount + " 人）";
+
+            StringBuilder all = new StringBuilder("⚠ 联机前检查：");
+            all.Append(string.Join("；", issues.ToArray()));
+            all.Append(" —— 仍将继续开始");
+            if (all.Length > 500) all.Length = 500;
+            return all.ToString();
+        }
+
+        /// <summary>
+        /// 会话标记是 HMOL 在启动游戏前写的，所以它的修改时间应该就在本进程启动前后。
+        /// 如果比本进程启动还早很多，说明是上一次 HMOL 留下的旧文件（比如这次是直接双击客户端），
+        /// 按"没有 HMOL 会话信息"处理，免得拿旧数据骗过检查。
+        /// </summary>
+        static bool SessionStampIsFresh(string path)
+        {
+            try
+            {
+                DateTime written = File.GetLastWriteTime(path);
+                DateTime started = Process.GetCurrentProcess().StartTime;
+                return written >= started.AddMinutes(-10);
+            }
+            catch
+            {
+                return true;   // 拿不到启动时间就不拦，宁可不报也别误报
+            }
+        }
+
+        static PreflightInfo ReadLocalPreflightInfo()
+        {
+            PreflightInfo info = new PreflightInfo();
+
+            try
+            {
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, SessionStampFileName);
+                if (!File.Exists(path))
+                {
+                    Log("preflight: 没有找到 " + path);
+                    return info;
+                }
+
+                if (!SessionStampIsFresh(path))
+                {
+                    Log("preflight: " + path + " 是上一次启动留下的旧文件，忽略");
+                    return info;
+                }
+
+                string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+                foreach (string raw in lines)
+                {
+                    string line = raw == null ? "" : raw.Trim();
+                    if (line.Length == 0) continue;
+
+                    if (line.StartsWith("HMOL=", StringComparison.OrdinalIgnoreCase))
+                        info.Version = SanitizeToken(line.Substring(5));
+                    else if (line.StartsWith("PACKAGE=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string package = SanitizeToken(line.Substring(8));
+                        if (package.Length > 0) info.Packages.Add(package);
+                    }
+                }
+
+                info.HasInfo = info.Version.Length > 0 &&
+                               !string.Equals(info.Version, PreflightUnknown, StringComparison.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                Log("preflight: 读取 HMOL 会话信息失败: " + ex.Message);
+            }
+
+            return info;
+        }
+
+        static string BuildPayload(PreflightInfo info)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append(info.Version);
+            foreach (string package in info.Packages) sb.Append('\n').Append(package);
+            return sb.ToString();
+        }
+
+        static int ConnectedPeerCount(object lobby)
+        {
+            try
+            {
+                string me = Clean(MyPlayerName());
+                int count = 0;
+                IList players = GetMember(lobby, "Players") as IList;
+                if (players == null) return 0;
+
+                foreach (object o in players)
+                {
+                    LANPlayerInfo lp = o as LANPlayerInfo;
+                    if (lp == null || lp.TcpClient == null) continue;
+                    if (SameName(Clean(lp.Name), me)) continue;
+                    count++;
+                }
+
+                return count;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        static List<string> Diff(List<string> left, List<string> right)
+        {
+            List<string> result = new List<string>();
+            foreach (string a in left)
+            {
+                bool found = false;
+                foreach (string b in right)
+                {
+                    if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) result.Add(a);
+            }
+            return result;
+        }
+
+        static string JoinLimited(List<string> items)
+        {
+            StringBuilder sb = new StringBuilder();
+            int limit = items.Count < 6 ? items.Count : 6;
+            for (int i = 0; i < limit; i++)
+            {
+                if (sb.Length > 0) sb.Append('、');
+                sb.Append(items[i]);
+            }
+            if (items.Count > limit) sb.Append(" 等 ").Append(items.Count).Append(" 个");
+            return sb.ToString();
+        }
+
+        static string SanitizeToken(string value)
+        {
+            if (value == null) return "";
+            StringBuilder sb = new StringBuilder(value.Length);
+            foreach (char ch in value)
+            {
+                if (ch == '\u0001' || ch == '\u0002' || ch == '\r' || ch == '\n') continue;
+                sb.Append(ch);
+            }
+            return sb.ToString().Trim();
+        }
+
         // ---- 游戏文件一致性 ----
 
         /// <summary>由 LANGameLobby::HandleFileHashCommand 的补丁调用（房主侧）。</summary>
@@ -992,6 +1721,16 @@ namespace MoLanRelay
                 else if (kind == HelloKind)
                 {
                     if (!mine) OnHello(lobby, from, b64);
+                }
+                else if (kind == PreflightRequestKind)
+                {
+                    // 房主向客机要信息；客机收到就回，不再往下转发，免得人人互问
+                    if (!mine && !IsHostOf(lobby)) SendPreflightInfo(lobby);
+                    return;
+                }
+                else if (kind == PreflightInfoKind)
+                {
+                    if (!mine) OnPreflight(lobby, from, b64);
                 }
                 else return;
 
