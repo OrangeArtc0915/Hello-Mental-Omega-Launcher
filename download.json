@@ -1,6 +1,12 @@
 {
-  "_readme": "HMOL 下载页文件：往 items 里加条目即可，不用改启动器。字段：name 显示名；url 单个直链、urls 多个直链（分卷，下载后自动按顺序合并）、homepage 只给官网地址（本启动器不托管该文件）；note 说明；group 分组名（下载页按它自动生成可折叠区块）；target 下载后的去向：runtime（解压到 exe 旁 runtime\\<folder>\\，用 marker 文件判断装没装）、plugin（存进「插件」包）、instance（选实例解压到游戏目录并打开包内 exe），不填则存到下载目录；folder / marker 供 runtime 用。默认都指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
+  "_readme": "HMOL 下载页文件：往 items 里加条目即可，不用改启动器。字段：name 显示名；url 单个直链、urls 多个直链（分卷，下载后自动按顺序合并）、homepage 只给官网地址（本启动器不托管该文件）；note 说明；group 分组名（下载页按它自动生成可折叠区块）；target 下载后的去向：runtime（解压到 exe 旁 runtime\\<folder>\\，用 marker 文件判断装没装）、plugin（存进「插件」包）、instance（选实例解压到游戏目录并打开包内 exe），不填则存到下载目录；folder / marker 供 runtime 用；hidden 为 true 的条目不在下载页显示（彩蛋补丁等特殊条目用）。默认都指向仓库 components 发行版的附件；改完提交到 survive 分支，下载页刷新即生效。",
   "items": [
+    {
+      "name": "联机补丁",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/patch/MO-patch.zip",
+      "note": "联机大厅对接补丁：点「安装」后选一个游戏实例，解压到它的游戏目录（覆盖 Resources\\ 下的客户端文件）。",
+      "hidden": true
+    },
     {
       "name": "EasyTier 组网组件",
       "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/easytier.zip",
@@ -92,3 +98,4 @@
     }
   ]
 }
+
