@@ -716,7 +716,7 @@ public partial class PagePackages : LauncherPage
     {
         var items = points
             .Select(point => new PickItem(point.Stamp, point.Time.ToString("yyyy-MM-dd HH:mm:ss"),
-                Loc.F("该时间点有 {0} 个文件可回退", point.FileCount)))
+                Loc.F("{0} 个文件 · {1}", point.FileCount, BackupService.FormatSize(point.SizeBytes))))
             .ToList();
 
         var picked = PickWindow.Pick(owner, Loc.T("回到某个时间点"),
@@ -770,12 +770,115 @@ public partial class PagePackages : LauncherPage
         await RefreshAsync();
     }
 
-    /// <summary>是否查得到精确安装记录（Core 会尝试「去扩展名」与「原名」两种写法）。</summary>
+    /// <summary>
+    /// 「清理备份」：列出游戏目录里的所有 <c>.bak-</c> 时间点，
+    /// 支持手动多选删除，或一键只保留最近 N 个。
+    /// </summary>
+    private async void OnCleanBackupsClick(object sender, RoutedEventArgs e)
+    {
+        var instance = InstanceManager.Current;
+        if (instance is null)
+        {
+            ShowNotice(Loc.T("请先在「游戏实例」页创建并选择一个实例。"), true);
+            return;
+        }
+
+        IReadOnlyList<PackageInstaller.RevertPoint> points;
+        try
+        {
+            points = await Task.Run(() => PackageInstaller.ListRevertPoints(instance));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(Loc.T("扫描备份时间点失败"), ex);
+            ShowNotice(Loc.F("扫描备份失败：{0}", ex.Message), true);
+            return;
+        }
+
+        if (points.Count == 0)
+        {
+            Notify(Loc.T("当前实例的游戏目录里没有可清理的 .bak- 备份。"), Loc.T("清理备份"), MessageBoxImage.Information);
+            return;
+        }
+
+        var owner = Window.GetWindow(this);
+        var total = points.Sum(point => point.SizeBytes);
+
+        var choice = ChoiceWindow.Ask(owner, Loc.T("清理备份"),
+            Loc.F("当前有 {0} 个时间点，共 {1}。", points.Count, BackupService.FormatSize(total)),
+            Loc.T("删除后这些时间点将无法再回退；游戏文件本身不受影响。"),
+            new ChoiceOption(Loc.T("手动选择…"), "pick"),
+            new ChoiceOption(Loc.T("只保留最近几个…"), "keep"),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
+
+        if (choice is null || choice == "cancel") return;
+
+        List<PackageInstaller.RevertPoint> doomed;
+
+        if (choice == "pick")
+        {
+            var items = points
+                .Select(point => new PickItem(point.Stamp, point.Time.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Loc.F("{0} 个文件 · {1}", point.FileCount, BackupService.FormatSize(point.SizeBytes))))
+                .ToList();
+
+            var picked = PickWindow.Pick(owner, Loc.T("清理备份"),
+                Loc.T("勾选要删除的时间点（更早的时间点通常可以放心删掉）："), items, PickMode.Multi);
+
+            if (picked is null || picked.Count == 0) return;
+
+            var wanted = new HashSet<string>(picked, StringComparer.OrdinalIgnoreCase);
+            doomed = points.Where(point => wanted.Contains(point.Stamp)).ToList();
+        }
+        else
+        {
+            var input = TextInputWindow.Ask(owner, Loc.T("只保留最近几个"),
+                Loc.T("输入要保留的时间点数量，更早的备份会被删除。"), "5",
+                Loc.T("例如 5 表示只保留最近 5 个时间点"),
+                value => int.TryParse(value.Trim(), out var number) && number >= 0
+                    ? null
+                    : Loc.T("请输入 0 或正整数"));
+
+            if (input is null) return;
+            if (!int.TryParse(input.Trim(), out var keep) || keep < 0) return;
+
+            // points 已按时间倒序，跳过前 keep 个就是更早的
+            doomed = points.Skip(keep).ToList();
+        }
+
+        if (doomed.Count == 0)
+        {
+            Notify(Loc.T("没有需要删除的时间点。"), Loc.T("清理备份"), MessageBoxImage.Information);
+            return;
+        }
+
+        var freed = doomed.Sum(point => point.SizeBytes);
+
+        var confirm = ChoiceWindow.Ask(owner, Loc.T("确认删除备份"),
+            Loc.F("将删除 {0} 个时间点、共 {1}。", doomed.Count, BackupService.FormatSize(freed)),
+            Loc.T("这是破坏性操作：删除后无法再回退到这些时间点，也无法撤销。"),
+            new ChoiceOption(Loc.T("删除"), "delete", ButtonTone.Danger),
+            new ChoiceOption(Loc.T("取消"), "cancel"));
+
+        if (confirm != "delete") return;
+
+        var stamps = doomed.Select(point => point.Stamp).ToList();
+        var (deleted, failed) = await Task.Run(() => PackageInstaller.DeleteRevertPoints(instance, stamps));
+
+        var message = failed == 0
+            ? Loc.F("已清理 {0} 个时间点，删除 {1} 个备份文件。", doomed.Count, deleted)
+            : Loc.F("已删除 {0} 个备份文件，{1} 个删除失败（可能正被占用）。", deleted, failed);
+
+        ShowNotice(message, failed > 0);
+        Notify(message, Loc.T("清理备份"), failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    }
+
+    /// <summary>是否查得到可用于卸载的精确安装记录（记录里必须真有文件清单）。</summary>
     private static bool HasInstallRecord(GameInstance instance, PackageType type, string packageName)
     {
         foreach (var candidate in InstallRecordStore.CandidateNames(packageName))
         {
-            if (InstallRecordStore.Load(instance, type, candidate) is not null) return true;
+            if (InstallRecordStore.Load(instance, type, candidate) is { Files.Count: > 0 }) return true;
         }
 
         return false;

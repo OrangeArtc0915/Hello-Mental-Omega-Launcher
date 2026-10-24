@@ -31,6 +31,10 @@
                                  Content="{loc:T '打开包目录'}"
                                  Click="OnOpenPackageDirClick" />
                 <c:OutlineButton Margin="8,0,0,0"
+                                 Content="{loc:T '清理备份'}"
+                                 ToolTip="{loc:T '清理历次安装覆盖文件时留下的 .bak- 时间点备份'}"
+                                 Click="OnCleanBackupsClick" />
+                <c:OutlineButton Margin="8,0,0,0"
                                  Content="{loc:T '刷新'}"
                                  Click="OnRefreshClick" />
             </StackPanel>

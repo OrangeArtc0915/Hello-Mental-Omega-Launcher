@@ -29,6 +29,17 @@ public static class InstallRecordStore
         Converters = { new JsonStringEnumConverter() }
     };
 
+    /// <summary>旧版（Python）记录用 snake_case 键，单独一套读取设置。</summary>
+    private static readonly JsonSerializerOptions LegacyOptions = new()
+    {
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     /// <summary>实例的安装记录根目录。</summary>
     public static string DirectoryOf(GameInstance instance) => instance.InstallRecordsDirectory;
 
@@ -199,7 +210,17 @@ public static class InstallRecordStore
     {
         try
         {
-            var record = JsonSerializer.Deserialize<InstallRecord>(File.ReadAllText(file), Options);
+            var json = File.ReadAllText(file);
+            var record = JsonSerializer.Deserialize<InstallRecord>(json, Options);
+
+            // 旧版（Python）写下的记录是 snake_case 键：包名读不到时按 snake_case 再读一次。
+            // 只比包名不看文件数——旧记录的 files 恰好能按大小写匹配上，但包名匹配不上。
+            if (record is null || string.IsNullOrEmpty(record.PackageName))
+            {
+                var legacy = JsonSerializer.Deserialize<InstallRecord>(json, LegacyOptions);
+                if (legacy is not null) record = legacy;
+            }
+
             record?.Normalize();
             return record;
         }

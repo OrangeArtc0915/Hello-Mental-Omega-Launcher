@@ -299,8 +299,9 @@ public static class PackageInstaller
     /// <param name="Stamp">时间戳（yyyyMMddHHmmss），回退时按它匹配。</param>
     /// <param name="Time">本地时间，界面直接显示。</param>
     /// <param name="FileCount">该时间点留下的备份文件数。</param>
+    /// <param name="SizeBytes">该时间点备份文件的总字节数。</param>
     /// <param name="Samples">前几个文件的相对路径，供界面展示。</param>
-    public sealed record RevertPoint(string Stamp, DateTime Time, int FileCount, IReadOnlyList<string> Samples);
+    public sealed record RevertPoint(string Stamp, DateTime Time, int FileCount, long SizeBytes, IReadOnlyList<string> Samples);
 
     /// <summary>覆盖文件时留下的备份文件名里那一段分隔符。</summary>
     private const string BakMarker = ".bak-";
@@ -365,6 +366,7 @@ public static class PackageInstaller
 
         var root = PathGuard.NormalizeRoot(instance.GameDir);
         var groups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
@@ -380,6 +382,9 @@ public static class PackageInstaller
                 }
 
                 list.Add(file);
+
+                try { sizes[stamp] = (sizes.TryGetValue(stamp, out var size) ? size : 0) + new FileInfo(file).Length; }
+                catch { /* 读不到就按 0 计 */ }
             }
         }
         catch (Exception ex)
@@ -393,10 +398,59 @@ public static class PackageInstaller
             if (!TryParseStamp(stamp, out var time)) continue;
 
             result.Add(new RevertPoint(stamp, time, files.Count,
+                sizes.TryGetValue(stamp, out var size) ? size : 0,
                 files.Take(5).Select(item => Path.GetRelativePath(root, item).Replace('\\', '/')).ToList()));
         }
 
         return result.OrderByDescending(item => item.Time).ToList();
+    }
+
+    /// <summary>
+    /// 删除指定的时间点备份（<c>.bak-&lt;时间戳&gt;</c> 文件），用于清理越积越多的旧备份。
+    /// 备份一删就再也回不到那个时间点，调用前必须让用户确认。返回实际删除与失败的文件数。
+    /// </summary>
+    public static (int Deleted, int Failed) DeleteRevertPoints(GameInstance instance, IReadOnlyCollection<string> stamps)
+    {
+        if (instance is null || stamps is null || stamps.Count == 0) return (0, 0);
+
+        var wanted = stamps
+            .Where(stamp => !string.IsNullOrWhiteSpace(stamp))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (wanted.Count == 0) return (0, 0);
+        if (!Directory.Exists(instance.GameDir)) return (0, 0);
+
+        var root = PathGuard.NormalizeRoot(instance.GameDir);
+        var deleted = 0;
+        var failed = 0;
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(root, "*" + BakMarker + "*", SearchOption.AllDirectories))
+            {
+                var stamp = StampOf(file);
+                if (stamp is null || !wanted.Contains(stamp)) continue;
+
+                try
+                {
+                    File.Delete(file);
+                    deleted++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Log.Warn(Loc.F("删除备份文件失败：{0}（{1}）", file, ex.Message));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("清理备份失败：{0}", ex.Message));
+        }
+
+        Log.Info(Loc.F("已清理 {0} 个时间点的备份：删除 {1} 个文件，失败 {2} 个", wanted.Count, deleted, failed));
+
+        return (deleted, failed);
     }
 
     /// <summary>

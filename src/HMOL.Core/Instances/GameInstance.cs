@@ -158,7 +158,20 @@ public sealed class GameInstance
         var key = PackageTypes.DirectoryNameOf(type);
         if (!InstalledPackages.TryGetValue(key, out var list)) return;
 
-        list.RemoveAll(item => string.Equals(item, NormalizePackageName(packageName), StringComparison.OrdinalIgnoreCase));
+        var raw = (packageName ?? string.Empty).Trim();
+        if (raw.Length == 0) return;
+
+        // 旧数据里的名字可能带或不带扩展名（"A.zip" / "A"），这里三种写法都认，
+        // 否则卸载后列表里会留下删不掉的同名项。
+        var normalized = NormalizePackageName(raw);
+        var stem = Path.GetFileNameWithoutExtension(raw);
+
+        list.RemoveAll(item =>
+            string.Equals(item, raw, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item, normalized, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Path.GetFileNameWithoutExtension(item), stem, StringComparison.OrdinalIgnoreCase));
+
+        if (list.Count == 0) InstalledPackages.Remove(key);
     }
 
     /// <summary>把一个分类下已安装的包名整体替换。</summary>
