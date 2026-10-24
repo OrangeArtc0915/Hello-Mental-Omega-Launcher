@@ -17,7 +17,8 @@ public sealed record ManifestEntry(
     string Target = "",
     string Group = "",
     string Folder = "",
-    string Marker = "")
+    string Marker = "",
+    bool Hidden = false)
 {
     /// <summary>首个下载地址，用于「打开链接」与推断文件名；纯「官网」条目为空。</summary>
     public string PrimaryUrl => Urls.Count > 0 ? Urls[0] : string.Empty;
@@ -94,6 +95,7 @@ public static class DownloadManifest
     private static readonly string[] GroupKeys = ["group", "分组", "分类", "类别"];
     private static readonly string[] FolderKeys = ["folder", "目录", "文件夹"];
     private static readonly string[] MarkerKeys = ["marker", "标志", "标记", "标志文件"];
+    private static readonly string[] HiddenKeys = ["hidden", "隐藏", "彩蛋", "secret"];
     private static readonly string[] ListKeys = ["items", "downloads", "list", "文件", "下载"];
 
     /// <summary>GitHub 的 raw 直链。</summary>
@@ -200,7 +202,8 @@ public static class DownloadManifest
                     ReadString(element, TargetKeys).ToLowerInvariant(),
                     ReadString(element, GroupKeys),
                     ReadString(element, FolderKeys),
-                    ReadString(element, MarkerKeys)));
+                    ReadString(element, MarkerKeys),
+                    ReadBool(element, HiddenKeys)));
             }
         }
         catch (JsonException ex)
@@ -277,5 +280,31 @@ public static class DownloadManifest
         }
 
         return string.Empty;
+    }
+
+    /// <summary>读布尔标记（如 <c>hidden</c>）：兼容 true / "true" / 1 / "是"。</summary>
+    private static bool ReadBool(JsonElement element, string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (!element.TryGetProperty(key, out var value)) continue;
+
+            switch (value.ValueKind)
+            {
+                case JsonValueKind.True:
+                    return true;
+                case JsonValueKind.False:
+                    return false;
+                case JsonValueKind.Number:
+                    return value.TryGetInt32(out var number) && number != 0;
+                case JsonValueKind.String:
+                    var text = value.GetString()?.Trim() ?? string.Empty;
+                    return string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
+                        || text == "1"
+                        || text == "是";
+            }
+        }
+
+        return false;
     }
 }

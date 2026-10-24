@@ -192,6 +192,9 @@ public partial class PageDownload : LauncherPage
     /// </summary>
     private void BuildGroups(IReadOnlyList<ManifestEntry> items)
     {
+        // 彩蛋条目（hidden）不在下载页露面，只在联机页由彩蛋逻辑取用
+        items = items.Where(entry => !entry.Hidden).ToList();
+
         _entries = items;
 
         // 运行时组件（target=runtime）单独在顶部「运行环境」区块里，不参与下面的分组列表

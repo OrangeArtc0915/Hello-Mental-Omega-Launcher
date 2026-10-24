@@ -82,6 +82,8 @@ internal static class GameSessionHub
             return false;
         }
 
+        HmolSessionStamp.Write(instance, executable);
+
         if (!GameLauncher.TryLaunch(instance.GameDir, instance.Kind, executable, out var session, out error)
             || session is null) return false;
 
