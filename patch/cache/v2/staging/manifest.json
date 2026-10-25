@@ -1,0 +1,7 @@
+{
+  "build": "staging-2026-10-24",
+  "state": "staged",
+  "artifacts": [
+    { "name": "components-extra.zip", "size": 62530 }
+  ]
+}
