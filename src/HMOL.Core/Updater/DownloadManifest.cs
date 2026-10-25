@@ -8,6 +8,7 @@ namespace HMOL.Core.Updater;
 /// <summary>
 /// 下载页文件里的一条：名字 + 一个或多个下载地址 + 可选说明。
 /// 多个地址表示分卷，下载时会按顺序合并成一个文件（如 EasyTier 的 4 个分卷）。
+/// <c>Hidden</c> 为 true 的条目不进下载页列表，只供程序内部按需取用。
 /// </summary>
 public sealed record ManifestEntry(
     string Name,
@@ -95,7 +96,7 @@ public static class DownloadManifest
     private static readonly string[] GroupKeys = ["group", "分组", "分类", "类别"];
     private static readonly string[] FolderKeys = ["folder", "目录", "文件夹"];
     private static readonly string[] MarkerKeys = ["marker", "标志", "标记", "标志文件"];
-    private static readonly string[] HiddenKeys = ["hidden", "隐藏", "彩蛋", "secret"];
+    private static readonly string[] HiddenKeys = ["hidden", "隐藏"];
     private static readonly string[] ListKeys = ["items", "downloads", "list", "文件", "下载"];
 
     /// <summary>GitHub 的 raw 直链。</summary>

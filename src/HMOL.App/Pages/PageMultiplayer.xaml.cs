@@ -16,7 +16,6 @@ using HMOL.Core.Instances;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
 using HMOL.Core.Localization;
-using HMOL.Core.Updater;
 
 namespace HMOL.App.Pages;
 
@@ -66,9 +65,6 @@ public partial class PageMultiplayer : LauncherPage
     /// <summary>上一次展示过的「必要文件」提示，避免同一句反复弹。</summary>
     private string? _lastRequiredHint;
 
-    /// <summary>彩蛋补丁正在下载 / 安装，挡掉重复点击。</summary>
-    private bool _patchBusy;
-
     private CancellationTokenSource? _connectCts;
     private CancellationTokenSource? _hallLoopCts;
     private Task? _hallLoopTask;
@@ -99,10 +95,6 @@ public partial class PageMultiplayer : LauncherPage
         RefreshOwnerButtons();
         RefreshHudButton();
         RefreshRequiredFilesUi();
-        RefreshPatchBar();
-
-        // 彩蛋触发 / 下载完 / 装好后，提示条跟着变
-        EasterEgg.Changed += RefreshPatchBar;
 
         // 樱花 Frp 的输出与 EasyTier / n2n 共用「引擎日志」，方便一起排查
         PanSakuraPlan.Log += AppendEngineLine;
@@ -147,7 +139,6 @@ public partial class PageMultiplayer : LauncherPage
         RefreshHudButton();
         UpdateEngineHint();
         RefreshRequiredFilesUi();
-        RefreshPatchBar();
 
         // 首次进联机页的必要文件引导放到页面渲染之后，避免打断入场动画与导航
         Dispatcher.InvokeAsync(MaybePromptRequiredFiles);
@@ -1777,201 +1768,5 @@ public partial class PageMultiplayer : LauncherPage
             LabNickname.Text = raw;
             LabNicknameHint.Text = Loc.T("昵称取自「设置 → 联机设置」，改动后重新进入大厅即可生效。");
         }
-    }
-
-    // ————— 彩蛋：联机补丁 —————
-
-    /// <summary>彩蛋提示条的按钮状态；未触发或已安装时整条收起。</summary>
-    private void RefreshPatchBar()
-    {
-        if (BarPatch is null) return;
-
-        var visible = EasterEgg.Revealed && !EasterEgg.Installed;
-        BarPatch.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-
-        if (!visible) return;
-
-        var downloaded = EasterEgg.DownloadedFile.Length > 0 && File.Exists(EasterEgg.DownloadedFile);
-
-        BtnPatchDownload.Visibility = downloaded ? Visibility.Collapsed : Visibility.Visible;
-        BtnPatchInstall.Visibility = downloaded ? Visibility.Visible : Visibility.Collapsed;
-
-        LabPatch.Text = downloaded
-            ? Loc.T("联机补丁已下载，点「安装」选一个游戏实例装进去。")
-            : Loc.T("联机补丁可以下载了：下载后选一个游戏实例安装即可。");
-    }
-
-    private async void OnPatchDownloadClick(object sender, RoutedEventArgs e)
-    {
-        if (_patchBusy) return;
-
-        _patchBusy = true;
-        BtnPatchDownload.IsEnabled = false;
-
-        try
-        {
-            var (items, error) = await DownloadManifest.FetchAsync(SettingsStore.Current.LauncherUpdateSource);
-
-            if (error is not null)
-            {
-                LabPatch.Text = Loc.F("无法获取补丁信息：{0}", error);
-                return;
-            }
-
-            // 彩蛋条目带 hidden，不会出现在下载页，只在这里取用
-            var entry = items.FirstOrDefault(item => item.Hidden && item.PrimaryUrl.Length > 0);
-
-            if (entry is null)
-            {
-                LabPatch.Text = Loc.T("补丁还没配置：请在仓库 survive 分支的 download.json 里加一条 hidden 条目。");
-                return;
-            }
-
-            var directory = PatchDownloadDirectory();
-            Directory.CreateDirectory(directory);
-
-            var target = Path.Combine(directory, PatchFileName(entry));
-            var progress = ProgressWindow.Open(OwnerWindow, Loc.T("下载联机补丁"), Loc.F("正在下载 {0}…", entry.Name), canCancel: true);
-
-            try
-            {
-                var result = await ResumableDownloader.DownloadAsync(
-                    entry.PrimaryUrl, target, progress.Progress, progress.Token);
-
-                if (!result.Success)
-                {
-                    LabPatch.Text = Loc.F("下载失败：{0}", result.Message);
-                    return;
-                }
-
-                EasterEgg.MarkDownloaded(result.FilePath ?? target);
-                Log.Info(Loc.F("联机补丁已下载：{0}", target));
-            }
-            finally
-            {
-                progress.Finish();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            LabPatch.Text = Loc.T("下载已取消。");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(Loc.T("下载联机补丁失败"), ex);
-            LabPatch.Text = Loc.F("下载失败：{0}", ex.Message);
-        }
-        finally
-        {
-            _patchBusy = false;
-            BtnPatchDownload.IsEnabled = true;
-            RefreshPatchBar();
-        }
-    }
-
-    private async void OnPatchInstallClick(object sender, RoutedEventArgs e)
-    {
-        if (_patchBusy) return;
-
-        var archive = EasterEgg.DownloadedFile;
-
-        if (archive.Length == 0 || !File.Exists(archive))
-        {
-            LabPatch.Text = Loc.T("补丁文件不在，请重新下载。");
-            return;
-        }
-
-        var instances = InstanceStore.All;
-
-        if (instances.Count == 0)
-        {
-            LabPatch.Text = Loc.T("还没有游戏实例：请先在「游戏实例」页创建实例，再回来安装。");
-            return;
-        }
-
-        var items = instances
-            .Select(instance => new PickItem(instance.Id, instance.Name,
-                string.IsNullOrWhiteSpace(instance.GameDir) ? Loc.T("（未设置游戏目录）") : instance.GameDir))
-            .ToList();
-
-        var picked = PickWindow.Pick(OwnerWindow, Loc.T("安装联机补丁"), Loc.T("选择要安装到哪个游戏实例："), items, PickMode.Single);
-
-        if (picked is null || picked.Count == 0) return;
-
-        var target = instances.FirstOrDefault(instance =>
-            string.Equals(instance.Id, picked[0], StringComparison.OrdinalIgnoreCase));
-
-        if (target is null) return;
-
-        if (string.IsNullOrWhiteSpace(target.GameDir) || !Directory.Exists(target.GameDir))
-        {
-            LabPatch.Text = Loc.F("实例「{0}」的游戏目录不可用：{1}", target.Name, target.GameDir);
-            return;
-        }
-
-        _patchBusy = true;
-        BtnPatchInstall.IsEnabled = false;
-
-        var progress = ProgressWindow.Open(OwnerWindow, Loc.T("安装联机补丁"),
-            Loc.F("正在解压到「{0}」…", target.Name), canCancel: true);
-
-        try
-        {
-            var (ok, message) = await Task.Run(
-                () => RequiredAssetDownloader.ExtractInto(archive, target.GameDir, progress.Sample, progress.Token),
-                progress.Token);
-
-            if (!ok)
-            {
-                LabPatch.Text = Loc.F("安装失败：{0}", message);
-                return;
-            }
-
-            EasterEgg.MarkInstalled();
-            Log.Info(Loc.F("联机补丁已安装到「{0}」", target.Name));
-        }
-        catch (OperationCanceledException)
-        {
-            LabPatch.Text = Loc.T("安装已取消。");
-        }
-        catch (Exception ex)
-        {
-            Log.Error(Loc.T("安装联机补丁失败"), ex);
-            LabPatch.Text = Loc.F("安装失败：{0}", ex.Message);
-        }
-        finally
-        {
-            progress.Finish();
-            _patchBusy = false;
-            BtnPatchInstall.IsEnabled = true;
-            RefreshPatchBar();
-        }
-    }
-
-    /// <summary>补丁存放目录，与下载页共用同一份「下载目录」设置。</summary>
-    private static string PatchDownloadDirectory()
-    {
-        var custom = SettingsStore.Current.DownloadDirectory;
-        return string.IsNullOrWhiteSpace(custom) ? Paths.Downloads : custom;
-    }
-
-    /// <summary>从下载地址末段取文件名，推不出就用条目名兜底。</summary>
-    private static string PatchFileName(ManifestEntry entry)
-    {
-        var name = string.Empty;
-
-        try
-        {
-            if (Uri.TryCreate(entry.PrimaryUrl, UriKind.Absolute, out var uri))
-                name = Path.GetFileName(Uri.UnescapeDataString(uri.AbsolutePath));
-        }
-        catch
-        {
-            // 解析不了就走兜底
-        }
-
-        if (name.Length == 0) name = entry.Name;
-
-        return name.Length > 0 ? name : "patch.zip";
     }
 }

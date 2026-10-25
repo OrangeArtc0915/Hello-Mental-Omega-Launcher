@@ -104,89 +104,44 @@
                       Subtitle="{loc:T '选方案与节点建房，队友按同样的房间名加入；大厅里可以互相发现、邀请与聊天'}"
                       Icon="lucide/network" />
 
-        <!-- 提示条（普通提示 + 彩蛋「联机补丁」） -->
-        <StackPanel Grid.Row="1">
-            <Border x:Name="BarNotice"
-                    Margin="0,12,0,0"
-                    Padding="12,10"
-                    Background="{DynamicResource Accent.Faint}"
-                    CornerRadius="{DynamicResource Radius.Item}"
-                    Visibility="Collapsed">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+        <!-- 提示条 -->
+        <Border x:Name="BarNotice"
+                Grid.Row="1"
+                Margin="0,12,0,0"
+                Padding="12,10"
+                Background="{DynamicResource Accent.Faint}"
+                CornerRadius="{DynamicResource Radius.Item}"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                    <svg:SvgIcon x:Name="IconNotice"
-                                 Grid.Column="0"
-                                 Width="16"
-                                 Height="16"
-                                 Margin="0,1,0,0"
-                                 VerticalAlignment="Top"
-                                 Icon="lucide/info"
-                                 IconBrush="{DynamicResource Accent.Base}" />
-                    <TextBlock x:Name="LabNotice"
-                               Grid.Column="1"
-                               Margin="10,0,8,0"
-                               VerticalAlignment="Center"
-                               FontSize="12"
-                               Foreground="{DynamicResource Text.Primary}"
-                               TextWrapping="Wrap" />
-                    <c:RoundIconButton Grid.Column="2"
-                                       VerticalAlignment="Center"
-                                       Icon="lucide/x"
-                                       IconSize="13"
-                                       Tone="Plain"
-                                       Click="OnDismissNoticeClick" />
-                </Grid>
-            </Border>
-
-            <!-- 彩蛋：连点「关于」五次后出现，下载后可装进任选实例；装好即收起 -->
-            <Border x:Name="BarPatch"
-                    Margin="0,12,0,0"
-                    Padding="12,10"
-                    Background="{DynamicResource Accent.Faint}"
-                    CornerRadius="{DynamicResource Radius.Item}"
-                    Visibility="Collapsed">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <svg:SvgIcon Grid.Column="0"
-                                 Width="16"
-                                 Height="16"
-                                 Margin="0,1,0,0"
-                                 VerticalAlignment="Top"
-                                 Icon="lucide/download"
-                                 IconBrush="{DynamicResource Accent.Base}" />
-                    <TextBlock x:Name="LabPatch"
-                               Grid.Column="1"
-                               Margin="10,0,8,0"
-                               VerticalAlignment="Center"
-                               FontSize="12"
-                               Foreground="{DynamicResource Text.Primary}"
-                               TextWrapping="Wrap" />
-                    <c:OutlineButton x:Name="BtnPatchDownload"
-                                     Grid.Column="2"
-                                     VerticalAlignment="Center"
-                                     Content="{loc:T '下载'}"
-                                     Click="OnPatchDownloadClick" />
-                    <c:OutlineButton x:Name="BtnPatchInstall"
-                                     Grid.Column="3"
-                                     Margin="8,0,0,0"
-                                     VerticalAlignment="Center"
-                                     Content="{loc:T '安装'}"
-                                     Visibility="Collapsed"
-                                     Click="OnPatchInstallClick" />
-                </Grid>
-            </Border>
-        </StackPanel>
+                <svg:SvgIcon x:Name="IconNotice"
+                             Grid.Column="0"
+                             Width="16"
+                             Height="16"
+                             Margin="0,1,0,0"
+                             VerticalAlignment="Top"
+                             Icon="lucide/info"
+                             IconBrush="{DynamicResource Accent.Base}" />
+                <TextBlock x:Name="LabNotice"
+                           Grid.Column="1"
+                           Margin="10,0,8,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource Text.Primary}"
+                           TextWrapping="Wrap" />
+                <c:RoundIconButton Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Icon="lucide/x"
+                                   IconSize="13"
+                                   Tone="Plain"
+                                   Click="OnDismissNoticeClick" />
+            </Grid>
+        </Border>
 
         <!-- 内容区：缺组网组件时由代码给出提示条；页面不再整块禁用 -->
         <Grid x:Name="PanContent" Grid.Row="2">

@@ -12,15 +12,15 @@ namespace HMOL.Core.Launch;
 /// <c>HMOL.session.txt</c>。
 ///
 /// <para>
-/// 联机补丁（MoLanRelay）在局域网大厅点「开始游戏」时会读这个文件，
+/// 联机扩展组件在局域网大厅点「开始游戏」时会读这个文件，
 /// 把 HMOL 版本与实例已装包清单通过大厅消息发给对端，双方核对后再开局。
-/// 文件放在客户端主程序旁边，补丁用 <c>AppDomain.BaseDirectory</c> 就能找到；
-/// 不通过 HMOL 启动时没有这个文件，补丁会提示「未检测到 HMOL 会话信息」并跳过核对。
+/// 文件放在客户端主程序旁边，组件用 <c>AppDomain.BaseDirectory</c> 就能找到；
+/// 不通过 HMOL 启动时没有这个文件，组件会提示「未检测到 HMOL 会话信息」并跳过核对。
 /// </para>
 /// </summary>
 public static class HmolSessionStamp
 {
-    /// <summary>补丁读取的固定文件名。</summary>
+    /// <summary>联机组件读取的固定文件名。</summary>
     public const string FileName = "HMOL.session.txt";
 
     /// <summary>

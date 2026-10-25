@@ -990,9 +990,6 @@ public partial class MainWindow : Window
     {
         if (sender is NavItem item) item.IsChecked = false;
 
-        // 彩蛋：连点「关于」五次，联机页会出现联机补丁的下载提示
-        EasterEgg.RegisterAboutClick();
-
         if (_aboutWindow is { IsLoaded: true })
         {
             if (_aboutWindow.WindowState == WindowState.Minimized)

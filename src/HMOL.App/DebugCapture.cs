@@ -170,13 +170,6 @@ internal static class DebugCapture
         // 指定了页面就先切过去，等动效收敛再截（不要的话截的就是主页，与原来一致）
         var setupCategory = ReadSetupCategory(args);
         var transparent = ReadFlag(args, "--capture-transparent");
-
-        // 调试用：模拟连点「关于」五次，便于截取联机页的彩蛋提示条
-        if (ReadFlag(args, "--easter-egg"))
-        {
-            for (var i = 0; i < 5; i++) EasterEgg.RegisterAboutClick();
-        }
-
         var page = setupCategory >= 0 ? NavPages.Settings : ReadPage(args);
         if (page != NavPages.Home) window.SwitchToPage(page);
 
