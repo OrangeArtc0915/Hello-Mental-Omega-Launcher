@@ -4,5 +4,6 @@
     { "version": "v1", "state": "frozen" },
     { "version": "v2", "state": "active" },
     { "version": "v3", "state": "stub" }
-  ]
+  ],
+  "archive": [ "2023", "2024", "2025" ]
 }
