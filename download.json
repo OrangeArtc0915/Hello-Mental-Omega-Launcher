@@ -3,7 +3,7 @@
   "items": [
     {
       "name": "联机补丁",
-      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/patch/MO-patch.zip",
+      "url": "https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases/download/components/MO-patch.zip",
       "note": "联机大厅对接补丁：点「安装」后选一个游戏实例，解压到它的游戏目录（覆盖 Resources\\ 下的客户端文件）。",
       "hidden": true
     },
