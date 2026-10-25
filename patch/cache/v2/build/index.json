@@ -1,0 +1,7 @@
+{
+  "build": "2026-10-02",
+  "artifacts": [
+    { "name": "components-extra.zip", "state": "published" }
+  ],
+  "logs": [ "build-2026-10-02.log", "build-2026-09-18.log" ]
+}
