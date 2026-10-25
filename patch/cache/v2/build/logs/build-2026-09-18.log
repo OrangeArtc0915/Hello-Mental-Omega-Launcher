@@ -1,0 +1,33 @@
+[2026-09-18 02:00:03] INFO  cache-sync: start (target=v2) bytes=109540
+[2026-09-18 02:00:06] INFO  cache-sync: resolve source ci/artifacts bytes=598836
+[2026-09-18 02:00:07] INFO  cache-sync: download components-extra.zip bytes=311306
+[2026-09-18 02:00:15] INFO  cache-sync: verify sha256 ok bytes=647413
+[2026-09-18 02:00:20] INFO  cache-sync: unpack staging/ bytes=908844
+[2026-09-18 02:00:23] INFO  cache-sync: write manifest.json bytes=902285
+[2026-09-18 02:00:25] INFO  cache-sync: prune old entries bytes=349425
+[2026-09-18 02:00:27] DEBUG chunk ok offset=737186
+[2026-09-18 02:00:31] INFO  cache-sync: publish assets/ bytes=763897
+[2026-09-18 02:00:35] INFO  cache-sync: done (exit 0) bytes=206332
+[2026-09-18 02:00:40] INFO  cache-sync: start (target=v2) bytes=930699
+[2026-09-18 02:00:43] INFO  cache-sync: resolve source ci/artifacts bytes=825996
+[2026-09-18 02:00:50] INFO  cache-sync: download components-extra.zip bytes=299220
+[2026-09-18 02:00:55] INFO  cache-sync: verify sha256 ok bytes=282597
+[2026-09-18 02:00:57] INFO  cache-sync: unpack staging/ bytes=383712
+[2026-09-18 02:01:00] DEBUG chunk ok offset=319239
+[2026-09-18 02:01:08] INFO  cache-sync: write manifest.json bytes=725866
+[2026-09-18 02:01:14] INFO  cache-sync: prune old entries bytes=316044
+[2026-09-18 02:01:16] INFO  cache-sync: publish assets/ bytes=768225
+[2026-09-18 02:01:18] INFO  cache-sync: done (exit 0) bytes=586499
+[2026-09-18 02:01:20] INFO  cache-sync: start (target=v2) bytes=256696
+[2026-09-18 02:01:26] INFO  cache-sync: resolve source ci/artifacts bytes=634316
+[2026-09-18 02:01:32] INFO  cache-sync: download components-extra.zip bytes=540461
+[2026-09-18 02:01:33] DEBUG chunk ok offset=215659
+[2026-09-18 02:01:36] INFO  cache-sync: verify sha256 ok bytes=682937
+[2026-09-18 02:01:42] INFO  cache-sync: unpack staging/ bytes=666002
+[2026-09-18 02:01:44] INFO  cache-sync: write manifest.json bytes=481154
+[2026-09-18 02:01:48] INFO  cache-sync: prune old entries bytes=306504
+[2026-09-18 02:01:55] INFO  cache-sync: publish assets/ bytes=510086
+[2026-09-18 02:02:02] INFO  cache-sync: done (exit 0) bytes=804637
+[2026-09-18 02:02:09] INFO  cache-sync: start (target=v2) bytes=611443
+[2026-09-18 02:02:11] DEBUG chunk ok offset=291722
+[2026-09-18 02:02:13] INFO  cache-sync: checksum ok
