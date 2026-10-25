@@ -1,0 +1,23 @@
+[2026-09-18 02:00:05] INFO  cache-sync: start (target=v2) bytes=627183
+[2026-09-18 02:00:12] INFO  cache-sync: resolve source ci/artifacts bytes=215223
+[2026-09-18 02:00:17] INFO  cache-sync: download components-extra.zip bytes=736269
+[2026-09-18 02:00:24] INFO  cache-sync: verify sha256 ok bytes=631275
+[2026-09-18 02:00:31] INFO  cache-sync: unpack staging/ bytes=341328
+[2026-09-18 02:00:38] INFO  cache-sync: write manifest.json bytes=889094
+[2026-09-18 02:00:46] INFO  cache-sync: prune old entries bytes=846231
+[2026-09-18 02:00:48] DEBUG chunk ok offset=507765
+[2026-09-18 02:00:56] INFO  cache-sync: publish assets/ bytes=157985
+[2026-09-18 02:01:01] INFO  cache-sync: done (exit 0) bytes=564459
+[2026-09-18 02:01:08] INFO  cache-sync: start (target=v2) bytes=668117
+[2026-09-18 02:01:10] INFO  cache-sync: resolve source ci/artifacts bytes=556632
+[2026-09-18 02:01:13] INFO  cache-sync: download components-extra.zip bytes=328163
+[2026-09-18 02:01:16] INFO  cache-sync: verify sha256 ok bytes=860583
+[2026-09-18 02:01:17] INFO  cache-sync: unpack staging/ bytes=81729
+[2026-09-18 02:01:20] DEBUG chunk ok offset=826643
+[2026-09-18 02:01:25] INFO  cache-sync: write manifest.json bytes=544636
+[2026-09-18 02:01:32] INFO  cache-sync: prune old entries bytes=468602
+[2026-09-18 02:01:38] INFO  cache-sync: publish assets/ bytes=640106
+[2026-09-18 02:01:40] INFO  cache-sync: done (exit 0) bytes=753255
+[2026-09-18 02:01:42] INFO  cache-sync: start (target=v2) bytes=310239
+[2026-09-18 02:01:49] INFO  cache-sync: resolve source ci/artifacts bytes=159903
+[2026-09-18 02:01:51] INFO  cache-sync: checksum ok
