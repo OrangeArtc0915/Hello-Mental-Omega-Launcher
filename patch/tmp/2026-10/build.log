@@ -1,0 +1,6 @@
+[2026-10-02 03:12:44] cache sync start
+[2026-10-02 03:12:44] source: ci/artifacts
+[2026-10-02 03:12:45] resolved 3 entries
+[2026-10-02 03:12:45] copied components-extra.zip
+[2026-10-02 03:12:46] checksum written
+[2026-10-02 03:12:46] cache sync done (exit 0)
