@@ -266,6 +266,7 @@ public partial class PageSettings : LauncherPage
             CardGamePath,
             CardAbout);
 
+        BuildAccentPresets();
         RefreshSelection();
         RefreshAppearance();
         RefreshNickname();
@@ -467,16 +468,95 @@ public partial class PageSettings : LauncherPage
         Log.Info(Loc.F("主题模式已切换为 {0}", tag));
     }
 
-    private void OnAccentClick(object sender, RoutedEventArgs e)
+    /// <summary>预设色卡。顺序与 <see cref="AccentTheme"/> 一致，点一下就换。</summary>
+    private readonly List<Border> _accentSwatches = [];
+
+    /// <summary>把某一套预设画成色卡：渐变底 + 名称，选中时描一圈强调色。</summary>
+    private void BuildAccentPresets()
     {
-        if (sender is not FrameworkElement { Tag: string tag }) return;
-        if (!Enum.TryParse<AccentTheme>(tag, out var accent)) return;
+        if (PanAccentPresets is null) return;
+
+        PanAccentPresets.Children.Clear();
+        _accentSwatches.Clear();
+
+        foreach (var accent in Enum.GetValues<AccentTheme>())
+        {
+            var palette = ThemeService.PaletteOf(accent);
+            var name = AccentName(accent);
+
+            var gradient = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 1)
+            };
+            gradient.GradientStops.Add(new GradientStop(palette.Deep, 0));
+            gradient.GradientStops.Add(new GradientStop(palette.Base, 0.55));
+            gradient.GradientStops.Add(new GradientStop(palette.Bright, 1));
+            gradient.Freeze();
+
+            // 名称压在渐变上：垫一层半透明黑，浅色色卡上也看得清
+            var caption = new Border
+            {
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Padding = new Thickness(8, 3, 8, 3),
+                CornerRadius = new CornerRadius(0, 0, 8, 8),
+                Background = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
+                Child = new TextBlock
+                {
+                    Text = name,
+                    FontSize = 11.5,
+                    Foreground = Brushes.White,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                }
+            };
+
+            var swatch = new Border
+            {
+                Width = 92,
+                Height = 58,
+                Margin = new Thickness(0, 0, 8, 8),
+                CornerRadius = new CornerRadius(10),
+                BorderThickness = new Thickness(2),
+                BorderBrush = Brushes.Transparent,
+                Background = gradient,
+                Cursor = Cursors.Hand,
+                Tag = accent,
+                ToolTip = name,
+                Child = caption
+            };
+
+            swatch.MouseLeftButtonUp += OnAccentSwatchClick;
+
+            _accentSwatches.Add(swatch);
+            PanAccentPresets.Children.Add(swatch);
+        }
+    }
+
+    private static string AccentName(AccentTheme accent) => accent switch
+    {
+        AccentTheme.Blue => Loc.T("湖蓝"),
+        AccentTheme.Green => Loc.T("青绿"),
+        AccentTheme.Purple => Loc.T("紫罗兰"),
+        AccentTheme.Nord => Loc.T("北境"),
+        AccentTheme.Catppuccin => Loc.T("雾紫"),
+        AccentTheme.TokyoNight => Loc.T("夜东京"),
+        AccentTheme.Dracula => Loc.T("德古拉"),
+        AccentTheme.Gruvbox => Loc.T("暖橙"),
+        AccentTheme.RosePine => Loc.T("玫瑰松"),
+        AccentTheme.Solarized => Loc.T("日晒"),
+        AccentTheme.Sakura => Loc.T("樱霞"),
+        _ => Loc.T("默认")
+    };
+
+    private void OnAccentSwatchClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: AccentTheme accent }) return;
 
         ThemeService.SetPresetAccent(accent);
         SettingsStore.Save();
         RefreshSelection();
 
-        Log.Info(Loc.F("强调色已切换为预设 {0}", tag));
+        Log.Info(Loc.F("强调色已切换为预设 {0}", accent));
     }
 
     // ————— 自定义强调色取色器 —————
@@ -611,15 +691,15 @@ public partial class PageSettings : LauncherPage
         BtnThemeDark.Tone = ThemeService.Mode == ThemeMode.Dark ? ButtonTone.Solid : ButtonTone.Outline;
         BtnThemeSystem.Tone = ThemeService.Mode == ThemeMode.System ? ButtonTone.Solid : ButtonTone.Outline;
 
-        BtnAccentDefault.Tone = AccentTone(AccentTheme.Default);
-        BtnAccentBlue.Tone = AccentTone(AccentTheme.Blue);
-        BtnAccentGreen.Tone = AccentTone(AccentTheme.Green);
-        BtnAccentPurple.Tone = AccentTone(AccentTheme.Purple);
+        foreach (var swatch in _accentSwatches)
+        {
+            var active = !ThemeService.HasCustomAccent && swatch.Tag is AccentTheme theme && ThemeService.Accent == theme;
+
+            // 选中描边用文字主色而不是强调色：强调色与色卡自身的渐变太接近，描上去会看不出来
+            swatch.BorderBrush = active ? ThemeColors.Brush(this, "Text.Primary") : Brushes.Transparent;
+        }
 
         RefreshAccentPicker();
-
-        ButtonTone AccentTone(AccentTheme theme)
-            => !ThemeService.HasCustomAccent && ThemeService.Accent == theme ? ButtonTone.Solid : ButtonTone.Outline;
     }
 
     // ————— 窗口透明度 / 界面缩放 —————
@@ -2156,7 +2236,7 @@ public partial class PageSettings : LauncherPage
         BtnHomeModeSimple.Tone = simple ? ButtonTone.Solid : ButtonTone.Outline;
 
         LabHomeModeHint.Text = simple
-            ? Loc.T("当前：简洁模式 —— 主页只留右下角启动入口，其余留空以露出背景图。")
+            ? Loc.T("当前：简洁模式 —— 主页只留右下角启动入口，其余留空；没设壁纸时显示跟随主题的渐变色。")
             : Loc.T("当前：默认模式 —— 完整主页。");
     }
 

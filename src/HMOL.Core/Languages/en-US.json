@@ -586,6 +586,7 @@
     "当前：{0}　{1}": "Current: {0}  {1}",
     "当前：不播放": "Current: Not playing",
     "当前：简洁模式 —— 主页只留右下角启动入口，其余留空以露出背景图。": "Current: Simple mode — the home page keeps only the Start entry in the bottom-right, leaving the rest blank to reveal the background image.",
+    "当前：简洁模式 —— 主页只留右下角启动入口，其余留空；没设壁纸时显示跟随主题的渐变色。": "Current: Simple mode — the home page keeps only the Start entry in the bottom-right; with no wallpaper set, it shows a theme-following gradient.",
     "当前：默认模式 —— 完整主页。": "Current: Default mode — full home page.",
     "当前：内置图标": "Current: Built-in icon",
     "当前版本": "Current version",
@@ -2940,6 +2941,14 @@
     "联机昵称 / 游戏内 HUD / HUD 透明度 / 樱花FRP 面板": "Multiplayer nickname / in-game HUD / HUD opacity / Sakura FRP panel",
     "重新运行配置向导 / 同文件夹多实例": "Run the setup wizard again / shared-folder multi-instance",
     "当前版本 / 数据目录": "Current version / data folder",
-    "界面语言 / 跟随系统": "UI language / follow system"
+    "界面语言 / 跟随系统": "UI language / follow system",
+    "北境": "Nord",
+    "雾紫": "Mist Violet",
+    "夜东京": "Tokyo Night",
+    "德古拉": "Dracula",
+    "暖橙": "Warm Orange",
+    "玫瑰松": "Rosé Pine",
+    "日晒": "Solarized",
+    "樱霞": "Sakura"
   }
 }

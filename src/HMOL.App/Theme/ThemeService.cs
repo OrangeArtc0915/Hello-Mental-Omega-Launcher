@@ -34,8 +34,26 @@ public static class ThemeService
             ColorOf("#427F38"), ColorOf("#CFE5C6"), ColorOf("#EDF5E9")),
         [AccentTheme.Purple] = new(
             ColorOf("#46246B"), ColorOf("#6A3A9E"), ColorOf("#8B57D0"),
-            ColorOf("#7B4BBC"), ColorOf("#E2D6F2"), ColorOf("#F4EFFB"))
+            ColorOf("#7B4BBC"), ColorOf("#E2D6F2"), ColorOf("#F4EFFB")),
+
+        // 下面八套来自常见的高辨识度配色：只取一个主色，色阶由 DerivePalette 统一推导，
+        // 保证按钮上的白字对比度与现有四套一致。
+        [AccentTheme.Nord] = Preset("#5E81AC"),
+        [AccentTheme.Catppuccin] = Preset("#CBA6F7"),
+        [AccentTheme.TokyoNight] = Preset("#7AA2F7"),
+        [AccentTheme.Dracula] = Preset("#BD93F9"),
+        [AccentTheme.Gruvbox] = Preset("#FE8019"),
+        [AccentTheme.RosePine] = Preset("#EB6F92"),
+        [AccentTheme.Solarized] = Preset("#268BD2"),
+        [AccentTheme.Sakura] = Preset("#F08FB0")
     };
+
+    /// <summary>由一个主色推出一整套色阶（与自定义强调色用的是同一套规则）。</summary>
+    private static AccentPalette Preset(string mainHex) => DerivePalette(ColorOf(mainHex));
+
+    /// <summary>取某个预设的完整色阶，供设置页画色卡用。</summary>
+    internal static AccentPalette PaletteOf(AccentTheme accent)
+        => Accents.TryGetValue(accent, out var found) ? found : Accents[AccentTheme.Default];
 
     private static DispatcherTimer? _systemWatcher;
     private static bool _systemWasDark;
@@ -157,6 +175,7 @@ public static class ThemeService
         resources["Shadow.Tint"] = IsDark ? ColorOf("#000000") : ColorOf("#2A3040");
         resources["Brush.WindowBackground"] = BuildWindowGradient(IsDark, Accent);
         resources["Brush.CardCover"] = BuildCardCover(IsDark, Accent);
+        resources["Brush.SimpleBackdrop"] = BuildSimpleBackdrop(IsDark, Accent);
 
         ThemeChanged?.Invoke();
     }
@@ -390,6 +409,38 @@ public static class ThemeService
         brush.GradientStops.Add(new GradientStop(edge, 0));
         brush.GradientStops.Add(new GradientStop(middle, 0.42));
         brush.GradientStops.Add(new GradientStop(edge, 1));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>
+    /// 简洁模式的默认背景：比窗口底纹更有存在感的三段对角渐变，跟着明暗模式与强调色走。
+    /// 只在用户没有设置壁纸时使用（设了壁纸就露出壁纸本身）。
+    /// </summary>
+    private static LinearGradientBrush BuildSimpleBackdrop(bool dark, AccentTheme accent)
+    {
+        var palette = ResolvePalette(accent);
+
+        // 深色：左上偏强调色的深蓝，往右下压暗到接近窗口底色，整屏才有「斜着打了一层光」的感觉；
+        // 浅色：左上用淡化后的强调色，往右下过渡到接近纯白，避免整块死白。
+        var start = dark
+            ? Mix(ColorOf("#11161F"), palette.Deep, 0.66)
+            : Mix(palette.Base, Colors.White, 0.78);
+        var middle = dark
+            ? Mix(ColorOf("#151A24"), palette.Base, 0.40)
+            : Mix(palette.Soft, Colors.White, 0.34);
+        var end = dark
+            ? Mix(ColorOf("#0F131A"), palette.Bright, 0.08)
+            : Mix(palette.Faint, Colors.White, 0.62);
+
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 1)
+        };
+        brush.GradientStops.Add(new GradientStop(start, 0));
+        brush.GradientStops.Add(new GradientStop(middle, 0.55));
+        brush.GradientStops.Add(new GradientStop(end, 1));
         brush.Freeze();
         return brush;
     }

@@ -372,6 +372,20 @@ public partial class MainWindow : Window
         }
 
         BackgroundView.ApplyFromSettings(over);
+        ApplySimpleBackdrop(page);
+    }
+
+    /// <summary>
+    /// 简洁模式的主页没什么元素撑场，底纹换成更明显的渐变；其他页面与默认模式仍用原来的窗口底纹。
+    /// 设了壁纸时背景层会把整块盖住，这里不必再判断有没有壁纸。
+    /// </summary>
+    private void ApplySimpleBackdrop(int page)
+    {
+        var simple = page == NavPages.Home && SettingsStore.Current.HomeMode == HomeMode.Simple;
+
+        PanForm.SetResourceReference(
+            Panel.BackgroundProperty,
+            simple ? "Brush.SimpleBackdrop" : "Brush.WindowBackground");
     }
 
     /// <summary>鼠标视差：把光标在主窗口里的归一化位置（−1..1）交给背景层。</summary>

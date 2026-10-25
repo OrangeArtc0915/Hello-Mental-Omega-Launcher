@@ -10,13 +10,21 @@ public enum ThemeMode
     System = 2
 }
 
-/// <summary>强调色。骨架阶段先放四套，后续按需求增删。</summary>
+/// <summary>强调色预设。前面四套是启动器自带的基础色，后面八套取自常见的高辨识度配色。</summary>
 public enum AccentTheme
 {
     Default = 0,
     Blue = 1,
     Green = 2,
-    Purple = 3
+    Purple = 3,
+    Nord = 4,
+    Catppuccin = 5,
+    TokyoNight = 6,
+    Dracula = 7,
+    Gruvbox = 8,
+    RosePine = 9,
+    Solarized = 10,
+    Sakura = 11
 }
 
 /// <summary>主页显示模式。</summary>

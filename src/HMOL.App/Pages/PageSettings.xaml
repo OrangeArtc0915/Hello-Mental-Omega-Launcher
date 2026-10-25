@@ -171,27 +171,8 @@
                                FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
                                Text="{loc:T '强调色'}" />
-                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
-                        <c:OutlineButton x:Name="BtnAccentDefault"
-                                         Tag="Default"
-                                         Content="{loc:T '默认'}"
-                                         Click="OnAccentClick" />
-                        <c:OutlineButton x:Name="BtnAccentBlue"
-                                         Margin="8,0,0,0"
-                                         Tag="Blue"
-                                         Content="{loc:T '湖蓝'}"
-                                         Click="OnAccentClick" />
-                        <c:OutlineButton x:Name="BtnAccentGreen"
-                                         Margin="8,0,0,0"
-                                         Tag="Green"
-                                         Content="{loc:T '青绿'}"
-                                         Click="OnAccentClick" />
-                        <c:OutlineButton x:Name="BtnAccentPurple"
-                                         Margin="8,0,0,0"
-                                         Tag="Purple"
-                                         Content="{loc:T '紫罗兰'}"
-                                         Click="OnAccentClick" />
-                    </StackPanel>
+                    <!-- 预设色卡：代码里按 AccentTheme 逐个生成（名称随界面语言变化） -->
+                    <WrapPanel x:Name="PanAccentPresets" Margin="0,10,0,0" />
 
                     <!-- 自定义强调色：HSL 滑块 + hex 输入 + 从背景图取色 -->
                     <TextBlock Margin="0,16,0,0"
