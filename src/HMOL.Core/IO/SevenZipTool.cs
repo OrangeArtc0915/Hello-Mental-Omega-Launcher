@@ -104,9 +104,10 @@ public static class SevenZipTool
     /// <summary>
     /// 用 7-Zip 把 <paramref name="archivePath"/> 解压到 <paramref name="destinationDirectory"/>。
     /// 不加 <c>-spf</c>：7-Zip 默认会剥掉条目里的盘符与 ".."，不会写到目标目录之外。
+    /// <paramref name="password"/> 不为空时以 <c>-p</c> 传入，供加密压缩包使用。
     /// </summary>
     public static (bool Ok, string Error) Extract(string archivePath, string destinationDirectory,
-        IProgress<double>? progress, CancellationToken token)
+        IProgress<double>? progress, CancellationToken token, string? password = null)
     {
         var exe = ExePath;
         if (exe is null) return (false, MissingMessage);
@@ -136,6 +137,8 @@ public static class SevenZipTool
         startInfo.ArgumentList.Add("x");
         startInfo.ArgumentList.Add(archivePath);
         startInfo.ArgumentList.Add($"-o{destinationDirectory}");
+
+        if (!string.IsNullOrEmpty(password)) startInfo.ArgumentList.Add("-p" + password);
 
         return Run(startInfo, progress, token);
     }

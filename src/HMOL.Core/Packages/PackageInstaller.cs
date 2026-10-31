@@ -18,8 +18,9 @@ namespace HMOL.Core.Packages;
 public sealed record PackageTarget(string SourcePath, bool IsArchive, string TargetDirectory, bool MergeIntoRoot);
 
 /// <summary>安装结果。</summary>
+/// <param name="NeedsPassword">压缩包有密码，需要调用方提示用户输入（或重新输入）密码后再试一次。</param>
 public sealed record InstallOutcome(bool Success, bool Cancelled, bool RolledBack,
-    int TotalFiles, int FailedFiles, int SkippedFiles, string Message);
+    int TotalFiles, int FailedFiles, int SkippedFiles, string Message, bool NeedsPassword = false);
 
 /// <summary>卸载结果。</summary>
 public sealed record UninstallOutcome(bool Success, bool Cancelled, bool RolledBack,
@@ -29,7 +30,9 @@ public sealed record UninstallOutcome(bool Success, bool Cancelled, bool RolledB
 /// <summary>
 /// 插件包的安装与卸载。规则按旧版 <c>_install_package_impl</c> / <c>_uninstall_package*</c>：
 /// <list type="bullet">
-/// <item>压缩包先解压到临时目录；解压后只有一个顶层目录时以该目录为内容根（旧版「智能识别」）。</item>
+/// <item>压缩包先解压到临时目录；解压后若外面还套着一层（或多层）包装目录，会剥到真正的内容根
+/// （旧版只剥一层，<c>Apra1\Apra2\文件</c> 这种会多出一个 Apra2 目录；遇到 MapsMO / INI / Resources
+/// 这类游戏内容目录则停手，避免把地图铺错位置）。</item>
 /// <item>单个 .map 文件装到 <c>Maps\Custom</c>；压缩包（含地图压缩包）解压后合并到游戏根目录；目录落到 <c>游戏目录\包名</c>；其它单文件落到 <c>游戏目录\同名文件</c>。</item>
 /// <item>覆盖已有文件前留下 <c>.bak-&lt;时间戳&gt;</c> 备份。</item>
 /// <item>全程登记痕迹，失败或取消时回滚本次已做的部分（旧版只有「全部失败就放弃」）。</item>
@@ -86,7 +89,7 @@ public static class PackageInstaller
     /// <summary>安装一个包；成功时写入精确安装记录与实例的已安装列表。</summary>
     public static InstallOutcome Install(GameInstance instance, PackageType type, string packageName,
         CopyConflictPolicy policy = CopyConflictPolicy.Overwrite,
-        IProgress<ProgressSample>? progress = null, CancellationToken token = default)
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default, string? password = null)
     {
         var extractDirectory = string.Empty;
         var scratch = string.Empty;
@@ -127,11 +130,22 @@ public static class PackageInstaller
 
                 Log.Info(Loc.F("正在解压：{0} → {1}", target.SourcePath, extractDirectory));
 
-                if (!ArchiveExtractor.TryExtract(target.SourcePath, extractDirectory, out var error,
-                        progress is null ? null : new ProgressSpan(progress, 0, 0.85), token))
+                var extracted = ArchiveExtractor.Extract(target.SourcePath, extractDirectory,
+                    progress is null ? null : new ProgressSpan(progress, 0, 0.85), token, password);
+
+                if (!extracted.Success)
                 {
                     TryDeleteDirectory(extractDirectory);
-                    return Fail(Loc.F("解压失败：{0}", error));
+
+                    // 加密压缩包：把「要密码 / 密码不对」原样交给调用方，由界面去问用户
+                    if (extracted.NeedsPassword)
+                    {
+                        return new InstallOutcome(false, false, false, 0, 0, 0,
+                            extracted.Error ?? Loc.T("这个压缩包有密码，需要输入解压密码。"),
+                            NeedsPassword: true);
+                    }
+
+                    return Fail(Loc.F("解压失败：{0}", extracted.Error));
                 }
 
                 if (!Directory.EnumerateFileSystemEntries(extractDirectory).Any())

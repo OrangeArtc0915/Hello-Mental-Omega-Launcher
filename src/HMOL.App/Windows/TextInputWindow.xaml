@@ -28,13 +28,23 @@
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource Radius.Button}">
-                <TextBox x:Name="TxtValue"
-                         VerticalContentAlignment="Center"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         CaretBrush="{DynamicResource Text.Primary}"
-                         Foreground="{DynamicResource Text.Primary}"
-                         TextChanged="OnValueChanged" />
+                <Grid>
+                    <TextBox x:Name="TxtValue"
+                             VerticalContentAlignment="Center"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             CaretBrush="{DynamicResource Text.Primary}"
+                             Foreground="{DynamicResource Text.Primary}"
+                             TextChanged="OnValueChanged" />
+                    <PasswordBox x:Name="PwdValue"
+                                 VerticalContentAlignment="Center"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{DynamicResource Text.Primary}"
+                                 Foreground="{DynamicResource Text.Primary}"
+                                 Visibility="Collapsed"
+                                 PasswordChanged="OnPasswordChanged" />
+                </Grid>
             </Border>
 
             <TextBlock x:Name="LabError"

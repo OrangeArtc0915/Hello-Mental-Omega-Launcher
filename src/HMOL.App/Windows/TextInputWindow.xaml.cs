@@ -11,8 +11,11 @@ public partial class TextInputWindow : Window
 {
     private readonly Func<string, string?>? _validate;
 
+    /// <summary>密码模式：显示掩码输入框，值不做 Trim（密码里的空格也算数）。</summary>
+    private readonly bool _passwordMode;
+
     public TextInputWindow(string title, string message, string initialValue = "", string hint = "",
-        Func<string, string?>? validate = null)
+        Func<string, string?>? validate = null, bool password = false)
     {
         InitializeComponent();
 
@@ -20,32 +23,48 @@ public partial class TextInputWindow : Window
         Card.Title = title;
 
         _validate = validate;
+        _passwordMode = password;
 
         LabMessage.Text = message;
         LabHint.Text = hint;
         LabHint.Visibility = string.IsNullOrWhiteSpace(hint) ? Visibility.Collapsed : Visibility.Visible;
 
-        TxtValue.Text = initialValue;
-        TxtValue.SelectAll();
+        if (password)
+        {
+            TxtValue.Visibility = Visibility.Collapsed;
+            PwdValue.Visibility = Visibility.Visible;
+            PwdValue.Password = initialValue;
 
-        Loaded += (_, _) => TxtValue.Focus();
+            Loaded += (_, _) => PwdValue.Focus();
+        }
+        else
+        {
+            TxtValue.Text = initialValue;
+            TxtValue.SelectAll();
+
+            Loaded += (_, _) => TxtValue.Focus();
+        }
     }
 
     /// <summary>用户输入的内容，点「确定」后有效。</summary>
-    public string Value => TxtValue.Text?.Trim() ?? string.Empty;
+    public string Value => _passwordMode ? PwdValue.Password : TxtValue.Text?.Trim() ?? string.Empty;
 
     /// <summary>显示输入窗，返回用户输入的内容（取消或关闭为 null）。</summary>
     public static string? Ask(Window? owner, string title, string message, string initialValue = "",
-        string hint = "", Func<string, string?>? validate = null)
+        string hint = "", Func<string, string?>? validate = null, bool password = false)
     {
-        var window = new TextInputWindow(title, message, initialValue, hint, validate);
+        var window = new TextInputWindow(title, message, initialValue, hint, validate, password);
 
         if (owner is not null) window.Owner = owner;
 
         return window.ShowDialog() == true ? window.Value : null;
     }
 
-    private void OnValueChanged(object sender, TextChangedEventArgs e)
+    private void OnValueChanged(object sender, TextChangedEventArgs e) => ClearError();
+
+    private void OnPasswordChanged(object sender, RoutedEventArgs e) => ClearError();
+
+    private void ClearError()
     {
         if (LabError is null) return;
 

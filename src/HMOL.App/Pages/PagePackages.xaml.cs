@@ -439,15 +439,51 @@ public partial class PagePackages : LauncherPage
             if (choice != "install") return;
         }
 
-        var progress = ProgressWindow.Open(owner, Loc.T("安装包"), Loc.F("正在安装「{0}」…", entry.Name));
+        var name = entry.Name;
+        var password = string.Empty;
 
         try
         {
-            var name = entry.Name;
-            var outcome = await Task.Run(() =>
-                PackageInstaller.Install(instance, type, name, policy, progress.Sample, progress.Token));
+            InstallOutcome outcome;
 
-            progress.Finish();
+            while (true)
+            {
+                var progress = ProgressWindow.Open(owner, Loc.T("安装包"), Loc.F("正在安装「{0}」…", name));
+
+                try
+                {
+                    var attemptPassword = password.Length == 0 ? null : password;
+
+                    outcome = await Task.Run(() =>
+                        PackageInstaller.Install(instance, type, name, policy, progress.Sample, progress.Token,
+                            attemptPassword));
+                }
+                finally
+                {
+                    progress.Finish();
+                }
+
+                if (!outcome.NeedsPassword) break;
+
+                // 加密压缩包：先要密码，密码不对就再问一次；取消则放弃安装
+                var typed = TextInputWindow.Ask(
+                    owner,
+                    Loc.T("压缩包密码"),
+                    password.Length == 0
+                        ? Loc.F("「{0}」是加密压缩包，请输入解压密码：", name)
+                        : Loc.F("密码不对，请重新输入「{0}」的密码：", name),
+                    hint: Loc.T("密码只用于本次安装，不会被保存。"),
+                    validate: value => value.Length == 0 ? Loc.T("密码不能为空。") : null,
+                    password: true);
+
+                if (typed is null)
+                {
+                    ShowNotice(Loc.T("已取消输入密码，安装未开始。"), false);
+                    return;
+                }
+
+                password = typed;
+            }
 
             ShowNotice(outcome.Message, !outcome.Success);
             Notify(outcome.Message, outcome.Success ? Loc.T("安装完成") : Loc.T("安装未完成"),
@@ -457,7 +493,6 @@ public partial class PagePackages : LauncherPage
         }
         catch (Exception ex)
         {
-            progress.Finish();
             Log.Error(Loc.F("安装包失败：{0}", entry.Name), ex);
             ShowNotice(Loc.F("安装失败：{0}", ex.Message), true);
         }
