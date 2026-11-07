@@ -190,6 +190,15 @@ public static class PackageInstaller
                 return Fail(Loc.F("安装失败：所有 {0} 个文件均无法复制", summary.Total));
             }
 
+            // 只要有一个文件没复制成功就整体回滚：覆盖前原文件已被挪进隔离区，
+            // 继续当成功会让游戏目录出现「文件缺失」的半装状态。
+            if (summary.Failed > 0)
+            {
+                journal.Rollback();
+                return Fail(Loc.F("安装失败：{0} 个文件复制失败（共 {1} 个），已回滚本次安装",
+                    summary.Failed, summary.Total));
+            }
+
             if (token.IsCancellationRequested)
             {
                 journal.Rollback();
@@ -281,15 +290,16 @@ public static class PackageInstaller
             if (type == PackageType.Map && !isArchive)
                 return UninstallMap(instance, packageName, progress, token);
 
+            var record = FindRecord(instance, type, packageName);
+
+            // 有精确安装记录时只删这个包自己的文件，不依赖原版备份
+            if (record is { Files.Count: > 0 })
+                return UninstallSelective(instance, type, packageName, record, progress, token);
+
             if (!Directory.Exists(BackupService.OriginalBackupPath))
                 return FailUninstall(Loc.T("未找到原版游戏备份。请先执行「备份原版游戏」，把原版游戏备份到：\n") +
                                      BackupService.OriginalBackupPath +
                                      Loc.T("\n\n原版备份是按包卸载、恢复原版状态的必要条件。"));
-
-            var record = FindRecord(instance, type, packageName);
-
-            if (record is { Files.Count: > 0 })
-                return UninstallSelective(instance, type, packageName, record, progress, token);
 
             if (!allowFullRestore)
                 return FailUninstall(Loc.T("未找到该包的精确安装记录，且当前不允许全量恢复原版。"));
@@ -684,6 +694,9 @@ public static class PackageInstaller
         var handled = new List<string>();
         var toRestore = new List<string>();
 
+        // 没删掉的文件要从安装记录里保留下来，否则「已安装」项被清掉后就再也卸不掉它们
+        var failedFiles = new List<string>();
+
         try
         {
             // 1) 该包的文件搬进隔离区：提交=真删除，回滚=原样搬回
@@ -708,6 +721,7 @@ public static class PackageInstaller
                 if (journal.MoveToQuarantine(full) is null)
                 {
                     deleteFailed++;
+                    failedFiles.Add(normalized);
                     continue;
                 }
 
@@ -754,17 +768,28 @@ public static class PackageInstaller
                     cleaned, Loc.T("卸载已取消，已回滚本次改动"));
             }
 
-            // 4) 更新已安装列表与安装记录：只删了一部分就缩减记录，全删完才整条清掉
+            // 4) 更新已安装列表与安装记录：只删了一部分就缩减记录，全删完才整条清掉。
+            // 删除失败的文件必须留在记录里，不然它们就变成「没有出处的孤儿」。
             var remaining = record.Files
-                .Where(item => !files.Contains(item, StringComparer.OrdinalIgnoreCase))
+                .Where(item =>
+                {
+                    var normalizedItem = PathGuard.NormalizeRelative(item);
+                    var targeted = files.Any(f =>
+                        string.Equals(PathGuard.NormalizeRelative(f), normalizedItem,
+                            StringComparison.OrdinalIgnoreCase));
+                    var failed = failedFiles.Any(f =>
+                        string.Equals(f, normalizedItem, StringComparison.OrdinalIgnoreCase));
+
+                    return !targeted || failed;
+                })
                 .ToList();
 
-            if (remaining.Count == 0)
+            if (remaining.Count == 0 && deleteFailed == 0)
             {
                 RemoveInstalledNames(instance, type, packageName);
                 InstallRecordStore.Delete(instance, type, packageName);
             }
-            else
+            else if (remaining.Count > 0)
             {
                 record.Files = remaining;
                 record.Normalize();

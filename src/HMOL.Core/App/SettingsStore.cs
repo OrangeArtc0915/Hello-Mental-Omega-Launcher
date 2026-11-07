@@ -47,17 +47,36 @@ public static class SettingsStore
         }
     }
 
+    /// <summary>保存设置：先写同目录临时文件再整体替换，写一半崩溃也不会把原配置弄丢。</summary>
     public static void Save()
     {
-        try
+        lock (SaveLock)
         {
-            File.WriteAllText(Paths.SettingsFile, JsonSerializer.Serialize(Current, Options));
-        }
-        catch (Exception ex)
-        {
-            Log.Error(Loc.T("设置保存失败"), ex);
+            var file = Paths.SettingsFile;
+            var temp = file + ".tmp";
+
+            try
+            {
+                var directory = Path.GetDirectoryName(file);
+                if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+                File.WriteAllText(temp, JsonSerializer.Serialize(Current, Options));
+
+                if (File.Exists(file)) File.Replace(temp, file, null);
+                else File.Move(temp, file);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(Loc.T("设置保存失败"), ex);
+
+                // 临时文件留着没意义，能删就删；删不掉也不影响下次启动
+                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+            }
         }
     }
+
+    /// <summary>设置可能被界面线程和后台任务同时保存，写文件要串行。</summary>
+    private static readonly object SaveLock = new();
 
     private static void TryBackupBadFile(string file)
     {

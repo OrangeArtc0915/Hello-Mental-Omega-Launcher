@@ -58,6 +58,7 @@ public partial class PageMultiplayer : LauncherPage
 
     private bool _publishing;
     private bool _hooked;
+    private Action<string>? _noticeHandler;
     private bool _loadingForm;
     private bool _suppressNodeChange;
     private bool _tapping;
@@ -69,7 +70,12 @@ public partial class PageMultiplayer : LauncherPage
     private CancellationTokenSource? _hallLoopCts;
     private Task? _hallLoopTask;
 
-    private HallClient? _hall;
+    /// <summary>
+    /// 大厅连接跨页面重建保留（换语言只重建页面对象，不该把用户踢出大厅），
+    /// 因此放静态字段；事件仍由各页自己挂 / 退订，见 <see cref="HookHall"/>。
+    /// </summary>
+    private static HallClient? _hall;
+
     private HallChat? _hallChat;
 
     private MultiplayerChatWindow? _roomChatWindow;
@@ -132,6 +138,8 @@ public partial class PageMultiplayer : LauncherPage
 
         if (_hall is { Connected: true })
         {
+            // 页面可能是换语言后新建的：旧页面销毁时已退订，这里补挂回当前页
+            HookHall();
             StartHallLoop();
             RefreshHall();
         }
@@ -150,6 +158,26 @@ public partial class PageMultiplayer : LauncherPage
     {
         // 页面只是被隐藏，订阅与大厅轮询照旧（后台仍要收消息），这里只收掉本页的入场动画
         _anim.Stop();
+    }
+
+    /// <summary>
+    /// 页面被丢弃（换语言重建）：本页挂过的静态 / 长活对象事件全部退掉，
+    /// 轮询停掉，自建窗口关掉。大厅连接本身保留，交给新页面接手。
+    /// </summary>
+    public override void OnDestroyed()
+    {
+        UnhookSession();
+        UnhookHall();
+
+        PanSakuraPlan.Log -= AppendEngineLine;
+
+        StopHallLoop();
+
+        _hallChatWindow?.Close();
+        _hallChatWindow = null;
+
+        _roomChatWindow?.Close();
+        _roomChatWindow = null;
     }
 
     /// <summary>本页自己管入场动画（见 <see cref="PageAnimator"/>）。</summary>
@@ -177,9 +205,32 @@ public partial class PageMultiplayer : LauncherPage
         session.PeersChanged += OnSessionPeersChanged;
         session.OutputReceived += OnEngineOutputLine;
         session.ChatMessageReceived += OnRoomMessage;
-        session.Notice += text => Dispatch(() => ShowNotice(text));
+
+        _noticeHandler = text => Dispatch(() => ShowNotice(text));
+        session.Notice += _noticeHandler;
 
         MultiplayerHub.StateChanged += OnHubStateChanged;
+    }
+
+    private void UnhookSession()
+    {
+        if (!_hooked) return;
+        _hooked = false;
+
+        var session = Session;
+
+        session.StateChanged -= OnSessionStateChanged;
+        session.PeersChanged -= OnSessionPeersChanged;
+        session.OutputReceived -= OnEngineOutputLine;
+        session.ChatMessageReceived -= OnRoomMessage;
+
+        if (_noticeHandler is not null)
+        {
+            session.Notice -= _noticeHandler;
+            _noticeHandler = null;
+        }
+
+        MultiplayerHub.StateChanged -= OnHubStateChanged;
     }
 
     private void OnSessionStateChanged() => Dispatch(() =>
@@ -863,15 +914,31 @@ public partial class PageMultiplayer : LauncherPage
 
     private HallClient EnsureHall()
     {
-        if (_hall is not null) return _hall;
+        var hall = _hall ??= new HallClient(line => ActivityLog.Write(LogSource.App, line));
 
-        var hall = new HallClient(line => ActivityLog.Write(LogSource.App, line));
-
-        hall.MessageReceived += OnHallMessage;
-        hall.InviteReceived += OnHallInvite;
-
-        _hall = hall;
+        HookHall();
         return hall;
+    }
+
+    /// <summary>把大厅事件挂到当前页。重复调用无副作用（先减后加）。</summary>
+    private void HookHall()
+    {
+        if (_hall is null) return;
+
+        _hall.MessageReceived -= OnHallMessage;
+        _hall.InviteReceived -= OnHallInvite;
+
+        _hall.MessageReceived += OnHallMessage;
+        _hall.InviteReceived += OnHallInvite;
+    }
+
+    /// <summary>页面丢弃时退订；大厅连接本身仍在，新页面会重新挂上。</summary>
+    private void UnhookHall()
+    {
+        if (_hall is null) return;
+
+        _hall.MessageReceived -= OnHallMessage;
+        _hall.InviteReceived -= OnHallInvite;
     }
 
     private async void OnHallClick(object sender, RoutedEventArgs e)

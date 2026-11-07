@@ -243,7 +243,7 @@ public static class DownloadManifest
 
         foreach (var key in UrlArrayKeys)
         {
-            if (!element.TryGetProperty(key, out var value) || value.ValueKind != JsonValueKind.Array) continue;
+            if (!TryGetProperty(element, key, out var value) || value.ValueKind != JsonValueKind.Array) continue;
 
             foreach (var item in value.EnumerateArray())
             {
@@ -262,10 +262,29 @@ public static class DownloadManifest
     {
         foreach (var key in ListKeys)
         {
-            if (root.TryGetProperty(key, out array) && array.ValueKind == JsonValueKind.Array) return true;
+            if (TryGetProperty(root, key, out array) && array.ValueKind == JsonValueKind.Array) return true;
         }
 
         array = default;
+        return false;
+    }
+
+    /// <summary>
+    /// 按键取属性，字段名不区分大小写：维护者手写 <c>Name</c> / <c>Hidden</c> 时也要能读到，
+    /// 否则整条清单会悄悄变成「没有名字、不隐藏」。
+    /// </summary>
+    private static bool TryGetProperty(JsonElement element, string key, out JsonElement value)
+    {
+        if (element.TryGetProperty(key, out value)) return true;
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (!string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase)) continue;
+
+            value = property.Value;
+            return true;
+        }
+
         return false;
     }
 
@@ -273,7 +292,7 @@ public static class DownloadManifest
     {
         foreach (var key in keys)
         {
-            if (!element.TryGetProperty(key, out var value)) continue;
+            if (!TryGetProperty(element, key, out var value)) continue;
             if (value.ValueKind != JsonValueKind.String) continue;
 
             var text = value.GetString();
@@ -288,7 +307,7 @@ public static class DownloadManifest
     {
         foreach (var key in keys)
         {
-            if (!element.TryGetProperty(key, out var value)) continue;
+            if (!TryGetProperty(element, key, out var value)) continue;
 
             switch (value.ValueKind)
             {

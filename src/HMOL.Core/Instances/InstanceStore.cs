@@ -46,6 +46,9 @@ public static class InstanceStore
         {
             if (Directory.Exists(Paths.Instances))
             {
+                // 同一 Id 只认第一个文件：手工复制过配置文件时，界面上不该出现两条一模一样的实例
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var file in Directory.EnumerateFiles(Paths.Instances, "*.json"))
                 {
                     var instance = ReadFrom(file, out var error);
@@ -53,6 +56,12 @@ public static class InstanceStore
                     if (instance is null)
                     {
                         Log.Warn(Loc.F("实例文件解析失败，已跳过：{0}（{1}）", Path.GetFileName(file), error));
+                        continue;
+                    }
+
+                    if (!seen.Add(instance.Id))
+                    {
+                        Log.Warn(Loc.F("实例 Id 重复，已跳过：{0}（{1}）", Path.GetFileName(file), instance.Id));
                         continue;
                     }
 
@@ -147,7 +156,18 @@ public static class InstanceStore
     {
         error = null;
 
-        Items.RemoveAll(item => string.Equals(item.Id, instance.Id, StringComparison.OrdinalIgnoreCase));
+        // 先删数据目录：删不掉就整体放弃（配置还在，用户能从界面重试）。
+        // 反过来先删配置的话，这一步失败就会留下一个界面上再也点不到、也没法清理的孤儿目录。
+        try
+        {
+            if (Directory.Exists(instance.InstanceDirectory))
+                Directory.Delete(instance.InstanceDirectory, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            error = Loc.F("实例数据目录删除失败：{0}", ex.Message);
+            return false;
+        }
 
         try
         {
@@ -157,23 +177,16 @@ public static class InstanceStore
         catch (Exception ex)
         {
             error = Loc.F("实例配置删除失败：{0}", ex.Message);
+            return false;
         }
 
-        try
-        {
-            if (Directory.Exists(instance.InstanceDirectory))
-                Directory.Delete(instance.InstanceDirectory, recursive: true);
-        }
-        catch (Exception ex)
-        {
-            error = error is null ? Loc.F("实例数据目录删除失败：{0}", ex.Message) : error;
-        }
+        Items.RemoveAll(item => string.Equals(item.Id, instance.Id, StringComparison.OrdinalIgnoreCase));
 
         if (ReferenceEquals(Current, instance)) SetCurrent(Items.FirstOrDefault());
         else Changed?.Invoke();
 
-        if (error is null) Log.Info(Loc.F("已删除实例「{0}」", instance.Name));
-        return error is null;
+        Log.Info(Loc.F("已删除实例「{0}」", instance.Name));
+        return true;
     }
 
     public static void SetCurrent(GameInstance? instance)

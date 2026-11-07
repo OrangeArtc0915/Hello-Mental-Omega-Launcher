@@ -170,8 +170,9 @@ public partial class MainWindow : Window
         // 统一清掉页面缓存、重建当前页最省心，页面本来就支持随时重建。
         Loc.Changed += OnLanguageChanged;
 
-        // 最小化时停掉背景里的动图与视频，别白烧 CPU
-        StateChanged += (_, _) => BackgroundView.SetPaused(WindowState == WindowState.Minimized);
+        // 最小化或收起到托盘时停掉背景里的动图与视频，别白烧 CPU；回到前台再恢复
+        StateChanged += (_, _) => UpdateBackgroundPause();
+        IsVisibleChanged += (_, _) => UpdateBackgroundPause();
     }
 
     /// <summary>
@@ -330,6 +331,10 @@ public partial class MainWindow : Window
             // null（关掉弹窗）→ 取消，什么都不做
         }
     }
+
+    /// <summary>收起到托盘只是 <c>Hide()</c>，WindowState 仍是 Normal，必须连可见性一起判断。</summary>
+    private void UpdateBackgroundPause()
+        => BackgroundView.SetPaused(WindowState == WindowState.Minimized || !IsVisible);
 
     /// <summary>收起到系统托盘：取消本次关闭，只把窗口藏起来，程序继续在后台运行。</summary>
     private void MinimizeToTray()
@@ -662,6 +667,10 @@ public partial class MainWindow : Window
         {
             // 补一次 OnLeave：让页面按约定把自己的动画收干净，动画键都带页面前缀
             cached.OnLeave();
+
+            // 再通知页面彻底销毁：退订静态事件、停轮询，否则旧页面会被这些引用一直拖着
+            cached.OnDestroyed();
+
             PanContent.Children.Remove(cached);
         }
 

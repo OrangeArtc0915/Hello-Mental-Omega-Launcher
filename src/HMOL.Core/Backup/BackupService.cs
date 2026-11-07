@@ -509,15 +509,36 @@ public static class BackupService
             info?.SourceInstance ?? string.Empty);
     }
 
-    /// <summary>先写临时目录，写完元数据再整体搬到目标位置；同名旧备份先删掉（与旧版一致）。</summary>
+    /// <summary>
+    /// 先写临时目录，写完元数据再整体搬到目标位置。
+    /// 同名旧备份不直接删，先改名放到一边：新备份搬失败时还能把它挪回去，避免新旧一起丢。
+    /// </summary>
     private static void Publish(string staging, string target)
     {
         // Directory.Move 要求目标父目录已存在
         Directory.CreateDirectory(Path.GetDirectoryName(target) ?? BackupRoot);
 
-        if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+        var retired = target + ".old";
+        TryDeleteDirectory(retired);
 
-        Directory.Move(staging, target);
+        if (Directory.Exists(target)) Directory.Move(target, retired);
+
+        try
+        {
+            Directory.Move(staging, target);
+        }
+        catch
+        {
+            // 新备份没搬成：把旧备份原样挪回原位再抛，别让用户两份都没有
+            if (Directory.Exists(retired) && !Directory.Exists(target))
+            {
+                try { Directory.Move(retired, target); } catch { }
+            }
+
+            throw;
+        }
+
+        TryDeleteDirectory(retired);
     }
 
     private static void WriteInfo(string directory, BackupInfo info)

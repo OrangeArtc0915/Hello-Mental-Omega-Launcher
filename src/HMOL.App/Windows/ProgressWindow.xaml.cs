@@ -297,7 +297,11 @@ public partial class ProgressWindow : Window
 
             if (_ownerWindow is not null) _ownerWindow.IsEnabled = true;
 
-            _cts.Dispose();
+            // 关窗等于放弃这次操作：必须把令牌取消掉，否则后台任务会继续跑，
+            // 而调用方拿到的是同一个令牌，之后只会得到「已取消」以外的异常行为。
+            // 这里不 Dispose：取消后仍可能有线程在读 Token，交给 GC 更安全。
+            try { _cts.Cancel(); }
+            catch (ObjectDisposedException) { }
         }
 
         base.OnClosed(e);

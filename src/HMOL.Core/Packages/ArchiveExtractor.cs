@@ -520,6 +520,7 @@ public static class ArchiveExtractor
         var totalBytes = files.Sum(entry => Math.Max(0L, entry.Size));
         var finished = 0;
         var rejected = 0;
+        var failed = 0;
         var doneBytes = 0L;
         var lastReported = -1.0;
 
@@ -592,7 +593,8 @@ public static class ArchiveExtractor
                     return (false, true);
                 }
 
-                // 单个条目失败不影响整体
+                // 单个条目失败不影响整体，全部失败才算整包失败（见方法末尾）
+                failed++;
                 Log.Warn(Loc.F("解压条目失败，已跳过：{0}（{1}）", key, ex.Message));
             }
 
@@ -604,6 +606,13 @@ public static class ArchiveExtractor
 
         if (rejected > 0)
             Log.Warn(Loc.F("解压 {0} 时跳过了 {1} 个路径不合法的条目", archiveName, rejected));
+
+        // 一个都没解出来：多半是包坏了 / 格式不支持，不能报成功让上层接着装空包
+        if (finished > 0 && failed >= finished)
+        {
+            Log.Error(Loc.F("解压失败：{0} 的 {1} 个条目全部无法解出", archiveName, finished));
+            return (false, false);
+        }
 
         Log.Info(Loc.F("解压完成：{0}（格式 {1}，文件 {2} 个）→ {3}", archiveName, format, finished, destinationRoot));
         return (true, false);

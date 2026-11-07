@@ -199,7 +199,8 @@ public static class SevenZipTool
         // WaitForExit 返回后输出流可能还有残余，再等一次确保错误信息拿全
         process.WaitForExit();
 
-        if (process.ExitCode is 0 or 1) return (true, string.Empty);   // 7-Zip：1 是"有警告但成功"
+        // 7-Zip 的退出码：0 成功；1 表示「有文件没能解出来」，这种残缺安装不能当成功
+        if (process.ExitCode == 0) return (true, string.Empty);
 
         return (false, Loc.F("7-Zip 返回错误码 {0}：{1}", process.ExitCode, LastLines(output.ToString())));
     }

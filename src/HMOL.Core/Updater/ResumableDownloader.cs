@@ -180,6 +180,7 @@ public static class ResumableDownloader
         IProgress<double>? progress, IReadOnlyDictionary<string, string>? headers, CancellationToken token)
     {
         var startAt = File.Exists(partPath) ? SafeLength(partPath) : 0;
+        var etagPath = partPath + ".meta";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("User-Agent", DefaultUserAgent);
@@ -192,9 +193,29 @@ public static class ResumableDownloader
             }
         }
 
-        if (startAt > 0) request.Headers.Range = new RangeHeaderValue(startAt, null);
+        if (startAt > 0)
+        {
+            request.Headers.Range = new RangeHeaderValue(startAt, null);
+
+            // 带上上次记的 ETag：服务器上文件换了会返回 200，于是整份重下，
+            // 而不是把旧前缀和新内容拼成一个「大小对得上但内容是坏的」包
+            var etag = ReadEtag(etagPath);
+            if (etag is not null && EntityTagHeaderValue.TryParse(etag, out var parsed))
+                request.Headers.IfRange = new RangeConditionHeaderValue(parsed);
+        }
 
         using var response = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+
+        // 416：续传位置超出服务器文件长度（文件被换成了更小的版本，或 .part 本身是完整的）
+        if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable && startAt > 0)
+        {
+            Log.Warn(Loc.F("续传位置无效（HTTP 416），将从头重下：{0}", url));
+
+            TryDelete(partPath);
+            TryDelete(etagPath);
+
+            return new AttemptOutcome(true, null, Loc.T("续传位置无效，已重新开始下载"), null, 0);
+        }
 
         if (!response.IsSuccessStatusCode)
         {
@@ -240,6 +261,9 @@ public static class ResumableDownloader
         if (total > 0 && !HasFreeSpace(destinationPath, total - startAt, out var spaceError))
             return new AttemptOutcome(false, new DownloadResult(false, null, startAt, spaceError!));
 
+        // 记下这次响应的 ETag，供下次续传时用 If-Range 校验
+        SaveEtag(etagPath, response.Headers.ETag?.ToString());
+
         var received = startAt;
 
         await using (var source = await response.Content.ReadAsStreamAsync(token))
@@ -268,6 +292,7 @@ public static class ResumableDownloader
         }
 
         File.Move(partPath, destinationPath, overwrite: true);
+        TryDelete(etagPath);
         progress?.Report(1);
         Log.Info(Loc.F("下载完成：{0}（{1}）", destinationPath, FormatSize(received)));
 
@@ -584,6 +609,41 @@ public static class ResumableDownloader
         catch (Exception ex)
         {
             Log.Warn(Loc.F("清理分片文件失败：{0}（{1}）", path, ex.Message));
+        }
+    }
+
+    /// <summary>读上次响应里记下的 ETag（没有就返回 null）。</summary>
+    private static string? ReadEtag(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return null;
+
+            var text = File.ReadAllText(path).Trim();
+            return text.Length == 0 ? null : text;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>把 ETag 写到 <c>.part.meta</c>；服务端没给 ETag 就删掉旧值。</summary>
+    private static void SaveEtag(string path, string? etag)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(etag))
+            {
+                TryDelete(path);
+                return;
+            }
+
+            File.WriteAllText(path, etag);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("写入下载校验信息失败：{0}（{1}）", path, ex.Message));
         }
     }
 

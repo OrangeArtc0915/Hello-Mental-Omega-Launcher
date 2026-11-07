@@ -129,7 +129,14 @@ public sealed class GameProcessSession : IDisposable
 
         _exitCompletion.TrySetResult(reported);
 
-        if (_disposed) return;
+        if (_disposed)
+        {
+            // 会话先 Dispose、进程后退出：句柄由这里补释放，否则每跑一次游戏就漏一个进程句柄
+            try { _process.Dispose(); }
+            catch (Exception ex) { Log.Warn(Loc.F("释放游戏进程句柄失败：{0}", ex.Message)); }
+
+            return;
+        }
 
         try { Exited?.Invoke(reported); }
         catch (Exception ex) { Log.Warn(Loc.F("处理游戏退出事件失败：{0}", ex.Message)); }

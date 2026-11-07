@@ -29,17 +29,60 @@
             </Grid.ColumnDefinitions>
             <Border Grid.Column="0"
                     Height="32"
-                    Padding="10,0"
+                    Padding="10,0,4,0"
                     Background="{DynamicResource Surface.Sunken}"
                     BorderBrush="{DynamicResource Border.Default}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource Radius.Button}">
-                <TextBox x:Name="TxtKey"
-                         VerticalContentAlignment="Center"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         CaretBrush="{DynamicResource Text.Primary}"
-                         Foreground="{DynamicResource Text.Primary}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 默认掩码显示，点右侧「显示」才明文 -->
+                    <PasswordBox x:Name="PwdKey"
+                                 Grid.Column="0"
+                                 VerticalContentAlignment="Center"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{DynamicResource Text.Primary}"
+                                 Foreground="{DynamicResource Text.Primary}" />
+                    <TextBox x:Name="TxtKey"
+                             Grid.Column="0"
+                             VerticalContentAlignment="Center"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             CaretBrush="{DynamicResource Text.Primary}"
+                             Foreground="{DynamicResource Text.Primary}"
+                             Visibility="Collapsed" />
+
+                    <Button x:Name="BtnToggleKey"
+                            Grid.Column="1"
+                            Padding="8,0"
+                            VerticalAlignment="Stretch"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            FontSize="11.5"
+                            Foreground="{DynamicResource Accent.Base}"
+                            Content="{loc:T '显示'}"
+                            ToolTip="{loc:T '显示 / 隐藏访问密钥'}"
+                            Click="OnToggleKeyVisibilityClick">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Opacity" Value="0.7" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
             </Border>
             <c:OutlineButton x:Name="BtnVerify"
                              Grid.Column="1"

@@ -346,6 +346,15 @@ public partial class PageSettings : LauncherPage
         _anim.Stop();
     }
 
+    /// <summary>页面被丢弃时退掉本页挂的静态事件，否则旧页面会被它们一直引用着。</summary>
+    public override void OnDestroyed()
+    {
+        BgmPlayer.StateChanged -= OnBgmStateChanged;
+        MultiplayerHub.StateChanged -= OnHubStateChanged;
+
+        _anim.Stop();
+    }
+
     /// <summary>本页自己管入场动画（见 <see cref="PageAnimator"/>）。</summary>
     public override bool HandlesEnterAnimation => true;
 

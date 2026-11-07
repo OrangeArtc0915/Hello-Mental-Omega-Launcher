@@ -43,10 +43,18 @@ public static class InstallRecordStore
     /// <summary>实例的安装记录根目录。</summary>
     public static string DirectoryOf(GameInstance instance) => instance.InstallRecordsDirectory;
 
-    /// <summary>某个包记录文件的绝对路径。包名里的非法字符会被替换为 "_"。</summary>
+    /// <summary>
+    /// 某个包记录文件的绝对路径。包名里的非法字符会被替换为 "_"。
+    /// 只去掉压缩包扩展名（zip / 7z / rar）：包名本身可能带点（<c>Patch.v2</c>），
+    /// 不能按「最后一个点」一刀切，否则 <c>Patch.v2</c> 和 <c>Patch.v3</c> 会写到同一个文件上。
+    /// </summary>
     public static string PathOf(GameInstance instance, PackageType type, string packageName)
     {
-        var safeName = PathGuard.SanitizeFileName(Path.GetFileNameWithoutExtension(packageName.Trim()));
+        var name = packageName.Trim();
+        if (PackageTypes.IsArchiveExtension(Path.GetExtension(name)))
+            name = Path.GetFileNameWithoutExtension(name);
+
+        var safeName = PathGuard.SanitizeFileName(name);
         return Path.Combine(DirectoryOf(instance), PackageTypes.DirectoryNameOf(type), safeName + ".json");
     }
 

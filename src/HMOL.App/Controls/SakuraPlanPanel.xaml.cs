@@ -59,7 +59,7 @@ public partial class SakuraPlanPanel : UserControl
 
         var settings = MultiplayerSettingsStore.Current;
 
-        TxtKey.Text = settings.SakuraAccessKey;
+        SetKey(settings.SakuraAccessKey);
         TxtTunnelName.Text = string.IsNullOrWhiteSpace(settings.SakuraTunnelName) ? Loc.T("心灵终结") : settings.SakuraTunnelName;
 
         Loaded += OnLoaded;
@@ -68,6 +68,46 @@ public partial class SakuraPlanPanel : UserControl
 
     /// <summary>一行日志。由联机页接到「引擎日志」面板上。</summary>
     public event Action<string>? Log;
+
+    /// <summary>密钥当前是否以明文显示。默认 false（掩码），避免旁边有人时直接看到。</summary>
+    private bool _keyVisible;
+
+    /// <summary>当前输入的访问密钥（去掉首尾空白），不区分明文 / 掩码两种输入控件。</summary>
+    private string KeyText => (_keyVisible ? TxtKey.Text : PwdKey.Password).Trim();
+
+    /// <summary>把密钥写进两个输入控件，并保持当前显示模式。</summary>
+    private void SetKey(string? value)
+    {
+        var text = value ?? string.Empty;
+
+        PwdKey.Password = text;
+        TxtKey.Text = text;
+    }
+
+    /// <summary>在掩码 / 明文之间切换；两个控件的内容始终同步，切换不丢输入。</summary>
+    private void OnToggleKeyVisibilityClick(object sender, RoutedEventArgs e)
+    {
+        if (_keyVisible)
+        {
+            PwdKey.Password = TxtKey.Text ?? string.Empty;
+            TxtKey.Visibility = Visibility.Collapsed;
+            PwdKey.Visibility = Visibility.Visible;
+
+            BtnToggleKey.Content = Loc.T("显示");
+            PwdKey.Focus();
+        }
+        else
+        {
+            TxtKey.Text = PwdKey.Password;
+            PwdKey.Visibility = Visibility.Collapsed;
+            TxtKey.Visibility = Visibility.Visible;
+
+            BtnToggleKey.Content = Loc.T("隐藏");
+            TxtKey.Focus();
+        }
+
+        _keyVisible = !_keyVisible;
+    }
 
     private SakuraFrpcRunner Frpc => MultiplayerHub.SakuraFrpc;
 
@@ -135,7 +175,7 @@ public partial class SakuraPlanPanel : UserControl
 
     private async Task<bool> LoadAccountAsync(bool silent = false)
     {
-        var key = TxtKey.Text.Trim();
+        var key = KeyText;
 
         if (key.Length == 0)
         {
@@ -220,13 +260,13 @@ public partial class SakuraPlanPanel : UserControl
         SetBusy(true);
         try
         {
-            if (TxtKey.Text.Trim().Length == 0)
+            if (KeyText.Length == 0)
             {
                 SetAccount(Loc.T("请先填写访问密钥。"), warn: true);
                 return;
             }
 
-            await ReloadTunnelsAsync(TxtKey.Text.Trim());
+            await ReloadTunnelsAsync(KeyText);
         }
         finally
         {
@@ -294,7 +334,7 @@ public partial class SakuraPlanPanel : UserControl
 
             AppendLog(Loc.F("正在创建 TCP 隧道「{0}」（节点 {1}，本地端口 {2}）…", name, nodeId, SakuraFrpApi.MoJoinPort));
 
-            var created = await Api.CreateTcpTunnelAsync(TxtKey.Text.Trim(), name, nodeId);
+            var created = await Api.CreateTcpTunnelAsync(KeyText, name, nodeId);
 
             if (!created.Ok || created.Value is null)
             {
@@ -305,7 +345,7 @@ public partial class SakuraPlanPanel : UserControl
             MultiplayerSettingsStore.Update(settings => settings.SakuraTunnelName = name);
 
             AppendLog(Loc.F("隧道已创建：{0}（ID {1}）", created.Value.Name, created.Value.Id));
-            await ReloadTunnelsAsync(TxtKey.Text.Trim());
+            await ReloadTunnelsAsync(KeyText);
         }
         finally
         {
@@ -344,7 +384,7 @@ public partial class SakuraPlanPanel : UserControl
             LabDomainAddress.Text = Loc.T("等待 frpc 输出…");
             PanRunning.Visibility = Visibility.Visible;
 
-            var started = Frpc.Start(TxtKey.Text.Trim(), row.Source.Id);
+            var started = Frpc.Start(KeyText, row.Source.Id);
 
             if (!started.Ok)
             {
@@ -517,6 +557,8 @@ public partial class SakuraPlanPanel : UserControl
         BtnRefresh.IsEnabled = !busy;
         BtnPrepare.IsEnabled = !busy;
         TxtKey.IsEnabled = !busy;
+        PwdKey.IsEnabled = !busy;
+        BtnToggleKey.IsEnabled = !busy;
     }
 
     private void Dispatch(Action action)
