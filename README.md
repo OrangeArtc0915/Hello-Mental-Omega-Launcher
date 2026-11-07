@@ -27,7 +27,7 @@
 | 设置 | 五大分组侧栏（个性化 / 更新与下载 / 联机 / 其他 / 语言），共 15 项分类；含界面语言（简体中文 / English / 跟随系统）、明暗模式与强调色、窗口透明度与缩放、自定义布局编辑器 |
 | 扩展模块 | 一份 JSON 清单即可在主页加一张小组件卡片；纯声明式、不执行代码、数据源只做只读 GET |
 | 在线更新 | 启动时检查 GitHub / Gitee 的 Release（双线路互为备份），下载校验后交棒替换脚本，只替换 `HMOL.exe`，不动设置与游戏文件 |
-| 发行与安全 | 自包含单文件发行、代码签名、单实例运行、系统托盘常驻、按需提权（默认 `asInvoker`，双击不弹 UAC）、启动安全自检 |
+| 发行与安全 | 自包含单文件发行、单实例运行、系统托盘常驻、按需提权（默认 `asInvoker`，双击不弹 UAC）、启动安全自检 |
 
 ## 下载与运行
 
@@ -36,9 +36,8 @@
 3. 双击目录内的 `HMOL.exe` 启动。
 4. 组网组件（EasyTier / n2n / TAP / WinIPBroadcast）与 7-Zip**不随包分发**：首次使用联机时在程序内「下载」页按需获取。
 
-`HMOL.exe` 已带**代码签名**（自签证书 `CN=mmm`，含 DigiCert 时间戳）。该证书由发布方自建、并非公共 CA
-签发，因此没把证书装进本机「受信任的根证书颁发机构 / 受信任的发布者」的机器上，SmartScreen 仍可能拦
-一次，点「更多信息 → 仍要运行」即可。
+v1.5.22 起发行包**不再附带代码签名**。Windows SmartScreen 可能提示「未知发布者」，点「更多信息 →
+仍要运行」即可；也可以先核对 Release 页面公布的 SHA-256 校验值。
 
 设置、实例、插件包与日志默认放在 exe 同目录的 `Data\`，可用环境变量 `HMOL_DATA` 重定向。
 
@@ -52,7 +51,7 @@ build-tools/          ConfuserEx 混淆等构建工具与脚本
 runtime/              组网组件（EasyTier / n2n 等，按需下载）
 docs/                 开发文档与迁移记录
 samples/              示例数据
-build.bat             一键构建：还原 → 发布 → 混淆 → 签名 → 组装发行包
+build.bat             一键构建：还原 → 发布 → 混淆 →（可选签名）→ 组装发行包
 ensure-dotnet-sdk.bat 缺 .NET SDK 时自动下载
 HMOL.sln              解决方案
 ```
@@ -66,12 +65,12 @@ HMOL.sln              解决方案
 前置：.NET SDK 8（缺失时 `ensure-dotnet-sdk.bat` 会自动下载）。
 
 ```bat
-build.bat                :: 完整构建（含混淆与代码签名）
-build.bat --skip-sign    :: 跳过签名（没有证书时用）
+build.bat                :: 完整构建（含混淆，默认不签名）
+build.bat --sign         :: 额外做代码签名（需要 签名\ 目录里的证书）
 ```
 
 - 版本号的**唯一来源**是 [src/HMOL.Core/App/AppInfo.cs](src/HMOL.Core/App/AppInfo.cs)，由 `build.bat` 读出后传给 MSBuild，不在 csproj 里写死。
-- 签名需要私钥 `签名\HMOL-mmm.pfx`，口令从环境变量 `HMOL_PFX_PASSWORD` 读；未设置时会交互询问，证书缺失或跳过签名只告警不中断。
+- 签名是可选步骤（`--sign`）：私钥 `签名\HMOL-mmm.pfx`，口令从环境变量 `HMOL_PFX_PASSWORD` 读；未设置时会交互询问，证书缺失或签名失败只告警不中断。
 - 产物在 `publish\`：`HMOL.exe` 与 `HMOL-v<版本>-win-x64.zip`。
 
 ---

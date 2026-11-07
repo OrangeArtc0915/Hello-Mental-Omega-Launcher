@@ -5,9 +5,9 @@ cd /d "%~dp0"
 
 rem ============================================================
 rem   HMOL 发行构建
-rem   用法：build.bat [--skip-obfuscate] [--skip-sign]
+rem   用法：build.bat [--skip-obfuscate] [--sign]
 rem     --skip-obfuscate  跳过混淆，出一个未混淆的版本（调试用）
-rem     --skip-sign       跳过代码签名（签名需要 签名\ 目录里的证书与 signtool）
+rem     --sign           额外做代码签名（默认不签名，签名需要 签名\ 目录里的证书与 signtool）
 rem ============================================================
 
 set "DISTDIR=publish"
@@ -27,9 +27,10 @@ set "OBFDIRS=%APPOBJDIR%;%COREBINDIR%;%COREOBJDIR%"
 set "OBFDIR=%~dp0obj\obfuscated"
 set "PREPDIR=%~dp0obj\prepublish"
 set "OBFUSCATE=1"
-set "SIGN=1"
+rem v1.5.22 起发行包默认不做代码签名；需要签名时加 --sign。
+set "SIGN=0"
 set "SIGNED=0"
-rem 代码签名：证书、私钥与 signtool 都在仓库根的 签名\ 目录（该目录不入库，见 .gitignore）。
+rem 代码签名（可选）：证书、私钥与 signtool 都在仓库根的 签名\ 目录（该目录不入库，见 .gitignore）。
 rem PFX 口令不写进本脚本：优先读环境变量 HMOL_PFX_PASSWORD，没有就停下来交互输入。
 set "SIGNDIR=%~dp0签名"
 set "SIGNPFX=%SIGNDIR%\HMOL-mmm.pfx"
@@ -38,7 +39,7 @@ set "SIGNTOOL=%SIGNDIR%\signtool.exe"
 :parseArgs
 if "%~1"=="" goto :argsDone
 if /i "%~1"=="--skip-obfuscate" set "OBFUSCATE=0"
-if /i "%~1"=="--skip-sign" set "SIGN=0"
+if /i "%~1"=="--sign" set "SIGN=1"
 shift
 goto :parseArgs
 :argsDone
@@ -133,13 +134,13 @@ if not exist "%DISTDIR%\HMOL.exe" (
     goto :failed
 )
 
-rem ---------- 5/7 代码签名 ----------
+rem ---------- 5/7 代码签名（可选，默认关闭）----------
 rem 必须赶在组装发行包之前签：zip 里装的就是这个 exe，签完再打包才不用重做一遍。
 rem 证书是自签的（CN=mmm），别的机器上仍会提示未知发布者；要消掉提示，得把 签名\HMOL-mmm.cer
 rem 装进那台机器的「受信任的根证书颁发机构」与「受信任的发布者」（需管理员）。
 echo.
 if "%SIGN%"=="0" (
-    echo [5/7] 已按 --skip-sign 跳过代码签名
+    echo [5/7] 默认不签名，跳过代码签名（需要签名请加 --sign）
     goto :signed
 )
 
