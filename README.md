@@ -50,7 +50,7 @@ src/
   HMOL.Core/          业务逻辑层（实例、包管理、联机、更新、日志、布局、外观等）
 build-tools/          ConfuserEx 混淆等构建工具与脚本
 runtime/              组网组件（EasyTier / n2n 等，按需下载）
-docs/                 开发文档与迁移记录
+docs/                 扩展与第三方说明
 samples/              示例数据
 build.bat             一键构建：还原 → 发布 → 混淆 → 签名 → 组装发行包
 ensure-dotnet-sdk.bat 缺 .NET SDK 时自动下载
