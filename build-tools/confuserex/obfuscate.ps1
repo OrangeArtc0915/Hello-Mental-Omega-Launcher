@@ -53,7 +53,10 @@ foreach ($module in $moduleList) {
 if (Test-Path $WorkDir) { Remove-Item -Recurse -Force $WorkDir }
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 
-# 防调试 + 常量加密 + 控制流混淆 + 引用代理 + 资源加密 + 重命名
+# 常量加密 + 引用代理 + 资源加密 + 重命名
+# v1.5.23 起移除 anti debug 与 ctrl flow：这两项是杀软 / 沙箱启发式的高危特征
+# （反调试会被判为"检测调试器"，控制流混淆会被判为恶意变形），而彩蛋的字符串与主密钥
+# 已由 constants（常量加密）与 rename（重命名）保护，仍然不会以明文出现在 exe 里。
 # 关于重命名强度（实测结论，别轻易改）：
 #   ConfuserEx 默认不重命名 public 成员，所以在当前配置下 HMOL.dll 的符号被改名，
 #   但 HMOL.Core.dll 的 public 类型与方法名会原样留在元数据里。
@@ -66,9 +69,7 @@ $moduleTags = ($moduleList | ForEach-Object { "  <module path=`"$_`" />" }) -joi
 $crproj = @"
 <project outputDir="$WorkDir" baseDir="$BaseDir" xmlns="http://confuser.codeplex.com">
   <rule pattern="true" preset="none" inherit="false">
-    <protection id="anti debug" />
     <protection id="constants" />
-    <protection id="ctrl flow" />
     <protection id="ref proxy" />
     <protection id="resources" />
     <protection id="rename" />
