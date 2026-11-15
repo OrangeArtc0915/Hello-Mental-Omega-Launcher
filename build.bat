@@ -68,7 +68,7 @@ rem ---------- 1/7 清理 ----------
 rem 每次都清 bin 与 obj：一是保证 app.manifest 的改动能被重新嵌进 apphost
 rem （清单改了但增量构建不重新嵌入，会得到"能编译但双击打不开"的 exe），
 rem 二是避免上一次混淆过的程序集残留在 bin 里被下一次构建复用。
-echo [1/7] 清理上次产物与中间产物...
+echo [1/8] 清理上次产物与中间产物...
 if exist "%DISTDIR%\HMOL.exe" del /f /q "%DISTDIR%\HMOL.exe"
 if exist "%DISTDIR%\*.zip" del /f /q "%DISTDIR%\*.zip"
 if exist "%DISTDIR%\_pkg" rmdir /s /q "%DISTDIR%\_pkg"
@@ -84,7 +84,7 @@ rem 这一步不能用 dotnet build：singlefilehost.exe 只在带 PublishSingle
 rem 里才会被放进 obj，光 build 不生成它，第 4 步 --no-build 的 publish 就会报
 rem "Could not find file ... singlefilehost.exe"。这里的产物只用来把 obj 填好，
 rem 真正发货的是第 4 步覆盖生成的混淆版，所以输出丢到 obj\prepublish 当临时目录。
-echo [2/7] 预发布（首次执行需下载运行时，请耐心等待）...
+echo [2/8] 预发布（首次执行需下载运行时，请耐心等待）...
 dotnet publish "%CSPROJ%" ^
     -c Release ^
     -r win-x64 ^
@@ -102,18 +102,18 @@ rem ---------- 3/7 混淆 ----------
 rem 只能混淆托管程序集：最终的单文件 exe 是原生 apphost，混淆器读不了
 if "%OBFUSCATE%"=="1" (
     echo.
-    echo [3/7] 混淆 HMOL.dll + HMOL.Core.dll...
+    echo [3/8] 混淆 HMOL.dll + HMOL.Core.dll...
     powershell -NoProfile -ExecutionPolicy Bypass -File "build-tools\confuserex\obfuscate.ps1" -BaseDir "%BINDIR%" -WorkDir "%OBFDIR%" -Modules "HMOL.dll,HMOL.Core.dll" -DistributeTo "%OBFDIRS%"
     if errorlevel 1 goto :failed
 ) else (
     echo.
-    echo [3/7] 已按 --skip-obfuscate 跳过混淆
+    echo [3/8] 已按 --skip-obfuscate 跳过混淆
 )
 
 rem ---------- 4/7 打单文件 exe ----------
 rem --no-build 是必须的：要复用第 2 步编译、第 3 步混淆过的程序集，不能再重新编译一遍
 echo.
-echo [4/7] 打包自包含单文件 exe...
+echo [4/8] 打包自包含单文件 exe...
 dotnet publish "%CSPROJ%" ^
     -c Release ^
     -r win-x64 ^
@@ -139,20 +139,20 @@ rem 证书是自签的（CN=mmm），别的机器上仍会提示未知发布者�
 rem 装进那台机器的「受信任的根证书颁发机构」与「受信任的发布者」（需管理员）。
 echo.
 if "%SIGN%"=="0" (
-    echo [5/7] 已按 --skip-sign 跳过代码签名
+    echo [5/8] 已按 --skip-sign 跳过代码签名
     goto :signed
 )
 
 if not exist "%SIGNTOOL%" (
-    echo [5/7] [警告] 没找到 %SIGNTOOL%，跳过签名
+    echo [5/8] [警告] 没找到 %SIGNTOOL%，跳过签名
     goto :signed
 )
 if not exist "%SIGNPFX%" (
-    echo [5/7] [警告] 没找到 %SIGNPFX%，跳过签名
+    echo [5/8] [警告] 没找到 %SIGNPFX%，跳过签名
     goto :signed
 )
 
-echo [5/7] 代码签名 %DISTDIR%\HMOL.exe ...
+echo [5/8] 代码签名 %DISTDIR%\HMOL.exe ...
 if not defined HMOL_PFX_PASSWORD (
     set /p "HMOL_PFX_PASSWORD=  请输入 PFX 口令（%SIGNPFX%）："
 )
@@ -175,7 +175,7 @@ if errorlevel 1 echo [警告] 签名链校验未通过 —— 自签根没装进
 
 rem ---------- 6/7 清掉被混淆污染的程序集 ----------
 echo.
-echo [6/7] 清理中间产物...
+echo [6/8] 清理中间产物...
 if exist "src\HMOL.App\bin" rmdir /s /q "src\HMOL.App\bin"
 if exist "src\HMOL.App\obj" rmdir /s /q "src\HMOL.App\obj"
 if exist "src\HMOL.Core\bin" rmdir /s /q "src\HMOL.Core\bin"
@@ -185,7 +185,7 @@ if exist "%PREPDIR%" rmdir /s /q "%PREPDIR%"
 
 rem ---------- 7/7 组装发行包 ----------
 echo.
-echo [7/7] 组装发行包...
+echo [7/8] 组装发行包...
 set "PKG=%DISTDIR%\_pkg"
 mkdir "%PKG%" 2>nul
 copy /y "%DISTDIR%\HMOL.exe" "%PKG%\HMOL.exe" >nul
@@ -204,6 +204,13 @@ rem 本地保留 runtime\ 只用于开发调试，不再进发行包。
 powershell -NoProfile -Command "Compress-Archive -Path '%PKG%\*' -DestinationPath '%DISTDIR%\%ZIPNAME%' -Force"
 if errorlevel 1 goto :failed
 rmdir /s /q "%PKG%"
+
+rem ---------- 8/8 同步官网版本副本 ----------
+rem 官网构建读不到上层源码，靠 Web\AppInfo.cs 这份副本取版本号；
+rem 不跟着同步的话线上会退回内置的兜底版本。脚本内部已容错，失败不影响发行包。
+echo.
+echo [8/8] 同步官网版本副本...
+powershell -NoProfile -ExecutionPolicy Bypass -File "build-tools\sync-web-version.ps1" -Version "%VERSION%"
 
 echo.
 echo ============================================
