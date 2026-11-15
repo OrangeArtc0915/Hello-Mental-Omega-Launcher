@@ -26,13 +26,14 @@ Data/
 *.cer
 
 # ---- 第三方工具与运行时组件：只在本地保留，不入库 ----
-# build-tools 下除 obfuscate.ps1（HMOL 自己的构建脚本，要入库）以外，都是 ConfuserEx 混淆器；
+# build-tools 下除这两个脚本（HMOL 自己的构建脚本，要入库）以外，都是 ConfuserEx 混淆器；
 # runtime 是 7-Zip / EasyTier / n2n / TAP 等第三方二进制。
 # 打包发行包时仍需它们在本机，所以只从 git 里移除、不删本地文件。
 /build-tools/*
 !/build-tools/confuserex/
 /build-tools/confuserex/*
 !/build-tools/confuserex/obfuscate.ps1
+!/build-tools/sync-web-version.ps1
 /runtime/
 
 # ---- 本地参考文档：仅供本人查阅，永远不入库 ----
