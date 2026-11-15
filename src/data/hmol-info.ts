@@ -44,11 +44,11 @@ export interface HmolInfo {
 /** 被标记为 LTS（长期支持）的系列。1.5.x 起为 LTS。 */
 const LTS_SERIES = "1.5";
 
-/** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（2026-10 快照） */
+/** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（发版时同步更新） */
 const FALLBACK: HmolInfo = {
 	name: "Hello Mental Omega Launcher",
-	version: "1.5.21",
-	versionDisplay: "v1.5.21",
+	version: "1.5.24",
+	versionDisplay: "v1.5.24",
 	author: "mmm",
 	license: "PolyForm Noncommercial 1.0.0",
 	githubUrl:
@@ -62,13 +62,22 @@ const FALLBACK: HmolInfo = {
 		"https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases",
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
-	zipName: "HMOL-v1.5.21-win-x64.zip",
+	zipName: "HMOL-v1.5.24-win-x64.zip",
 	isLts: true,
 	ltsSeries: LTS_SERIES,
 };
 
 const APPINFO_REL = path.join("src", "HMOL.Core", "App", "AppInfo.cs");
-const APPINFO_ABS = path.resolve(process.cwd(), "..", APPINFO_REL);
+
+/**
+ * AppInfo.cs 的候选位置，按顺序尝试：
+ * 1. 本地开发：Web 目录嵌在 HMOL 仓库里，版本文件在上层；
+ * 2. 云端构建：Web 仓库自带一份副本（GitHub Pages 构建时访问不到上层）。
+ */
+const APPINFO_CANDIDATES = [
+	path.resolve(process.cwd(), "..", APPINFO_REL),
+	path.resolve(process.cwd(), APPINFO_REL),
+];
 
 /** 解析 AppInfo.cs 里的 `public const string X = "...";` 与 `= Y + "...";` */
 function parseAppInfo(source: string): Record<string, string> {
@@ -95,35 +104,41 @@ function parseAppInfo(source: string): Record<string, string> {
 }
 
 function loadInfo(): HmolInfo {
-	try {
-		const source = fs.readFileSync(APPINFO_ABS, "utf-8");
-		const v = parseAppInfo(source);
-		if (!v.Version || !v.GitHubUrl) {
-			throw new Error("没有解析到 Version / GitHubUrl");
+	let lastError: Error | null = null;
+
+	for (const file of APPINFO_CANDIDATES) {
+		try {
+			const source = fs.readFileSync(file, "utf-8");
+			const v = parseAppInfo(source);
+			if (!v.Version || !v.GitHubUrl) {
+				throw new Error("没有解析到 Version / GitHubUrl");
+			}
+			return {
+				name: v.Name || FALLBACK.name,
+				version: v.Version,
+				versionDisplay: v.VersionDisplay || `v${v.Version}`,
+				author: v.Author || FALLBACK.author,
+				license: v.License || FALLBACK.license,
+				githubUrl: v.GitHubUrl,
+				githubIssuesUrl: v.GitHubIssuesUrl || `${v.GitHubUrl}/issues`,
+				githubReleasesUrl: v.GitHubReleasesUrl || `${v.GitHubUrl}/releases`,
+				giteeUrl: v.GiteeUrl || FALLBACK.giteeUrl,
+				giteeReleasesUrl: v.GiteeReleasesUrl || `${v.GiteeUrl}/releases`,
+				qqGroup: v.QqGroup || FALLBACK.qqGroup,
+				qqGroupUrl: v.QqGroupUrl || FALLBACK.qqGroupUrl,
+				zipName: `HMOL-v${v.Version}-win-x64.zip`,
+				isLts: v.Version.startsWith(`${LTS_SERIES}.`),
+				ltsSeries: LTS_SERIES,
+			};
+		} catch (error) {
+			lastError = error as Error;
 		}
-		return {
-			name: v.Name || FALLBACK.name,
-			version: v.Version,
-			versionDisplay: v.VersionDisplay || `v${v.Version}`,
-			author: v.Author || FALLBACK.author,
-			license: v.License || FALLBACK.license,
-			githubUrl: v.GitHubUrl,
-			githubIssuesUrl: v.GitHubIssuesUrl || `${v.GitHubUrl}/issues`,
-			githubReleasesUrl: v.GitHubReleasesUrl || `${v.GitHubUrl}/releases`,
-			giteeUrl: v.GiteeUrl || FALLBACK.giteeUrl,
-			giteeReleasesUrl: v.GiteeReleasesUrl || `${v.GiteeUrl}/releases`,
-			qqGroup: v.QqGroup || FALLBACK.qqGroup,
-			qqGroupUrl: v.QqGroupUrl || FALLBACK.qqGroupUrl,
-			zipName: `HMOL-v${v.Version}-win-x64.zip`,
-			isLts: v.Version.startsWith(`${LTS_SERIES}.`),
-			ltsSeries: LTS_SERIES,
-		};
-	} catch (error) {
-		console.warn(
-			`[hmol-info] 读取 ${APPINFO_ABS} 失败，回退到内置值：${(error as Error).message}`,
-		);
-		return FALLBACK;
 	}
+
+	console.warn(
+		`[hmol-info] 读取 AppInfo.cs 失败（试过 ${APPINFO_CANDIDATES.length} 个位置），回退到内置值：${lastError?.message ?? "未知错误"}`,
+	);
+	return FALLBACK;
 }
 
 export const hmol: HmolInfo = loadInfo();
