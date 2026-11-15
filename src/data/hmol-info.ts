@@ -72,11 +72,12 @@ const APPINFO_REL = path.join("src", "HMOL.Core", "App", "AppInfo.cs");
 /**
  * AppInfo.cs 的候选位置，按顺序尝试：
  * 1. 本地开发：Web 目录嵌在 HMOL 仓库里，版本文件在上层；
- * 2. 云端构建：Web 仓库自带一份副本（GitHub Pages 构建时访问不到上层）。
+ * 2. 云端构建：Web 仓库根目录自带一份副本（GitHub Pages 构建时访问不到上层）。
+ * 注意副本不能放在 src/ 下，否则会被 Vite 当成源码尝试编译 .cs。
  */
 const APPINFO_CANDIDATES = [
 	path.resolve(process.cwd(), "..", APPINFO_REL),
-	path.resolve(process.cwd(), APPINFO_REL),
+	path.resolve(process.cwd(), "AppInfo.cs"),
 ];
 
 /** 解析 AppInfo.cs 里的 `public const string X = "...";` 与 `= Y + "...";` */
