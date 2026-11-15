@@ -64,6 +64,24 @@
                              Content="{loc:T '清理旧日志'}"
                              Tone="Danger"
                              Click="OnCleanupClick" />
+            <Border Margin="12,0,0,0"
+                    Width="150"
+                    Height="30"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderBrush="{DynamicResource Border.Default}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource Radius.Button}">
+                <TextBox x:Name="TxtFilter"
+                         Padding="8,0"
+                         VerticalContentAlignment="Center"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         CaretBrush="{DynamicResource Text.Primary}"
+                         Foreground="{DynamicResource Text.Primary}"
+                         ToolTip="{loc:T '输入关键词筛选当前视图'}"
+                         TextChanged="OnFilterChanged" />
+            </Border>
             <TextBlock x:Name="LabStatus"
                        Margin="12,0,0,0"
                        VerticalAlignment="Center"

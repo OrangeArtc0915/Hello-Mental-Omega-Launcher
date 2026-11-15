@@ -46,6 +46,9 @@ public partial class PageLog : LauncherPage
     /// <summary>当前视图的每一行，导出时直接用这份数据，不再重新查一遍。</summary>
     private readonly List<ViewRow> _rows = [];
 
+    /// <summary>当前视图的关键词过滤（空串表示不过滤）。</summary>
+    private string _filter = string.Empty;
+
     private int _tab;
     private string? _diskFile;
     private bool _subscribed;
@@ -140,6 +143,16 @@ public partial class PageLog : LauncherPage
         if (_rows.Count >= ActivityLog.Capacity) _rows.RemoveAt(0);
         _rows.Add(ToRow(line));
 
+        // 有筛选时整表重绘，保证刚进来的行也按关键词过一遍
+        if (_filter.Length > 0)
+        {
+            Render();
+            return;
+        }
+
+        // 用户正在往上翻历史时不要把他拽回底部；滚回底部后自动恢复跟随
+        var follow = ScrollLog.VerticalOffset + ScrollLog.ViewportHeight >= ScrollLog.ExtentHeight - 12;
+
         PanLines.Children.Add(BuildLineBlock(_rows[^1]));
         while (PanLines.Children.Count > ActivityLog.Capacity) PanLines.Children.RemoveAt(0);
 
@@ -147,7 +160,7 @@ public partial class PageLog : LauncherPage
         RefreshStatus();
 
         // ScrollToEnd 内部按无限偏移排队，布局完成后会被夹到末尾，无需额外 UpdateLayout
-        ScrollLog.ScrollToEnd();
+        if (follow) ScrollLog.ScrollToEnd();
     }
 
     // ————— 刷新与渲染 —————
@@ -185,7 +198,12 @@ public partial class PageLog : LauncherPage
     {
         PanLines.Children.Clear();
 
-        foreach (var row in _rows) PanLines.Children.Add(BuildLineBlock(row));
+        foreach (var row in _rows)
+        {
+            if (!Matches(row)) continue;
+
+            PanLines.Children.Add(BuildLineBlock(row));
+        }
 
         RefreshEmptyHint();
         RefreshStatus();
@@ -206,6 +224,19 @@ public partial class PageLog : LauncherPage
         return block;
     }
 
+    private bool Matches(ViewRow row)
+        => _filter.Length == 0 || row.Text.Contains(_filter, StringComparison.OrdinalIgnoreCase);
+
+    private void OnFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        var text = TxtFilter.Text.Trim();
+
+        if (string.Equals(text, _filter, StringComparison.Ordinal)) return;
+
+        _filter = text;
+        Render();
+    }
+
     private void RefreshEmptyHint()
     {
         var hasRows = PanLines.Children.Count > 0;
@@ -216,12 +247,14 @@ public partial class PageLog : LauncherPage
 
         if (hasRows) return;
 
-        LabEmpty.Text = _tab switch
-        {
-            2 => Loc.T("日志目录里还没有文件。"),
-            1 => Loc.T("还没有游戏日志。"),
-            _ => Loc.T("还没有日志。")
-        };
+        LabEmpty.Text = _filter.Length > 0
+            ? Loc.F("没有匹配「{0}」的日志行。", _filter)
+            : _tab switch
+            {
+                2 => Loc.T("日志目录里还没有文件。"),
+                1 => Loc.T("还没有游戏日志。"),
+                _ => Loc.T("还没有日志。")
+            };
     }
 
     private void RefreshStatus()
@@ -235,7 +268,9 @@ public partial class PageLog : LauncherPage
             _ => Loc.T("应用日志")
         };
 
-        LabStatus.Text = Loc.F("共 {0} 行 · {1}", _rows.Count, scope);
+        LabStatus.Text = _filter.Length > 0
+            ? Loc.F("共 {0} 行 · 命中 {1} 行 · {2}", _rows.Count, PanLines.Children.Count, scope)
+            : Loc.F("共 {0} 行 · {1}", _rows.Count, scope);
     }
 
     // ————— 磁盘日志 —————
@@ -427,30 +462,7 @@ public partial class PageLog : LauncherPage
     }
 
     /// <summary>删除超过保留期的日志文件。正在写入的那份必须跳过，否则会把当前会话的日志删掉。</summary>
-    private static int CleanupOldFiles()
-    {
-        var removed = 0;
-        var threshold = DateTime.Now.AddDays(-CleanupKeepDays);
-        var currentFile = Log.Current?.CurrentFile;
-
-        foreach (var file in LogFiles())
-        {
-            if (file.LastWriteTime >= threshold) continue;
-            if (string.Equals(file.FullName, currentFile, StringComparison.OrdinalIgnoreCase)) continue;
-
-            try
-            {
-                file.Delete();
-                removed++;
-            }
-            catch (Exception ex)
-            {
-                Log.Warn(Loc.F("删除旧日志失败 {0}：{1}", file.Name, ex.Message));
-            }
-        }
-
-        return removed;
-    }
+    private static int CleanupOldFiles() => Log.Cleanup(CleanupKeepDays);
 
     private void Notify(string message, string title, MessageBoxImage icon)
     {

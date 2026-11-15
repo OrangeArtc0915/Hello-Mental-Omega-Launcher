@@ -192,7 +192,7 @@ public partial class PageDownload : LauncherPage
     /// </summary>
     private void BuildGroups(IReadOnlyList<ManifestEntry> items)
     {
-        // 标了 hidden 的条目不在下载页展示，只由程序内部按需取用
+        // 彩蛋条目（hidden）不在下载页露面，只在联机页由彩蛋逻辑取用
         items = items.Where(entry => !entry.Hidden).ToList();
 
         _entries = items;
@@ -490,7 +490,7 @@ public partial class PageDownload : LauncherPage
             if (total <= 1)
             {
                 var single = await ResumableDownloader.DownloadAsync(
-                    entry.PrimaryUrl, target, progress.Progress, progress.Token);
+                    entry.PrimaryUrl, target, progress.Sample, progress.Token);
 
                 if (single.Success) ShowNotice(DescribeManifestDownload(entry, single.FilePath ?? target));
                 else ShowNotice(Loc.F("下载失败：{0}", single.Message), isError: true);
@@ -507,7 +507,7 @@ public partial class PageDownload : LauncherPage
 
                 var partPath = $"{target}.part{index + 1:000}";
                 var result = await ResumableDownloader.DownloadAsync(
-                    entry.Urls[index], partPath, progress.Progress, progress.Token);
+                    entry.Urls[index], partPath, progress.Sample, progress.Token);
 
                 if (!result.Success)
                 {
@@ -575,7 +575,7 @@ public partial class PageDownload : LauncherPage
         try
         {
             var download = await ResumableDownloader.DownloadAsync(
-                entry.PrimaryUrl, archive, progress.Progress, progress.Token);
+                entry.PrimaryUrl, archive, progress.Sample, progress.Token);
 
             if (!download.Success)
             {
@@ -678,7 +678,7 @@ public partial class PageDownload : LauncherPage
                 var archive = Path.Combine(Paths.Cache, ManifestFileName(entry));
 
                 var download = await ResumableDownloader.DownloadAsync(
-                    entry.PrimaryUrl, archive, progress.Progress, progress.Token);
+                    entry.PrimaryUrl, archive, progress.Sample, progress.Token);
 
                 if (!download.Success)
                 {
@@ -786,7 +786,7 @@ public partial class PageDownload : LauncherPage
         try
         {
             var download = await ResumableDownloader.DownloadAsync(
-                entry.PrimaryUrl, archive, progress.Progress, progress.Token);
+                entry.PrimaryUrl, archive, progress.Sample, progress.Token);
 
             if (!download.Success)
             {

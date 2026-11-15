@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using HMOL.Core.App;
+using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Localization;
 
@@ -53,11 +54,12 @@ public static class ResumableDownloader
 
     /// <summary>
     /// 下载到目标文件，支持断点续传。目标已存在且没有残留 .part 时不重复下载。
+    /// 给 <see cref="ProgressSample"/> 时能算出实时速度与剩余时间（进度窗据此显示速率）。
     /// <paramref name="multiThread"/> 为 null 时按设置里的开关决定是否分片并发。
     /// 任何异常都被捕获并写进结果，绝不向外抛。
     /// </summary>
     public static async Task<DownloadResult> DownloadAsync(string url, string destinationPath,
-        IProgress<double>? progress = null, CancellationToken token = default,
+        IProgress<ProgressSample>? progress = null, CancellationToken token = default,
         IReadOnlyDictionary<string, string>? headers = null, bool? multiThread = null)
     {
         if (string.IsNullOrWhiteSpace(url))
@@ -83,7 +85,7 @@ public static class ResumableDownloader
         if (File.Exists(destinationPath) && !HasResidue(destinationPath))
         {
             var size = SafeLength(destinationPath);
-            progress?.Report(1);
+            progress?.Report(new ProgressSample(1, size, size));
             return new DownloadResult(true, destinationPath, size, Loc.T("目标文件已存在，跳过下载"));
         }
 
@@ -175,9 +177,22 @@ public static class ResumableDownloader
         return new DownloadResult(false, null, received, Loc.F("重试 {0} 次后仍失败：{1}", RetryDelaysMs.Length, lastMessage));
     }
 
+    /// <summary>只关心百分比时的重载：包一层适配器，转成带字节明细的样本走同一条下载路径。</summary>
+    public static Task<DownloadResult> DownloadAsync(string url, string destinationPath,
+        IProgress<double>? progress, CancellationToken token = default,
+        IReadOnlyDictionary<string, string>? headers = null, bool? multiThread = null)
+        => DownloadAsync(url, destinationPath,
+            progress is null ? null : new FractionProgress(progress), token, headers, multiThread);
+
+    /// <summary>把 <see cref="ProgressSample"/> 压回百分比，供只关心进度的调用方使用。</summary>
+    private sealed class FractionProgress(IProgress<double> inner) : IProgress<ProgressSample>
+    {
+        public void Report(ProgressSample value) => inner.Report(value.Fraction);
+    }
+
     /// <summary>单次尝试：返回是否应重试，以及最终结果。</summary>
     private static async Task<AttemptOutcome> TryOnceAsync(string url, string destinationPath, string partPath,
-        IProgress<double>? progress, IReadOnlyDictionary<string, string>? headers, CancellationToken token)
+        IProgress<ProgressSample>? progress, IReadOnlyDictionary<string, string>? headers, CancellationToken token)
     {
         var startAt = File.Exists(partPath) ? SafeLength(partPath) : 0;
         var etagPath = partPath + ".meta";
@@ -280,7 +295,9 @@ public static class ResumableDownloader
                 received += read;
 
                 // 拿不到总长度时回报不确定值 0
-                progress?.Report(total > 0 ? Math.Clamp((double)received / total, 0d, 1d) : 0d);
+                progress?.Report(total > 0
+                    ? new ProgressSample(Math.Clamp((double)received / total, 0d, 1d), received, total)
+                    : new ProgressSample(0, received, 0));
             }
         }
 
@@ -293,7 +310,7 @@ public static class ResumableDownloader
 
         File.Move(partPath, destinationPath, overwrite: true);
         TryDelete(etagPath);
-        progress?.Report(1);
+        progress?.Report(new ProgressSample(1, received, total > 0 ? total : received));
         Log.Info(Loc.F("下载完成：{0}（{1}）", destinationPath, FormatSize(received)));
 
         return new AttemptOutcome(false, new DownloadResult(true, destinationPath, received, Loc.T("下载完成")));
@@ -330,7 +347,7 @@ public static class ResumableDownloader
     /// 由调用方退回单连接；否则返回分片下载的最终结果。
     /// </summary>
     private static async Task<DownloadResult?> TrySegmentedAsync(string url, string destinationPath,
-        string partPath, IReadOnlyDictionary<string, string>? headers, IProgress<double>? progress,
+        string partPath, IReadOnlyDictionary<string, string>? headers, IProgress<ProgressSample>? progress,
         CancellationToken token)
     {
         var (supported, total) = await ProbeAsync(url, headers, token);
@@ -399,7 +416,7 @@ public static class ResumableDownloader
         }
 
         CleanupSegments(destinationPath);
-        progress?.Report(1);
+        progress?.Report(new ProgressSample(1, total, total));
         Log.Info(Loc.F("分片下载完成：{0}（{1}，{2} 路并发）", destinationPath, FormatSize(total), segmentCount));
 
         return new DownloadResult(true, destinationPath, total, Loc.T("下载完成"));
@@ -408,7 +425,7 @@ public static class ResumableDownloader
     /// <summary>下载单个分片（含重试与断点续传）；已收字节累加到 <paramref name="receivedBox"/> 用于进度。</summary>
     private static async Task<(bool Ok, string Message)> DownloadSegmentAsync(string url, string segmentPath,
         long from, long to, IReadOnlyDictionary<string, string>? headers, long[] receivedBox,
-        IProgress<double>? progress, long total, CancellationToken token)
+        IProgress<ProgressSample>? progress, long total, CancellationToken token)
     {
         var segmentLength = to - from + 1;
         var lastMessage = Loc.T("分片下载失败");
@@ -452,7 +469,9 @@ public static class ResumableDownloader
                         Interlocked.Add(ref receivedBox[0], read);
 
                         var got = Interlocked.Read(ref receivedBox[0]);
-                        progress?.Report(total > 0 ? Math.Clamp((double)got / total, 0d, 1d) : 0d);
+                        progress?.Report(total > 0
+                            ? new ProgressSample(Math.Clamp((double)got / total, 0d, 1d), got, total)
+                            : new ProgressSample(0, got, 0));
                     }
                 }
 

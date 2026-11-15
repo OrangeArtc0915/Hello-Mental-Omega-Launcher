@@ -2962,6 +2962,16 @@
     "暖橙": "Warm Orange",
     "玫瑰松": "Rosé Pine",
     "日晒": "Solarized",
-    "樱霞": "Sakura"
+    "樱霞": "Sakura",
+    "输入关键词筛选当前视图": "Type a keyword to filter the current view",
+    "共 {0} 行 · 命中 {1} 行 · {2}": "{0} lines · {1} matched · {2}",
+    "没有匹配「{0}」的日志行。": "No log lines match \"{0}\".",
+    "启动游戏：{0}": "Launch game: {0}",
+    "启动游戏（还没有实例）": "Launch game (no instances yet)",
+    "输入关键词筛选实例名与目录": "Type a keyword to filter by instance name or folder",
+    "没有名称或目录包含「{0}」的实例。": "No instance has a name or folder containing \"{0}\".",
+    "输入关键词筛选包名": "Type a keyword to filter package names",
+    "没有名称包含「{0}」的包。": "No package name contains \"{0}\".",
+    "没有名称包含「{0}」的已安装包。": "No installed package name contains \"{0}\"."
   }
 }

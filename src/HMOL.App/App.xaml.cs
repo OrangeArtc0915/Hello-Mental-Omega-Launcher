@@ -125,6 +125,9 @@ public partial class App : Application
         // 注册表里的自启项指向旧路径（程序被挪过目录）时顺手改正，已经正确就一个字节都不动
         AutoStartManager.RepairIfStale();
 
+        // 日志目录不无限增长：超过 30 天的日志在启动时顺手清掉
+        Log.Cleanup(30);
+
         // 下面全是本地初始化：读配置、铺主题与字体资源、读联机配置、扫扩展目录。
         // 既不联网也不建窗口，正好塞进等门锁的这段时间里并行完成。
         ThemeService.Initialize(SettingsStore.Current.ThemeMode, SettingsStore.Current.Accent);
@@ -284,6 +287,10 @@ public partial class App : Application
         var show = new MenuItem { Header = Loc.T("显示主窗口") };
         show.Click += (_, _) => ShowMainWindow(window);
 
+        // 托盘里直接启动 / 停止当前实例：关着窗口也能一键开局
+        var launch = new MenuItem { Header = Loc.T("启动游戏") };
+        launch.Click += (_, _) => ToggleLaunch(window);
+
         var toggle = new MenuItem { Header = Loc.T("连接联机") };
         toggle.Click += async (_, _) => await ToggleMultiplayerAsync(window);
 
@@ -291,6 +298,7 @@ public partial class App : Application
         exit.Click += (_, _) => window.RequestExit();
 
         menu.Items.Add(show);
+        menu.Items.Add(launch);
         menu.Items.Add(toggle);
         menu.Items.Add(new Separator());
         menu.Items.Add(exit);
@@ -300,9 +308,43 @@ public partial class App : Application
         {
             show.Header = window.IsVisible ? Loc.T("显示主窗口") : Loc.T("显示主窗口（当前未显示）");
             toggle.Header = MultiplayerHub.IsConnected || MultiplayerHub.IsBusy ? Loc.T("断开联机") : Loc.T("连接联机");
+
+            var instance = InstanceManager.Current;
+            var running = GameSessionHub.IsRunning;
+
+            launch.Header = running
+                ? Loc.T("停止游戏")
+                : instance is null
+                    ? Loc.T("启动游戏（还没有实例）")
+                    : Loc.F("启动游戏：{0}", instance.Name);
+
+            // 没有实例可启动，或者实例目录已经不可用时，别给一个点了只会报错的项
+            launch.IsEnabled = running || instance is { IsValid: true };
         };
 
         return menu;
+    }
+
+    /// <summary>
+    /// 托盘里的启动 / 停止。多版本实例要先选版本，这时把主窗口叫出来再弹选择框，
+    /// 免得选择框挂在一个看不见的宿主窗口上。
+    /// </summary>
+    private static void ToggleLaunch(MainWindow window)
+    {
+        if (GameSessionHub.IsRunning)
+        {
+            GameSessionHub.Kill();
+            return;
+        }
+
+        var instance = InstanceManager.Current;
+        if (instance is null) return;
+
+        if (instance.HasMultipleVersions) ShowMainWindow(window);
+
+        if (GameSessionHub.TryLaunchPicked(window, instance, out var error) || error is null) return;
+
+        ChoiceWindow.Warn(window, Loc.T("启动游戏"), error);
     }
 
     /// <summary>

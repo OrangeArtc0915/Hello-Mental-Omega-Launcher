@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Threading.Channels;
+using HMOL.Core.App;
 using HMOL.Core.Localization;
 
 namespace HMOL.Core.Logging;
@@ -224,5 +225,43 @@ public static class Log
         if (string.IsNullOrEmpty(file)) return _module;
         var name = Path.GetFileNameWithoutExtension(file);
         return string.IsNullOrEmpty(name) ? _module : name;
+    }
+
+    /// <summary>
+    /// 删除超过保留期的日志文件，正在写的那份跳过。启动时调一次，日志目录不会无限增长。
+    /// 返回实际删掉的文件数；目录不可读时返回 0，不抛异常。
+    /// </summary>
+    public static int Cleanup(int keepDays)
+    {
+        try
+        {
+            if (!Directory.Exists(Paths.Log)) return 0;
+
+            var threshold = DateTime.Now.AddDays(-keepDays);
+            var current = _logger?.CurrentFile;
+            var removed = 0;
+
+            foreach (var file in new DirectoryInfo(Paths.Log).GetFiles("*.log"))
+            {
+                if (file.LastWriteTime >= threshold) continue;
+                if (string.Equals(file.FullName, current, StringComparison.OrdinalIgnoreCase)) continue;
+
+                try
+                {
+                    file.Delete();
+                    removed++;
+                }
+                catch
+                {
+                    // 被占用就留到下次
+                }
+            }
+
+            return removed;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 }

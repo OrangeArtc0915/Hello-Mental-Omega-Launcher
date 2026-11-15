@@ -74,6 +74,13 @@ public partial class PagePackages : LauncherPage
     private PackageType _type = PackageType.Ini;
     private bool _subscribed;
 
+    /// <summary>最近一次列出的可用包与已安装名，筛选时直接在这份数据上过滤，不重扫磁盘。</summary>
+    private IReadOnlyList<PackageEntry> _entries = [];
+    private IReadOnlyList<string> _installedNames = [];
+
+    /// <summary>包名筛选关键词（空串表示不过滤）。</summary>
+    private string _filter = string.Empty;
+
     public PagePackages()
     {
         InitializeComponent();
@@ -222,19 +229,57 @@ public partial class PagePackages : LauncherPage
         if (type != _type) return;
 
         var instance = InstanceManager.Current;
-        var installedNames = instance?.InstalledOf(type) ?? [];
-        var installedSet = new HashSet<string>(installedNames, StringComparer.OrdinalIgnoreCase);
 
-        PanAvailable.ItemsSource = entries
+        _entries = entries;
+        _installedNames = instance?.InstalledOf(type) ?? [];
+
+        ApplyFilter();
+    }
+
+    /// <summary>按当前关键词就地过滤两个列表（不重新读目录）。</summary>
+    private void ApplyFilter()
+    {
+        if (PanAvailable is null) return;
+
+        var installedSet = new HashSet<string>(_installedNames, StringComparer.OrdinalIgnoreCase);
+
+        var packages = _entries
+            .Where(Matches)
             .Select(entry => new AvailableRowItem(entry, installedSet.Contains(entry.Name)))
             .ToList();
-        PanAvailableEmpty.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        PanInstalled.ItemsSource = installedNames
+        PanAvailable.ItemsSource = packages;
+        PanAvailableEmpty.Visibility = packages.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        LabAvailableEmpty.Text = _filter.Length > 0 && _entries.Count > 0
+            ? Loc.F("没有名称包含「{0}」的包。", _filter)
+            : Loc.T("这个分类下还没有可用的包");
+
+        var installed = _installedNames
+            .Where(Matches)
             .Select(name => new InstalledRowItem(name,
-                entries.FirstOrDefault(entry => string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase))))
+                _entries.FirstOrDefault(entry => string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase))))
             .ToList();
-        PanInstalledEmpty.Visibility = installedNames.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        PanInstalled.ItemsSource = installed;
+        PanInstalledEmpty.Visibility = installed.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        LabInstalledEmpty.Text = _filter.Length > 0 && _installedNames.Count > 0
+            ? Loc.F("没有名称包含「{0}」的已安装包。", _filter)
+            : Loc.T("当前实例还没有安装这个分类的包");
+    }
+
+    private bool Matches(PackageEntry entry) => Matches(entry.Name);
+
+    private bool Matches(string name)
+        => _filter.Length == 0 || name.Contains(_filter, StringComparison.OrdinalIgnoreCase);
+
+    private void OnFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        var text = TxtFilter.Text.Trim();
+
+        if (string.Equals(text, _filter, StringComparison.Ordinal)) return;
+
+        _filter = text;
+        ApplyFilter();
     }
 
     private void OnRefreshClick(object sender, RoutedEventArgs e) => _ = RefreshAsync();

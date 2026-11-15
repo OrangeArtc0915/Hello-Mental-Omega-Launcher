@@ -131,32 +131,59 @@
 
         <!-- 类型分段控件：视图切换单独成行，不与页头操作混在一起 -->
         <StackPanel x:Name="PanTypeTabs" Grid.Row="2" Margin="0,12,0,0">
-            <WrapPanel>
-                <c:OutlineButton x:Name="BtnTabIni"
-                                 Padding="16,6"
-                                 FontSize="12.5"
-                                 Tag="0"
-                                 Tone="Solid"
-                                 Click="OnTabClick" />
-                <c:OutlineButton x:Name="BtnTabMap"
-                                 Margin="8,0,0,0"
-                                 Padding="16,6"
-                                 FontSize="12.5"
-                                 Tag="1"
-                                 Click="OnTabClick" />
-                <c:OutlineButton x:Name="BtnTabMission"
-                                 Margin="8,0,0,0"
-                                 Padding="16,6"
-                                 FontSize="12.5"
-                                 Tag="2"
-                                 Click="OnTabClick" />
-                <c:OutlineButton x:Name="BtnTabPlugin"
-                                 Margin="8,0,0,0"
-                                 Padding="16,6"
-                                 FontSize="12.5"
-                                 Tag="3"
-                                 Click="OnTabClick" />
-            </WrapPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <WrapPanel Grid.Column="0">
+                    <c:OutlineButton x:Name="BtnTabIni"
+                                     Padding="16,6"
+                                     FontSize="12.5"
+                                     Tag="0"
+                                     Tone="Solid"
+                                     Click="OnTabClick" />
+                    <c:OutlineButton x:Name="BtnTabMap"
+                                     Margin="8,0,0,0"
+                                     Padding="16,6"
+                                     FontSize="12.5"
+                                     Tag="1"
+                                     Click="OnTabClick" />
+                    <c:OutlineButton x:Name="BtnTabMission"
+                                     Margin="8,0,0,0"
+                                     Padding="16,6"
+                                     FontSize="12.5"
+                                     Tag="2"
+                                     Click="OnTabClick" />
+                    <c:OutlineButton x:Name="BtnTabPlugin"
+                                     Margin="8,0,0,0"
+                                     Padding="16,6"
+                                     FontSize="12.5"
+                                     Tag="3"
+                                     Click="OnTabClick" />
+                </WrapPanel>
+
+                <!-- 关键词筛选：同时作用于「可用包」与「已安装」两个列表 -->
+                <Border Grid.Column="1"
+                        Width="180"
+                        Height="30"
+                        VerticalAlignment="Top"
+                        Background="Transparent"
+                        BorderBrush="{DynamicResource Border.Default}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource Radius.Button}">
+                    <TextBox x:Name="TxtFilter"
+                             Padding="8,0"
+                             VerticalContentAlignment="Center"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             CaretBrush="{DynamicResource Text.Primary}"
+                             Foreground="{DynamicResource Text.Primary}"
+                             ToolTip="{loc:T '输入关键词筛选包名'}"
+                             TextChanged="OnFilterChanged" />
+                </Border>
+            </Grid>
 
             <TextBlock x:Name="LabTypeHint"
                        Margin="0,8,0,0"

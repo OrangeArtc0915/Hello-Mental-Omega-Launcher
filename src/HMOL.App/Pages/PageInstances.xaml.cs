@@ -114,6 +114,9 @@ public partial class PageInstances : LauncherPage
 
     private bool _subscribed;
 
+    /// <summary>实例筛选关键词（空串表示不过滤），同时匹配实例名与游戏目录。</summary>
+    private string _filter = string.Empty;
+
     public PageInstances()
     {
         InitializeComponent();
@@ -178,17 +181,39 @@ public partial class PageInstances : LauncherPage
         if (PanInstances is null) return;
 
         var instances = InstanceManager.All;
+        var matched = instances.Where(Matches).ToList();
 
-        _items = instances.Select(instance => new InstanceCardItem(instance)).ToList();
+        _items = matched.Select(instance => new InstanceCardItem(instance)).ToList();
         PanInstances.ItemsSource = _items;
 
-        var empty = _items.Count == 0;
-        PanInstances.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
-        CardEmpty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        var noInstance = instances.Count == 0;
+        var noMatch = !noInstance && _items.Count == 0;
+
+        PanInstances.Visibility = _items.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        CardEmpty.Visibility = noInstance ? Visibility.Visible : Visibility.Collapsed;
+
+        // 「一个实例都没有」与「筛掉了」是两种空，提示不该混着用
+        CardNoMatch.Visibility = noMatch ? Visibility.Visible : Visibility.Collapsed;
+        if (noMatch) LabNoMatch.Text = Loc.F("没有名称或目录包含「{0}」的实例。", _filter);
 
         UpdateBackupTarget();
         _ = RefreshSizesAsync();
     }
+
+    private void OnFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        var text = TxtFilter.Text.Trim();
+
+        if (string.Equals(text, _filter, StringComparison.Ordinal)) return;
+
+        _filter = text;
+        RefreshInstances();
+    }
+
+    private bool Matches(GameInstance instance)
+        => _filter.Length == 0
+           || instance.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+           || instance.GameDir.Contains(_filter, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>占用体积要遍历游戏目录，放到后台算，算完逐个回填，避免卡住界面。</summary>
     private async Task RefreshSizesAsync()

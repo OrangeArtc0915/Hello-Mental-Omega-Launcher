@@ -21,6 +21,24 @@
                       Subtitle="{loc:T '每个实例记录一份游戏目录与它的插件包组合'}"
                       Icon="lucide/layers">
             <StackPanel Orientation="Horizontal">
+                <Border Width="170"
+                        Height="30"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Background="Transparent"
+                        BorderBrush="{DynamicResource Border.Default}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource Radius.Button}">
+                    <TextBox x:Name="TxtFilter"
+                             Padding="8,0"
+                             VerticalContentAlignment="Center"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             CaretBrush="{DynamicResource Text.Primary}"
+                             Foreground="{DynamicResource Text.Primary}"
+                             ToolTip="{loc:T '输入关键词筛选实例名与目录'}"
+                             TextChanged="OnFilterChanged" />
+                </Border>
                 <c:OutlineButton Content="{loc:T '新建实例'}"
                                  Tone="Solid"
                                  Click="OnNewInstanceClick" />
@@ -313,6 +331,36 @@
                                            Text="{loc:T '新建实例'}" />
                             </StackPanel>
                         </c:OutlineButton>
+                    </StackPanel>
+                </c:SurfaceCard>
+
+                <!-- 筛选无结果：只在「有实例但都不匹配」时出现，和「一个实例都没有」区分开 -->
+                <c:SurfaceCard x:Name="CardNoMatch"
+                               Margin="0,0,0,10"
+                               HasHoverEffect="False"
+                               UseShadow="False"
+                               Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border Width="54"
+                                Height="54"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource Accent.Faint}"
+                                CornerRadius="{DynamicResource Radius.Card}">
+                            <svg:SvgIcon Width="26"
+                                         Height="26"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         Icon="lucide/search"
+                                         IconBrush="{DynamicResource Accent.Base}" />
+                        </Border>
+
+                        <TextBlock x:Name="LabNoMatch"
+                                   Margin="0,14,0,0"
+                                   HorizontalAlignment="Center"
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap" />
                     </StackPanel>
                 </c:SurfaceCard>
 
