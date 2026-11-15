@@ -22,12 +22,15 @@
 
 （注意是 **`patch` 分支**，不是默认分支。）
 
-补丁包里**不含任何来自 MO 客户端或 CnCNet 客户端的二进制文件**——
+**工具包**里**不含任何来自 MO 客户端或 CnCNet 客户端的二进制文件**——
 被改动的那几个文件（`clientdx.exe` 等）由包里的工具在**你自己的机器上就地打补丁**生成，
 具体见第 3 节。
 
 包里带的二进制只有我们的工具本身，以及 MIT 许可的 `dnlib.dll`
 （唯一随包分发的第三方二进制，允许自由再分发）——明细见 [NOTICE.md](NOTICE.md)。
+
+> 另有自用的「直接覆盖包」，里面**确实带着**改过的客户端 exe/dll（GPL 派生二进制），
+> 只在自用/朋友间传递，不放在本仓库；它的合规要求见 [2.6](#26-直接覆盖包自用)。
 
 ---
 
@@ -38,8 +41,8 @@
 
 | 补丁包 | 目标文件 | 作用 |
 |---|---|---|
-| **补丁1-中文输入** | `Resources\Binaries\Windows\MonoGame.Framework.dll` | 让客户端窗口能正常用中文输入法：候选框跟随光标、不重复上屏 |
-| **补丁2-联机** | `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` + `MoLanRelay.dll` | 局域网联机修复（队伍 A/B/C/D、spawn.ini 越界、重复连接、AI 裁剪）+ 底部 IP 直连框 + 游戏内 UDP 中继（配合樱花 Frp 等只开一条 TCP 隧道的场景）+ 局域网踢人 + @ 提醒与 Tab 名字补全 |
+| **补丁1-中文输入** | `Resources\Binaries\Windows\MonoGame.Framework.dll` + `Rampastring.XNAUI.dll` | 让客户端窗口能正常用中文输入法：候选框跟随光标、不重复上屏；聊天框组词过程中按回车选词不再被当成「发送」、按 Esc 不再清空整行 |
+| **补丁2-联机** | `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` + `MoLanRelay.dll` | 局域网联机修复（队伍 A/B/C/D、spawn.ini 越界、重复连接、AI 裁剪）+ 底部 IP 直连框 + 游戏内 UDP 中继（配合樱花 Frp 等只开一条 TCP 隧道的场景）+ 局域网踢人 + @ 提醒与 Tab 名字补全 + **地图同步**（房主点按钮才推、客机确认后写入）+ 聊天命令（`/diag` 诊断包、`/sync`）+ 锁房/满员原因提示 + 客机自动准备 + 聊天时间戳 |
 
 两个包改的文件**完全不重叠**，可以各自单独装，也可以都装。
 
@@ -85,8 +88,8 @@
 | 项 | 内容 |
 |---|---|
 | **被修改的文件（补丁2）** | `Resources\clientdx.exe`、`Resources\clientogl.exe`、`Resources\clientxna.exe` |
-| **被修改的文件（补丁1）** | `Resources\Binaries\Windows\MonoGame.Framework.dll` |
-| **修改日期** | 2026-10-06 |
+| **被修改的文件（补丁1）** | `Resources\Binaries\Windows\MonoGame.Framework.dll`、`Resources\Binaries\Windows\Rampastring.XNAUI.dll` |
+| **修改日期** | 首次修改 2026-10-06；最近修改 2026-11-15（中继 v0.6.0） |
 | **修改版本标识** | 中继 DLL 的日志第一行 `======== MoLanRelay v<版本> ========` |
 | **修改性质** | 主要是**对原文件追加 IL 指令**；少数位置会改写个别指令或补一段判断（例如直连入口的 TCP 端口取值、上游 `HandleFileHashCommand` 漏判空处补上空值判断）。改动**只涉及客户端（大厅/聊天/联机）逻辑**；游戏本体、在线联机流程、MO 的游戏素材均未改动 |
 | **原文件来源** | 你自己安装的 MO 客户端自带文件；安装时会自动备份到 `<游戏根>\_MO补丁备份\`，**该备份只存在于你本机，不随包分发** |
@@ -97,14 +100,43 @@
 
 - **不含任何 MO 的游戏素材**：美术、音频、地图、规则 ini 等一律没有。
 - **不修改游戏本体**：`gamemd.exe` / `Syringe.exe` 保持原样，仅沿用其原有的“以管理员身份运行”设置。
-- **不修改 MO 的更新源/服务端**，不绕过任何校验。
-- **不包含**客户端的完整源码，也不是客户端的重新分发版本。
+- **不修改 MO 的更新源/服务端**，不绕过任何校验；只移除/隐藏客户端自己的 UI 入口
+  （CnCNet 大厅、更新标签页、下载音乐包按钮）。
+- **不包含**客户端的完整源码，也不是客户端的重新分发版本（例外见 2.6「直接覆盖包」）。
+
+### 2.4.1 改动边界：只改开源客户端，不碰闭源 MO 本体
+
+**MO（Mental Omega）是闭源商业模组，我们既不改它的文件，也不分发它的文件。**
+本补丁动到的全部是开源的 CnCNet 客户端（GPL-3.0-or-later）那一层：
+
+| 会改（客户端层，均在 `Resources\` 下） | 补丁 |
+|---|---|
+| `Resources\clientdx.exe` / `clientogl.exe` / `clientxna.exe` | 补丁2 |
+| `Resources\Binaries\Windows\MonoGame.Framework.dll` | 补丁1 |
+| `Resources\Binaries\Windows\Rampastring.XNAUI.dll` | 补丁1 |
+| `Resources\MainMenu.ini`（**仅工具包**；直接覆盖版不改，由中继启动后隐藏入口） | 补丁2 |
+| `Resources\MoLanRelay.dll`、`Resources\Binaries\MoLanRelay.dll`（新增文件，原版没有） | 补丁2 |
+
+| 从不触碰（MO 本体） |
+|---|
+| `gamemd.exe`、`Syringe.exe`、`rulesmo.ini`、`artmo.ini`、`aimo.ini`、`*.mix`、`MapsMO\`、`INI\`、`Map Editor\`、`RA2MO.ini`、`ddraw.ini` |
+
+装好之后，**运行时会新增或重写**下面这些文件。它们都是客户端自己本来就会写的，
+不是 MO 的发行文件，删掉不影响游戏：
+
+| 文件 | 谁写的 | 说明 |
+|---|---|---|
+| `spawn.ini` | 客户端 `GameLobbyBase.WriteSpawnIni`（每局点“开始游戏”时重写） | 补丁只把 `[OtherN]` 的 `Ip`/`Port` 指向 `127.0.0.1:12340+N`，让联机流量走本机中继。不改任何单位/规则/地图数据 |
+| `Resources\MoLanPatch.ini` | 本补丁 | 设置窗口里那些开关 |
+| `MoLanRelay.log` | 本补丁 | 中继日志 |
+| `Resources\lanip.txt` | 本补丁 | 直连框的临时输入文件（读完即删） |
 
 ### 2.5 关于「对应源码」
 
-GPL-3.0 要求分发二进制时向接收者提供对应源码。**本项目从设计上就避开了这个义务**：
+GPL-3.0 要求分发二进制时向接收者提供对应源码。**工具包从设计上就避开了这个义务**
+（“直接覆盖包”例外，见 [2.6](#26-直接覆盖包自用)）：
 
-1. **不分发任何 MO / CnCNet 客户端的二进制。** 补丁包里只有我们自己写的东西
+1. **工具包不分发任何 MO / CnCNet 客户端的二进制。** 包里只有我们自己写的东西
    （`dnlibpatch.exe` + `MoLanRelay.dll` + 安装脚本 + 文档），
    外加一个 MIT 许可、允许自由再分发的 `dnlib.dll`（其许可文本见 [NOTICE.md](NOTICE.md)）。
    被改的 `clientdx.exe` 等**不经过我们分发**，而是由包里的工具在你自己本机就地修改 ——
@@ -117,6 +149,32 @@ GPL-3.0 要求分发二进制时向接收者提供对应源码。**本项目从�
    （流程内含 dnlib 栈自检、`脚本\JIT校验.ps1` 强制 JIT、SHA256 比对）；
 5. 若 MO 客户端自身包含未公开的官方改动，那部分源码不在我们手上，请向 MO 官方索取；
 6. 对源码或构建方式有任何疑问，欢迎在本仓库开 Issue 索取。
+
+### 2.6 直接覆盖包（自用）
+
+「直接覆盖包」（`MO-补丁1+2-直接覆盖-<日期>.zip`）是把改好的客户端文件直接打包的版本，
+装上就能用、不跑脚本。它**确实分发了 GPL 派生二进制**，因此：
+
+- 包里同时带 `LICENSE`（GPL-3.0 全文）、`LICENSE-CnCNet-Client.md`（上游声明原文）、
+  `使用说明.txt`，转发时必须原样带走，**不要删许可文件**；
+- 对应源码 = 上游 <https://github.com/CnCNet/xna-cncnet-client> + 本仓库 `patch` 分支
+  （`IL补丁工具\`、`中继\`、`脚本\`），任何人都能按第 4 节重建出同一份字节；
+- 包内只有客户端层文件（见 2.4.1），没有任何 MO 本体文件；
+- 它不是“原创客户端”，不要改个名字当成自己的作品对外分发。
+
+### 2.7 发行格式：`.HMOL`（HMOLPKG v1）
+
+直接覆盖包对外**只以 `patch.HMOL` 一个文件**发行（HMOL 启动器识别的容器格式）。
+它本质是「明文 JSON 头 + AES-256-GCM 加密的标准 zip」，解密后就是上面那个压缩包，
+安装链路完全不变。
+
+- 格式规范、字节布局、密钥派生、解密步骤与**可直接粘贴的 C# 参考实现**：
+  见 [`设计文档\HMOL包格式与解密说明.md`](设计文档/HMOL包格式与解密说明.md)；
+- 打包/解包工具源码在本仓库 [`打包工具\HmolPack\`](打包工具/HmolPack)，
+  一键脚本 `脚本\打包hmol.ps1`；
+- 该格式只是**防误改、防随手解包**（共享密钥），不构成强保密；
+- 与 2.6 的许可义务无关：`.HMOL` 里仍带 GPL 派生二进制，转发时同样要遵守 2.6，
+  并同时提供源码地址。
 
 ---
 

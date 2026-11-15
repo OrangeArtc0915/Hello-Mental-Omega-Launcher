@@ -11,7 +11,7 @@ try {
     Write-Host "[!] Cannot listen on port 1233 : $($_.Exception.Message)"
     Write-Host "    (maybe the game/client is already using it - close them and retry)"
     Read-Host "Press Enter to exit"
-    exit
+    exit 1
 }
 
 try {
@@ -35,8 +35,9 @@ try {
     $t.Close()
 } catch {
     Write-Host "[!] error: $($_.Exception.Message)"
+} finally {
+    $l.Stop()
 }
 
-$l.Stop()
 Write-Host ""
 Read-Host "Press Enter to exit"

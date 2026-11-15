@@ -10,15 +10,26 @@
 | 分发的文件 | 是什么 | 许可 | 许可文本在哪 |
 |---|---|---|---|
 | `tools\dnlib.dll` | **dnlib 4.4.0**（IL 读写库，我们的补丁器依赖它） | MIT | 本文件第 2 节（全文） |
+| `tools\LICENSE-dnlib.txt` | 上面 dnlib 的 MIT 许可原文（紧挨二进制放一份，满足 MIT“随副本提供”的要求） | MIT | 该文件 |
 | `tools\dnlibpatch.exe` | 本项目用 `csc` 编译的补丁器（源码：`IL补丁工具\Program.cs`） | GPL-3.0-or-later | 仓库根 `LICENSE` |
 | `tools\MoLanRelay.dll` | 本项目编译的中继（源码：`中继\MoLanRelay.cs`） | GPL-3.0-or-later | 仓库根 `LICENSE` |
 | `tools\install.ps1`、`tools\restore.ps1` | 本项目的安装/还原脚本 | GPL-3.0-or-later | 仓库根 `LICENSE` |
+| `安装.bat`、`还原.bat` | 双击入口（纯 ASCII 批处理） | GPL-3.0-or-later | 仓库根 `LICENSE` |
+| `安装说明.txt`、`README.md`、`构建说明.md` | 本项目的说明文档 | GPL-3.0-or-later | 仓库根 `LICENSE` |
+| `LICENSE` | GNU GPL-3.0 全文 | — | 该文件 |
 | `LICENSE-CnCNet-Client.md` | **上游 CnCNet 客户端的许可声明原文**（见第 3 节） | 该文件自身的说明 | 该文件 |
 
-**本项目不分发**：MO 客户端、CnCNet 客户端的任何二进制文件（`clientdx.exe`、
+**工具包不分发**：MO 客户端、CnCNet 客户端的任何二进制文件（`clientdx.exe`、
 `clientogl.exe`、`clientxna.exe`、`MonoGame.Framework.dll` 等）。
 这些文件由 `tools\install.ps1` 在**使用者自己的机器上**就地修改。
-`dnlib.dll` 是唯一随包分发的第三方二进制，它是 MIT 许可、允许自由再分发。
+`dnlib.dll` 是唯一随工具包分发的第三方二进制，它是 MIT 许可、允许自由再分发。
+
+**例外（自用的“直接覆盖包”）**：那是把改好的客户端文件直接打包的版本，
+确实含 GPL 派生二进制（三个 client exe + `MonoGame.Framework.dll` + `Rampastring.XNAUI.dll` + `MoLanRelay.dll`），
+分发时必须同时提供 `LICENSE`、`LICENSE-CnCNet-Client.md` 与对应源码地址
+（上游 commit + 本仓库 `patch` 分支）。它不放在本仓库，规则见 README 2.6。
+
+**最近修改日期**：2026-11-15（中继 v0.6.0）。本项目从未修改 MO 本体文件，边界见 README 2.4.1。
 
 ---
 

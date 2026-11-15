@@ -57,24 +57,50 @@ if (!(Test-Path $backupDir)) {
 
 # 1) 把备份里的文件原样覆盖回去
 $n = 0
-Get-ChildItem $backupDir -Recurse -File | ForEach-Object {
+$skipped = New-Object System.Collections.ArrayList
+Get-ChildItem -LiteralPath $backupDir -Recurse -File | ForEach-Object {
     $rel = $_.FullName.Substring($backupDir.Length).TrimStart('\')
     $dst = Join-Path $root $rel
+
+    # 备份文件是 0 字节/读不出来时绝不覆盖 —— 那多半是半拷贝，会把能用的客户端写坏
+    if ($_.Length -eq 0) { [void]$skipped.Add($rel); return }
+
     New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
-    Copy-Item $_.FullName $dst -Force
+    Copy-Item -LiteralPath $_.FullName -Destination $dst -Force
     Say ('  还原: ' + $rel)
     $n++
 }
 
 # 2) 删掉补丁新加进去的文件（备份里没有的那些）
+$removed = New-Object System.Collections.ArrayList
 foreach ($rel in @('Resources\MoLanRelay.dll', 'Resources\Binaries\MoLanRelay.dll')) {
-    $inBackup = Test-Path (Join-Path $backupDir $rel)
+    $inBackup = Test-Path -LiteralPath (Join-Path $backupDir $rel)
     $full = Join-Path $root $rel
-    if (!$inBackup -and (Test-Path $full)) {
-        Remove-Item $full -Force
+    if (!$inBackup -and (Test-Path -LiteralPath $full)) {
+        Remove-Item -LiteralPath $full -Force
+        [void]$removed.Add($rel)
         Say ('  删除: ' + $rel + '（本补丁新加的）')
     }
 }
 
+# 3) 补丁自己生成的运行期文件（设置/日志/直连临时文件），一并清掉，回到原版状态
+foreach ($rel in @('Resources\MoLanPatch.ini', 'MoLanRelay.log', 'Resources\lanip.txt')) {
+    $full = Join-Path $root $rel
+    if (Test-Path -LiteralPath $full) {
+        Remove-Item -LiteralPath $full -Force -ErrorAction SilentlyContinue
+        [void]$removed.Add($rel)
+        Say ('  删除: ' + $rel + '（本补丁生成的）')
+    }
+}
+
 Say ''
+if ($n -eq 0) {
+    Say '***** 一个文件都没恢复：备份目录是空的，或里面的文件是 0 字节。*****'
+    Say ('请检查 ' + $backupDir + '，必要时用你自己的备份重装客户端。')
+    exit 1
+}
+if ($skipped.Count -gt 0) {
+    Say '注意：下面这些备份是 0 字节，已跳过（没有覆盖）：'
+    foreach ($s in $skipped) { Say ('    ' + $s) }
+}
 Say ('还原完成，共恢复 ' + $n + ' 个文件。备份目录保留在 ' + $backupDir + '，确认没问题后可以自己删掉。')

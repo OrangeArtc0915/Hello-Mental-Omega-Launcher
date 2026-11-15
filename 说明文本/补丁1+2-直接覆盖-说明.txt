@@ -1,0 +1,127 @@
+﻿MO 补丁 1+2（直接覆盖版）
+适用客户端：Mental Omega 的 XNA CnCNet 客户端 2.6.10.3
+
+【许可与改动边界（务必先看）】
+ 本包里的客户端文件是**开源 CnCNet 客户端（XNA CnCNet Client）的修改版**，
+ 按 GNU GPL-3.0-or-later 发布：
+   · 上游源码：https://github.com/CnCNet/xna-cncnet-client
+   · 本补丁源码：https://github.com/OrangeArtc0915/Hello-Mental-Omega-Launcher/tree/patch
+   · 许可原文：本包 LICENSE（GPL-3.0 全文）、LICENSE-CnCNet-Client.md（上游声明原文）
+   分发/转发本包时请把这两个许可文件一起带走，不要删。
+   · 本包**不含任何 MO 本体文件**，也没有修改它们。
+
+ MO（Mental Omega）是闭源商业模组，本包从不修改、也不分发它的任何文件：
+   gamemd.exe、Syringe.exe、rulesmo.ini、artmo.ini、aimo.ini、
+   *.mix、MapsMO\、INI\、Map Editor\、RA2MO.ini、ddraw.ini
+ 本包改的只有开源的客户端层（都在 Resources\ 下）：
+   clientdx.exe / clientogl.exe / clientxna.exe
+   Binaries\Windows\MonoGame.Framework.dll
+   Binaries\Windows\Rampastring.XNAUI.dll
+   MoLanRelay.dll、Binaries\MoLanRelay.dll（本补丁新增，原版没有）
+ 装好后运行时会新增/重写：spawn.ini（客户端每局自己重写，只把 [OtherN] 的
+ Ip/Port 指向本机中继）、MoLanPatch.ini（本补丁设置）、MoLanRelay.log（日志）、
+ lanip.txt（直连临时文件）。这些都不是 MO 的发行文件，删掉不影响游戏。
+ 首次修改：2026-10-06　最近修改：2026-11-15（中继 v0.6.0）
+
+一、怎么用（不需要运行任何脚本）
+  1. 完全关掉 MO 客户端和游戏（任务管理器里确认 clientdx.exe 已经没了）
+  2. 建议先把下面几个原文件复制到别处备份：
+        Resources\clientdx.exe
+        Resources\clientogl.exe
+        Resources\clientxna.exe
+        Resources\Binaries\Windows\MonoGame.Framework.dll
+        Resources\Binaries\Windows\Rampastring.XNAUI.dll
+  3. 把本压缩包里的 Resources 文件夹整个复制到游戏根目录
+     （就是有 MentalOmegaClient.exe 的那一层），提示「是否替换」时选「是」
+  4. 启动客户端。主菜单右下角出现
+        Patch v0.6.0  |  HMOL v1.5.16
+     就说明补丁生效了
+
+二、包里是什么
+  Resources\clientdx.exe / clientogl.exe / clientxna.exe
+      联机补丁：局域网直连、游戏内中继、踢人、聊天 @ 高亮 + 提示音、
+                开赛前 3 秒检查、隐藏 CnCNet 线上入口、主菜单右下角版本号
+  Resources\Binaries\Windows\MonoGame.Framework.dll
+      中文输入补丁（只对应 clientdx.exe 用的 Windows 渲染器；
+      OpenGL / XNA 渲染器的 MonoGame 不是同一套构建，本补丁不适用）
+  Resources\Binaries\Windows\Rampastring.XNAUI.dll
+      聊天框输入法修正：组词过程中按回车选词，不再同时触发「发送聊天」；
+      按 Esc 取消组词，也不会再把已经打好的字整行清空（见第六节）
+  Resources\MoLanRelay.dll
+  Resources\Binaries\MoLanRelay.dll
+      游戏内 UDP 中继（两个位置都放，客户端会从 Resources\ 加载）
+
+三、主菜单 / 顶部栏的改动
+  CnCNet 线上大厅入口由中继在启动后自动隐藏，下面的按钮整体上移 42 像素。
+  顶部栏的「CnCNet 大厅」「私信」「注销」三个按钮也会一起关闭（F3/F4 热键失效），
+  顶部状态文字改成「局域网大厅」。
+  进入局域网大厅后，聊天输入框上方会常驻一行：
+      FPS 60   |   Ping 23ms   |   Patch v0.6.0   |   HMOL v1.5.17
+  有人断开时，聊天区会提示「XXX 掉线了」。
+  设置窗口里「CnCNet」「更新」两个标签页和「下载音乐包」按钮已删除，
+  并新增「联机补丁」页，10 个开关：@ 提示音、Tab 名字补全、掉线提示、
+  进房间报版本、开赛前 3 秒检查、显示状态条，以及状态条里的 FPS / Ping /
+  版本号三项和顶部延迟，可分别开关（保存在 Resources\MoLanPatch.ini）。
+  所以本包不带 MainMenu.ini，你自己的主题不会被覆盖。
+
+四、地图同步（本轮新增）
+  房主在地图列表下面会多出一个「同步地图」按钮（客机看不到这个按钮）。
+  1. 房主先在地图列表里选好这一局要打的地图；
+  2. 点「同步地图」——只把**这一张图**需要的文件清单发给房间里的人：
+        · 地图文件本身（.map / .mpr / .yrm）
+        · 同目录同名的 .ini、预览图等附加文件
+     所以地图不一定在 Maps\Custom 也能对上：文件按「相对游戏根目录」的路径发送，
+     房主那边在哪、客机就写到同一个位置。
+  3. 客机本地已经和房主一致（大小 + SHA-256 都相同）→ 什么都不做，聊天区提示一句；
+     确实缺文件 → 弹窗显示地图名、文件数、总大小，点「是」才开始接收。
+  4. 接收完成后逐个校验 SHA-256，写入前先写 .mosync-part 临时文件，校验通过才替换。
+  5. 传完后**退出局域网大厅再重新进去**，地图列表里就能看到这张图。
+  注意：
+   · 地图走的是大厅那条 TCP 连接（公网隧道），2 MB 左右的图大约十几秒；
+     传输期间房主别关客户端。状态条会显示「地图同步 发送 45%」这样的进度。
+   · **传的过程中再点一次按钮就是「取消同步」**（按钮文字会自己变）。
+   · 只发地图相关文件，不动 MO 本体；同名文件只有在内容不同时才会被覆盖。
+
+五、聊天框打中文（本轮修复）
+  以前用微软拼音在聊天框打字，候选条正常，但按回车选词后整行字会消失：
+  回车被聊天框当成「发送」、Esc 被当成「清空」，而这两个键本来该由输入法吃掉。
+  现在组词过程中（候选条还开着）回车/Esc 只作用于输入法，不会再清空输入框；
+  组词结束后再按回车才是发送。
+
+六、本版新增的几个小功能
+  1. `/diag` 诊断包
+     在大厅聊天框里输入 `/diag` 回车（不会发出去），会把
+     MoLanRelay.log、client.log、最近的崩溃日志、spawn.ini、MoLanPatch.ini
+     以及关键文件的版本哈希打成一个 zip，放到**桌面**：
+         MO诊断-20261115-2003.zip
+     出问题时直接把这个 zip 发出来就行，不用再问「要哪些日志」。
+  2. 进不去房间会给原因
+     以前房主锁房/满员时，客机表现为「刚进去就自动退」，什么提示都没有。
+     现在会弹一个框写明「房主锁了房间」或「房间人数已满」。
+  3. 客机进房自动准备
+     客机会自动勾上「自动准备」，不用每局手动点。
+     不想要的话，在 Resources\MoLanPatch.ini 里加一行 `AutoReady=0`。
+  4. 聊天消息带时间戳
+     收到的每句话前面会有 `[20:03]`，只影响本机显示，不改发出去的内容。
+     不想要的话，在 MoLanPatch.ini 里加一行 `ChatTimestamp=0`。
+     注意：**不做本地聊天记录**，聊天内容不落盘。
+  5. 同名提醒
+     房间里出现两个同名玩家时，聊天区会提示一次「@ 和踢人会认错人」。
+  6. `/sync` 也可以同步地图
+     效果和点「同步地图」按钮一样，房主在聊天框敲 `/sync` 即可。
+
+七、怎么还原
+  用第一步备份的原文件覆盖回去，再删掉这两个文件：
+      Resources\MoLanRelay.dll
+      Resources\Binaries\MoLanRelay.dll
+
+八、注意
+  · 参与联机的每一台机器都要用同一个包。主菜单右下角对一下 Patch 版本
+    （`Patch v0.6.0`），MoLanRelay.log 第一行也会写同一个号。
+    只换 DLL 不换 exe（或反过来）会出现「客机回的信房主收不到」这类怪问题。
+  · 开赛前 3 秒检查需要从新版 HMOL 启动游戏才能核对；直接双击客户端时，
+    主菜单会显示 `HMOL not running`，开局前同样会弹「没法核对」的确认框。
+  · 检查发现双方不一致、或根本没法核对时，都会停下来弹「是/否」确认框：
+    选「是」才继续开始，选「否」停在局域网大厅（差异会列在聊天区）。
+  · 客户端本体来自开源的 XNA CnCNet Client（GPL-3.0-or-later），
+    许可原文见本包 LICENSE / LICENSE-CnCNet-Client.md。

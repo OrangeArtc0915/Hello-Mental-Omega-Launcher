@@ -17,11 +17,24 @@
  1. 客户端打不了中文（只能 Ctrl+V 粘贴，键盘敲不进去）
  2. 候选框位置跑偏 —— 现在会贴着你正在打字的那个输入框（不是鼠标位置）
  3. 打「你好」发出去变成「你好你好」（重复上屏）
+ 4. 组词时按回车选词，整行字消失 / 同时把聊天发出去了
+    （回车被文本框当成「发送」、Esc 被当成「清空」，而这两个键本该由输入法吃掉）
 
  本包不含任何 MO / CnCNet 客户端的 exe/dll —— 被改的文件由包里的工具
  在你自己的机器上就地打补丁，原文件会先自动备份，不会破坏你的客户端。
  （包里出现的 exe/dll 只有本补丁自己的工具，以及 MIT 许可、可自由再分发的
    dnlib.dll；第三方组件明细见包里的 NOTICE.md。）
+
+
+【只改开源客户端，不碰 MO 本体】
+ MO（Mental Omega）是闭源商业模组。本补丁只改**开源的 CnCNet 客户端**
+ （GPL-3.0-or-later）的一个依赖库，从不修改、也不分发 MO 的任何文件：
+    gamemd.exe、Syringe.exe、rulesmo.ini、artmo.ini、aimo.ini、
+    *.mix、MapsMO\、INI\、Map Editor\、RA2MO.ini、ddraw.ini
+ 改到的只有两个（都在客户端层）：
+    Resources\Binaries\Windows\MonoGame.Framework.dll
+    Resources\Binaries\Windows\Rampastring.XNAUI.dll
+ 首次修改：2026-10-06　最近修改：2026-11-15（中继 v0.6.0）
 
 
 【怎么安装】
@@ -37,11 +50,12 @@
  这个备份只在你本机，请不要连同补丁包一起发给别人。
 
 
-【改了哪个文件】
- 只有这一个：
+【改了哪几个文件】
+ 两个：
     Resources\Binaries\Windows\MonoGame.Framework.dll
+    Resources\Binaries\Windows\Rampastring.XNAUI.dll
 
- 具体改了三处：
+ MonoGame.Framework.dll 改了三处：
     · 给游戏窗口补上 IME 上下文
       （根因：WinForms 不会给「没有子控件的窗口」创建 IME 上下文，
         所以系统输入法根本不知道这个窗口能输入中文）
@@ -49,10 +63,16 @@
       （微软拼音这类 TSF 输入法只认光标矩形，所以候选框能贴到输入框旁边）
     · 补上 KeyPressEventArgs.Handled，避免同一个字被上屏两次
 
+ Rampastring.XNAUI.dll 改了一处：
+    · 在 XNATextBox.HandleKeyPress 开头判断「输入法是否正在组词」
+      （ImmGetCompositionStringW 的 GCS_COMPSTR 长度 > 0）；
+      正在组词时，Enter / Esc 直接当已处理返回，不再落到文本框的
+      「发送聊天」和「清空整行」逻辑上。
+
 
 【和「补丁 2／联机」的关系】
  完全独立、互不冲突 —— 两个包改的文件没有一个是重叠的：
-    · 本包：MonoGame.Framework.dll
+    · 本包：MonoGame.Framework.dll、Rampastring.XNAUI.dll
     · 联机包：clientdx.exe / clientogl.exe / clientxna.exe + MoLanRelay.dll
  可以只装一个，也可以两个都装（两个都装就是原来的全量包）。
  两个包的备份都放在同一个 _MO补丁备份\ 里，互不影响。
@@ -66,9 +86,11 @@
 
 
 【注意事项】
- · 本包只作用于 Resources\Binaries\Windows\ 这一套二进制，也就是
-   clientdx.exe（MO 默认渲染器）用的那套。
+ · MonoGame.Framework.dll 那一处只作用于 Resources\Binaries\Windows\ 这一套二进制，
+   也就是 clientdx.exe（MO 默认渲染器）用的那套。
    如果你在客户端选项里换成了 OpenGL / XNA 渲染器，加载的是另外一套 MonoGame
-   （里面根本没有 WinFormsGameForm 这个窗口类），本包的改法对它不适用。
+   （里面根本没有 WinFormsGameForm 这个窗口类），这一处对它不适用。
+ · Rampastring.XNAUI.dll 是三个渲染器共用的，所以「组词时回车/Esc 清空输入框」
+   这一处在任何渲染器下都生效。
  · 安装脚本会检查客户端/游戏是否在运行；在运行会直接拒绝，不会写坏文件。
  · 中途任何一步失败，脚本会自动回滚到打补丁之前的样子。

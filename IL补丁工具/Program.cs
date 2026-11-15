@@ -1,20 +1,46 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
 
 /// <summary>
-/// 用 dnlib 给 MonoGame.Framework.dll 的 WinFormsGameForm::WndProc 增加 WM_IME_CHAR(0x286) 处理。
-/// 用法: dnlibpatch &lt;in.dll&gt; &lt;out.dll&gt; [roundtrip|patch]
-///   roundtrip = 只读入再写出，不做任何修改（用于检验工具链是否会破坏 IL）
-///   patch     = 插入 WM_IME_CHAR 处理
+/// 用 dnlib 给 CnCNet 客户端文件打 IL 补丁（补丁1 改 MonoGame.Framework.dll，补丁2 改三个 client exe）。
+/// 用法: dnlibpatch &lt;in&gt; &lt;out&gt; &lt;mode&gt; [args]
+///   mode: ime / lanip / relay / relaysend / relayhost / lobbyfix / kick / mention / tab /
+///         preflight / verlabel / rxbuf        —— 就地安装流水线用的模式
+///         checkstack / pinvokes / refs / methods / fields / types / dumpm  —— 只读探查工具
+///         roundtrip                            —— 只读入再写出，不做任何修改
+///   未知 mode 直接报错退出（2），绝不写出"看起来成功但没打上"的副本。
 /// </summary>
 class Program
 {
+    static readonly string[] KnownModes =
+    {
+        "ime", "imediag", "imekey", "chatcmd", "deny", "lanip", "relay", "relaysend", "relayhost", "lobbyfix", "kick",
+        "mention", "tab", "preflight", "verlabel", "rxbuf",
+        "checkstack", "pinvokes", "refs", "methods", "fields", "types", "dumpm",
+        "roundtrip", "patch",
+        // 早期/停用方案，保留只为历史版本能复现，安装流水线不再调用
+        "xna", "shot", "hashcheck"
+    };
+
     static int Main(string[] args)
     {
-        if (args.Length < 2) { Console.WriteLine("usage: dnlibpatch <in.dll> <out.dll> [roundtrip|patch]"); return 2; }
+        if (args.Length < 2)
+        {
+            Console.WriteLine("usage: dnlibpatch <in> <out> <mode> [args]");
+            Console.WriteLine("  mode: " + string.Join(" / ", KnownModes));
+            return 2;
+        }
         string mode = args.Length > 2 ? args[2] : "patch";
+
+        if (Array.IndexOf(KnownModes, mode) < 0)
+        {
+            Console.Error.WriteLine("未知 mode: " + mode);
+            Console.Error.WriteLine("  可用: " + string.Join(" / ", KnownModes));
+            return 2;
+        }
 
         var mod = ModuleDefMD.Load(args[0]);
         Console.WriteLine("模块: " + mod.Name + "  (runtime " + mod.RuntimeVersion + ")");
@@ -77,6 +103,16 @@ class Program
 
         if (mode == "ime" || mode == "imediag")
         {
+            // 幂等保护：跑过一次的 DLL 里已经有 _moImeBuf 等字段。
+            // 再跑一次会重复定义同名同签名的成员，产出的 DLL 加载时 TypeLoadException。
+            bool alreadyPatched = mod.GetTypes().Any(t => t.Fields.Any(f => f.Name == "_moImeBuf"));
+            if (alreadyPatched)
+            {
+                if (mode == "imediag") { Console.WriteLine("已打过 ime（_moImeBuf 存在）"); return 0; }
+                Console.Error.WriteLine("SKIP: 这个 DLL 已经打过 ime 补丁，拒绝重复插桩（重复会产出加载不了的 DLL）");
+                return 3;
+            }
+
             var type = mod.GetTypes().FirstOrDefault(t => t.Name == "WinFormsGameForm");
             if (type == null) { Console.WriteLine("SKIP: WinFormsGameForm"); return 0; }
             var method = type.Methods.FirstOrDefault(m => m.Name == "WndProc");
@@ -355,6 +391,263 @@ class Program
             }
             else Console.WriteLine("  OnKeyPress: 未找到，跳过");
 
+            // 插了约 90 条指令，写文件前必须过一遍栈自检
+            CheckStack(method);
+            if (onKeyPress != null && onKeyPress.HasBody) CheckStack(onKeyPress);
+            if (stackErrors > 0)
+            {
+                Console.Error.WriteLine("  FAIL: ime 栈自检发现 " + stackErrors + " 处不平衡，拒绝写出");
+                return 1;
+            }
+
+            mod.Write(args[1]);
+            Console.WriteLine("OK -> " + args[1]);
+            return 0;
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // imekey：输入法正在组词时，别让 Enter / Esc 落到文本框上
+        //
+        // 现象（2026-11 反馈）：用微软拼音在聊天框打 "ni'hao"，候选条正常出来，
+        // 但选词/取消之后输入框整个空了 —— 一个字都没留下。
+        // 原因：MO 客户端没有 IMEHandler，Enter/Esc 直接进 XNATextBox.HandleKeyPress：
+        //       Enter 触发 EnterPressed（发一条空聊天并把输入框清空），
+        //       Esc 则 UnselectText + InputPosition=0 + Text=""（直接清空）。
+        //       而组词过程中的回车/ESC 本来该由输入法吃掉。
+        // 做法：在 HandleKeyPress 开头插一段判断 —— 当「当前有输入法组合串」时，
+        //       把 Enter(13)/Esc(27) 当成已处理直接 return true，其余键原样放行。
+        //       组合串用 ImmGetCompositionStringW(GCS_COMPSTR) 查，长度 > 0 即正在组词。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "imekey")
+        {
+            var tbType = mod.GetTypes().FirstOrDefault(t => t.Name == "XNATextBox");
+            if (tbType == null) { Console.WriteLine("SKIP: XNATextBox 未找到（不是 Rampastring.XNAUI.dll？）"); return 0; }
+
+            if (tbType.Fields.Any(f => f.Name == "_moImeCtx"))
+            {
+                Console.Error.WriteLine("SKIP: 这个 DLL 已经打过 imekey 补丁");
+                return 3;
+            }
+
+            var hkp = tbType.Methods.FirstOrDefault(m => m.Name == "HandleKeyPress");
+            if (hkp == null || !hkp.HasBody) { Console.WriteLine("SKIP: HandleKeyPress"); return 0; }
+            if (hkp.MethodSig.Params.Count != 1) { Console.WriteLine("SKIP: HandleKeyPress 参数不是 1 个"); return 0; }
+
+            var imm32 = new ModuleRefUser(mod, "imm32.dll");
+            var user32m = new ModuleRefUser(mod, "user32.dll");
+            MethodDefUser MakePInvoke2(ModuleRef mref, string name, MethodSig sig)
+            {
+                var md = new MethodDefUser(name, sig,
+                    MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.PinvokeImpl | MethodAttributes.HideBySig)
+                { ImplAttributes = MethodImplAttributes.PreserveSig };
+                md.ImplMap = new ImplMapUser(mref, name, PInvokeAttributes.CallConvWinapi);
+                return md;
+            }
+
+            var pGetFore = MakePInvoke2(user32m, "GetForegroundWindow", MethodSig.CreateStatic(mod.CorLibTypes.IntPtr));
+            var pGetCtx = MakePInvoke2(imm32, "ImmGetContext", MethodSig.CreateStatic(mod.CorLibTypes.IntPtr, mod.CorLibTypes.IntPtr));
+            var pGetStr = MakePInvoke2(imm32, "ImmGetCompositionStringW",
+                MethodSig.CreateStatic(mod.CorLibTypes.Int32, mod.CorLibTypes.IntPtr, mod.CorLibTypes.Int32, mod.CorLibTypes.IntPtr, mod.CorLibTypes.Int32));
+            var pRelease = MakePInvoke2(imm32, "ImmReleaseContext",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.IntPtr, mod.CorLibTypes.IntPtr));
+            foreach (var m in new[] { pGetFore, pGetCtx, pGetStr, pRelease }) tbType.Methods.Add(m);
+
+            var fCtx = new FieldDefUser("_moImeCtx", new FieldSig(mod.CorLibTypes.IntPtr), FieldAttributes.Private | FieldAttributes.Static);
+            var fLen = new FieldDefUser("_moImeLen", new FieldSig(mod.CorLibTypes.Int32), FieldAttributes.Private | FieldAttributes.Static);
+            tbType.Fields.Add(fCtx);
+            tbType.Fields.Add(fLen);
+
+            var intPtrRef2 = mod.CorLibTypes.IntPtr.ToTypeDefOrRef();
+            var intPtrZero2 = new MemberRefUser(mod, "Zero", new FieldSig(mod.CorLibTypes.IntPtr), intPtrRef2);
+            var opEquality2 = new MemberRefUser(mod, "op_Equality",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.IntPtr, mod.CorLibTypes.IntPtr), intPtrRef2);
+
+            // static bool _moImeComposing()
+            var helper = new MethodDefUser("_moImeComposing",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean),
+                MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.HideBySig);
+            helper.Body = new CilBody();
+            var hf = Instruction.Create(OpCodes.Nop);
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Call, pGetFore));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Call, pGetCtx));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Stsfld, fCtx));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldsfld, fCtx));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldsfld, intPtrZero2));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Call, opEquality2));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Brtrue, hf));
+            // GCS_COMPSTR = 0x0008；lpBuf = IntPtr.Zero / 0 表示只问长度（字节数）
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldsfld, fCtx));
+            helper.Body.Instructions.Add(Instruction.CreateLdcI4(0x0008));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldsfld, intPtrZero2));
+            helper.Body.Instructions.Add(Instruction.CreateLdcI4(0));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Call, pGetStr));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Stsfld, fLen));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Call, pGetFore));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldsfld, fCtx));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Call, pRelease));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Pop));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldsfld, fLen));
+            helper.Body.Instructions.Add(Instruction.CreateLdcI4(0));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Cgt));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+            helper.Body.Instructions.Add(hf);
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ldc_I4_0));
+            helper.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+            helper.Body.SimplifyBranches();
+            helper.Body.OptimizeBranches();
+            helper.Body.MaxStack = 4;
+            tbType.Methods.Add(helper);
+
+            var ins2 = hkp.Body.Instructions;
+            var Lcheck = Instruction.Create(OpCodes.Nop);
+            var Lbody = Instruction.Create(OpCodes.Nop);
+            var guard = new[]
+            {
+                Instruction.Create(OpCodes.Ldarg_1),
+                Instruction.CreateLdcI4(13),          // Keys.Enter
+                Instruction.Create(OpCodes.Beq, Lcheck),
+                Instruction.Create(OpCodes.Ldarg_1),
+                Instruction.CreateLdcI4(27),          // Keys.Escape
+                Instruction.Create(OpCodes.Bne_Un, Lbody),
+                Lcheck,
+                Instruction.Create(OpCodes.Call, helper),
+                Instruction.Create(OpCodes.Brfalse, Lbody),
+                Instruction.Create(OpCodes.Ldc_I4_1),  // 已处理 → 吞掉，文本框不动
+                Instruction.Create(OpCodes.Ret),
+                Lbody,
+            };
+            for (int k = 0; k < guard.Length; k++) ins2.Insert(k, guard[k]);
+
+            if (hkp.Body.MaxStack < 4) hkp.Body.MaxStack = 4;
+            hkp.Body.SimplifyBranches();
+            CheckStack(hkp);
+            if (stackErrors > 0)
+            {
+                Console.Error.WriteLine("  FAIL: imekey 栈自检发现 " + stackErrors + " 处不平衡，拒绝写出");
+                return 1;
+            }
+
+            Console.WriteLine("  XNATextBox.HandleKeyPress: 已插入 12 条指令（组词中吞掉 Enter/Esc）");
+            try
+            {
+                mod.Write(args[1]);
+            }
+            catch (Exception wex)
+            {
+                // dnlib 在某些畸形/旧版 DLL 上写不出来时，ToString() 会自己再抛，
+                // 只剩一句 "由于 Exception.ToString() 失败"，先用类型 + Message 兜住
+                Console.Error.WriteLine("写出失败: " + wex.GetType().Name + ": " + wex.Message);
+                return 1;
+            }
+            Console.WriteLine("OK -> " + args[1]);
+            return 0;
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // chatcmd：大厅里敲 /diag、/sync 这类命令时拦下来，不发到聊天里
+        //   LANGameLobby::SendChatMessage(string) 开头插：
+        //       if (Relay.TryChatCommand(this, message)) return;
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "chatcmd")
+        {
+            var lglC = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglC == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+            var scm = lglC.Methods.FirstOrDefault(m => m.Name == "SendChatMessage" && m.MethodSig.Params.Count == 1);
+            if (scm == null || !scm.HasBody) { Console.WriteLine("SKIP: 找不到 SendChatMessage"); return 0; }
+
+            bool doneC = false;
+            foreach (var i in scm.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "TryChatCommand") { doneC = true; break; }
+            }
+            if (doneC) { Console.WriteLine("  SendChatMessage: 已改过，跳过"); return 0; }
+
+            var relayAsmC = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeC = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmC);
+            var callC = new MemberRefUser(mod, "TryChatCommand",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.Object, mod.CorLibTypes.String), relayTypeC);
+
+            var insC = scm.Body.Instructions;
+            var bodyC = Instruction.Create(OpCodes.Nop);
+            insC.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+            insC.Insert(1, Instruction.Create(OpCodes.Ldarg_1));
+            insC.Insert(2, Instruction.Create(OpCodes.Call, callC));
+            insC.Insert(3, Instruction.Create(OpCodes.Brfalse, bodyC));
+            insC.Insert(4, Instruction.Create(OpCodes.Ret));
+            insC.Insert(5, bodyC);
+            if (scm.Body.MaxStack < 4) scm.Body.MaxStack = 4;
+            scm.Body.SimplifyBranches();
+
+            CheckStack(scm);
+            if (stackErrors > 0) { Console.Error.WriteLine("  FAIL: chatcmd 栈自检失败"); return 1; }
+            Console.WriteLine("  SendChatMessage: 已挂 /diag、/sync（5 条）");
+            mod.Write(args[1]);
+            Console.WriteLine("OK -> " + args[1]);
+            return 0;
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // deny：房主拒绝加入时先回一句话，再断开
+        //   以前 ListenForClients 是「直接 client.Close()」，客机那边只表现为
+        //   「刚进去就自动退」，完全不知道为什么。现在 Close 之前先发一帧：
+        //       dup / ldc.i4 <原因> / call Relay.DenyIncoming
+        //   原因：1 = 房间已锁，2 = 人数已满（按 Close 之前那句日志判断）。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "deny")
+        {
+            var lglD = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglD == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+            var lfd = lglD.Methods.FirstOrDefault(m => m.Name == "ListenForClients");
+            if (lfd == null || !lfd.HasBody) { Console.WriteLine("SKIP: 找不到 ListenForClients"); return 0; }
+
+            var insD = lfd.Body.Instructions;
+            bool doneD = false;
+            foreach (var i in insD)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "DenyIncoming") { doneD = true; break; }
+            }
+            if (doneD) { Console.WriteLine("  ListenForClients: 已改过，跳过"); return 0; }
+
+            var relayAsmD = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeD = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmD);
+            var callD = new MemberRefUser(mod, "DenyIncoming",
+                MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Int32), relayTypeD);
+
+            List<Instruction> closes = new List<Instruction>();
+            foreach (var i in insD)
+            {
+                var im = i.Operand as IMethod;
+                if (i.OpCode == OpCodes.Callvirt && im != null && im.Name == "Close"
+                    && im.DeclaringType != null && (string)im.DeclaringType.Name == "TcpClient")
+                    closes.Add(i);
+            }
+            if (closes.Count == 0) { Console.WriteLine("SKIP: 没找到 TcpClient::Close"); return 0; }
+
+            int added = 0;
+            foreach (var close in closes)
+            {
+                int idx = insD.IndexOf(close);
+                int reason = 1;
+                for (int k = idx - 1; k >= 0 && k > idx - 40; k--)
+                {
+                    var s = insD[k].Operand as string;
+                    if (s == null) continue;
+                    if (s.IndexOf("player limit", StringComparison.OrdinalIgnoreCase) >= 0) reason = 2;
+                    else if (s.IndexOf("locked", StringComparison.OrdinalIgnoreCase) >= 0) reason = 1;
+                    break;
+                }
+                insD.Insert(idx, Instruction.Create(OpCodes.Dup));
+                insD.Insert(idx + 1, Instruction.CreateLdcI4(reason));
+                insD.Insert(idx + 2, Instruction.Create(OpCodes.Call, callD));
+                added++;
+            }
+            if (lfd.Body.MaxStack < 4) lfd.Body.MaxStack = 4;
+
+            CheckStack(lfd);
+            if (stackErrors > 0) { Console.Error.WriteLine("  FAIL: deny 栈自检失败"); return 1; }
+            Console.WriteLine("  ListenForClients: 已在 " + added + " 处 Close 前插入「拒绝原因」");
             mod.Write(args[1]);
             Console.WriteLine("OK -> " + args[1]);
             return 0;
@@ -728,7 +1021,14 @@ class Program
                     var im3 = iins[k].Operand as IMethod;
                     if (im3 != null && im3.Name == "AddChild") { anchor = k + 1; break; }
                 }
-            if (anchor < 0) { Console.WriteLine("  SKIP: Initialize 里找不到插入点"); }
+            if (anchor < 0)
+            {
+                // 聊天框回车的前插代码会读 tbDirectIP，而 tbDirectIP 只在这个块里赋值。
+                // 锚点找不到还继续写文件 → 产出的 exe 每次在聊天框按回车都会空引用，
+                // 而且安装器会认为"成功"。这里必须硬失败，不写文件。
+                Console.Error.WriteLine("  FAIL: LANLobby.Initialize 里找不到插入点，lanip 未打上（不写出文件）");
+                return 1;
+            }
             else
             {
                 for (int k = 0; k < ublk.Count; k++) iins.Insert(anchor + k, ublk[k]);
@@ -1511,6 +1811,254 @@ class Program
         }
 
         // ──────────────────────────────────────────────────────────────
+        // preflight：房主点「开始游戏」后先等 3 秒核对双方信息
+        //   (a) LANGameLobby::Update 开头插 Relay.Tick（每帧等回信、到点继续开始）
+        //   (b) HandleClientMessage / HandleMessageFromServer 开头插 MO-CTRL 识别
+        //   (c) MultiplayerGameLobby::StartGame 开头插 Relay.BeforeStart(this)，
+        //       返回 true 就先 return，3 秒后由 Tick 反射再调一次 StartGame
+        //   （tab / shot 模式里对 Update / OnCtrl 有同一处插入，这里都做了"已插过就跳过"）
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "preflight")
+        {
+            var lglP = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            if (lglP == null) { Console.WriteLine("SKIP: 找不到 LANGameLobby"); return 0; }
+
+            var relayAsmP = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeP = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmP);
+
+            // ---- (a) Update：每帧驱动检查状态机 ----
+            var updP = lglP.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (updP == null || !updP.HasBody) Console.WriteLine("  SKIP: 找不到 LANGameLobby::Update");
+            else
+            {
+                bool doneP1 = false;
+                foreach (var i in updP.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "Tick" && im.DeclaringType != null
+                        && (string)im.DeclaringType.Name == "Relay") { doneP1 = true; break; }
+                }
+                if (doneP1) Console.WriteLine("  Update: 已改过，跳过");
+                else
+                {
+                    var tickCallP = new MemberRefUser(mod, "Tick",
+                        MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Object), relayTypeP);
+                    var uinsP = updP.Body.Instructions;
+                    uinsP.Insert(0, Instruction.Create(OpCodes.Call, tickCallP));
+                    uinsP.Insert(0, Instruction.Create(OpCodes.Ldarg_1));
+                    uinsP.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                    if (updP.Body.MaxStack < 8) updP.Body.MaxStack = 8;
+                    Console.WriteLine("  Update: 已挂 Relay.Tick（开赛前检查）");
+                }
+                CheckStack(updP);
+            }
+
+            // ---- (b) 控制帧识别：接收 PREQ / PMETA ----
+            var isCtrlCallP = new MemberRefUser(mod, "IsCtrlMessage",
+                MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.String), relayTypeP);
+            var onCtrlCallP = new MemberRefUser(mod, "OnCtrl",
+                MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.String), relayTypeP);
+
+            foreach (string mnP in new string[] { "HandleClientMessage", "HandleMessageFromServer" })
+            {
+                var mP = lglP.Methods.FirstOrDefault(x => x.Name == mnP);
+                if (mP == null || !mP.HasBody) { Console.WriteLine("  SKIP: 找不到 " + mnP); continue; }
+                bool doneP2 = false;
+                foreach (var i in mP.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "IsCtrlMessage") { doneP2 = true; break; }
+                }
+                if (doneP2) { Console.WriteLine("  " + mnP + ": 已改过，跳过"); continue; }
+
+                var pinsP = mP.Body.Instructions;
+                var origFirstP = pinsP[0];
+                var seqP = new System.Collections.Generic.List<Instruction>();
+
+                // (b0) 诊断：把收到的前 30 条原始消息记下来（查"分隔符到底在不在"）
+                var probeP = new MemberRefUser(mod, "ProbeMessage",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.String), relayTypeP);
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_1));
+                seqP.Add(Instruction.Create(OpCodes.Call, probeP));
+
+                // (b1) 自己的控制帧：先处理再 return。
+                //     必须在 PeerGone 之前判断 —— PeerGone 是"连接已废"的过滤，
+                //      一旦它误判，连检查回信都会被丢掉（曾经的 BUG：房主一直说没收到回信）。
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_1));
+                seqP.Add(Instruction.Create(OpCodes.Call, isCtrlCallP));
+                seqP.Add(Instruction.Create(OpCodes.Brfalse, origFirstP));
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_0));
+                seqP.Add(Instruction.Create(OpCodes.Ldarg_1));
+                seqP.Add(Instruction.Create(OpCodes.Call, onCtrlCallP));
+                seqP.Add(Instruction.Create(OpCodes.Ret));
+
+                // (b2) 非控制帧：房主侧连这条玩家已经废了就直接丢，
+                //      免得客户端在"未知命令"日志里读已释放的 socket 把进程打崩。
+                if (mnP == "HandleClientMessage")
+                {
+                    var peerGoneP = new MemberRefUser(mod, "PeerGone",
+                        MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.Object), relayTypeP);
+                    seqP.Add(Instruction.Create(OpCodes.Ldarg_2));       // lpInfo
+                    seqP.Add(Instruction.Create(OpCodes.Call, peerGoneP));
+                    seqP.Add(Instruction.Create(OpCodes.Brfalse, origFirstP));
+                    seqP.Add(Instruction.Create(OpCodes.Ret));
+                }
+
+                for (int k = 0; k < seqP.Count; k++) pinsP.Insert(k, seqP[k]);
+                if (mP.Body.MaxStack < 16) mP.Body.MaxStack = 16;
+                Console.WriteLine("  " + mnP + ": 已挂 MO-CTRL 识别 + 死连接跳过 + 诊断探针");
+                CheckStack(mP);
+            }
+
+            // ---- (c) 房主点开始游戏：先扣住，3 秒后继续 ----
+            var mglP = mod.GetTypes().FirstOrDefault(t => t.Name == "MultiplayerGameLobby");
+            if (mglP == null) { Console.WriteLine("  SKIP: 找不到 MultiplayerGameLobby"); return 0; }
+
+            var sgp = mglP.Methods.FirstOrDefault(m => m.Name == "StartGame" && m.MethodSig != null
+                                                       && m.MethodSig.Params.Count == 0);
+            if (sgp == null || !sgp.HasBody) { Console.WriteLine("  SKIP: 找不到 MultiplayerGameLobby::StartGame"); return 0; }
+
+            bool doneP3 = false;
+            foreach (var i in sgp.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "BeforeStart" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneP3 = true; break; }
+            }
+            if (doneP3) Console.WriteLine("  StartGame: 已改过，跳过");
+            else
+            {
+                var beforeCallP = new MemberRefUser(mod, "BeforeStart",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.Object), relayTypeP);
+
+                var firstP = sgp.Body.Instructions[0];
+                var seqP3 = new System.Collections.Generic.List<Instruction>();
+                seqP3.Add(Instruction.Create(OpCodes.Ldarg_0));
+                seqP3.Add(Instruction.Create(OpCodes.Call, beforeCallP));
+                seqP3.Add(Instruction.Create(OpCodes.Brfalse, firstP));
+                seqP3.Add(Instruction.Create(OpCodes.Ret));
+                for (int k = 0; k < seqP3.Count; k++) sgp.Body.Instructions.Insert(k, seqP3[k]);
+                if (sgp.Body.MaxStack < 8) sgp.Body.MaxStack = 8;
+                Console.WriteLine("  MultiplayerGameLobby::StartGame: 已挂 Relay.BeforeStart（3 秒检查）");
+                CheckStack(sgp);
+            }
+
+            // ---- (d) 房主点开始游戏时真正该拦的地方 ----
+            // 局域网是「HostLaunchGame 广播 LAUNCH → 各端（含房主自己）收到后各自 StartGame」。
+            // 只拦 StartGame 的话 LAUNCH 早就发出去了，客机会直接进游戏（只有房主被卡住）。
+            var lglH = mod.GetTypes().FirstOrDefault(t => t.Name == "LANGameLobby");
+            var hlg = lglH == null ? null
+                : lglH.Methods.FirstOrDefault(m => m.Name == "HostLaunchGame"
+                                                   && m.MethodSig != null && m.MethodSig.Params.Count == 0);
+            if (hlg == null || !hlg.HasBody) Console.WriteLine("  SKIP: 找不到 LANGameLobby::HostLaunchGame");
+            else
+            {
+                bool doneP4 = false;
+                foreach (var i in hlg.Body.Instructions)
+                {
+                    var im = i.Operand as IMethod;
+                    if (im != null && im.Name == "BeforeHostLaunch" && im.DeclaringType != null
+                        && (string)im.DeclaringType.Name == "Relay") { doneP4 = true; break; }
+                }
+                if (doneP4) Console.WriteLine("  HostLaunchGame: 已改过，跳过");
+                else
+                {
+                    var beforeLaunchP = new MemberRefUser(mod, "BeforeHostLaunch",
+                        MethodSig.CreateStatic(mod.CorLibTypes.Boolean, mod.CorLibTypes.Object), relayTypeP);
+
+                    var firstH = hlg.Body.Instructions[0];
+                    var seqP4 = new System.Collections.Generic.List<Instruction>();
+                    seqP4.Add(Instruction.Create(OpCodes.Ldarg_0));
+                    seqP4.Add(Instruction.Create(OpCodes.Call, beforeLaunchP));
+                    seqP4.Add(Instruction.Create(OpCodes.Brfalse, firstH));
+                    seqP4.Add(Instruction.Create(OpCodes.Ret));
+                    for (int k = 0; k < seqP4.Count; k++) hlg.Body.Instructions.Insert(k, seqP4[k]);
+                    if (hlg.Body.MaxStack < 8) hlg.Body.MaxStack = 8;
+                    Console.WriteLine("  LANGameLobby::HostLaunchGame: 已挂 Relay.BeforeHostLaunch（扣住 LAUNCH 广播）");
+                    CheckStack(hlg);
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // verlabel：主菜单右下角显示「补丁版本 + HMOL 版本」
+        //   MainMenu::Update 开头插 Relay.MainMenuTick(this)。
+        //   文本与位置都由中继算（改写 [lblVersion]，再按控件尺寸贴到右下角），
+        //   所以既不用改 MainMenu.ini 的坐标，也不怕客户端自己重写这个标签。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "verlabel")
+        {
+            var mmT = mod.GetTypes().FirstOrDefault(t => t.Name == "MainMenu");
+            if (mmT == null) { Console.WriteLine("SKIP: 找不到 MainMenu"); return 0; }
+            var mmUpd = mmT.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (mmUpd == null || !mmUpd.HasBody) { Console.WriteLine("SKIP: 找不到 MainMenu::Update"); return 0; }
+            if (mmUpd.MethodSig == null || mmUpd.MethodSig.Params.Count != 1) { Console.WriteLine("SKIP: MainMenu::Update 签名不是 (GameTime)"); return 0; }
+
+            bool doneV = false;
+            foreach (var i in mmUpd.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "MainMenuTick" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneV = true; break; }
+            }
+            if (doneV) Console.WriteLine("  MainMenu::Update: 已改过，跳过");
+            else
+            {
+                var relayAsmV = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeV = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmV);
+                var tickCallV = new MemberRefUser(mod, "MainMenuTick",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object), relayTypeV);
+
+                var vins = mmUpd.Body.Instructions;
+                vins.Insert(0, Instruction.Create(OpCodes.Call, tickCallV));
+                vins.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                if (mmUpd.Body.MaxStack < 8) mmUpd.Body.MaxStack = 8;
+                Console.WriteLine("  MainMenu::Update: 已挂 Relay.MainMenuTick（版本号显示）");
+                CheckStack(mmUpd);
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // rxbuf：把 LANPlayerInfo::ReceiveMessages 的接收缓冲从 1024 调大
+        //   原版每读一次最多 1KB，游戏数据突发时要来回几十次 Read（每次一个系统调用），
+        //   而且还夹着 overMessage 的字符串拼接。调到 8KB 后同样的数据几次就读完。
+        //   只改 new byte[] 的那个长度常量，不动逻辑。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "rxbuf")
+        {
+            const int WantBuffer = 8192;
+
+            var lpi = mod.GetTypes().FirstOrDefault(t => t.Name == "LANPlayerInfo");
+            if (lpi == null) { Console.WriteLine("SKIP: 找不到 LANPlayerInfo"); return 0; }
+            var rm = lpi.Methods.FirstOrDefault(m => m.Name == "ReceiveMessages");
+            if (rm == null || !rm.HasBody) { Console.WriteLine("SKIP: 找不到 ReceiveMessages"); return 0; }
+
+            var ins2 = rm.Body.Instructions;
+            bool changed = false;
+            for (int i = 0; i + 1 < ins2.Count; i++)
+            {
+                if (ins2[i].OpCode.Code != Code.Ldc_I4) continue;
+                if (ins2[i + 1].OpCode.Code != Code.Newarr) continue;
+                var elem = ins2[i + 1].Operand as ITypeDefOrRef;
+                if (elem == null || (string)elem.Name != "Byte") continue;
+
+                int oldSize = Convert.ToInt32(ins2[i].Operand);
+                if (oldSize >= WantBuffer)
+                {
+                    Console.WriteLine("  ReceiveMessages: 缓冲已是 " + oldSize + "，跳过");
+                    return 0;
+                }
+
+                ins2[i].Operand = WantBuffer;
+                Console.WriteLine("  ReceiveMessages: 接收缓冲 " + oldSize + " → " + WantBuffer);
+                changed = true;
+                break;
+            }
+
+            if (!changed) Console.WriteLine("  SKIP: 没找到 new byte[...]");
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // hashcheck：把"游戏文件是否一致"讲清楚
         //   LANGameLobby::HandleFileHashCommand(sender, fileHash) 开头插一次调用，
         //   把 (大厅, 发送者, 对方哈希) 交给 Relay.FileHashResult：
@@ -1611,6 +2159,19 @@ class Program
                 if ((string)t.Name != tn0) continue;
                 Console.WriteLine("== " + t.FullName + " ==");
                 foreach (var m in t.Methods) Console.WriteLine("  " + m.Name + "  " + (m.MethodSig == null ? "" : m.MethodSig.ToString()));
+            }
+            return 0;
+        }
+
+        if (mode == "fields")
+        {
+            string tn0 = args.Length > 3 ? args[3] : "";
+            foreach (var t in mod.GetTypes())
+            {
+                if ((string)t.Name != tn0) continue;
+                Console.WriteLine("== " + t.FullName + " ==");
+                foreach (var f in t.Fields)
+                    Console.WriteLine("  " + f.Name + "  " + (f.FieldType == null ? "" : f.FieldType.FullName));
             }
             return 0;
         }
@@ -1771,7 +2332,6 @@ class Program
                 kpeCtor = new MemberRefUser(mod, ".ctor", ctorSig, kpeType);
                 Console.WriteLine("    自建 KeyPressEventArgs(char) 引用");
             }
-        refsReady:
 
             // this.OnKeyPress(KeyPressEventArgs) 的方法引用
             var kpeSig = MethodSig.CreateInstance(mod.CorLibTypes.Void, kpeType.ToTypeSig());
@@ -1861,14 +2421,28 @@ class Program
             }
         }
 
+        if (stackErrors > 0)
+        {
+            Console.Error.WriteLine("  FAIL: 栈自检发现 " + stackErrors + " 处不平衡，拒绝写出 —— 这类 exe 装上会直接 InvalidProgramException");
+            return 1;
+        }
+
         mod.Write(args[1]);
         Console.WriteLine("OK -> " + args[1]);
         return 0;
     }
 
+    /// <summary>栈自检累计发现的问题数：>0 就不写出文件（免得产出"能装上但一跑就 InvalidProgram"的 exe）。</summary>
+    static int stackErrors;
+
     /// <summary>自写栈深度校验：找出栈不平衡的指令（dnlib 只给一句 "Error calculating max stack value"）。</summary>
-    static void CheckStack(MethodDef m)
+    static int CheckStack(MethodDef m)
     {
+        if (m == null || !m.HasBody || m.Body.Instructions.Count == 0) return 0;
+
+        int before = stackErrors;
+        bool returnsValue = m.MethodSig != null && m.MethodSig.RetType.ElementType != ElementType.Void;
+
         var ins = m.Body.Instructions;
         var depth = new System.Collections.Generic.Dictionary<Instruction, int>();
         var order = new System.Collections.Generic.Dictionary<Instruction, int>();
@@ -1883,19 +2457,40 @@ class Program
             int d = depth[i], pops, pushes;
             i.CalculateStackUsage(false, out pushes, out pops);
             if (pops < 0 || pushes < 0)
-            { Console.WriteLine("  [stack] " + tag + " 未知指令 @0x" + i.Offset.ToString("X4") + " " + i.OpCode.Name); return; }
+            {
+                // dnlib 对 leave / endfinally 这类异常处理指令算不出栈变化（返回 -1）。
+                // 这只说明"这条没法自动验证"，不代表插桩有错，不能当错误拦住构建。
+                Console.WriteLine("  [stack] " + tag + " 跳过无法计算的指令 @0x" + i.Offset.ToString("X4") + " " + i.OpCode.Name);
+                return stackErrors - before;
+            }
             int nd = d - pops;
             if (nd < 0)
-            { Console.WriteLine("  [stack] " + tag + " 下溢 @0x" + i.Offset.ToString("X4") + " " + i.OpCode.Name + " (depth=" + d + ", pops=" + pops + ")"); return; }
-            if (i.OpCode.Code == Code.Ret && nd != 0)
-            { Console.WriteLine("  [stack] " + tag + " ret 时栈非空 @0x" + i.Offset.ToString("X4") + " (depth=" + nd + ")"); return; }
+            { Console.WriteLine("  [stack] " + tag + " 下溢 @0x" + i.Offset.ToString("X4") + " " + i.OpCode.Name + " (depth=" + d + ", pops=" + pops + ")"); stackErrors++; return stackErrors - before; }
+            if (i.OpCode.Code == Code.Ret)
+            {
+                // 有返回值的方法在 ret 时栈上应该正好剩 1 个；void 方法应为 0。
+                // 以前一律按 0 判，导致所有非 void 方法都被误报"ret 时栈非空"。
+                int expect = returnsValue ? 1 : 0;
+                if (nd != expect)
+                {
+                    Console.WriteLine("  [stack] " + tag + " ret 时栈深度 " + nd + "（应为 " + expect + "）@0x" + i.Offset.ToString("X4"));
+                    stackErrors++;
+                    return stackErrors - before;
+                }
+            }
             nd += pushes;
             void Goto(Instruction t)
             {
                 if (t == null) return;
                 int old;
                 if (depth.TryGetValue(t, out old))
-                { if (old != nd) Console.WriteLine("  [stack] " + tag + " 深度不一致 @0x" + t.Offset.ToString("X4") + " (" + old + " vs " + nd + ")"); }
+                {
+                    if (old != nd)
+                    {
+                        Console.WriteLine("  [stack] " + tag + " 深度不一致 @0x" + t.Offset.ToString("X4") + " (" + old + " vs " + nd + ")");
+                        stackErrors++;
+                    }
+                }
                 else { depth[t] = nd; work.Enqueue(t); }
             }
             var fc = i.OpCode.FlowControl;
@@ -1912,5 +2507,7 @@ class Program
                 if (idx + 1 < ins.Count) Goto(ins[idx + 1]);
             }
         }
+
+        return stackErrors - before;
     }
 }
