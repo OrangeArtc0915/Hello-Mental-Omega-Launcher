@@ -254,6 +254,12 @@
                                                    Tag="4"
                                                    Text="{loc:T '语言'}"
                                                    Checked="OnSetupGroupChecked" />
+                                        <c:NavItem x:Name="SetupGroupAdvanced"
+                                                   GroupName="SetupGroupNav"
+                                                   Icon="lucide/wrench"
+                                                   Tag="5"
+                                                   Text="{loc:T '高级'}"
+                                                   Checked="OnSetupGroupChecked" />
                                     </StackPanel>
 
                                     <!--
@@ -365,6 +371,13 @@
                                                    Icon="lucide/earth"
                                                    Tag="14"
                                                    Text="{loc:T '语言'}"
+                                                   Checked="OnSetupCategoryChecked" />
+
+                                        <c:NavItem x:Name="SetupCatAdvanced"
+                                                   GroupName="SetupNav"
+                                                   Icon="lucide/wrench"
+                                                   Tag="15"
+                                                   Text="{loc:T '高级'}"
                                                    Checked="OnSetupCategoryChecked" />
                                     </StackPanel>
 

@@ -87,6 +87,45 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 「高级 → 游戏壁纸」列表：配色与选中态跟其余列表一致，深色主题下不会白底白字 -->
+        <Style x:Key="GameWallpaperList" TargetType="ListBox">
+            <Setter Property="Background" Value="{DynamicResource Surface.Sunken}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border.Default}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Foreground" Value="{DynamicResource Text.Primary}" />
+                        <Setter Property="Padding" Value="8,5" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="Bd"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="{DynamicResource Common.Transparent}"
+                                            CornerRadius="{DynamicResource Radius.Small}">
+                                        <ContentPresenter HorizontalAlignment="Stretch" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Surface.CardHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent.Faint}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </c:LauncherPage.Resources>
 
     <ScrollViewer x:Name="ScrollCategory"
@@ -111,7 +150,7 @@
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource Text.Secondary}"
                                TextWrapping="Wrap"
-                               Text="{loc:T '左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他 / 语言），点进去再看该类下的具体设置项。'}" />
+                               Text="{loc:T '左边先选一个大类（个性化 / 更新与下载 / 联机 / 其他 / 语言 / 高级），点进去再看该类下的具体设置项。'}" />
                     <TextBlock Margin="0,6,0,0"
                                FontSize="11.5"
                                Foreground="{DynamicResource Text.Tertiary}"
@@ -570,6 +609,125 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="{loc:T '开启后每次启动都按系统时区与区域自动挑语言（中国时区判中文，其余看系统语言）。手动选过一次语言就会自动关掉它。'}" />
+                </StackPanel>
+            </c:SurfaceCard>
+
+            <!-- 高级：把 HMOL 壁纸做成 MO 局域网补丁能识别的游戏主题（没装补丁时只留一行「敬请期待」） -->
+            <c:SurfaceCard x:Name="CardAdvanced" Margin="0,14,0,0" Title="{loc:T '高级'}">
+                <StackPanel>
+                    <TextBlock FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '游戏壁纸'}" />
+
+                    <!-- 没有安装 MO 局域网补丁时，整块只显示这一行 -->
+                    <TextBlock x:Name="LabGameWallpaperPending"
+                               Margin="0,8,0,0"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource Text.Tertiary}"
+                               TextWrapping="Wrap"
+                               Text="{loc:T '敬请期待'}"
+                               Visibility="Collapsed" />
+
+                    <StackPanel x:Name="PanGameWallpaper">
+                        <TextBlock Margin="0,6,0,0"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap"
+                                   Text="{loc:T '从 HMOL 的壁纸库里挑一张，或从文件选择任意本机图片 / 视频，生成当前游戏实例的游戏壁纸主题。补丁会在下次启动客户端时自动生成背景与控件配色。'}" />
+                        <TextBlock Margin="0,4,0,0"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap"
+                                   Text="{loc:T '壁纸会等比缩放到 1920×1080 并居中裁切；主题名形如 HMOL-壁纸名，写在 Resources\MoThemes 下，同时更新 MoLanPatch.ini 的 Theme。'}" />
+
+                        <TextBlock Margin="0,16,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:T '选择壁纸'}" />
+
+                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                            <c:OutlineButton x:Name="BtnPickGameWallpaperFile"
+                                             Content="{loc:T '从文件选择…'}"
+                                             Click="OnPickGameWallpaperFileClick" />
+                            <c:OutlineButton x:Name="BtnOpenMoThemes"
+                                             Margin="8,0,0,0"
+                                             Content="{loc:T '打开 MoThemes 目录'}"
+                                             Click="OnOpenMoThemesClick" />
+                        </StackPanel>
+
+                        <ListBox x:Name="LstGameWallpapers"
+                                 Margin="0,8,0,0"
+                                 MaxHeight="220"
+                                 Style="{StaticResource GameWallpaperList}"
+                                 SelectionChanged="OnGameWallpaperSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock FontSize="12"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="{Binding Title}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Margin="0,2,0,0"
+                                                   FontSize="10.5"
+                                                   Foreground="{DynamicResource Text.Tertiary}"
+                                                   Text="{Binding Kind}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock x:Name="LabGameWallpaperEmpty"
+                                   Margin="0,6,0,0"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap"
+                                   Visibility="Collapsed"
+                                   Text="{loc:T '壁纸库还是空的：先到「主页背景」导入图片 / 视频或壁纸包，也可以直接点上面的「从文件选择…」。'}" />
+
+                        <TextBlock Margin="0,16,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Text.Secondary}"
+                                   Text="{loc:T '预览'}" />
+                        <Border Width="320"
+                                Height="180"
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource Surface.Sunken}"
+                                BorderBrush="{DynamicResource Border.Default}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource Radius.Item}"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Image x:Name="ImgGameWallpaperPreview" Stretch="UniformToFill" />
+                                <Border x:Name="PanGameWallpaperVideoHint"
+                                        Background="#66000000"
+                                        Visibility="Collapsed">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   FontSize="34"
+                                                   Foreground="{DynamicResource Text.Primary}"
+                                                   Text="▶" />
+                                        <TextBlock Margin="0,4,0,0"
+                                                   FontSize="11.5"
+                                                   Foreground="{DynamicResource Text.Secondary}"
+                                                   Text="{loc:T '视频（应用时自动取一帧）'}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                            <c:OutlineButton x:Name="BtnApplyGameWallpaper"
+                                             Content="{loc:T '应用为游戏壁纸'}"
+                                             IsEnabled="False"
+                                             Tone="Solid"
+                                             Click="OnApplyGameWallpaperClick" />
+                        </StackPanel>
+                        <TextBlock x:Name="LabGameWallpaperStatus"
+                                   Margin="0,8,0,0"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
             </c:SurfaceCard>
 
@@ -2039,6 +2197,25 @@
                                Foreground="{DynamicResource Text.Tertiary}"
                                TextWrapping="Wrap"
                                Text="{loc:T '设置、实例、插件包与日志都放在这里；可用环境变量 HMOL_DATA 重定向。'}" />
+
+                    <!-- 配置备份：换机器 / 重装后把设置与实例找回来 -->
+                    <TextBlock Margin="0,12,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource Text.Secondary}"
+                               Text="{loc:T '配置备份'}" />
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <c:OutlineButton Content="{loc:T '导出配置'}"
+                                         Click="OnExportConfigClick" />
+                        <c:OutlineButton Margin="8,0,0,0"
+                                         Content="{loc:T '导入配置'}"
+                                         Click="OnImportConfigClick" />
+                        <TextBlock Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource Text.Tertiary}"
+                                   TextWrapping="Wrap"
+                                   Text="{loc:T '设置、联机配置与实例清单打包成 zip；不含游戏文件、插件包与日志。'}" />
+                    </StackPanel>
                 </StackPanel>
             </c:SurfaceCard>
             </Grid>

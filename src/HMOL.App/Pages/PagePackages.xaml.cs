@@ -425,6 +425,20 @@ public partial class PagePackages : LauncherPage
         var kind = entry.IsDirectory ? Loc.T("文件夹") : entry.IsArchive ? Loc.T("压缩包") : Loc.T("文件");
         var message = Loc.F("即将安装{0}：\n{1}\n\n到实例「{2}」：\n{3}", kind, entry.Name, instance.Name, target.TargetDirectory);
 
+        // 先给一份文件清单：会写哪些文件、哪些会覆盖现有的，确认后才进入原来的安装流程
+        PackagePreview preview;
+        try
+        {
+            preview = await Task.Run(() => PackageInstaller.Preview(instance, type, entry.Name));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("生成安装预览失败：{0}（{1}）", entry.Name, ex.Message));
+            preview = new PackagePreview(entry.Name, target.TargetDirectory, 0, 0, [], null);
+        }
+
+        if (!PackagePreviewWindow.Ask(owner, preview)) return;
+
         var policy = CopyConflictPolicy.Overwrite;
 
         if (Directory.Exists(target.TargetDirectory) && !target.MergeIntoRoot && Directory.Exists(target.SourcePath))

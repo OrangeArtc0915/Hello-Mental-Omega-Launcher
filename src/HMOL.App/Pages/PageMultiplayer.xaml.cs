@@ -325,6 +325,7 @@ public partial class PageMultiplayer : LauncherPage
         TxtRoomKey.Text = settings.RoomKey;
         TxtManualIp.Text = string.IsNullOrWhiteSpace(settings.ManualIp) ? $"{NodeCatalog.N2nDefaultSubnet}.66" : settings.ManualIp;
         ChkHideForeignPeers.IsChecked = settings.HideForeignPeers;
+        TxtLanPort.Text = settings.LanPort.ToString();
 
         _loadingForm = false;
 
@@ -348,6 +349,7 @@ public partial class PageMultiplayer : LauncherPage
         var manualIp = ManualIp;
         var publishing = _publishing;
         var hideForeignPeers = ChkHideForeignPeers.IsChecked == true;
+        var lanPort = LanPortInput();
 
         MultiplayerSettingsStore.Update(settings =>
         {
@@ -359,6 +361,7 @@ public partial class PageMultiplayer : LauncherPage
             settings.ManualIp = manualIp;
             settings.PublishRoom = publishing;
             settings.HideForeignPeers = hideForeignPeers;
+            settings.LanPort = lanPort;
 
             if (kind == NetworkEngineKind.N2n) settings.N2nNode = node;
             else settings.EasyTierNode = node;
@@ -429,6 +432,10 @@ public partial class PageMultiplayer : LauncherPage
         BtnHud.Visibility = vpnTools;
 
         PanN2nTools.Visibility = !_sakuraPlan && _kind == NetworkEngineKind.N2n ? Visibility.Visible : Visibility.Collapsed;
+
+        // 局域网端口是两处共用的同一个设置：切换方案时互相同步一下
+        if (!_loadingForm) TxtLanPort.Text = MultiplayerSettingsStore.Current.LanPort.ToString();
+        PanSakuraPlan.ReloadLanPort();
 
         LabPlanHint.Text = _sakuraPlan
             ? Loc.T("樱花 Frp 是端口映射直连：不用装虚拟网卡、不分配虚拟 IP，主机开一条隧道把地址发给队友，队友在客户端里直连（见下方「樱花 Frp 参数」）。人少、临时开一局很方便。")
@@ -508,6 +515,41 @@ public partial class PageMultiplayer : LauncherPage
         TxtRoomName.Text = NewRoomName();
         SaveForm();
         RefreshSharePreview();
+    }
+
+    /// <summary>读界面上的局域网端口；留空或填错时沿用当前设置值，免得一次误输入把配置写成 0。</summary>
+    private int LanPortInput()
+    {
+        if (int.TryParse(TxtLanPort.Text.Trim(), out var port) && port is >= 1 and <= 65535) return port;
+        return MultiplayerSettingsStore.Current.LanPort;
+    }
+
+    /// <summary>端口框失焦时规范化：合法就落盘，非法就还原成当前生效值。</summary>
+    private void OnLanPortLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_loadingForm) return;
+
+        var port = LanPortInput();
+        MultiplayerSettingsStore.Update(settings => settings.LanPort = port);
+        TxtLanPort.Text = port.ToString();
+    }
+
+    /// <summary>「保存」按钮：校验后立刻写进 Data\multiplayer.json，并给出结果提示。</summary>
+    private void OnLanPortSaveClick(object sender, RoutedEventArgs e)
+    {
+        if (!int.TryParse(TxtLanPort.Text.Trim(), out var port) || port is < 1 or > 65535)
+        {
+            ShowNotice(Loc.T("端口要填 1–65535 之间的整数。"), isError: true);
+            return;
+        }
+
+        MultiplayerSettingsStore.Update(settings => settings.LanPort = port);
+        TxtLanPort.Text = port.ToString();
+
+        // 樱花面板上的那个输入框显示的是同一个值，一并刷新
+        PanSakuraPlan.ReloadLanPort();
+
+        ShowNotice(Loc.F("局域网端口已保存为 {0}，下次从这里启动游戏时生效。", port));
     }
 
     private void OnIpModeClick(object sender, RoutedEventArgs e)

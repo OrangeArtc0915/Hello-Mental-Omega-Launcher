@@ -46,7 +46,7 @@ public partial class MainWindow : Window
     /// <summary>设置页的分类项，下标与 <c>Tag</c> 里的分类序号一一对应。</summary>
     private readonly NavItem[] _setupCategories;
 
-    /// <summary>设置分组项（个性化 / 更新与下载 / 联机 / 其他），按下标与 <see cref="SetupGroupCategories"/> 对齐。</summary>
+    /// <summary>设置分组项（个性化 / 更新与下载 / 联机 / 其他 / 语言 / 高级），按下标与 <see cref="SetupGroupCategories"/> 对齐。</summary>
     private readonly NavItem[] _setupGroups;
 
     /// <summary>设置分组栏顶部的「菜单」项，对应右侧的设置小主页。</summary>
@@ -87,7 +87,7 @@ public partial class MainWindow : Window
         _ready = true;
 
         // 设置分类项按 Tag 顺序抓成表：切分类时按下标同步选中态，不必写一堆 if
-        // 顺序 = 侧栏里的排列（分组标题不参与）：个性化 → 更新与下载 → 联机 → 其他 → 语言
+        // 顺序 = 侧栏里的排列（分组标题不参与）：个性化 → 更新与下载 → 联机 → 其他 → 语言 → 高级
         _setupCategories =
         [
             SetupCatAppearance,
@@ -105,6 +105,7 @@ public partial class MainWindow : Window
             SetupCatGamePath,
             SetupCatAbout,
             SetupCatLanguage,
+            SetupCatAdvanced,
         ];
 
         _setupGroups =
@@ -114,6 +115,7 @@ public partial class MainWindow : Window
             SetupGroupMultiplayer,
             SetupGroupOther,
             SetupGroupLanguage,
+            SetupGroupAdvanced,
         ];
 
         _setupGroupMenu = SetupGroupMenu;
@@ -701,14 +703,15 @@ public partial class MainWindow : Window
 
     // ————— 设置页的分类侧栏（两级：分组 → 分类） —————
 
-    /// <summary>每一组包含哪些分类（下标与侧栏 Tag 一致）：个性化 / 更新与下载 / 联机 / 其他 / 语言。</summary>
+    /// <summary>每一组包含哪些分类（下标与侧栏 Tag 一致）：个性化 / 更新与下载 / 联机 / 其他 / 语言 / 高级。</summary>
     private static readonly int[][] SetupGroupCategories =
     [
         [0, 1, 2, 3, 4, 5, 6, 7, 10],
         [8],
         [9],
         [11, 12, 13],
-        [14]
+        [14],
+        [15]
     ];
 
     /// <summary>侧栏当前停在哪一层：0 = 分组列表，1 = 某一组的分类列表。</summary>
@@ -727,12 +730,13 @@ public partial class MainWindow : Window
         9 => 2,
         10 => 0,
         14 => 4,
+        15 => 5,
         _ => 3
     };
 
     /// <summary>
     /// 在设置页 / 联机页用各自的分类栏顶替主导航栏，切到别的页面再换回来。
-    /// 设置页分两级：先只列五个分组，点进某组才显示该组的分类。
+    /// 设置页分两级：先只列六个分组，点进某组才显示该组的分类。
     /// </summary>
     private void ApplySidebarMode(int page)
     {
@@ -750,7 +754,7 @@ public partial class MainWindow : Window
         SyncSetupCategorySelection();
 
         // 内容区永远只留一张卡可见：停在分组层时显示「设置」小主页（小贴士 + 常用入口），
-        // 否则 15 张卡会叠着全部显示（又长又卡，这就是之前那个显示问题）。
+        // 否则 16 张卡会叠着全部显示（又长又卡，这就是之前那个显示问题）。
         var settings = GetPage(NavPages.Settings) as PageSettings;
 
         if (_setupLevel == 0) settings?.ShowHome();

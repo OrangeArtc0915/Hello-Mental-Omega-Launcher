@@ -89,6 +89,21 @@ public static class MultiplayerSettingsStore
     /// </summary>
     private static void Migrate()
     {
+        // 旧版只有一个「樱花本地端口」，新版它同时充当 MO 局域网端口（LanPort）。
+        // 只合并一次：用户之前把端口改成非 1233 的，沿用它，免得升级后隧道指向新端口、
+        // 而游戏还在监听旧端口，表现为「能连上大厅、进游戏就卡住」。
+        if (!Current.LanPortMerged)
+        {
+            if (Current.SakuraLocalPort is >= 1 and <= 65535
+                && Current.SakuraLocalPort != SakuraFrpApi.DefaultLocalPort)
+            {
+                Current.LanPort = Current.SakuraLocalPort;
+            }
+
+            Current.LanPortMerged = true;
+            Save();
+        }
+
         if (Current.EasyTierNode == "tcp://39.108.52.138:11010")
         {
             Current.EasyTierNode = "udp://39.108.52.138:11010";

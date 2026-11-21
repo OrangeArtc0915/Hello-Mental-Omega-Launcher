@@ -365,6 +365,54 @@ public static class ArchiveExtractor
     private const int MaxUnwrapDepth = 8;
 
     /// <summary>
+    /// 按条目名剥掉外层包装目录，规则与 <see cref="ResolveSingleTopDirectory"/> 一致，
+    /// 供「安装前预览」在不真正解压的情况下算出每个文件会落到哪里。
+    /// </summary>
+    public static IReadOnlyList<string> StripWrapperDirectories(IReadOnlyList<string> entryNames)
+    {
+        var list = entryNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Replace('\\', '/').TrimStart('/'))
+            .Where(name => name.Length > 0)
+            .ToList();
+
+        for (var depth = 0; depth < MaxUnwrapDepth; depth++)
+        {
+            string? top = null;
+            var shared = true;
+
+            foreach (var name in list)
+            {
+                var slash = name.IndexOf('/');
+
+                // 根目录下直接有文件，说明没有统一的外包装目录
+                if (slash <= 0)
+                {
+                    shared = false;
+                    break;
+                }
+
+                var folder = name[..slash];
+                if (top is null) top = folder;
+                else if (!string.Equals(top, folder, StringComparison.OrdinalIgnoreCase))
+                {
+                    shared = false;
+                    break;
+                }
+            }
+
+            if (!shared || top is null || ContentFolderNames.Contains(top)) break;
+
+            list = list
+                .Select(name => name[(name.IndexOf('/') + 1)..])
+                .Where(name => name.Length > 0)
+                .ToList();
+        }
+
+        return list;
+    }
+
+    /// <summary>
     /// 游戏根目录自带的内容目录名：遇到它们就不再往外剥，否则地图 / INI 会被铺到错误的位置。
     /// 比较不区分大小写。
     /// </summary>

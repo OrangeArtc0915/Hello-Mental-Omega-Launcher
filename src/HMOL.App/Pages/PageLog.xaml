@@ -58,6 +58,10 @@
                              Content="{loc:T '导出 CSV'}"
                              Click="OnExportCsvClick" />
             <c:OutlineButton Margin="8,0,0,0"
+                             Content="{loc:T '导出诊断包'}"
+                             ToolTip="{loc:T '把日志、版本、系统信息、设置与实例清单打包成 zip，反馈问题时直接附上'}"
+                             Click="OnExportDiagnosticsClick" />
+            <c:OutlineButton Margin="8,0,0,0"
                              Content="{loc:T '打开日志目录'}"
                              Click="OnOpenLogFolderClick" />
             <c:OutlineButton Margin="8,0,0,0"

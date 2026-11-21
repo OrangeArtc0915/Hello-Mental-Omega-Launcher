@@ -9,7 +9,7 @@
         <TextBlock FontSize="11.5"
                    Foreground="{DynamicResource Text.Tertiary}"
                    TextWrapping="Wrap"
-                   Text="{loc:T '端口映射直连（房主端）：把本地 1233 端口（MO 加入游戏时的握手端口）穿透出去，把「口令」发给队友；队友在 MO 客户端「局域网大厅」底部的地址框里粘上（Ctrl+V）回车即可加入。客户端只认纯 IP，所以口令取的是「IP 地址」那一栏。'}" />
+                   Text="{loc:T '端口映射直连（房主端）：把本地端口穿透出去，把「口令」发给队友；队友在 MO 客户端「局域网大厅」底部的地址框里粘上（Ctrl+V）回车即可加入。本地端口默认 1233（MO 加入游戏时的握手端口），也可以填任意 1–65535 的端口。客户端只认纯 IP，所以口令取的是「IP 地址」那一栏。'}" />
         <TextBlock Margin="0,8,0,0"
                    FontSize="11.5"
                    Foreground="{DynamicResource Text.Tertiary}"
@@ -177,6 +177,43 @@
                              Margin="8,0,0,0"
                              Content="{loc:T '刷新'}"
                              Click="OnRefreshTunnelsClick" />
+        </Grid>
+
+        <!-- 本地端口：默认 1233，可填任意 1–65535 -->
+        <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="76" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource Text.Secondary}"
+                       Text="{loc:T '局域网端口'}" />
+            <Border Grid.Column="1"
+                    Height="32"
+                    Margin="8,0,0,0"
+                    Padding="10,0"
+                    Background="{DynamicResource Surface.Sunken}"
+                    BorderBrush="{DynamicResource Border.Default}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource Radius.Button}">
+                <TextBox x:Name="TxtLocalPort"
+                         MaxLength="5"
+                         VerticalContentAlignment="Center"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         CaretBrush="{DynamicResource Text.Primary}"
+                         Foreground="{DynamicResource Text.Primary}" />
+            </Border>
+            <TextBlock Grid.Column="2"
+                       Margin="10,0,0,0"
+                       VerticalAlignment="Center"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource Text.Tertiary}"
+                       TextWrapping="Wrap"
+                       Text="{loc:T '默认 1233；房主监听、客机加入、这条隧道都用它，和队友填一样的值即可。'}" />
         </Grid>
 
         <ListBox x:Name="ListTunnels"

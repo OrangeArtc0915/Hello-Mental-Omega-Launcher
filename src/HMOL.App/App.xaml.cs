@@ -563,6 +563,14 @@ public partial class App : Application
         Shutdown();
     }
 
+    /// <summary>
+    /// 供「导入配置」这类需要重建界面的操作调用：重启启动器，让新配置完整生效。
+    /// </summary>
+    public static void RestartForReload()
+    {
+        if (Current is App app) app.RestartSelf();
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         // 先把联机侧收干净（断开引擎、停守护、关 HUD 与文件接收、停自建节点）

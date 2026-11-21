@@ -1798,7 +1798,7 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            TextWrapping="Wrap"
-                                           Text="{loc:T '· 「樱花 Frp 参数」是选樱花方案时用的：填访问密钥、选节点、新建一条 TCP 隧道（本地端口要用 1233），准备好 frpc 再启动隧道，然后把「连接地址」里的 IP 发给队友，队友在 MO「局域网大厅」底部的地址框里粘上回车即可加入。&#10;· 这是实验特性：进游戏后的数据要经隧道中继转发，所以双方都得用带中继的客户端；TCP 承载 UDP 在网络抖动时可能卡顿，求稳改用 EasyTier / n2n。'}" />
+                                           Text="{loc:T '· 「樱花 Frp 参数」是选樱花方案时用的：填访问密钥、选节点、新建一条 TCP 隧道（本地端口默认 1233，可改成任意 1–65535 的端口），准备好 frpc 再启动隧道，然后把「连接地址」里的 IP 发给队友，队友在 MO「局域网大厅」底部的地址框里粘上回车即可加入。&#10;· 这是实验特性：进游戏后的数据要经隧道中继转发，所以双方都得用带中继的客户端；TCP 承载 UDP 在网络抖动时可能卡顿，求稳改用 EasyTier / n2n。'}" />
                                 <TextBlock Margin="0,4,0,0"
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
@@ -2516,7 +2516,7 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            TextWrapping="Wrap"
-                                           Text="{loc:T '· 可以导出 TXT / CSV、打开日志目录、清理旧日志。'}" />
+                                           Text="{loc:T '· 可以导出 TXT / CSV、一键导出诊断包、打开日志目录、清理旧日志。'}" />
                                 <TextBlock Margin="0,4,0,0"
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
@@ -2541,7 +2541,7 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            TextWrapping="Wrap"
-                                           Text="{loc:T '· 三个页签「应用日志 / 游戏日志 / 磁盘日志」选中项是实心的；操作栏有「刷新」「清空视图」「导出 TXT」「导出 CSV」「打开日志目录」「清理旧日志」（危险色）。&#10;· 「清空视图」只清掉当前显示，不动内存里的缓冲——之后再刷新或来新日志，内容还会回来。'}" />
+                                           Text="{loc:T '· 三个页签「应用日志 / 游戏日志 / 磁盘日志」选中项是实心的；操作栏有「刷新」「清空视图」「导出 TXT」「导出 CSV」「导出诊断包」「打开日志目录」「清理旧日志」（危险色）。&#10;· 「清空视图」只清掉当前显示，不动内存里的缓冲——之后再刷新或来新日志，内容还会回来。'}" />
                                 <TextBlock Margin="0,4,0,0"
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
@@ -2930,7 +2930,7 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource Text.Secondary}"
                                            TextWrapping="Wrap"
-                                           Text="{loc:T '· 当前版本：显示启动器版本号。&#10;· 数据目录：点一下直接在资源管理器里打开；设置、实例、包与日志都放在这里，可用环境变量 HMOL_DATA 重定向。'}" />
+                                           Text="{loc:T '· 当前版本：显示启动器版本号。&#10;· 数据目录：点一下直接在资源管理器里打开；设置、实例、包与日志都放在这里，可用环境变量 HMOL_DATA 重定向。&#10;· 配置备份：「导出配置」把设置、联机配置与实例清单打包成 zip；换机器或重装后用「导入配置」找回（导入前会自动备份当前配置，完成后重启启动器生效）。'}" />
 
                                 <TextBlock Margin="0,16,0,0"
                                            FontSize="12.5"

@@ -6,6 +6,7 @@ using HMOL.Core.Instances;
 using HMOL.Core.Launch;
 using HMOL.Core.Logging;
 using HMOL.Core.Localization;
+using HMOL.Core.Multiplayer;
 
 namespace HMOL.App.Services;
 
@@ -82,7 +83,7 @@ internal static class GameSessionHub
             return false;
         }
 
-        HmolSessionStamp.Write(instance, executable);
+        HmolSessionStamp.Write(instance, executable, MultiplayerSettingsStore.Current.LanPort);
 
         if (!GameLauncher.TryLaunch(instance.GameDir, instance.Kind, executable, out var session, out error)
             || session is null) return false;

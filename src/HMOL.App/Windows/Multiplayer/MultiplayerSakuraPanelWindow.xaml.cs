@@ -25,6 +25,9 @@ public partial class MultiplayerSakuraPanelWindow : Window
     /// <summary>官方管理面板的隧道列表页。</summary>
     public const string PanelUrl = "https://www.natfrp.com/tunnel/";
 
+    /// <summary>WebView2 运行时（常青版引导程序）的官方下载页，缺运行时时引导用户去装。</summary>
+    public const string RuntimeDownloadUrl = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+
     private WebView2? _browser;
 
     public MultiplayerSakuraPanelWindow()
@@ -48,6 +51,22 @@ public partial class MultiplayerSakuraPanelWindow : Window
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>把用户送到 WebView2 运行时的官方下载页；打不开浏览器只记日志，不抛异常。</summary>
+    public static void OpenRuntimeDownloadPage()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(RuntimeDownloadUrl)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("打开 WebView2 下载页失败：{0}", ex.Message));
         }
     }
 

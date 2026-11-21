@@ -27,6 +27,16 @@ public sealed record UninstallOutcome(bool Success, bool Cancelled, bool RolledB
     int DeletedFiles, int DeleteFailures, int RestoredFiles, int RestoreFailures,
     int CleanedDirectories, string Message);
 
+/// <summary>安装前预览里的一行：文件相对路径，以及目标位置是否已经有同名文件。</summary>
+public sealed record PreviewFile(string RelativePath, bool Exists);
+
+/// <summary>
+/// 安装前预览：不真正解压 / 复制，只列出会落进游戏目录的文件。
+/// <paramref name="Error"/> 非空表示源不可读，此时文件列表为空。
+/// </summary>
+public sealed record PackagePreview(string PackageName, string TargetDirectory, int TotalFiles, int ExistingFiles,
+    IReadOnlyList<PreviewFile> Files, string? Error);
+
 /// <summary>
 /// 插件包的安装与卸载。规则按旧版 <c>_install_package_impl</c> / <c>_uninstall_package*</c>：
 /// <list type="bullet">
@@ -85,6 +95,72 @@ public static class PackageInstaller
 
         return conflicts;
     }
+
+    /// <summary>
+    /// 安装前预览：列出本次会落进游戏目录的文件，并标出目标位置已存在的那些。
+    /// 目录包按目录遍历；压缩包按条目名推算落点（外层包装目录的剥离规则与真实安装一致），
+    /// 不会真的解压，所以对几个 GB 的包也只是一次读列表。
+    /// </summary>
+    public static PackagePreview Preview(GameInstance instance, PackageType type, string packageName)
+    {
+        try
+        {
+            var target = Describe(instance, type, packageName);
+
+            if (!File.Exists(target.SourcePath) && !Directory.Exists(target.SourcePath))
+            {
+                return new PackagePreview(packageName, target.TargetDirectory, 0, 0, [],
+                    Loc.F("包文件不存在：{0}", target.SourcePath));
+            }
+
+            List<string> relativeFiles;
+
+            if (Directory.Exists(target.SourcePath))
+            {
+                relativeFiles = [.. DirectoryCopier.ListFiles(target.SourcePath)];
+            }
+            else if (target.IsArchive)
+            {
+                var entries = ArchiveExtractor.ListEntries(target.SourcePath, ArchiveEntryPreviewLimit);
+                relativeFiles = [.. ArchiveExtractor.StripWrapperDirectories(entries)];
+            }
+            else
+            {
+                relativeFiles = [Path.GetFileName(target.SourcePath)];
+            }
+
+            if (target.IsArchive && relativeFiles.Count == 0)
+            {
+                return new PackagePreview(packageName, target.TargetDirectory, 0, 0, [],
+                    Loc.T("读不出压缩包内的文件列表（加密包或格式不支持），仍可继续安装。"));
+            }
+
+            var files = new List<PreviewFile>(relativeFiles.Count);
+            var existing = 0;
+
+            foreach (var relative in relativeFiles)
+            {
+                var destination = Path.Combine(target.TargetDirectory,
+                    relative.Replace('/', Path.DirectorySeparatorChar));
+
+                var exists = File.Exists(destination);
+                if (exists) existing++;
+
+                files.Add(new PreviewFile(relative, exists));
+            }
+
+            return new PackagePreview(packageName, target.TargetDirectory, files.Count, existing, files, null);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("生成安装预览失败：{0}（{1}）", packageName, ex.Message));
+            return new PackagePreview(packageName, string.Empty, 0, 0, [],
+                Loc.F("生成安装预览失败：{0}", ex.Message));
+        }
+    }
+
+    /// <summary>预览时最多读多少个压缩包条目，避免超大包把界面拖住。</summary>
+    private const int ArchiveEntryPreviewLimit = 5000;
 
     /// <summary>安装一个包；成功时写入精确安装记录与实例的已安装列表。</summary>
     public static InstallOutcome Install(GameInstance instance, PackageType type, string packageName,

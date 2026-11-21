@@ -117,6 +117,19 @@ public sealed class MultiplayerSettings
     public string SakuraTunnelName { get; set; } = Loc.T("心灵终结");
 
     /// <summary>
+    /// MO 局域网大厅的 TCP 端口（房主监听 / 房主自连 / 客机双击加入都用它）。
+    /// 启动游戏时写进 <c>HMOL.session.txt</c> 的 <c>LANPORT=</c>，客户端补丁读它来替代写死的 1233。
+    /// 樱花FRP 的隧道本地端口也用这个值（两边必须一致，否则隧道指向的端口没人监听）。
+    /// </summary>
+    public int LanPort { get; set; } = SakuraFrpApi.DefaultLocalPort;
+
+    /// <summary>旧版的「樱花FRP 本地端口」，已并入 <see cref="LanPort"/>，只为兼容老配置保留。</summary>
+    public int SakuraLocalPort { get; set; } = SakuraFrpApi.DefaultLocalPort;
+
+    /// <summary>上面那次合并是否已经做过（只做一次，免得把用户后来改回 1233 的值又覆盖掉）。</summary>
+    public bool LanPortMerged { get; set; }
+
+    /// <summary>
     /// 是否在启动器里内嵌樱花FRP 网页面板（需要本机装了 WebView2 运行时）。
     /// 默认关闭：没装 WebView2 的机器上打不开，开着只会徒增困惑。
     /// </summary>

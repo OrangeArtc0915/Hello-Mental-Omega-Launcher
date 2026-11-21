@@ -183,6 +183,33 @@ public sealed class WallpaperLibraryRow
     public bool IsCurrent { get; }
 }
 
+/// <summary>「高级 → 游戏壁纸」列表里的一行：来自壁纸库，或用户临时从文件选择的素材。</summary>
+public sealed class GameWallpaperRow
+{
+    public GameWallpaperRow(string fileName, string? absolutePath, string title, string kind)
+    {
+        FileName = fileName;
+        AbsolutePath = absolutePath;
+        Title = title;
+        Kind = kind;
+    }
+
+    /// <summary>素材库里的相对标识（普通素材是文件名，壁纸包素材是 wallpapers/…）。临时选择的文件为空。</summary>
+    public string FileName { get; }
+
+    /// <summary>临时选择的文件的绝对路径；来自素材库时为空。</summary>
+    public string? AbsolutePath { get; }
+
+    public string Title { get; }
+
+    public string Kind { get; }
+
+    /// <summary>实际可读取的路径；素材已被删掉时为空字符串。</summary>
+    public string SourcePath => !string.IsNullOrEmpty(AbsolutePath)
+        ? AbsolutePath
+        : BackgroundService.ResolveExistingFile(FileName) ?? string.Empty;
+}
+
 /// <summary>
 /// 设置页。只做 <see cref="Settings"/> 里已有的字段：主题模式、强调色、窗口透明度、界面缩放、
 /// 联机设置（昵称与游戏内 HUD）、天气城市、常用网站、主页背景、背景音乐。
@@ -240,6 +267,12 @@ public partial class PageSettings : LauncherPage
     /// <summary>检查到的新版本。非空时按钮变成「下载并更新到 vX.Y.Z」或「打开下载页」。</summary>
     private LauncherUpdateInfo? _updateInfo;
 
+    /// <summary>「高级 → 游戏壁纸」里临时从文件选择的素材；null 表示没选。</summary>
+    private string? _gameWallpaperPickedFile;
+
+    /// <summary>当前实例是否装了 MO 局域网补丁。没装时整块只显示「敬请期待」。</summary>
+    private bool _gameWallpaperAvailable;
+
     public PageSettings()
     {
         InitializeComponent();
@@ -264,7 +297,8 @@ public partial class PageSettings : LauncherPage
             CardLook,
             CardAutoStart,
             CardGamePath,
-            CardAbout);
+            CardAbout,
+            CardAdvanced);
 
         BuildAccentPresets();
         RefreshSelection();
@@ -290,6 +324,7 @@ public partial class PageSettings : LauncherPage
         BuildBackgroundPageList();
         RefreshExtensions();
         RefreshUpdate();
+        RefreshGameWallpaper();
 
         // 兜底：先只显示设置主页，避免任何路径下出现「所有卡片都可见」
         ShowHome();
@@ -329,6 +364,9 @@ public partial class PageSettings : LauncherPage
         RefreshExtensions();
         RefreshUpdate();
 
+        // 实例可能在这期间被切换或补丁被装上 / 卸掉，重新判断一次
+        RefreshGameWallpaper();
+
         // 首次进入时弹一次扩展模块的安全说明；排到本页入场动画之后再弹，别打断动效
         Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowExtensionNoticeOnce));
 
@@ -361,7 +399,7 @@ public partial class PageSettings : LauncherPage
     // ————— 分类卡片 —————
 
     /// <summary>设置分类数量。窗口侧栏的分类项、下面的卡片表都按这个数对齐。</summary>
-    private const int CategoryCount = 15;
+    private const int CategoryCount = 16;
 
     /// <summary>一个分类一张卡片，只给自检用。</summary>
     public override int SubViewCount => CategoryCount;
@@ -405,6 +443,10 @@ public partial class PageSettings : LauncherPage
         // 已经显示着的那张（同分类重复调用）不重放动画
         if (!alreadyShown) PlayCardEnter(card, index);
 
+        // 「高级」里的游戏壁纸列表是读磁盘的：每次切过来都重扫一遍，
+        // 刚导入的壁纸包 / 新装的补丁不用退出设置页才看得到
+        if (ReferenceEquals(card, CardAdvanced)) RefreshGameWallpaper();
+
         // 换分类后回到顶部，否则会停在上一个分类的滚动位置
         ScrollCategory.ScrollToTop();
     }
@@ -427,6 +469,7 @@ public partial class PageSettings : LauncherPage
         CardGamePath,
         CardAbout,
         CardLanguage,
+        CardAdvanced,
     ];
 
     /// <summary>设置主页里的快捷入口：跳到对应分类（展开分组与选中态交给窗口）。</summary>
@@ -1365,19 +1408,26 @@ public partial class PageSettings : LauncherPage
 
         BtnSakuraPanel.Content = enabled ? Loc.T("已启用") : Loc.T("未启用");
         BtnSakuraPanel.Tone = enabled ? ButtonTone.Solid : ButtonTone.Outline;
-        BtnSakuraPanel.IsEnabled = available;
+
+        // 按钮始终可点：缺 WebView2 时点一下直接给下载页，别留一个没有任何反馈的灰按钮
+        BtnSakuraPanel.IsEnabled = true;
 
         SetSakuraPanelHint(available
                 ? enabled
                     ? Loc.T("「樱花 Frp 直连」窗口里会多出「内嵌面板」按钮，可以在启动器里登录樱花FRP、建隧道与看流量。")
                     : Loc.T("打开后，「樱花 Frp 直连」窗口里会多一个「内嵌面板」按钮（默认关闭）。")
-                : Loc.T("本机没有 WebView2 运行时，打不开这个面板；樱花 Frp 直连照常可用，建隧道去官网 natfrp.com 即可。"),
+                : Loc.T("本机没有 WebView2 运行时，打不开这个面板；点左边的按钮会打开 WebView2 下载页。樱花 Frp 直连照常可用，建隧道去官网 natfrp.com 即可。"),
             warn: !available);
     }
 
     private void OnSakuraPanelToggleClick(object sender, RoutedEventArgs e)
     {
-        if (!MultiplayerSakuraPanelWindow.IsRuntimeAvailable()) return;
+        if (!MultiplayerSakuraPanelWindow.IsRuntimeAvailable())
+        {
+            SetSakuraPanelHint(Loc.T("本机没有 WebView2 运行时，内嵌面板打不开；已为你打开 WebView2 下载页，装完再点一次即可。"), warn: true);
+            MultiplayerSakuraPanelWindow.OpenRuntimeDownloadPage();
+            return;
+        }
 
         var enabled = !MultiplayerSettingsStore.Current.SakuraPanelEnabled;
 
@@ -1717,6 +1767,9 @@ public partial class PageSettings : LauncherPage
         RefreshBackgroundPageMaterials();
         ApplyBackgroundToWindow();
 
+        // 刚导入的素材立刻出现在「高级 → 游戏壁纸」的选择列表里
+        RefreshGameWallpaper();
+
         SetBackgroundStatus(message, warn: false);
     }
 
@@ -2021,6 +2074,230 @@ public partial class PageSettings : LauncherPage
     {
         LabBackgroundStatus.Text = message;
         LabBackgroundStatus.SetResourceReference(TextBlock.ForegroundProperty,
+            warn ? "Status.Warn" : "Text.Tertiary");
+    }
+
+    // ————— 游戏壁纸（高级） —————
+
+    /// <summary>
+    /// 按当前实例刷新「游戏壁纸」：没装 MO 局域网补丁（或没有可用实例）时整块只留一行「敬请期待」。
+    /// </summary>
+    private void RefreshGameWallpaper()
+    {
+        var gameDir = InstanceManager.Current?.GameDir;
+        _gameWallpaperAvailable = GameWallpaperService.IsPatchInstalled(gameDir);
+
+        PanGameWallpaper.Visibility = _gameWallpaperAvailable ? Visibility.Visible : Visibility.Collapsed;
+        LabGameWallpaperPending.Visibility = _gameWallpaperAvailable ? Visibility.Collapsed : Visibility.Visible;
+
+        if (!_gameWallpaperAvailable)
+        {
+            _gameWallpaperPickedFile = null;
+
+            LstGameWallpapers.ItemsSource = null;
+            ImgGameWallpaperPreview.Source = null;
+            PanGameWallpaperVideoHint.Visibility = Visibility.Collapsed;
+            BtnApplyGameWallpaper.IsEnabled = false;
+
+            return;
+        }
+
+        RefreshGameWallpaperList();
+    }
+
+    /// <summary>重建列表：壁纸库（壁纸包 + Data\backgrounds）+ 临时从文件选择的素材。</summary>
+    private void RefreshGameWallpaperList()
+    {
+        var rows = new List<GameWallpaperRow>();
+
+        if (!string.IsNullOrEmpty(_gameWallpaperPickedFile) && File.Exists(_gameWallpaperPickedFile))
+        {
+            rows.Add(new GameWallpaperRow(
+                string.Empty,
+                _gameWallpaperPickedFile,
+                Path.GetFileName(_gameWallpaperPickedFile),
+                BackgroundService.DescribeKind(BackgroundService.DetectKind(_gameWallpaperPickedFile))));
+        }
+
+        foreach (var media in WallpaperPackageService.ListMedia())
+        {
+            rows.Add(new GameWallpaperRow(
+                media.RelativePath,
+                null,
+                $"{media.PackageName} / {media.Title}",
+                BackgroundService.DescribeKind(media.Kind)));
+        }
+
+        foreach (var name in BackgroundService.ListLibrary())
+        {
+            if (BackgroundService.IsPackageMedia(name)) continue;
+
+            var path = BackgroundService.ResolveExistingFile(name);
+            if (path is null) continue;
+
+            rows.Add(new GameWallpaperRow(
+                name,
+                null,
+                Path.GetFileName(name),
+                BackgroundService.DescribeKind(BackgroundService.DetectKind(path))));
+        }
+
+        LstGameWallpapers.ItemsSource = rows;
+        LabGameWallpaperEmpty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (rows.Count > 0) LstGameWallpapers.SelectedIndex = 0;
+        else UpdateGameWallpaperPreview(null);
+    }
+
+    private void OnGameWallpaperSelectionChanged(object sender, SelectionChangedEventArgs e)
+        => UpdateGameWallpaperPreview(LstGameWallpapers.SelectedItem as GameWallpaperRow);
+
+    /// <summary>选中项预览：图片直接显示；视频只显示图标，应用时才取帧。</summary>
+    private void UpdateGameWallpaperPreview(GameWallpaperRow? row)
+    {
+        ImgGameWallpaperPreview.Source = null;
+        ImgGameWallpaperPreview.Visibility = Visibility.Visible;
+        PanGameWallpaperVideoHint.Visibility = Visibility.Collapsed;
+        BtnApplyGameWallpaper.IsEnabled = _gameWallpaperAvailable && row is not null;
+
+        if (row is null) return;
+
+        if (BackgroundService.DetectKind(row.SourcePath) == BackgroundKind.Video)
+        {
+            ImgGameWallpaperPreview.Visibility = Visibility.Collapsed;
+            PanGameWallpaperVideoHint.Visibility = Visibility.Visible;
+            return;
+        }
+
+        ImgGameWallpaperPreview.Source = LoadGameWallpaperPreview(row.SourcePath);
+    }
+
+    /// <summary>读一张缩略图；文件丢了或解不出来就返回 null（预览留空）。</summary>
+    private static System.Windows.Media.Imaging.BitmapSource? LoadGameWallpaperPreview(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+
+        try
+        {
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+
+            image.BeginInit();
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.DecodePixelWidth = 480;
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreImageCache;
+            image.EndInit();
+            image.Freeze();
+
+            return image;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("读取游戏壁纸预览失败：{0}", ex.Message));
+            return null;
+        }
+    }
+
+    /// <summary>临时选一张本机的图片 / 视频，不复制进壁纸库，只在这次应用时使用。</summary>
+    private void OnPickGameWallpaperFileClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = Loc.T("选择游戏壁纸"),
+            Filter = Loc.F("图片与视频 ({0})|{1}|所有文件 (*.*)|*.*", BackgroundService.PickPattern, BackgroundService.PickPattern)
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+
+        _gameWallpaperPickedFile = dialog.FileName;
+        RefreshGameWallpaperList();
+
+        SetGameWallpaperStatus(Loc.F("已选择：{0}", Path.GetFileName(dialog.FileName)), warn: false);
+    }
+
+    private void OnOpenMoThemesClick(object sender, RoutedEventArgs e)
+    {
+        var gameDir = InstanceManager.Current?.GameDir;
+
+        if (string.IsNullOrWhiteSpace(gameDir) || !GameWallpaperService.IsPatchInstalled(gameDir)) return;
+
+        var directory = GameWallpaperService.ThemesDirectory(gameDir);
+
+        try
+        {
+            Directory.CreateDirectory(directory);
+        }
+        catch (Exception ex)
+        {
+            SetGameWallpaperStatus(Loc.F("创建 MoThemes 目录失败：{0}", ex.Message), warn: true);
+            return;
+        }
+
+        ShellHelper.OpenFolder(directory);
+    }
+
+    /// <summary>生成壁纸并写进当前实例的主题目录，同时更新 MoLanPatch.ini 的 Theme。</summary>
+    private async void OnApplyGameWallpaperClick(object sender, RoutedEventArgs e)
+    {
+        if (LstGameWallpapers.SelectedItem is not GameWallpaperRow row) return;
+
+        var gameDir = InstanceManager.Current?.GameDir;
+
+        if (!GameWallpaperService.IsPatchInstalled(gameDir))
+        {
+            RefreshGameWallpaper();
+            SetGameWallpaperStatus(Loc.T("当前游戏实例没有安装 MO 局域网补丁，无法应用游戏壁纸。"), warn: true);
+            return;
+        }
+
+        var path = row.SourcePath;
+
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            SetGameWallpaperStatus(Loc.T("选中的壁纸文件已丢失，请重新选择。"), warn: true);
+            return;
+        }
+
+        BtnApplyGameWallpaper.IsEnabled = false;
+        BtnPickGameWallpaperFile.IsEnabled = false;
+        SetGameWallpaperStatus(Loc.F("正在生成壁纸：{0}…", Path.GetFileName(path)), warn: false);
+
+        try
+        {
+            var composed = await GameWallpaperComposer.ComposeAsync(path);
+
+            if (!composed.Ok || composed.Art is null)
+            {
+                SetGameWallpaperStatus(composed.Message, warn: true);
+                return;
+            }
+
+            // 动图 / 视频只记路径：补丁在客户端主菜单和大厅里逐帧播放，静态图当兜底
+            var kind = BackgroundService.DetectKind(path);
+            var animPath = kind is BackgroundKind.Video or BackgroundKind.Gif ? path : null;
+
+            var result = GameWallpaperService.Apply(
+                gameDir!, row.Title, composed.Art.Png, composed.Art.AccentHex, composed.Art.TextHex,
+                animPath);
+
+            SetGameWallpaperStatus(result.Message, warn: !result.Ok);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(Loc.T("应用游戏壁纸失败"), ex);
+            SetGameWallpaperStatus(Loc.F("应用游戏壁纸失败：{0}", ex.Message), warn: true);
+        }
+        finally
+        {
+            BtnPickGameWallpaperFile.IsEnabled = true;
+            BtnApplyGameWallpaper.IsEnabled = _gameWallpaperAvailable && LstGameWallpapers.SelectedItem is not null;
+        }
+    }
+
+    private void SetGameWallpaperStatus(string message, bool warn)
+    {
+        LabGameWallpaperStatus.Text = message;
+        LabGameWallpaperStatus.SetResourceReference(TextBlock.ForegroundProperty,
             warn ? "Status.Warn" : "Text.Tertiary");
     }
 
@@ -2812,4 +3089,77 @@ public partial class PageSettings : LauncherPage
 
     private void OnOpenDataFolderClick(object sender, MouseButtonEventArgs e)
         => ShellHelper.OpenFolder(Paths.Data);
+
+    // ————— 配置备份与恢复 —————
+
+    private void OnExportConfigClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = Loc.T("导出配置"),
+            FileName = ConfigBackupService.SuggestedFileName,
+            Filter = Loc.T("配置备份 (*.zip)|*.zip")
+        };
+
+        var owner = Window.GetWindow(this);
+        if ((owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return;
+
+        try
+        {
+            var instances = ConfigBackupService.Export(dialog.FileName);
+
+            Log.Info(Loc.F("已导出配置（{0} 个实例）到 {1}", instances, dialog.FileName));
+
+            ChoiceWindow.Info(owner, Loc.T("导出配置"),
+                Loc.F("配置已导出：\n{0}\n\n包含设置、联机配置与 {1} 个实例的清单。", dialog.FileName, instances));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(Loc.F("导出配置失败：{0}", ex.Message), ex);
+            ChoiceWindow.Error(owner, Loc.T("导出配置"), Loc.F("导出配置失败：{0}", ex.Message));
+        }
+    }
+
+    private void OnImportConfigClick(object sender, RoutedEventArgs e)
+    {
+        var owner = Window.GetWindow(this);
+
+        if (GameSessionHub.IsRunning)
+        {
+            ChoiceWindow.Warn(owner, Loc.T("导入配置"), Loc.T("请先停止游戏，再导入配置。"));
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = Loc.T("导入配置"),
+            Filter = Loc.T("配置备份 (*.zip)|*.zip"),
+            CheckFileExists = true
+        };
+
+        if ((owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return;
+
+        var confirmed = ChoiceWindow.Confirm(owner, Loc.T("导入配置"),
+            Loc.T("导入会覆盖当前的设置与联机配置，实例按 Id 合并（同名覆盖、其余保留）。"),
+            Loc.T("导入前会自动把当前配置备份到数据目录的 backup 文件夹。\n\n确定继续？"),
+            confirmText: Loc.T("导入"));
+
+        if (!confirmed) return;
+
+        var result = ConfigBackupService.Import(dialog.FileName);
+
+        if (!result.Success)
+        {
+            ChoiceWindow.Error(owner, Loc.T("导入配置"), result.Message);
+            return;
+        }
+
+        Log.Info(Loc.F("已导入配置：{0}，来自 {1}", result.Message, dialog.FileName));
+
+        ChoiceWindow.Info(owner, Loc.T("导入配置"),
+            result.Message + "\n\n" + Loc.T("重启启动器后，所有设置与实例才会完整生效。"));
+
+        // 设置与实例都已从磁盘重新读取，界面上的语言 / 主题等需要重建页面才能跟上
+        App.RestartForReload();
+    }
 }

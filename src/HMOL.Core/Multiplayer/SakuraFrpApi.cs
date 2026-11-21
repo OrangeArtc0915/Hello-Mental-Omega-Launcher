@@ -77,9 +77,10 @@ public sealed record SakuraResult<T>(bool Ok, T? Value, string Message)
 /// </para>
 ///
 /// <para>
-/// 本方案给心灵终结做的是 <b>TCP 1233</b> 的端口映射：MO 客户端加入别人的游戏时走 TCP 1233
-/// 做大厅握手（见 ClientCore 的 <c>LAN_GAME_LOBBY_PORT</c>），配合客户端里的 <c>/ip 地址:端口</c>
-/// 直连补丁，队友就能用隧道地址直接加入 —— 不需要虚拟网卡，也不需要局域网广播。
+/// 本方案做的是<b>任意 TCP 本地端口</b>的端口映射：默认映射 1233（MO 客户端加入别人的游戏时
+/// 走 TCP 1233 做大厅握手，见 ClientCore 的 <c>LAN_GAME_LOBBY_PORT</c>），配合客户端里的
+/// <c>/ip 地址:端口</c> 直连补丁，队友就能用隧道地址直接加入 —— 不需要虚拟网卡，也不需要局域网广播。
+/// 映射别的服务（或改了握手端口的客户端）时，把本地端口填成对应值即可，不再是固定 1233。
 /// </para>
 /// </summary>
 public sealed class SakuraFrpApi : IDisposable
@@ -87,10 +88,10 @@ public sealed class SakuraFrpApi : IDisposable
     private const string BaseUrl = "https://api.natfrp.com/v4";
 
     /// <summary>
-    /// MO 加入游戏时握手用的 TCP 端口（ClientCore 的 LAN_GAME_LOBBY_PORT）。
-    /// 隧道必须映射到主机的这个本地端口。
+    /// 默认映射的本地端口：MO 加入游戏时握手用的 TCP 端口（ClientCore 的 LAN_GAME_LOBBY_PORT）。
+    /// 只是新建隧道时的默认值，实际端口由用户在界面上填，可以任意改。
     /// </summary>
-    public const int MoJoinPort = 1233;
+    public const int DefaultLocalPort = 1233;
 
     /// <summary>MO 客户端的局域网大厅「发现」端口（UDP 广播，本方案不需要穿透）。</summary>
     public const int MoDiscoveryPort = 1232;
@@ -198,10 +199,17 @@ public sealed class SakuraFrpApi : IDisposable
         }
     }
 
-    /// <summary>创建一条 TCP 隧道，默认就映射到 MO 的 1233，省得用户填错。</summary>
+    /// <summary>
+    /// 创建一条 TCP 隧道。本地端口默认取 <see cref="DefaultLocalPort"/>，也可以传任意 1–65535 的端口。
+    /// </summary>
     public async Task<SakuraResult<SakuraTunnel>> CreateTcpTunnelAsync(
-        string accessKey, string name, int nodeId, int localPort = MoJoinPort, CancellationToken token = default)
+        string accessKey, string name, int nodeId, int localPort = DefaultLocalPort, CancellationToken token = default)
     {
+        if (localPort is < 1 or > 65535)
+        {
+            return SakuraResult<SakuraTunnel>.Fail(Loc.T("本地端口要填 1–65535 之间的整数"));
+        }
+
         var form = new Dictionary<string, string>
         {
             ["name"] = name,

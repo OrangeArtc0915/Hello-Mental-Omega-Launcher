@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using HMOL.App.Services;
+using HMOL.App.Windows;
 using HMOL.App.Windows.Multiplayer;
 using HMOL.Core.Logging;
 using HMOL.Core.Multiplayer;
@@ -61,6 +62,7 @@ public partial class SakuraPlanPanel : UserControl
 
         SetKey(settings.SakuraAccessKey);
         TxtTunnelName.Text = string.IsNullOrWhiteSpace(settings.SakuraTunnelName) ? Loc.T("心灵终结") : settings.SakuraTunnelName;
+        TxtLocalPort.Text = NormalizePort(settings.LanPort).ToString();
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -68,6 +70,15 @@ public partial class SakuraPlanPanel : UserControl
 
     /// <summary>一行日志。由联机页接到「引擎日志」面板上。</summary>
     public event Action<string>? Log;
+
+    /// <summary>
+    /// 把「局域网端口」同步到这个面板。它和联机页上的那个输入框是同一个设置，
+    /// 切换方案时调用一次，避免两处显示不一致。
+    /// </summary>
+    public void ReloadLanPort()
+    {
+        TxtLocalPort.Text = NormalizePort(MultiplayerSettingsStore.Current.LanPort).ToString();
+    }
 
     /// <summary>密钥当前是否以明文显示。默认 false（掩码），避免旁边有人时直接看到。</summary>
     private bool _keyVisible;
@@ -251,6 +262,28 @@ public partial class SakuraPlanPanel : UserControl
 
     private int SelectedNodeId() => ListNodes.SelectedItem is SakuraNodeRow row ? row.Id : 0;
 
+    /// <summary>把端口收进 1–65535；越界或为 0 时回落到默认值。</summary>
+    private static int NormalizePort(int port)
+        => port is < 1 or > 65535 ? SakuraFrpApi.DefaultLocalPort : port;
+
+    /// <summary>
+    /// 读界面上的本地端口。留空按默认值算；填了非数字或越界则提示并返回 0，由调用方中止。
+    /// </summary>
+    private int LocalPortInput()
+    {
+        var text = TxtLocalPort.Text.Trim();
+
+        if (text.Length == 0) return SakuraFrpApi.DefaultLocalPort;
+
+        if (!int.TryParse(text, out var port) || port is < 1 or > 65535)
+        {
+            AppendLog(Loc.T("本地端口要填 1–65535 之间的整数。"), warn: true);
+            return 0;
+        }
+
+        return port;
+    }
+
     // ————— 隧道 —————
 
     private async void OnRefreshTunnelsClick(object sender, RoutedEventArgs e)
@@ -302,7 +335,6 @@ public partial class SakuraPlanPanel : UserControl
                 Source = tunnel,
                 Title = tunnel.Name + (tunnel.Id == lastUsed ? Loc.T("　（上次用的）") : string.Empty),
                 Detail = Loc.F("ID {0}　本地 {1}:{2}　远程 {3}", tunnel.Id, tunnel.LocalIp, tunnel.LocalPort, tunnel.Remote) +
-                         (tunnel.LocalPort == SakuraFrpApi.MoJoinPort ? string.Empty : Loc.F("　⚠ 本地端口不是 {0}，MO 用不了", SakuraFrpApi.MoJoinPort)) +
                          (tunnel.Status != 0 ? Loc.F("　状态异常：{0}", tunnel.StatusReason) : string.Empty)
             })
             .ToList();
@@ -319,6 +351,9 @@ public partial class SakuraPlanPanel : UserControl
             return;
         }
 
+        var localPort = LocalPortInput();
+        if (localPort == 0) return;
+
         SetBusy(true);
         try
         {
@@ -332,9 +367,9 @@ public partial class SakuraPlanPanel : UserControl
                 return;
             }
 
-            AppendLog(Loc.F("正在创建 TCP 隧道「{0}」（节点 {1}，本地端口 {2}）…", name, nodeId, SakuraFrpApi.MoJoinPort));
+            AppendLog(Loc.F("正在创建 TCP 隧道「{0}」（节点 {1}，本地端口 {2}）…", name, nodeId, localPort));
 
-            var created = await Api.CreateTcpTunnelAsync(KeyText, name, nodeId);
+            var created = await Api.CreateTcpTunnelAsync(KeyText, name, nodeId, localPort);
 
             if (!created.Ok || created.Value is null)
             {
@@ -342,7 +377,12 @@ public partial class SakuraPlanPanel : UserControl
                 return;
             }
 
-            MultiplayerSettingsStore.Update(settings => settings.SakuraTunnelName = name);
+            MultiplayerSettingsStore.Update(settings =>
+            {
+                settings.SakuraTunnelName = name;
+                // 与 MO 局域网监听端口是同一个值，必须一起改
+                settings.LanPort = localPort;
+            });
 
             AppendLog(Loc.F("隧道已创建：{0}（ID {1}）", created.Value.Name, created.Value.Id));
             await ReloadTunnelsAsync(KeyText);
@@ -521,16 +561,29 @@ public partial class SakuraPlanPanel : UserControl
 
     private void OnPanelClick(object sender, RoutedEventArgs e)
     {
-        if (!MultiplayerSettingsStore.Current.SakuraPanelEnabled)
+        if (!MultiplayerSakuraPanelWindow.IsRuntimeAvailable())
         {
-            AppendLog(Loc.T("内嵌面板没开：到「设置 → 联机设置」里打开（需要本机装了 WebView2 运行时）。"), warn: true);
+            AppendLog(Loc.T("本机没有 WebView2 运行时，内嵌面板打不开；已为你打开 WebView2 下载页，装完再点一次即可（也可以直接用浏览器打开 natfrp.com）。"), warn: true);
+            MultiplayerSakuraPanelWindow.OpenRuntimeDownloadPage();
             return;
         }
 
-        if (!MultiplayerSakuraPanelWindow.IsRuntimeAvailable())
+        // 面板默认关闭，但按钮始终可点：点了就说明要用，确认一下当场启用，不必再跑一趟设置页
+        if (!MultiplayerSettingsStore.Current.SakuraPanelEnabled)
         {
-            AppendLog(Loc.T("本机没有 WebView2 运行时，打不开内嵌面板；可到设置里确认，或直接用浏览器打开 natfrp.com。"), warn: true);
-            return;
+            var owner = Window.GetWindow(this);
+
+            if (!ChoiceWindow.Confirm(
+                    owner,
+                    Loc.T("启用内嵌面板"),
+                    Loc.T("内嵌面板默认是关闭的。要现在启用，并在启动器里打开樱花FRP 管理面板吗？"),
+                    Loc.T("启用后可在「设置 → 联机设置」里再次关闭。")))
+            {
+                return;
+            }
+
+            MultiplayerSettingsStore.Update(settings => settings.SakuraPanelEnabled = true);
+            RefreshPanelButton();
         }
 
         new MultiplayerSakuraPanelWindow { Owner = Window.GetWindow(this) }.Show();
@@ -538,12 +591,16 @@ public partial class SakuraPlanPanel : UserControl
 
     private void RefreshPanelButton()
     {
-        var enabled = MultiplayerSettingsStore.Current.SakuraPanelEnabled && MultiplayerSakuraPanelWindow.IsRuntimeAvailable();
+        var available = MultiplayerSakuraPanelWindow.IsRuntimeAvailable();
+        var enabled = MultiplayerSettingsStore.Current.SakuraPanelEnabled;
 
-        BtnPanel.IsEnabled = enabled;
-        BtnPanel.ToolTip = enabled
-            ? Loc.T("在内嵌浏览器里打开樱花FRP 管理面板（登录后可建隧道 / 看流量）")
-            : Loc.T("内嵌面板未启用或本机缺少 WebView2 运行时，可在「设置 → 联机设置」里查看");
+        // 按钮永远可点：没启用就点一下当场启用，缺运行时就给出下载地址，不要留一个灰按钮没有任何反馈
+        BtnPanel.IsEnabled = true;
+        BtnPanel.ToolTip = !available
+            ? Loc.T("在内嵌浏览器里打开樱花FRP 管理面板（本机缺少 WebView2 运行时，点击会打开下载页）")
+            : enabled
+                ? Loc.T("在内嵌浏览器里打开樱花FRP 管理面板（登录后可建隧道 / 看流量）")
+                : Loc.T("在内嵌浏览器里打开樱花FRP 管理面板（点击会先确认启用，可在「设置 → 联机设置」里关闭）");
     }
 
     // ————— 通用 —————
@@ -558,6 +615,7 @@ public partial class SakuraPlanPanel : UserControl
         BtnPrepare.IsEnabled = !busy;
         TxtKey.IsEnabled = !busy;
         PwdKey.IsEnabled = !busy;
+        TxtLocalPort.IsEnabled = !busy;
         BtnToggleKey.IsEnabled = !busy;
     }
 

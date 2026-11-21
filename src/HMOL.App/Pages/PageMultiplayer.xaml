@@ -285,6 +285,62 @@
                     <c:SakuraPlanPanel x:Name="PanSakuraPlan" />
                 </c:SurfaceCard>
 
+                <!-- 局域网端口：房主监听、客机加入、樱花隧道共用同一个值 -->
+                <c:SurfaceCard x:Name="CardLanPort"
+                               Margin="0,14,0,0"
+                               Title="{loc:T '局域网端口'}"
+                               UseShadow="False"
+                               HasHoverEffect="False">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource MpHint}"
+                                   Margin="0,0,0,6"
+                                   Text="{loc:T 'MO 局域网大厅的 TCP 端口，默认 1233。房主监听、客机加入、樱花隧道映射都用它，所以队友要填同一个值；走底部直连地址框时不看这里（那里填的端口优先）。'}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="76" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Text.Secondary}"
+                                       Text="{loc:T '端口'}" />
+                            <Border Grid.Column="1"
+                                    Height="32"
+                                    Margin="8,0,0,0"
+                                    Padding="10,0"
+                                    Background="{DynamicResource Surface.Sunken}"
+                                    BorderBrush="{DynamicResource Border.Default}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource Radius.Button}">
+                                <TextBox x:Name="TxtLanPort"
+                                         MaxLength="5"
+                                         VerticalContentAlignment="Center"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         CaretBrush="{DynamicResource Text.Primary}"
+                                         Foreground="{DynamicResource Text.Primary}"
+                                         LostFocus="OnLanPortLostFocus" />
+                            </Border>
+                            <c:OutlineButton x:Name="BtnSaveLanPort"
+                                             Grid.Column="2"
+                                             Margin="8,0,0,0"
+                                             VerticalAlignment="Center"
+                                             Content="{loc:T '保存'}"
+                                             Click="OnLanPortSaveClick" />
+                            <TextBlock Grid.Column="3"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource Text.Tertiary}"
+                                       TextWrapping="Wrap"
+                                       Text="{loc:T '有效范围 1–65535；留空或填错会回到当前设置值。'}" />
+                        </Grid>
+                    </StackPanel>
+                </c:SurfaceCard>
+
                 <c:SurfaceCard x:Name="CardConnect"
                                Margin="0,14,0,0"
                                Title="{loc:T '连接'}"

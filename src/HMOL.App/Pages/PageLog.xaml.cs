@@ -8,6 +8,7 @@ using HMOL.App.Animation;
 using HMOL.App.Controls;
 using HMOL.App.Windows;
 using HMOL.Core.App;
+using HMOL.Core.Diagnostics;
 using HMOL.Core.IO;
 using HMOL.Core.Logging;
 using HMOL.Core.Localization;
@@ -445,6 +446,40 @@ public partial class PageLog : LauncherPage
     private static string Csv(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
 
     private void OnOpenLogFolderClick(object sender, RoutedEventArgs e) => ShellHelper.OpenFolder(Paths.Log);
+
+    /// <summary>一键诊断包：日志 + 版本 + 系统信息 + 设置 / 实例快照，反馈问题时直接附上。</summary>
+    private async void OnExportDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = Loc.T("导出诊断包"),
+            FileName = DiagnosticBundle.SuggestedFileName,
+            Filter = Loc.T("压缩包 (*.zip)|*.zip")
+        };
+
+        var owner = Window.GetWindow(this);
+        if ((owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner)) != true) return;
+
+        try
+        {
+            var (ok, message) = await Task.Run(() => DiagnosticBundle.Export(dialog.FileName));
+
+            if (ok)
+            {
+                Log.Info(message);
+                Notify(message, Loc.T("导出诊断包"), MessageBoxImage.Information);
+            }
+            else
+            {
+                Notify(message, Loc.T("导出诊断包"), MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(Loc.F("导出诊断包失败：{0}", ex.Message), ex);
+            Notify(Loc.F("导出诊断包失败：{0}", ex.Message), Loc.T("导出诊断包"), MessageBoxImage.Warning);
+        }
+    }
 
     private void OnCleanupClick(object sender, RoutedEventArgs e)
     {

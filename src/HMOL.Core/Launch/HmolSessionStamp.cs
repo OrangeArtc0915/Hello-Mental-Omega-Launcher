@@ -28,7 +28,8 @@ public static class HmolSessionStamp
     /// </summary>
     /// <param name="instance">本次启动的实例。</param>
     /// <param name="executable">本次选中的主程序（可能为空，表示按类型自动探测）。</param>
-    public static void Write(GameInstance instance, string? executable)
+    /// <param name="lanPort">MO 局域网大厅的 TCP 端口（0 表示不写，客户端回退 1233）。</param>
+    public static void Write(GameInstance instance, string? executable, int lanPort = 0)
     {
         try
         {
@@ -50,6 +51,9 @@ public static class HmolSessionStamp
 
             var text = new StringBuilder();
             text.Append("HMOL=").AppendLine(AppInfo.Version);
+            // 客户端补丁用它替代写死的 1233（房主监听、房主自连、客机双击加入三处）。
+            if (lanPort is >= 1 and <= 65535)
+                text.Append("LANPORT=").AppendLine(lanPort.ToString());
             foreach (var package in packages)
                 text.Append("PACKAGE=").AppendLine(package);
 
@@ -57,9 +61,9 @@ public static class HmolSessionStamp
             foreach (var directory in directories)
                 File.WriteAllText(Path.Combine(directory, FileName), text.ToString(), content);
 
-            Log.Info(Loc.F("已写入联机会话信息：{0}（HMOL {1}，已装包 {2} 个）",
+            Log.Info(Loc.F("已写入联机会话信息：{0}（HMOL {1}，局域网端口 {2}，已装包 {3} 个）",
                 string.Join("、", directories.Select(item => Path.Combine(item, FileName))),
-                AppInfo.Version, packages.Count));
+                AppInfo.Version, lanPort, packages.Count));
         }
         catch (Exception ex)
         {
