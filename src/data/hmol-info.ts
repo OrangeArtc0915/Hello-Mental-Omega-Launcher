@@ -41,14 +41,14 @@ export interface HmolInfo {
 	ltsSeries: string;
 }
 
-/** 被标记为 LTS（长期支持）的系列。1.5.x 起为 LTS。 */
-const LTS_SERIES = "1.5";
+/** 被标记为 LTS（长期支持）的系列。1.6.x 起为 LTS。 */
+const LTS_SERIES = "1.6";
 
 /** AppInfo.cs 读取失败时的兜底值，来源同 AppInfo.cs（发版时同步更新） */
 const FALLBACK: HmolInfo = {
 	name: "Hello Mental Omega Launcher",
-	version: "1.5.24",
-	versionDisplay: "v1.5.24",
+	version: "1.6.0",
+	versionDisplay: "v1.6.0",
 	author: "mmm",
 	license: "PolyForm Noncommercial 1.0.0",
 	githubUrl:
@@ -62,7 +62,7 @@ const FALLBACK: HmolInfo = {
 		"https://gitee.com/orangearc655743/Hello-Mental-Omega-Launcher/releases",
 	qqGroup: "1034243331",
 	qqGroupUrl: "https://qm.qq.com/q/ia8Zv2AtEY",
-	zipName: "HMOL-v1.5.24-win-x64.zip",
+	zipName: "HMOL-v1.6.0-win-x64.zip",
 	isLts: true,
 	ltsSeries: LTS_SERIES,
 };
