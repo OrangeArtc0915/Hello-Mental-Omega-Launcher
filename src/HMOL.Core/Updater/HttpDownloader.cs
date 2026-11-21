@@ -52,14 +52,18 @@ public static class HttpDownloader
     private static readonly object TextCacheLock = new();
 
     /// <summary>GET 一个文本资源（带缓存与重试）。失败返回 null，不抛出。</summary>
-    public static async Task<string?> GetStringAsync(string url, string? userAgent = null, CancellationToken token = default)
+    public static async Task<string?> GetStringAsync(string url, string? userAgent = null,
+        CancellationToken token = default, string? accept = null)
     {
         if (string.IsNullOrWhiteSpace(url)) return null;
+
+        // 同一地址可能按 Accept 返回不同内容（Gitee 发行页就是如此），缓存键要带上它
+        var cacheKey = string.IsNullOrWhiteSpace(accept) ? url : url + "\n" + accept;
 
         var now = DateTimeOffset.Now;
         lock (TextCacheLock)
         {
-            if (TextCache.TryGetValue(url, out var cached) && now - cached.FetchedAt < TextCacheTtl)
+            if (TextCache.TryGetValue(cacheKey, out var cached) && now - cached.FetchedAt < TextCacheTtl)
                 return cached.Text;
         }
 
@@ -67,7 +71,7 @@ public static class HttpDownloader
         {
             try
             {
-                using var request = CreateRequest(url, userAgent);
+                using var request = CreateRequest(url, userAgent, accept);
                 using var response = await Client.SendAsync(request, HttpCompletionOption.ResponseContentRead, token);
                 response.EnsureSuccessStatusCode();
 
@@ -75,7 +79,7 @@ public static class HttpDownloader
 
                 lock (TextCacheLock)
                 {
-                    TextCache[url] = (text, DateTimeOffset.Now);
+                    TextCache[cacheKey] = (text, DateTimeOffset.Now);
                 }
 
                 return text;
@@ -138,11 +142,13 @@ public static class HttpDownloader
         lock (TextCacheLock) TextCache.Remove(url);
     }
 
-    private static HttpRequestMessage CreateRequest(string url, string? userAgent)
+    private static HttpRequestMessage CreateRequest(string url, string? userAgent, string? accept = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("User-Agent",
             string.IsNullOrWhiteSpace(userAgent) ? DefaultUserAgent : userAgent);
+        if (!string.IsNullOrWhiteSpace(accept))
+            request.Headers.TryAddWithoutValidation("Accept", accept);
         return request;
     }
 }

@@ -302,12 +302,94 @@ public static class LauncherUpdater
         return SourceProbe.Released(tag, page, ParseGitHubAssets(html));
     }
 
-    /// <summary>Gitee 用官方 API，但要查两次：releases/latest 里的 assets 是自动生成的源码包，不是人上传的附件。</summary>
+    /// <summary>Gitee 网页对非浏览器 UA 会 302 到源码归档，抓发行页时必须冒充浏览器。</summary>
+    private const string GiteeBrowserUserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+    /// <summary>
+    /// Gitee 先走网页：api/v5 的匿名请求按 IP 限流，超限直接 403，用户侧就是「Gitee 线路收不到更新」。
+    /// 网页不经过那个额度，只有结构变化、读不到时才退回官方接口兜底。
+    /// </summary>
     private static async Task<SourceProbe> ProbeGiteeAsync(CancellationToken token)
     {
         var repo = RepoPathOf(AppInfo.GiteeUrl);
         if (repo is null) return SourceProbe.Unreachable(Loc.T("仓库地址无法解析"));
 
+        var web = await ProbeGiteeWebAsync(repo, token).ConfigureAwait(false);
+        if (web.Reachable) return web;
+
+        Log.Warn(Loc.F("Gitee 发行页读取失败（{0}），改用官方接口重试", web.Error));
+
+        return await ProbeGiteeApiAsync(repo, token).ConfigureAwait(false);
+    }
+
+    /// <summary>两步：先取 releases/latest 的 302 拿 tag，再读发行页返回的 JSON 里的附件。</summary>
+    private static async Task<SourceProbe> ProbeGiteeWebAsync(string repo, CancellationToken token)
+    {
+        var location = await HttpDownloader
+            .GetRedirectLocationAsync($"https://gitee.com/{repo}/releases/latest", GiteeBrowserUserAgent, token)
+            .ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(location)) return SourceProbe.Unreachable(Loc.T("没有取到跳转地址"));
+
+        var tag = ExtractTag(location);
+
+        // 一个发行版都没有时只跳到 .../releases，这是正常状态，不是错误
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            Log.Info(Loc.F("Gitee 上还没有发布版本（releases/latest 跳到 {0}）", location));
+            return SourceProbe.Released(null, AppInfo.GiteeReleasesUrl, []);
+        }
+
+        var page = $"{AppInfo.GiteeReleasesUrl}/tag/{tag}";
+        var json = await HttpDownloader
+            .GetStringAsync(page, GiteeBrowserUserAgent, token, "application/json")
+            .ConfigureAwait(false);
+
+        if (json is null) return SourceProbe.Unreachable(Loc.F("发行页读取失败（{0}）", tag));
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("release", out var release)
+                || release.ValueKind != JsonValueKind.Object)
+                return SourceProbe.Unreachable(Loc.T("发行页不是预期格式"));
+
+            var assets = new List<UpdateAsset>();
+
+            // 结构：{ release: { release: { attach_files: [ { name, download_url } ] } } }
+            if (release.TryGetProperty("release", out var detail)
+                && detail.ValueKind == JsonValueKind.Object
+                && detail.TryGetProperty("attach_files", out var files)
+                && files.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in files.EnumerateArray())
+                {
+                    var name = ReadString(item, "name");
+                    var url = ReadString(item, "download_url");
+
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(url)) continue;
+
+                    if (url!.StartsWith("/", StringComparison.Ordinal)) url = "https://gitee.com" + url;
+
+                    assets.Add(new UpdateAsset(name!, url!));
+                }
+            }
+
+            return SourceProbe.Released(tag, page, assets);
+        }
+        catch (Exception ex)
+        {
+            return SourceProbe.Unreachable(Loc.F("发行页解析失败（{0}）", ex.Message));
+        }
+    }
+
+    /// <summary>官方接口兜底：releases/latest 里的 assets 是自动生成的源码包，附件要另查一次。</summary>
+    private static async Task<SourceProbe> ProbeGiteeApiAsync(string repo, CancellationToken token)
+    {
         var json = await HttpDownloader
             .GetStringAsync($"https://gitee.com/api/v5/repos/{repo}/releases/latest", UserAgent, token)
             .ConfigureAwait(false);
