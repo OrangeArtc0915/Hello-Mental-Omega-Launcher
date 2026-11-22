@@ -386,6 +386,14 @@ const transparentClass = shouldEnableTransparency
                 <div id="content-wrapper" class="onload-animation transition-leaving">
                     <!-- the overflow-hidden here prevent long text break the layout-->
                     <!-- make id different from windows.swup global property -->
+                    {isHomePage && (
+                        <div class="card-base mb-4 flex items-start gap-2.5 px-4 py-3">
+                            <Icon class="mt-0.5 shrink-0 text-[1.15rem] text-[var(--primary)]" name="material-symbols:info-outline-rounded" />
+                            <p class="text-sm leading-relaxed text-black/75 dark:text-white/75">
+                                <span class="font-bold">开发计划：</span>v1.6.x 将是最后一个版本，之后只修复 BUG，不再更新新内容。不是因为其他原因，是想象力匮乏了。
+                            </p>
+                        </div>
+                    )}
                     <slot></slot>
                     <div class="footer col-span-2 onload-animation hidden lg:block">
                         <Footer></Footer>

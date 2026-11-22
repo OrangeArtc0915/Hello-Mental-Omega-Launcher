@@ -22,6 +22,7 @@ import {
 } from "../data/hmol-info";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
 import { url } from "../utils/url-utils";
+import { Icon } from "astro-icon/components";
 
 const installGuideHref = url("/posts/hmol-install-guide/");
 const faqHref = url("/faq/");
@@ -99,6 +100,16 @@ const installSteps = [
 				</h1>
 				<p class="text-lg text-black/60 dark:text-white/60">
 					请仅从本页给出的官方渠道下载。第三方分发版本可能已被修改，请勿使用。
+				</p>
+			</div>
+
+			<!-- 开发计划公告 -->
+			<div
+				class="card-base !p-4 border border-black/5 dark:border-white/5 flex items-start gap-2.5 mb-8"
+			>
+				<Icon class="mt-0.5 shrink-0 text-[1.15rem] text-[var(--primary)]" name="material-symbols:info-outline-rounded" />
+				<p class="text-sm leading-relaxed text-black/75 dark:text-white/75">
+					<span class="font-bold">开发计划：</span>v1.6.x 将是最后一个版本，之后只修复 BUG，不再更新新内容。不是因为其他原因，是想象力匮乏了。当前版本仍可正常下载与使用。
 				</p>
 			</div>
 
