@@ -47,17 +47,7 @@ namespace MoLanRelay
         // 每次改动都改这个号：日志开头的 "MoLanRelay vX" 就是它。
         // 三台机器版本不一致会导致"有的能收不能发"这类诡异现象，先看这个号。
         // 语义化版本 vX.Y.Z，主菜单右下角显示的也是它。
-        public const string Version = "0.16.4";
-
-        // v0.16.4 是最后一个版本：每次启动在房间聊天区提示一次
-        static bool finalNoticeShown;
-
-        static void ShowFinalNotice(object lobby)
-        {
-            if (finalNoticeShown || lobby == null) return;
-            finalNoticeShown = true;
-            Notice(lobby, "提示：v" + Version + " 将是最后一个版本，不再更新新内容！", true);
-        }
+        public const string Version = "0.16.5";
         const int MaxPeers = 8;
 
         class Peer
@@ -2596,27 +2586,13 @@ namespace MoLanRelay
             }
         }
 
-        /// <summary>房间那张背景用的纯色：theme.ini 有 Dark 就用它，否则用压暗到 20% 的主色。</summary>
+        /// <summary>局域网大厅与房间的背景：固定纯黑，不跟主题走。</summary>
         static void SetSolidFromTheme(string dir, int ar, int ag, int ab)
         {
-            string dark = ThemeIniValue(dir, "Dark");
-            if (dark.Length >= 6)
-            {
-                try
-                {
-                    solidR = Convert.ToInt32(dark.Substring(0, 2), 16);
-                    solidG = Convert.ToInt32(dark.Substring(2, 2), 16);
-                    solidB = Convert.ToInt32(dark.Substring(4, 2), 16);
-                    ThemeVideo.SetSolid(solidR, solidG, solidB);
-                    return;
-                }
-                catch { }
-            }
-
-            solidR = ar * 20 / 100;
-            solidG = ag * 20 / 100;
-            solidB = ab * 20 / 100;
-            ThemeVideo.SetSolid(solidR, solidG, solidB);
+            solidR = 0;
+            solidG = 0;
+            solidB = 0;
+            ThemeVideo.SetSolid(0, 0, 0);
         }
 
         static string ThemeVideoPath(string dir)
@@ -4259,7 +4235,7 @@ namespace MoLanRelay
                 ? "HMOL not running"
                 : "HMOL v" + versionLabelHmol;
 
-            return "Patch v" + Version + " · 最终版  |  " + hmol;
+            return "Patch v" + Version + "  |  " + hmol;
         }
 
         /// <summary>读 HMOL 启动前写的会话标记；不是这次启动留下的旧文件就算"没在跑"。</summary>
@@ -4376,10 +4352,6 @@ namespace MoLanRelay
         public static void Tick(object lobby, object gameTime)
         {
             LoadSettings();
-
-            // v0.16.4 是最后一个版本：进房间后在聊天区提示一次
-            try { ShowFinalNotice(lobby); }
-            catch { }
 
             // 视频壁纸：大厅里的背景也逐帧刷新
             try { ThemeVideo.Tick(1, IsWindowVisible(lobby)); }
