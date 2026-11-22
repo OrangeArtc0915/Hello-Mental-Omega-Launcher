@@ -199,6 +199,8 @@ public partial class App : Application
             {
                 await LauncherUpdateFlow.StartupCheckAsync(window, updateFailure, silenced: quiet);
 
+                if (!quiet) ShowEndOfLineNotice(window);
+
                 if (!quiet) window.ShowTutorialHintOnce();
             }));
 
@@ -210,8 +212,15 @@ public partial class App : Application
         }
     }
 
-    // ————— 门锁（远程开关）—————
+    /// <summary>
+    /// v1.6.x 收尾公告：每次正常启动（显示主窗口）都提示一次。
+    /// 开机自启驻留托盘与截图自检走不到这里，避免开机打扰与干扰截图。
+    /// </summary>
+    private static void ShowEndOfLineNotice(Window owner)
+        => ChoiceWindow.Info(owner, Loc.T("开发计划"),
+            Loc.T("v1.6.x 将是最后一个版本，之后只修复 BUG，不再更新新内容。"));
 
+    // ————— 门锁（远程开关）—————
     /// <summary>
     /// 显示门锁提示并留日志。自启驻留托盘时只记日志、不弹窗，避免开机时打扰用户
     /// （与「已有实例」那处的安静退出保持一致）。

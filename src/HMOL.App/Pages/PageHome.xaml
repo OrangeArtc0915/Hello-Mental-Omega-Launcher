@@ -37,7 +37,45 @@
         纵向留白放在 ScrollViewer 上、不放进滚动内容里，内层栅格才能用「至少与可视区等高」表达
         「窗口够大时铺满（弹性行 PanHomeStage 仍拉伸，百分比基准不塌），装不下时才滚动」。
     -->
-    <ScrollViewer x:Name="ScrollHome"
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--
+            v1.6.x 收尾公告：常驻在主页最上方，不参与主页自由定位，也不进布局方案。
+        -->
+        <Border Grid.Row="0"
+                Margin="24,16,24,0"
+                Padding="12,10"
+                Background="{DynamicResource Accent.Faint}"
+                CornerRadius="{DynamicResource Radius.Item}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <svg:SvgIcon Grid.Column="0"
+                             Width="16"
+                             Height="16"
+                             Margin="0,1,0,0"
+                             VerticalAlignment="Top"
+                             Icon="lucide/info"
+                             IconBrush="{DynamicResource Accent.Base}" />
+                <TextBlock Grid.Column="1"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource Text.Secondary}"
+                           Text="{loc:T 'v1.6.x 是最后一个版本，之后只修复 BUG，不再更新新内容。'}" />
+            </Grid>
+        </Border>
+
+        <ScrollViewer x:Name="ScrollHome"
+                  Grid.Row="1"
                   Margin="0,16,0,12"
                   HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto">
@@ -1315,5 +1353,6 @@
                 </StackPanel>
             </Border>
         </Grid>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
 </c:LauncherPage>
