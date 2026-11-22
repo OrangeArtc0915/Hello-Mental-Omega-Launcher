@@ -95,7 +95,7 @@ if (!(Test-Path $dnlib)) { throw ('缺文件: ' + $dnlib) }
 # ------------------------------------------------------------------
 # 2) 本次要改哪些文件
 # ------------------------------------------------------------------
-$exeModes = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'chatcmd', 'deny', 'mention', 'tab', 'preflight', 'verlabel', 'rxbuf')
+$exeModes = @('lanip', 'relay', 'relaysend', 'relayhost', 'lobbyfix', 'kick', 'chatcmd', 'deny', 'mention', 'tab', 'preflight', 'verlabel', 'rxbuf', 'lanport', 'mapmsg', 'lantick')
 
 # 键 = 相对游戏根的路径；值 = 依次执行的 dnlibpatch 模式
 $jobs = @{}

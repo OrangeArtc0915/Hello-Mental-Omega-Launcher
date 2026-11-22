@@ -1,4 +1,4 @@
-// MO 局域网「游戏内 UDP 中继」
+﻿// MO 局域网「游戏内 UDP 中继」
 //
 // 作用：樱花 Frp 只开一条 TCP 隧道（公网 → 本机 1233），游戏的 UDP 走不出去。
 //       本中继把 gamemd 发出的 UDP 包封进大厅**已有的那条 TCP 连接**里转发，
@@ -22,8 +22,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.IO.Compression;
 using System.Linq.Expressions;
 using System.Net;
 using System.Net.Sockets;
@@ -45,7 +47,17 @@ namespace MoLanRelay
         // 每次改动都改这个号：日志开头的 "MoLanRelay vX" 就是它。
         // 三台机器版本不一致会导致"有的能收不能发"这类诡异现象，先看这个号。
         // 语义化版本 vX.Y.Z，主菜单右下角显示的也是它。
-        public const string Version = "0.6.0";
+        public const string Version = "0.16.4";
+
+        // v0.16.4 是最后一个版本：每次启动在房间聊天区提示一次
+        static bool finalNoticeShown;
+
+        static void ShowFinalNotice(object lobby)
+        {
+            if (finalNoticeShown || lobby == null) return;
+            finalNoticeShown = true;
+            Notice(lobby, "提示：v" + Version + " 将是最后一个版本，不再更新新内容！", true);
+        }
         const int MaxPeers = 8;
 
         class Peer
@@ -127,6 +139,8 @@ namespace MoLanRelay
                 Log("start: self=" + selfName + " host=" + isHost
                     + " (byOrder=" + byOrder + " byConn=" + byConn + ")"
                     + " 玩家数=" + CountPeers(playersList) + " 本机端口表=[" + PeerMap() + "]");
+
+                SnapshotMatch(key);
             }
             catch (Exception ex)
             {
@@ -141,6 +155,118 @@ namespace MoLanRelay
         {
             try { return typeof(Relay).Assembly.Location; }
             catch { return "?"; }
+        }
+
+        // ------------------------------------------------------------------
+        // 对局记录
+        //
+        // 这个客户端**完全没有录像功能**（clientdx.exe 里连 "record" 字样都搜不到），
+        // 所以能留下的只有"这局是什么样"：开局几秒后把 spawn.ini 复制一份，
+        // 再把地图 / 模式 / 玩家追加到 index.txt —— 出问题时拿来复盘谁在场、什么设置。
+        // ------------------------------------------------------------------
+
+        static string lastSnapshotKey = "";
+
+        static void SnapshotMatch(string key)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(key) || key == lastSnapshotKey) return;
+                lastSnapshotKey = key;
+                if (string.IsNullOrEmpty(logPath)) return;
+                string logDir = Path.GetDirectoryName(logPath);
+                if (string.IsNullOrEmpty(logDir)) return;
+
+                Thread t = new Thread(delegate()
+                {
+                    try
+                    {
+                        Thread.Sleep(6000);      // 等客户端把 spawn.ini 写完、游戏真正起来
+                        string src = Path.Combine(logDir, "spawn.ini");
+                        if (!File.Exists(src)) return;
+
+                        string text = File.ReadAllText(src);
+                        string map = IniValue(text, "UIMapName");
+                        string mode = IniValue(text, "UIGameMode");
+                        string stamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm");
+
+                        string dir = Path.Combine(logDir, "对局记录");
+                        Directory.CreateDirectory(dir);
+
+                        string safe = SafeFileName(map);
+                        if (safe.Length == 0) safe = "未知地图";
+                        string dst = Path.Combine(dir, stamp + "_" + safe + ".ini");
+                        File.Copy(src, dst, true);
+
+                        string players = string.Join("、", PlayerNames(text));
+                        File.AppendAllText(Path.Combine(dir, "index.txt"),
+                            stamp + "  |  " + map + "  |  " + mode + "  |  " + players + Environment.NewLine,
+                            new UTF8Encoding(false));
+
+                        Log("match: 已保存对局记录 " + Path.GetFileName(dst) + "（" + players + "）");
+                    }
+                    catch (Exception ex) { Log("match: 保存对局记录失败: " + ex.Message); }
+                });
+                t.IsBackground = true;
+                t.Start();
+            }
+            catch { }
+        }
+
+        /// <summary>从 ini 文本里取一个键的值（找不到返回空串）。</summary>
+        static string IniValue(string text, string key)
+        {
+            try
+            {
+                foreach (string raw in text.Split('\n'))
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0 || line[0] == ';' || line[0] == '[') continue;
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    if (string.Equals(line.Substring(0, eq).Trim(), key, StringComparison.OrdinalIgnoreCase))
+                        return line.Substring(eq + 1).Trim();
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        /// <summary>spawn.ini 里所有 Name= 的值（含 [Settings] 的主机自己和 [OtherN]）。</summary>
+        static List<string> PlayerNames(string spawnText)
+        {
+            List<string> names = new List<string>();
+            try
+            {
+                foreach (string raw in spawnText.Split('\n'))
+                {
+                    string line = raw.Trim();
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string k = line.Substring(0, eq).Trim();
+                    if (!string.Equals(k, "Name", StringComparison.OrdinalIgnoreCase)) continue;
+                    string v = line.Substring(eq + 1).Trim();
+                    if (v.Length > 0 && !names.Contains(v)) names.Add(v);
+                }
+            }
+            catch { }
+            return names;
+        }
+
+        /// <summary>把地图名变成合法文件名（去掉 [] 之类）。</summary>
+        static string SafeFileName(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            StringBuilder sb = new StringBuilder(s.Length);
+            char[] bad = Path.GetInvalidFileNameChars();
+            foreach (char c in s)
+            {
+                bool ok = true;
+                for (int i = 0; i < bad.Length; i++) if (c == bad[i]) { ok = false; break; }
+                if (ok && c != '[' && c != ']' && c != '\\' && c != '/') sb.Append(c);
+            }
+            string r = sb.ToString().Trim();
+            return r.Length > 40 ? r.Substring(0, 40) : r;
         }
 
         // ------------------------------------------------------------------
@@ -344,6 +470,28 @@ namespace MoLanRelay
             return null;
         }
 
+        /// <summary>从 "RRGGBB" 造一个 XNA Color（主题配色用）。</summary>
+        static object MakeColorHex(string hex)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(hex) || hex.Length < 6) return null;
+                int r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                int g = Convert.ToInt32(hex.Substring(2, 2), 16);
+                int b = Convert.ToInt32(hex.Substring(4, 2), 16);
+
+                foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type ct = a.GetType("Microsoft.Xna.Framework.Color");
+                    if (ct == null) continue;
+                    ConstructorInfo ci = ct.GetConstructor(new Type[] { typeof(int), typeof(int), typeof(int) });
+                    if (ci != null) return ci.Invoke(new object[] { r, g, b });
+                }
+            }
+            catch { }
+            return null;
+        }
+
         static string cachedMyName;
         static bool warnedNoName;
 
@@ -484,6 +632,7 @@ namespace MoLanRelay
             try
             {
                 if (text == null) return original;
+                AppendChatLog(text);
                 string me = MyPlayerName();
                 bool hasAt = text.IndexOf('@') >= 0;
 
@@ -509,6 +658,59 @@ namespace MoLanRelay
             }
             catch (Exception ex) { Log("mention error: " + ex.Message); }
             return original;
+        }
+
+        // ------------------------------------------------------------------
+        // 聊天留档
+        //
+        // 这个客户端没有录像，聊天就是最直接的复盘材料：和 spawn.ini 快照放同一个目录。
+        // 每条聊天先入队，StatusTick 每 2 秒落一次盘，避免每句话都碰磁盘。
+        // ------------------------------------------------------------------
+
+        static readonly List<string> chatLogQueue = new List<string>();
+        static DateTime lastChatFlush = DateTime.MinValue;
+
+        static void AppendChatLog(string text)
+        {
+            try
+            {
+                if (!chatLogEnabled || string.IsNullOrEmpty(text)) return;
+                string line = DateTime.Now.ToString("HH:mm:ss") + "  " + text.Trim();
+                if (line.Length == 0) return;
+                lock (chatLogQueue)
+                {
+                    if (chatLogQueue.Count >= 2000) return;   // 异常刷屏时别把内存撑爆
+                    chatLogQueue.Add(line);
+                }
+            }
+            catch { }
+        }
+
+        static void ChatLogTick()
+        {
+            if ((DateTime.Now - lastChatFlush).TotalSeconds < 2) return;
+            lastChatFlush = DateTime.Now;
+
+            string[] lines;
+            lock (chatLogQueue)
+            {
+                if (chatLogQueue.Count == 0) return;
+                lines = chatLogQueue.ToArray();
+                chatLogQueue.Clear();
+            }
+
+            try
+            {
+                if (!chatLogEnabled) return;      // 关掉了就把积压丢掉
+                string root = SafeGetGamePath();
+                if (string.IsNullOrEmpty(root)) return;
+
+                string dir = Path.Combine(root, "对局记录");
+                Directory.CreateDirectory(dir);
+                string file = Path.Combine(dir, "聊天_" + DateTime.Now.ToString("yyyy-MM-dd") + ".txt");
+                File.AppendAllLines(file, lines, new UTF8Encoding(false));
+            }
+            catch (Exception ex) { Log("chatlog: 写入失败: " + ex.Message); }
         }
 
         /// <summary>
@@ -588,26 +790,16 @@ namespace MoLanRelay
                 if (string.IsNullOrEmpty(text)) return text;
                 if (text.StartsWith("[@", StringComparison.Ordinal)) return text;   // 已经加过，别重复
 
-                // 时间戳：只改本机显示的字符串，发出去的内容一个字节都不动
-                string shown = text;
-                if (chatTimestampEnabled && !LooksTimestamped(text))
-                    shown = "[" + DateTime.Now.ToString("HH:mm") + "] " + text;
-
                 string me = MyPlayerName();
-                if (me.Length == 0) return shown;
+                if (me.Length == 0) return text;
 
                 string why;
-                if (!IsMentioned(text, lobby, me, out why)) return shown;
+                if (!IsMentioned(text, lobby, me, out why)) return text;
 
                 Log("@：给消息正文加了 [@你] 标记（" + why + "）→ " + text);
-                return "[@你] " + shown;
+                return "[@你] " + text;
             }
             catch { return text; }
-        }
-
-        static bool LooksTimestamped(string text)
-        {
-            return text.Length > 6 && text[0] == '[' && text[3] == ':' && text[6] == ']';
         }
 
         // ------------------------------------------------------------------
@@ -953,6 +1145,10 @@ namespace MoLanRelay
 
             LoadSettings();
 
+            // 视频壁纸：有新帧就上传到主菜单背景贴图
+            try { ThemeVideo.Tick(0, IsWindowVisible(mainMenu)); }
+            catch (Exception ex) { Log("video tick error: " + ex.Message); }
+
             // 设置窗口：删掉 CnCNet/更新页和「下载音乐包」，加「联机补丁」页
             try { OptionsTick(mainMenu); }
             catch (Exception ex) { Log("options tick error: " + ex.Message); }
@@ -962,9 +1158,28 @@ namespace MoLanRelay
             try { ApplyMainMenuLayout(mainMenu); }
             catch (Exception ex) { Log("verlabel: 调整主菜单布局失败: " + ex.Message); }
 
+            try { HideLeftoverLinks(mainMenu); }
+            catch (Exception ex) { Log("verlabel: 清理残留链接失败: " + ex.Message); }
+
+            // 启动器（HMOL）写进来的壁纸：主题目录里有 .pending 就套用一次
+            try { ApplyPendingThemeOnce(); }
+            catch (Exception ex) { Log("theme: 自动套用主题失败: " + ex.Message); }
+
+            try { TryAutoGlass(); }
+            catch (Exception ex) { Log("theme: 自动玻璃按钮失败: " + ex.Message); }
+
+            try { GlassBootTick(); }
+            catch (Exception ex) { Log("theme: 玻璃按钮热加载失败: " + ex.Message); }
+
             // 顶部栏：禁用「CnCNet 大厅」小按钮、把状态文字改成「局域网大厅」
             try { ApplyTopBarLayout(mainMenu); }
             catch (Exception ex) { Log("verlabel: 调整顶部栏失败: " + ex.Message); }
+
+            // 回主菜单：清掉大厅引用（导出的提示不要再往旧大厅里发）
+            logLobbyCurrent = null;
+
+            // 设置窗口「地图」页：清单有变化时重画
+            try { MapTabTick(); } catch (Exception ex) { Log("clearmaps: 刷新列表失败: " + ex.Message); }
 
             try
             {
@@ -1089,6 +1304,179 @@ namespace MoLanRelay
                 if (cnt != null) SetMember(cnt, "Visible", false);
                 cncnetLabelsHidden = true;
             }
+
+            // 主页的社交图标（推特/油管/脸书/Discord）和左下角更新状态一并关掉
+            if (!ReferenceEquals(extraMenuOwner, mainMenu))
+            {
+                extraMenuOwner = mainMenu;
+                extraMenuHidden = false;
+            }
+
+            if (!extraMenuHidden)
+            {
+                string[] extraNames = { "menu_fb", "menu_yt", "menu_tw", "menu_dc", "lblUpdateStatus", "btnCredits" };
+                int found = 0;
+                for (int i = 0; i < extraNames.Length; i++)
+                {
+                    object ctl = FindControl(mainMenu, extraNames[i]);
+                    if (ctl == null) continue;
+                    found++;
+                    SetMember(ctl, "Visible", false);
+                }
+                if (found == extraNames.Length)
+                {
+                    extraMenuHidden = true;
+                    Log("verlabel: 已关闭主页社交图标与更新状态 " + found + " 项");
+                }
+            }
+
+            currentMainMenu = mainMenu;
+            ApplyMenuLayout(mainMenu);
+        }
+
+        static object extraMenuOwner;
+        static bool extraMenuHidden;
+
+        // ---------------- 主页按钮布局 ----------------
+
+        static readonly string[] MenuLayouts = { "left", "bottom", "center", "right" };
+        static readonly string[] MenuLayoutTexts = { "左侧竖排", "底部横排", "居中竖排", "右侧竖排" };
+        static string menuLayout = "left";
+        static string menuLayoutApplied = "";
+        static object menuLayoutAppliedTo;
+
+        static string MenuLayoutText()
+        {
+            int i = Array.IndexOf(MenuLayouts, menuLayout);
+            return i >= 0 ? MenuLayoutTexts[i] : MenuLayoutTexts[0];
+        }
+
+        static void ApplyMenuLayout(object mainMenu)
+        {
+            if (mainMenu == null) return;
+            if (ReferenceEquals(menuLayoutAppliedTo, mainMenu) && menuLayoutApplied == menuLayout) return;
+
+            try
+            {
+                string[] order =
+                {
+                    "btnNewCampaign", "btnSkirmish", "btnLan", "btnLoadGame",
+                    "btnOptions", "btnMapEditor", "btnStatistics", "btnExit",
+                };
+
+                List<object> btns = new List<object>();
+                for (int i = 0; i < order.Length; i++)
+                {
+                    object b = FindControl(mainMenu, order[i]);
+                    if (b == null) continue;
+                    if (GetMember(b, "Visible") is bool v && !v) continue;
+                    btns.Add(b);
+                }
+                if (btns.Count == 0) return;
+
+                int W = GetInt(mainMenu, "Width", 1280);
+                int H = GetInt(mainMenu, "Height", 768);
+                int bw = 145, bh = 42, gap = 10;
+
+                int totalV = btns.Count * bh + (btns.Count - 1) * gap;
+                int startY = (H - totalV) / 2;
+                if (startY < 20) startY = 20;
+
+                for (int i = 0; i < btns.Count; i++)
+                {
+                    int x, y;
+                    if (menuLayout == "bottom")
+                    {
+                        int step = bw + 8;
+                        int startX = (W - (btns.Count * bw + (btns.Count - 1) * 8)) / 2;
+                        if (startX < 8) startX = 8;
+                        x = startX + i * step;
+                        y = H - bh - 48;
+                    }
+                    else
+                    {
+                        if (menuLayout == "left") x = 70;
+                        else if (menuLayout == "center") x = (W - bw) / 2;
+                        else x = W - bw - 70;
+                        y = startY + i * (bh + gap);
+                    }
+
+                    SetMember(btns[i], "X", x);
+                    SetMember(btns[i], "Y", y);
+                }
+
+                menuLayoutAppliedTo = mainMenu;
+                menuLayoutApplied = menuLayout;
+                Log("menu: 布局=" + menuLayout + " 按钮数=" + btns.Count);
+            }
+            catch (Exception ex) { Log("menu: 应用布局失败: " + ex.Message); }
+        }
+
+        static void MenuLayoutClick(object sender, EventArgs e)
+        {
+            try
+            {
+                int i = Array.IndexOf(MenuLayouts, menuLayout);
+                i = (i + 1) % MenuLayouts.Length;
+                menuLayout = MenuLayouts[i];
+                SaveSettings();
+
+                if (sender != null) SetMember(sender, "Text", "主页布局：" + MenuLayoutText());
+                menuLayoutAppliedTo = null;
+                if (currentMainMenu != null) ApplyMenuLayout(currentMainMenu);
+
+                Log("menu: 布局切换为 " + menuLayout);
+            }
+            catch (Exception ex) { Log("menu: 切换布局失败: " + ex.Message); }
+        }
+
+        static object currentMainMenu;
+
+        // 「关于/制作人员」窗口里的 ModDB（官网）按钮：窗口是临时创建的，
+        // 所以每两秒扫一遍 WindowManager.Controls，见到就关掉。
+        static DateTime lastLinkSweep = DateTime.MinValue;
+        static bool moddbHiddenLogged;
+
+        static void HideLeftoverLinks(object mainMenu)
+        {
+            if ((DateTime.Now - lastLinkSweep).TotalSeconds < 2) return;
+            lastLinkSweep = DateTime.Now;
+
+            try
+            {
+                object wm = GetMember(mainMenu, "WindowManager");
+                if (wm == null) return;
+                IList controls = GetMember(wm, "Controls") as IList;
+                if (controls == null) return;
+
+                foreach (object ctl in controls)
+                {
+                    if (ctl == null) continue;
+
+                    string[] linkNames =
+                    {
+                        "btnModDB", "btnForums", "btnGooglePlus",
+                        "btnYouTube", "btnFacebook", "btnTwitter",
+                        // 主菜单右上角那个 24x24 的「附加」小方块：点开只有一个「返回」，
+                        // MO 里所有 Extras 按钮都是 Visible=0，留着纯占位，直接关掉
+                        "btnExtras",
+                    };
+
+                    for (int i = 0; i < linkNames.Length; i++)
+                    {
+                        object b = FindControl(ctl, linkNames[i]);
+                        if (b == null) continue;
+                        if (GetMember(b, "Visible") is bool v && !v) continue;
+                        SetMember(b, "Visible", false);
+                        if (!moddbHiddenLogged)
+                        {
+                            moddbHiddenLogged = true;
+                            Log("verlabel: 已关闭关于窗口里的官网/社交链接");
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         static readonly string[] MenuButtons =
@@ -1112,6 +1500,17 @@ namespace MoLanRelay
         static object topBar;
         static bool topBarApplied;
         static int topBarAttempts;
+        static DateTime lastTopBarVerify = DateTime.MinValue;
+
+        /// <summary>控件存在且 Visible/AllowClick 仍为真（需要重新关）。</summary>
+        static bool IsControlShown(object root, string name)
+        {
+            object c = FindControl(root, name);
+            if (c == null) return false;
+            if (GetMember(c, "Visible") is bool v && v) return true;
+            if (GetMember(c, "AllowClick") is bool a && a) return true;
+            return false;
+        }
 
         static void ApplyTopBarLayout(object mainMenu)
         {
@@ -1147,7 +1546,27 @@ namespace MoLanRelay
                 HideControl(topBar, "lblCnCNetPlayerCount");
 
                 topBarApplied = true;
+                topBarAttempts = 0;
                 Log("verlabel: 顶部栏已关闭 CnCNet 入口（大厅/私信/注销）");
+            }
+            else if ((DateTime.Now - lastTopBarVerify).TotalMilliseconds >= 1000)
+            {
+                // 顶部栏在切分辨率 / 返回主菜单时会重建控件，重建后那几个按钮又会显示出来。
+                // 每秒复查一次：只有真的变回可见时才重新关（正常情况什么都不做）。
+                lastTopBarVerify = DateTime.Now;
+                if (IsControlShown(topBar, "btnCnCNetLobby")
+                    || IsControlShown(topBar, "btnPrivateMessages")
+                    || IsControlShown(topBar, "btnLogout")
+                    || IsControlShown(topBar, "lblCnCNetStatus")
+                    || IsControlShown(topBar, "lblCnCNetPlayerCount"))
+                {
+                    DisableButton(topBar, "btnCnCNetLobby");
+                    DisableButton(topBar, "btnPrivateMessages");
+                    DisableButton(topBar, "btnLogout");
+                    HideControl(topBar, "lblCnCNetStatus");
+                    HideControl(topBar, "lblCnCNetPlayerCount");
+                    Log("verlabel: 顶部栏被重建，已重新关闭 CnCNet 入口");
+                }
             }
 
             // 客户端在连接状态变化时会重写这个标签（默认「离线」），每帧对一次
@@ -1160,6 +1579,2615 @@ namespace MoLanRelay
         }
 
         const string LanLobbyStatusText = "局域网大厅";
+
+        // ------------------------------------------------------------------
+        // 大厅背景图
+        //
+        // 客户端的大厅底板就是 Resources\gamelobbybg.png（局域网和在线大厅共用）。
+        // 换背景不做贴图注入，直接换文件：谁想要自定义就把图存成
+        //   Resources\MoLobbyBg.png
+        // 本机会自动备份原图（gamelobbybg.orig.png）再覆盖；关掉开关会还原。
+        // 改文件不影响联机同步 —— 这只影响自己看到的底图。
+        // ------------------------------------------------------------------
+
+        static bool lobbyBgDone;
+
+        static void LobbyBackgroundTick()
+        {
+            if (lobbyBgDone) return;
+            lobbyBgDone = true;
+
+            // 用了整套主题就别再让单张 MoLobbyBg.png 覆盖大厅底图，否则每次启动都会把主题换回去
+            if (!string.IsNullOrEmpty(themeName))
+            {
+                Log("lobbybg: 已启用主题「" + themeName + "」，跳过单图替换");
+                return;
+            }
+
+            try
+            {
+                string root = SafeGetGamePath();
+                if (string.IsNullOrEmpty(root)) return;
+                string dir = Path.Combine(root, "Resources");
+                if (!Directory.Exists(dir)) return;
+
+                string target = Path.Combine(dir, "gamelobbybg.png");
+                string backup = Path.Combine(dir, "gamelobbybg.orig.png");
+                string custom = Path.Combine(dir, "MoLobbyBg.png");
+
+                if (!lobbyBgEnabled)
+                {
+                    // 关掉：把原图放回去（只做一次，之后不再动）
+                    if (File.Exists(backup) && File.Exists(target))
+                    {
+                        File.Copy(backup, target, true);
+                        Log("lobbybg: 已还原默认大厅背景");
+                    }
+                    return;
+                }
+
+                if (!File.Exists(custom))
+                {
+                    Log("lobbybg: 没有 MoLobbyBg.png，使用默认背景");
+                    return;
+                }
+                if (!File.Exists(target))
+                {
+                    Log("lobbybg: 找不到 gamelobbybg.png，跳过");
+                    return;
+                }
+
+                if (SameFile(target, custom))
+                {
+                    Log("lobbybg: 自定义背景已生效");
+                    return;
+                }
+
+                if (!File.Exists(backup)) File.Copy(target, backup, false);
+                File.Copy(custom, target, true);
+                Log("lobbybg: 已应用 MoLobbyBg.png（原图备份为 gamelobbybg.orig.png）");
+            }
+            catch (Exception ex) { Log("lobbybg: 换背景失败: " + ex.Message); }
+        }
+
+        static bool SameFile(string a, string b)
+        {
+            try
+            {
+                if (new FileInfo(a).Length != new FileInfo(b).Length) return false;
+                using (FileStream fa = File.OpenRead(a))
+                using (FileStream fb = File.OpenRead(b))
+                {
+                    int x, y;
+                    do
+                    {
+                        x = fa.ReadByte();
+                        y = fb.ReadByte();
+                        if (x != y) return false;
+                    } while (x != -1);
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // ------------------------------------------------------------------
+        // 主题（美化）
+        //
+        // 客户端所有界面底板都是 Resources 下的固定文件名，所以"换主题"就是换文件。
+        // 目录约定： Resources\MoThemes\<主题名>\
+        //   · 放一张 bg.png（或 bg.jpg / wall.png）→ 自动裁剪缩放成全套 9 张背景
+        //   · 也可以放同名文件精确覆盖其中某几张（gamelobbybg.png 等）
+        // 首次应用会把原图备份到 Resources\MoThemes\_原图备份\，"还原"就是拷回去。
+        // 贴图在客户端启动时载入，所以换完要重开客户端才看得到。
+        // ------------------------------------------------------------------
+
+        static readonly string[] ThemeTargets =
+        {
+            "gamelobbybg.png",          // 局域网/在线大厅底板
+            "cncnetlobbybg.png",        // 在线大厅
+            "optionsbg.png",            // 设置窗口（含我们加的标签）
+            "hotkeyconfigbg.png",       // 快捷键设置
+            "loadmissionbg.png",        // 载入任务
+            "missionselectorbg.png",    // 战役选择
+            "campsite.png",             // 战役界面
+            "campsite2.png",
+            @"MainMenu\mainmenubg.png", // 主菜单
+            "loadingscreen.png",        // 载入画面
+            "gameinprogresswindowbg.png",
+            "gamecreationoptionsbg.png",
+            "longdescbg.png",
+        };
+
+        // 主题会换色的按钮贴图：8 种通用宽度（普通 + 悬停）+ 主菜单的文字按钮
+        static readonly string[] ThemeButtonTargets =
+        {
+            "75pxbtn.png", "75pxbtn_c.png", "92pxbtn.png", "92pxbtn_c.png",
+            "97pxbtn.png", "97pxbtn_c.png", "110pxbtn.png", "110pxbtn_c.png",
+            "121pxbtn.png", "121pxbtn_c.png", "133pxbtn.png", "133pxbtn_c.png",
+            "142pxbtn.png", "142pxbtn_c.png", "160pxbtn.png", "160pxbtn_c.png",
+            @"MainMenu\campaign.png", @"MainMenu\campaign_c.png",
+            @"MainMenu\cncnet.png", @"MainMenu\cncnet_c.png",
+            @"MainMenu\exitgame.png", @"MainMenu\exitgame_c.png",
+            @"MainMenu\lan.png", @"MainMenu\lan_c.png",
+            @"MainMenu\loadmission.png", @"MainMenu\loadmission_c.png",
+            @"MainMenu\mapeditor.png", @"MainMenu\mapeditor_c.png",
+            @"MainMenu\options.png", @"MainMenu\options_c.png",
+            @"MainMenu\skirmish.png", @"MainMenu\skirmish_c.png",
+            @"MainMenu\statistics.png", @"MainMenu\statistics_c.png",
+        };
+
+        // 下拉箭头、滚动条、复选框、滑杆、筛选/排序图标：只换色相，形状不动
+        static readonly string[] ThemeChromeTargets =
+        {
+            "comboBoxArrow.png", "openedComboBoxArrow.png",
+            "sbUpArrow.png", "sbDownArrow.png",
+            "sbThumbTop.png", "sbThumbTopSpan.png",
+            "sbThumbBottom.png", "sbThumbBottomSpan.png",
+            "sbMiddle.png", "sbBackground.png",
+            "checkBoxChecked.png", "checkBoxCheckedD.png", "checkBoxClear.png",
+            "trackbarButton.png",
+            "filterActive.png", "sortAlphaActive.png",
+        };
+
+        // 壁纸文件（主题目录里放任意一种即可）
+        static readonly string[] ThemeWallpapers = { "bg.png", "bg.jpg", "bg.jpeg", "wall.png", "wall.jpg", "壁纸.png", "壁纸.jpg" };
+
+        static string ResDir()
+        {
+            string root = SafeGetGamePath();
+            if (string.IsNullOrEmpty(root)) return "";
+            string d = Path.Combine(root, "Resources");
+            return Directory.Exists(d) ? d : "";
+        }
+
+        static string ThemeRoot()
+        {
+            string r = ResDir();
+            return r.Length == 0 ? "" : Path.Combine(r, "MoThemes");
+        }
+
+        static string ThemeBackup()
+        {
+            string r = ThemeRoot();
+            return r.Length == 0 ? "" : Path.Combine(r, "_原图备份");
+        }
+
+        /// <summary>列出所有主题目录（排除备份目录）。</summary>
+        static List<string> ListThemes()
+        {
+            List<string> list = new List<string>();
+            try
+            {
+                string root = ThemeRoot();
+                if (root.Length == 0 || !Directory.Exists(root)) return list;
+                foreach (string d in Directory.GetDirectories(root))
+                {
+                    string name = Path.GetFileName(d);
+                    if (name.StartsWith("_")) continue;
+                    list.Add(name);
+                }
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+            catch { }
+            return list;
+        }
+
+        static string FindWallpaper(string dir)
+        {
+            foreach (string n in ThemeWallpapers)
+            {
+                string p = Path.Combine(dir, n);
+                if (File.Exists(p)) return p;
+            }
+            return "";
+        }
+
+        /// <summary>主题一句话说明：几张精确覆盖 + 有没有万用壁纸。</summary>
+        static string ThemeSummary(string dir)
+        {
+            try
+            {
+                int exact = 0;
+                foreach (string t in ThemeTargets)
+                    if (File.Exists(Path.Combine(dir, t))) exact++;
+                string wall = FindWallpaper(dir);
+                StringBuilder sb = new StringBuilder();
+                if (wall.Length > 0) sb.Append("壁纸");
+                if (exact > 0)
+                {
+                    if (sb.Length > 0) sb.Append(" + ");
+                    sb.Append(exact + " 张指定图");
+                }
+                if (sb.Length == 0) sb.Append("空");
+                return sb.ToString();
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>应用主题。quiet=true 时不弹通知（启动时自动应用用）。</summary>
+        static void ApplyTheme(object lobby, string name, bool quiet)
+        {
+            try
+            {
+                string root = ThemeRoot();
+                if (root.Length == 0) { Log("theme: 找不到 Resources 目录"); return; }
+
+                string dir = Path.Combine(root, name);
+                if (!Directory.Exists(dir)) { Log("theme: 主题不存在 " + name); return; }
+
+                string backup = ThemeBackup();
+                Directory.CreateDirectory(backup);
+
+                string wall = FindWallpaper(dir);
+                int done = 0, skipped = 0;
+                List<string> written = new List<string>();
+
+                int accentR = 0, accentG = 0, accentB = 0;
+                string accentHex = ThemeIniValue(dir, "Accent");
+                if (accentHex.Length >= 6)
+                {
+                    accentR = Convert.ToInt32(accentHex.Substring(0, 2), 16);
+                    accentG = Convert.ToInt32(accentHex.Substring(2, 2), 16);
+                    accentB = Convert.ToInt32(accentHex.Substring(4, 2), 16);
+                }
+                // 大厅/房间那两个背景要用的纯色（theme.ini 的 Dark，没有就压暗主色）
+                SetSolidFromTheme(dir, accentR, accentG, accentB);
+
+                foreach (string rel in ThemeTargets)
+                {
+                    string target = Path.Combine(ResDir(), rel);
+                    if (!File.Exists(target)) { skipped++; continue; }
+
+                    string bak = Path.Combine(backup, rel);
+                    if (!File.Exists(bak))
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(bak));
+                        File.Copy(target, bak, false);
+                    }
+
+                    string exact = Path.Combine(dir, rel);
+                    try
+                    {
+                        if (IsSolidBackground(rel))
+                        {
+                            // 局域网大厅（房间列表）和房间内：纯色，不铺壁纸
+                            int w, h;
+                            using (Bitmap b = new Bitmap(bak)) { w = b.Width; h = b.Height; }
+                            MakeSolid(target, w, h, solidR, solidG, solidB);
+                            done++;
+                            written.Add(rel);
+                        }
+                        else if (File.Exists(exact))
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(target));
+                            File.Copy(exact, target, true);
+                            done++;
+                            written.Add(rel);
+                        }
+                        else if (wall.Length > 0)
+                        {
+                            // 按原图尺寸生成，保证不改变客户端布局
+                            int w, h;
+                            using (Bitmap b = new Bitmap(bak)) { w = b.Width; h = b.Height; }
+
+                            // 载入画面/进度框也直接铺壁纸，不再压暗
+                            MakeBackground(wall, target, w, h);
+                            done++;
+                            written.Add(rel);
+                        }
+                    }
+                    catch (Exception ex) { Log("theme: " + rel + " 失败: " + ex.Message); }
+                }
+
+                // 按钮统一换成主题色：只换色相、保留原图的明暗和描边，
+                // 白字对比度不变；主菜单按钮上烘焙的白字也会被当作灰阶跳过。
+                if (accentHex.Length >= 6)
+                {
+                    foreach (string rel in ThemeButtonTargets)
+                    {
+                        string target = Path.Combine(ResDir(), rel);
+                        if (!File.Exists(target)) continue;
+
+                        string bak = Path.Combine(backup, rel);
+                        if (!File.Exists(bak))
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(bak));
+                            File.Copy(target, bak, false);
+                        }
+
+                        try
+                        {
+                            bool keepText = rel.StartsWith("MainMenu", StringComparison.OrdinalIgnoreCase);
+                            bool hover = rel.IndexOf("_c.", StringComparison.OrdinalIgnoreCase) >= 0;
+                            MakeGlass(bak, target, accentR, accentG, accentB, hover, keepText);
+                            done++;
+                            written.Add(rel);
+                        }
+                        catch (Exception ex) { Log("theme: 按钮换色 " + rel + " 失败: " + ex.Message); }
+                    }
+
+                    // 下拉箭头 / 滚动条 / 复选框 / 滑杆 / 筛选排序图标
+                    foreach (string rel in ThemeChromeTargets)
+                    {
+                        string target = Path.Combine(ResDir(), rel);
+                        if (!File.Exists(target)) continue;
+
+                        string bak = Path.Combine(backup, rel);
+                        if (!File.Exists(bak))
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(bak));
+                            File.Copy(target, bak, false);
+                        }
+
+                        try
+                        {
+                            HueShift(bak, target, accentR, accentG, accentB, 0.9f);
+                            done++;
+                            written.Add(rel);
+                        }
+                        catch (Exception ex) { Log("theme: 控件换色 " + rel + " 失败: " + ex.Message); }
+                    }
+                }
+
+                themeCurrent = name;
+                try
+                {
+                    string marker = GlassMarker();
+                    if (marker.Length > 0) File.WriteAllText(marker, "1");
+
+                    string off = GlassOffMarker();
+                    if (off.Length > 0 && File.Exists(off)) File.Delete(off);
+                }
+                catch { }
+                themeAccentHex = ThemeIniValue(dir, "Text");
+                if (themeAccentHex.Length == 0) themeAccentHex = ThemeIniValue(dir, "Accent");
+                themeAccentColor = MakeColorHex(themeAccentHex);
+                SaveThemeSetting(name);
+
+                int swapped = HotReloadAll(written);
+                RefreshWindowBackgrounds();
+
+                // 视频壁纸：theme.ini 里有 Video 就在主菜单和大厅逐帧播放
+                ThemeVideo.Start(ThemeVideoPath(dir));
+
+                Log("theme: 已应用「" + name + "」替换 " + done + " 张，跳过 " + skipped
+                    + " 张（缺原图），热加载 " + swapped + " 张");
+                if (!quiet && lobby != null)
+                    Notice(lobby, "主题「" + name + "」已应用并热加载（" + swapped + " 张）", false);
+            }
+            catch (Exception ex) { Log("theme: 应用失败: " + ex.Message); }
+        }
+
+        static void RestoreTheme(object lobby)
+        {
+            try
+            {
+                string backup = ThemeBackup();
+                if (backup.Length == 0 || !Directory.Exists(backup))
+                {
+                    if (lobby != null) Notice(lobby, "没有可还原的原图备份", false);
+                    return;
+                }
+
+                int n = 0;
+                List<string> restored = new List<string>();
+                foreach (string rel in ThemeTargets)
+                    RestoreOne(backup, rel, restored, ref n);
+                foreach (string rel in ThemeButtonTargets)
+                    RestoreOne(backup, rel, restored, ref n);
+                foreach (string rel in ThemeChromeTargets)
+                    RestoreOne(backup, rel, restored, ref n);
+
+                themeCurrent = "";
+                themeAccentHex = "";
+                themeAccentColor = null;
+                SaveThemeSetting("");
+                try
+                {
+                    string marker = GlassMarker();
+                    if (marker.Length > 0 && File.Exists(marker)) File.Delete(marker);
+
+                    string off = GlassOffMarker();
+                    if (off.Length > 0) File.WriteAllText(off, "1");
+                }
+                catch { }
+
+                int swapped = HotReloadAll(restored);
+                RefreshWindowBackgrounds();
+                ThemeVideo.Stop();
+                Log("theme: 已还原默认贴图 " + n + " 张，热加载 " + swapped + " 张");
+                if (lobby != null) Notice(lobby, "已还原默认贴图并热加载（" + swapped + " 张）", false);
+            }
+            catch (Exception ex) { Log("theme: 还原失败: " + ex.Message); }
+        }
+
+        static void RestoreOne(string backup, string rel, List<string> restored, ref int n)
+        {
+            try
+            {
+                string bak = Path.Combine(backup, rel);
+                if (!File.Exists(bak)) return;
+                File.Copy(bak, Path.Combine(ResDir(), rel), true);
+                restored.Add(rel);
+                n++;
+            }
+            catch (Exception ex) { Log("theme: 还原 " + rel + " 失败: " + ex.Message); }
+        }
+
+        /// <summary>把壁纸裁成目标尺寸（等比放大后居中裁切），不做任何压暗。</summary>
+        static void MakeBackground(string src, string dst, int w, int h)
+        {
+            using (Bitmap bmp = new Bitmap(src))
+            using (Bitmap outBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
+            {
+                double scale = Math.Max((double)w / bmp.Width, (double)h / bmp.Height);
+                int dw = (int)Math.Ceiling(bmp.Width * scale);
+                int dh = (int)Math.Ceiling(bmp.Height * scale);
+
+                using (Graphics g = Graphics.FromImage(outBmp))
+                {
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.SmoothingMode = SmoothingMode.HighQuality;
+                    g.DrawImage(bmp, new Rectangle((w - dw) / 2, (h - dh) / 2, dw, dh));
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(dst));
+                outBmp.Save(dst, ImageFormat.Png);
+            }
+        }
+
+        static int Clamp255(int v)
+        {
+            if (v < 0) return 0;
+            if (v > 255) return 255;
+            return v;
+        }
+
+        /// <summary>
+        /// 玻璃拟态按钮：半透明主题色渐变 + 高光边 + 圆角。
+        /// keepText=true 时保留原图里烘焙的白字（主菜单按钮），只换背景。
+        /// </summary>
+        static void MakeGlass(string src, string dst, int ar, int ag, int ab, bool hover, bool keepText)
+        {
+            using (Bitmap bmp = new Bitmap(src))
+            {
+                int w = bmp.Width, h = bmp.Height;
+                bool[] keep = null;
+                Color[] keepColors = null;
+
+                if (keepText)
+                {
+                    keep = new bool[w * h];
+                    keepColors = new Color[w * h];
+                    bool[] core = new bool[w * h];
+
+                    for (int y = 0; y < h; y++)
+                        for (int x = 0; x < w; x++)
+                        {
+                            Color c = bmp.GetPixel(x, y);
+                            keepColors[y * w + x] = c;
+
+                            int mx = Math.Max(c.R, Math.Max(c.G, c.B));
+                            int mn = Math.Min(c.R, Math.Min(c.G, c.B));
+
+                            // 只认中间区域：原按钮最外圈的白色高光描边不能被当成文字保留
+                            bool inside = x > 6 && y > 6 && x < w - 7 && y < h - 7;
+                            if (inside && c.A > 200 && mx > 225 && mx - mn < 30) core[y * w + x] = true;
+                        }
+
+                    // 膨胀 2 像素：把抗锯齿和描边一起保住，文字才不会变细
+                    for (int y = 0; y < h; y++)
+                        for (int x = 0; x < w; x++)
+                            if (core[y * w + x])
+                                for (int dy = -2; dy <= 2; dy++)
+                                    for (int dx = -2; dx <= 2; dx++)
+                                    {
+                                        int nx = x + dx, ny = y + dy;
+                                        if (nx >= 0 && ny >= 0 && nx < w && ny < h) keep[ny * w + nx] = true;
+                                    }
+                }
+
+                using (Bitmap outBmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
+                {
+                    using (Graphics g = Graphics.FromImage(outBmp))
+                    {
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+                        int radius = Math.Max(4, Math.Min(10, Math.Min(w, h) / 3));
+                        using (GraphicsPath path = RoundedRect(new Rectangle(0, 0, w - 1, h - 1), radius))
+                        {
+                            int aTop = hover ? 242 : 214;
+                            int aBot = hover ? 226 : 190;
+                            Color top = Color.FromArgb(aTop,
+                                Clamp255((int)(ar * (hover ? 0.78f : 0.62f)) + 26),
+                                Clamp255((int)(ag * (hover ? 0.78f : 0.62f)) + 26),
+                                Clamp255((int)(ab * (hover ? 0.78f : 0.62f)) + 26));
+                            Color bot = Color.FromArgb(aBot,
+                                Clamp255((int)(ar * 0.34f) + 10),
+                                Clamp255((int)(ag * 0.34f) + 10),
+                                Clamp255((int)(ab * 0.34f) + 10));
+
+                            using (LinearGradientBrush fill = new LinearGradientBrush(
+                                new Point(0, 0), new Point(0, h), top, bot))
+                                g.FillPath(fill, path);
+
+                            int inset = radius + 2;
+                            if (w - inset * 2 > 4)
+                            {
+                                using (Pen hl = new Pen(Color.FromArgb(hover ? 130 : 75, 255, 255, 255), 1))
+                                    g.DrawLine(hl, inset, 1, w - inset - 1, 1);
+                            }
+
+                            Color border = Color.FromArgb(hover ? 245 : 205,
+                                Clamp255((int)(ar * 1.5f) + 34),
+                                Clamp255((int)(ag * 1.5f) + 34),
+                                Clamp255((int)(ab * 1.5f) + 34));
+                            using (Pen pen = new Pen(border, hover ? 2f : 1f))
+                                g.DrawPath(pen, path);
+                        }
+                    }
+
+                    if (keepText)
+                    {
+                        // 原图文字是白字 + 深紫描边；直接照搬会把紫底一起带进来，
+                        // 所以按亮度重画：亮的还原成白字，暗的当描边。
+                        for (int y = 0; y < h; y++)
+                            for (int x = 0; x < w; x++)
+                                if (keep[y * w + x])
+                                {
+                                    Color c = keepColors[y * w + x];
+                                    float lum = c.R * 0.299f + c.G * 0.587f + c.B * 0.114f;
+                                    if (lum > 120f)
+                                        outBmp.SetPixel(x, y, Color.FromArgb(
+                                            Clamp255((int)((lum - 120f) * 255f / 135f)), 255, 255, 255));
+                                    else
+                                        outBmp.SetPixel(x, y, Color.FromArgb(150, 6, 8, 12));
+                                }
+                    }
+
+                    Directory.CreateDirectory(Path.GetDirectoryName(dst));
+                    outBmp.Save(dst, ImageFormat.Png);
+                }
+            }
+        }
+
+        static GraphicsPath RoundedRect(Rectangle r, int radius)
+        {
+            GraphicsPath p = new GraphicsPath();
+            int d = Math.Max(2, radius * 2);
+            p.AddArc(r.X, r.Y, d, d, 180, 90);
+            p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            p.CloseFigure();
+            return p;
+        }
+
+        /// <summary>
+        /// 只换色相、亮度原样保留：滚动条/复选框/下拉箭头的明暗和形状不变，
+        /// 紫色边框变成主题色；灰阶像素（白色箭头、灰图标）不动。
+        /// </summary>
+        static void HueShift(string src, string dst, int ar, int ag, int ab, float strength)
+        {
+            float ah, asat, av;
+            RgbToHsv(ar, ag, ab, out ah, out asat, out av);
+
+            using (Bitmap bmp = new Bitmap(src))
+            using (Bitmap outBmp = new Bitmap(bmp.Width, bmp.Height, PixelFormat.Format32bppArgb))
+            {
+                for (int y = 0; y < bmp.Height; y++)
+                {
+                    for (int x = 0; x < bmp.Width; x++)
+                    {
+                        Color c = bmp.GetPixel(x, y);
+                        if (c.A == 0) { outBmp.SetPixel(x, y, c); continue; }
+
+                        float h, s, v;
+                        RgbToHsv(c.R, c.G, c.B, out h, out s, out v);
+                        if (s < 0.06f) { outBmp.SetPixel(x, y, c); continue; }
+
+                        float dh = ((ah - h + 540f) % 360f) - 180f;
+                        float nh = h + dh * strength;
+                        if (nh < 0) nh += 360f;
+                        if (nh >= 360f) nh -= 360f;
+
+                        Color nc = HsvToRgb(nh, Math.Min(s, 0.85f), v);
+
+                        float oldLum = c.R * 0.299f + c.G * 0.587f + c.B * 0.114f;
+                        float newLum = nc.R * 0.299f + nc.G * 0.587f + nc.B * 0.114f;
+                        float k = newLum > 1f ? oldLum / newLum : 1f;
+
+                        outBmp.SetPixel(x, y, Color.FromArgb(c.A,
+                            Clamp255((int)(nc.R * k)),
+                            Clamp255((int)(nc.G * k)),
+                            Clamp255((int)(nc.B * k))));
+                    }
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(dst));
+                outBmp.Save(dst, ImageFormat.Png);
+            }
+        }
+
+        static void RgbToHsv(int r, int g, int b, out float h, out float s, out float v)
+        {
+            float rf = r / 255f, gf = g / 255f, bf = b / 255f;
+            float mx = Math.Max(rf, Math.Max(gf, bf));
+            float mn = Math.Min(rf, Math.Min(gf, bf));
+            float d = mx - mn;
+
+            h = 0f;
+            if (d > 0f)
+            {
+                if (mx == rf) h = 60f * (((gf - bf) / d) % 6f);
+                else if (mx == gf) h = 60f * (((bf - rf) / d) + 2f);
+                else h = 60f * (((rf - gf) / d) + 4f);
+            }
+            if (h < 0f) h += 360f;
+            s = mx > 0f ? d / mx : 0f;
+            v = mx;
+        }
+
+        static Color HsvToRgb(float h, float s, float v)
+        {
+            float c = v * s;
+            float x = c * (1f - Math.Abs((h / 60f) % 2f - 1f));
+            float m = v - c;
+            float r, g, b;
+
+            if (h < 60f) { r = c; g = x; b = 0f; }
+            else if (h < 120f) { r = x; g = c; b = 0f; }
+            else if (h < 180f) { r = 0f; g = c; b = x; }
+            else if (h < 240f) { r = 0f; g = x; b = c; }
+            else if (h < 300f) { r = x; g = 0f; b = c; }
+            else { r = c; g = 0f; b = x; }
+
+            return Color.FromArgb(
+                Clamp255((int)((r + m) * 255f)),
+                Clamp255((int)((g + m) * 255f)),
+                Clamp255((int)((b + m) * 255f)));
+        }
+
+        // ------------------------------------------------------------------
+        // 热加载
+        //
+        // 客户端的贴图都在 AssetLoader.textureCache（List<Texture2D>）里，
+        // 每个 Texture2D 的 Name 就是加载时的文件名，界面控件持有的是这个对象本身。
+        // 所以不用重启：把新图片按同样的尺寸写进原 Texture2D（SetData）就能立刻换掉。
+        // 尺寸不一致的不动（换尺寸会打乱布局），只记日志。
+        // ------------------------------------------------------------------
+
+        static Type FindXnaType(string name)
+        {
+            foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type t = a.GetType(name);
+                if (t != null) return t;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 设置窗口的背景是 LoadTextureUncached("optionsbg.png") 读的，不进贴图缓存，
+        /// 所以热加载永远碰不到它 —— 它只在窗口初始化时读一次，应用主题后要手动换掉。
+        /// </summary>
+        static void RefreshWindowBackgrounds()
+        {
+            try
+            {
+                Type loaderType = FindXnaType("Rampastring.XNAUI.AssetLoader");
+                if (loaderType == null) return;
+                MethodInfo load = loaderType.GetMethod("LoadTextureUncached",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (load == null) return;
+
+                object wm = currentMainMenu == null ? null : GetMember(currentMainMenu, "WindowManager");
+                if (wm == null) return;
+                IList windows = GetMember(wm, "Controls") as IList;
+                if (windows == null) return;
+
+                object tex = load.Invoke(null, new object[] { "optionsbg.png" });
+                if (tex == null) return;
+
+                int tw = GetInt(tex, "Width", 0);
+                int th = GetInt(tex, "Height", 0);
+                bool used = false;
+
+                for (int i = 0; i < windows.Count; i++)
+                {
+                    object win = windows[i];
+                    if (win == null) continue;
+                    if (win.GetType().Name != "OptionsWindow") continue;
+                    if (SwapBackgroundTexture(win, tex, tw, th)) used = true;
+                }
+
+                if (used) Log("theme: 设置窗口背景已刷新");
+                else
+                {
+                    IDisposable d = tex as IDisposable;
+                    if (d != null) d.Dispose();
+                }
+            }
+            catch (Exception ex) { Log("theme: 刷新设置背景失败: " + ex.Message); }
+        }
+
+        static bool SwapBackgroundTexture(object ctl, object tex, int tw, int th)
+        {
+            bool done = false;
+            try
+            {
+                object bg = GetMember(ctl, "BackgroundTexture");
+                if (bg != null && GetInt(ctl, "Width", 0) == tw && GetInt(ctl, "Height", 0) == th)
+                {
+                    SetMember(ctl, "BackgroundTexture", tex);
+                    IDisposable old = bg as IDisposable;
+                    if (old != null) { try { old.Dispose(); } catch { } }
+                    done = true;
+                }
+
+                IList kids = GetMember(ctl, "Children") as IList;
+                if (kids != null)
+                    for (int i = 0; i < kids.Count; i++)
+                        if (kids[i] != null && SwapBackgroundTexture(kids[i], tex, tw, th)) done = true;
+            }
+            catch { }
+            return done;
+        }
+
+        /// <summary>把磁盘上的新贴图写回已加载的 Texture2D，返回换成功的张数。</summary>
+        static int HotReloadAll(List<string> rels)
+        {
+            int n = 0;
+            if (rels == null) return 0;
+            foreach (string rel in rels)
+            {
+                try { n += HotReloadTexture(rel); }
+                catch (Exception ex) { Log("theme: 热加载 " + rel + " 失败: " + ex.Message); }
+            }
+            return n;
+        }
+
+        static int HotReloadTexture(string rel)
+        {
+            string path = Path.Combine(ResDir(), rel);
+            if (!File.Exists(path)) return 0;
+
+            Type texType = FindXnaType("Microsoft.Xna.Framework.Graphics.Texture2D");
+            Type colorType = FindXnaType("Microsoft.Xna.Framework.Color");
+            Type loaderType = FindXnaType("Rampastring.XNAUI.AssetLoader");
+            if (texType == null || colorType == null || loaderType == null) return 0;
+
+            FieldInfo cacheField = loaderType.GetField("textureCache",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (cacheField == null) return 0;
+            IList cache = cacheField.GetValue(null) as IList;
+            if (cache == null) return 0;
+
+            PropertyInfo nameProp = texType.GetProperty("Name");
+            PropertyInfo widthProp = texType.GetProperty("Width");
+            PropertyInfo heightProp = texType.GetProperty("Height");
+            if (nameProp == null || widthProp == null || heightProp == null) return 0;
+
+            MethodInfo setData = null;
+            foreach (MethodInfo m in texType.GetMethods())
+            {
+                if (m.Name == "SetData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
+                {
+                    setData = m.MakeGenericMethod(colorType);
+                    break;
+                }
+            }
+            if (setData == null) return 0;
+
+            int w, h;
+            byte[] rgba;
+            try { rgba = LoadRgba(path, out w, out h); }
+            catch (Exception ex) { Log("theme: 读图失败 " + rel + ": " + ex.Message); return 0; }
+
+            string baseName = Path.GetFileName(rel);
+            int swapped = 0;
+
+            foreach (object tex in cache)
+            {
+                if (tex == null) continue;
+                try
+                {
+                    string nm = nameProp.GetValue(tex, null) as string;
+                    if (string.IsNullOrEmpty(nm)) continue;
+                    if (!string.Equals(Path.GetFileName(nm.Replace('/', '\\')), baseName,
+                            StringComparison.OrdinalIgnoreCase)) continue;
+
+                    int tw = (int)widthProp.GetValue(tex, null);
+                    int th = (int)heightProp.GetValue(tex, null);
+                    if (tw != w || th != h) continue;
+
+                    Array colors = Array.CreateInstance(colorType, w * h);
+                    GCHandle pin = GCHandle.Alloc(colors, GCHandleType.Pinned);
+                    try { Marshal.Copy(rgba, 0, pin.AddrOfPinnedObject(), rgba.Length); }
+                    finally { pin.Free(); }
+
+                    setData.Invoke(tex, new object[] { colors });
+                    swapped++;
+                }
+                catch (Exception ex) { Log("theme: SetData " + rel + ": " + ex.Message); }
+            }
+
+            if (swapped > 0) Log("theme: 热加载 " + rel + " -> " + swapped + " 个贴图");
+            return swapped;
+        }
+
+        /// <summary>读成 XNA 需要的 RGBA 字节序，并做预乘 alpha（和 AssetLoader 的加载方式一致）。</summary>
+        static byte[] LoadRgba(string path, out int w, out int h)
+        {
+            using (Bitmap src = new Bitmap(path))
+            {
+                w = src.Width;
+                h = src.Height;
+                using (Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
+                {
+                    using (Graphics g = Graphics.FromImage(bmp))
+                        g.DrawImageUnscaled(src, 0, 0);
+
+                    BitmapData bd = bmp.LockBits(new Rectangle(0, 0, w, h),
+                        ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    byte[] rgba = new byte[w * h * 4];
+                    try
+                    {
+                        byte[] row = new byte[bd.Stride];
+                        for (int y = 0; y < h; y++)
+                        {
+                            Marshal.Copy(new IntPtr(bd.Scan0.ToInt64() + (long)y * bd.Stride), row, 0, bd.Stride);
+                            int o = y * w * 4;
+                            for (int x = 0; x < w; x++)
+                            {
+                                byte b = row[x * 4 + 0];
+                                byte g2 = row[x * 4 + 1];
+                                byte r = row[x * 4 + 2];
+                                byte a = row[x * 4 + 3];
+
+                                if (a != 255)
+                                {
+                                    r = (byte)(r * a / 255);
+                                    g2 = (byte)(g2 * a / 255);
+                                    b = (byte)(b * a / 255);
+                                }
+                                rgba[o++] = r;
+                                rgba[o++] = g2;
+                                rgba[o++] = b;
+                                rgba[o++] = a;
+                            }
+                        }
+                    }
+                    finally { bmp.UnlockBits(bd); }
+                    return rgba;
+                }
+            }
+        }
+
+        static void SaveThemeSetting(string name)
+        {
+            try
+            {
+                themeName = name ?? "";
+                SaveSettings();
+            }
+            catch { }
+        }
+
+        /// <summary>读主题目录里 theme.ini 的键（Name / Accent / Dark / Light / Text）。</summary>
+        static string ThemeIniValue(string dir, string key)
+        {
+            try
+            {
+                string p = Path.Combine(dir, "theme.ini");
+                if (!File.Exists(p)) return "";
+                foreach (string raw in File.ReadAllLines(p, Encoding.UTF8))
+                {
+                    string line = raw == null ? "" : raw.Trim();
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    if (string.Equals(line.Substring(0, eq).Trim(), key, StringComparison.OrdinalIgnoreCase))
+                        return line.Substring(eq + 1).Trim();
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        /// <summary>启动时按已保存的主题名把配色读回来（不重写贴图）。</summary>
+        static void LoadThemeAccent()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(themeName)) return;
+                string root = ThemeRoot();
+                if (root.Length == 0) return;
+                string dir = Path.Combine(root, themeName);
+                if (!Directory.Exists(dir)) return;
+
+                themeAccentHex = ThemeIniValue(dir, "Text");
+                if (themeAccentHex.Length == 0) themeAccentHex = ThemeIniValue(dir, "Accent");
+                themeAccentColor = MakeColorHex(themeAccentHex);
+                themeCurrent = themeName;
+                Log("theme: 当前主题「" + themeName + "」配色 " + themeAccentHex);
+
+                int sr = 0x3E, sg = 0x5C, sb = 0x86;
+                string acc = ThemeIniValue(dir, "Accent");
+                if (acc.Length >= 6)
+                {
+                    try
+                    {
+                        sr = Convert.ToInt32(acc.Substring(0, 2), 16);
+                        sg = Convert.ToInt32(acc.Substring(2, 2), 16);
+                        sb = Convert.ToInt32(acc.Substring(4, 2), 16);
+                    }
+                    catch { }
+                }
+                SetSolidFromTheme(dir, sr, sg, sb);
+
+                // 已经应用过的视频主题，重启客户端也要接着播
+                ThemeVideo.Start(ThemeVideoPath(dir));
+            }
+            catch { }
+        }
+
+        // ---------------- 启动时套用外部写入的主题 ----------------
+        // HMOL 的「设置 → 高级 → 游戏壁纸」没法直接调这里的方法，只能往主题目录写
+        // bg.png / theme.ini，再改 MoLanPatch.ini 的 Theme 行，并留一个 .pending 标记。
+        // 第一次进主菜单时把它认领掉，走与「设置里点应用」完全相同的 ApplyTheme。
+
+        static bool pendingThemeChecked;
+
+        static void ApplyPendingThemeOnce()
+        {
+            if (pendingThemeChecked) return;
+            // 设置还没读到就先不动；themeName 为空说明本来就用默认主题
+            if (string.IsNullOrEmpty(themeName)) { pendingThemeChecked = true; return; }
+
+            string root = ThemeRoot();
+            if (root.Length == 0) return;      // 游戏目录还没就绪，下一帧再试
+
+            string dir = Path.Combine(root, themeName);
+            string marker = Path.Combine(dir, ".pending");
+            if (!File.Exists(marker)) { pendingThemeChecked = true; return; }
+
+            pendingThemeChecked = true;
+            Log("theme: 发现外部写入的壁纸主题「" + themeName + "」，开始套用");
+
+            ApplyTheme(null, themeName, true);
+
+            // ApplyTheme 内部吞异常；只有真的切过去（themeCurrent 对上了）才清标记，
+            // 失败就留着，下次启动接着试。
+            if (string.Equals(themeCurrent, themeName, StringComparison.OrdinalIgnoreCase))
+            {
+                try { File.Delete(marker); } catch { }
+                Log("theme: 外部壁纸主题已套用完毕");
+            }
+            else Log("theme: 外部壁纸主题套用未完成，保留标记下次再试");
+
+            lastStatusColor = "";              // 让状态条立刻换成本主题配色
+        }
+
+        // ------------------------------------------------------------------
+        // 视频壁纸：主菜单 + 大厅（约 15fps）
+        //
+        // HMOL 只把视频路径写进 theme.ini 的 Video 行，不复制文件。
+        // 这里用 Media Foundation 的 SourceReader 解码成 RGB32，后台线程裁切成
+        // 主菜单和大厅两张目标尺寸的帧，主线程在 MainMenuTick / Tick 里 SetData。
+        // 打不开（没解码器、文件被删或移动）就安静地留在静态壁纸上，只写日志。
+        // ------------------------------------------------------------------
+
+        // 大厅（房间列表）和房间内这两个背景永远用纯色，不再铺壁纸
+        static bool IsSolidBackground(string rel)
+        {
+            return string.Equals(rel, "gamelobbybg.png", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rel, "cncnetlobbybg.png", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static void MakeSolid(string dst, int w, int h, int r, int g, int b)
+        {
+            using (Bitmap bmp = new Bitmap(w, h, PixelFormat.Format24bppRgb))
+            {
+                using (Graphics g2 = Graphics.FromImage(bmp))
+                    g2.Clear(Color.FromArgb(r, g, b));
+                bmp.Save(dst, ImageFormat.Png);
+            }
+        }
+
+        /// <summary>房间那张背景用的纯色：theme.ini 有 Dark 就用它，否则用压暗到 20% 的主色。</summary>
+        static void SetSolidFromTheme(string dir, int ar, int ag, int ab)
+        {
+            string dark = ThemeIniValue(dir, "Dark");
+            if (dark.Length >= 6)
+            {
+                try
+                {
+                    solidR = Convert.ToInt32(dark.Substring(0, 2), 16);
+                    solidG = Convert.ToInt32(dark.Substring(2, 2), 16);
+                    solidB = Convert.ToInt32(dark.Substring(4, 2), 16);
+                    ThemeVideo.SetSolid(solidR, solidG, solidB);
+                    return;
+                }
+                catch { }
+            }
+
+            solidR = ar * 20 / 100;
+            solidG = ag * 20 / 100;
+            solidB = ab * 20 / 100;
+            ThemeVideo.SetSolid(solidR, solidG, solidB);
+        }
+
+        static string ThemeVideoPath(string dir)
+        {
+            string v = ThemeIniValue(dir, "Anim");       // 动图 / 视频共用一条
+            if (v.Length == 0) v = ThemeIniValue(dir, "Video");
+            if (v.Length == 0) return "";
+            try
+            {
+                if (!Path.IsPathRooted(v)) v = Path.Combine(dir, v);
+            }
+            catch { return ""; }
+            return v;
+        }
+
+        static class ThemeVideo
+        {
+            // MF_SOURCE_READER_FIRST_VIDEO_STREAM
+            const int FirstVideoStream = unchecked((int)0xFFFFFFFC);
+            const int EndOfStream = 0x2;
+            const int FrameMs = 33;                        // 约 30fps
+            const int MfVersion = 0x00020070;              // MF_VERSION
+
+            // phase 0=主菜单，1=房间（纯色），2=局域网大厅（游戏列表）
+            static readonly string[] VideoTargets =
+            {
+                "MainMenu/mainmenubg.png",
+                "gamelobbybg.png",
+                "cncnetlobbybg.png",
+            };
+            static readonly bool[] VideoSolid = { false, true, true };
+
+            class Target
+            {
+                public string Rel;
+                public string BaseName;
+                public int W;
+                public int H;
+                // 真正看得见的区域：贴图可能比渲染分辨率高（如主菜单 1280x768 画在 1280x720 里），
+                // 只在可见区域里按显示比例裁切，画面比例才是对的。
+                public int VisW;
+                public int VisH;
+                public int Phase;                          // 0=主菜单，1=房间，2=局域网大厅
+                public bool Solid;                         // 这张不播视频，填主题深色
+                public byte[] Front;                       // RGBA（XNA Color 的字节序）
+                public byte[] Back;
+                public byte[] Row;                         // GIF 那条路转行用
+                public bool HasNew;
+                public readonly object Sync = new object();
+                public object[] Textures;
+                public Array Colors;
+                public bool UploadLogged;
+                public int StarvedAt;
+                public int LastUploadMs;
+                public bool RenderErrorLogged;
+
+                // cover 裁切后的源矩形（解码尺寸变化时重算一次）
+                public int SrcX, SrcY, SrcW, SrcH;
+            }
+
+            static readonly object gate = new object();
+            static Thread worker;
+            static volatile bool running;
+            static string activePath = "";
+            static int solidR = 0x14, solidG = 0x18, solidB = 0x1D;
+
+            /// <summary>房间（gamelobbybg）用纯色：优先 theme.ini 的 Dark，没有就用压暗的主色。</summary>
+            public static void SetSolid(int r, int g, int b)
+            {
+                solidR = r; solidG = g; solidB = b;
+
+                List<Target> local;
+                lock (gate) local = targets;
+                if (local == null) return;
+                foreach (Target t in local)
+                    if (t.Solid) FillSolid(t);
+            }
+
+            static void FillSolid(Target t)
+            {
+                try
+                {
+                    byte[] dst = t.Back;
+                    byte r = (byte)solidR, g = (byte)solidG, b = (byte)solidB;
+                    for (int i = 0; i < dst.Length; i += 4)
+                    {
+                        dst[i] = r;
+                        dst[i + 1] = g;
+                        dst[i + 2] = b;
+                        dst[i + 3] = 255;
+                    }
+                    lock (t.Sync)
+                    {
+                        byte[] swap = t.Front;
+                        t.Front = t.Back;
+                        t.Back = swap;
+                        t.HasNew = true;
+                    }
+                }
+                catch { }
+            }
+
+            static List<Target> targets = new List<Target>();
+            static int lastTick;
+            static int lastResolve;
+            static int lastVw, lastVh;                     // 最近一次解码尺寸（重算裁切用）
+            static readonly int[] lastPhaseTick = new int[8];  // 每个 phase 最后一次「可见」tick
+            static int framesSinceLog;
+            static int fpsClock;
+            static Type colorType;
+            static MethodInfo setDataMethod;
+            static bool loggedLobbyTick;
+            static bool loggedListTick;
+            static bool loggedMenuTick;
+
+            /// <summary>开始播放一个视频。路径为空或不存在就停掉（回到静态壁纸）。</summary>
+            public static void Start(string path)
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    {
+                        if (activePath.Length > 0) Log("video: 主题没有可播放的视频，保留静态壁纸");
+                        Stop();
+                        return;
+                    }
+
+                    lock (gate)
+                    {
+                        if (running && string.Equals(activePath, path, StringComparison.OrdinalIgnoreCase)) return;
+                    }
+
+                    Stop();
+
+                    List<Target> list = new List<Target>();
+                    int rw, rh;
+                    GetRenderResolution(out rw, out rh);
+
+                    for (int i = 0; i < VideoTargets.Length; i++)
+                    {
+                        string rel = VideoTargets[i];
+                        string file = Path.Combine(ResDir(), rel);
+                        if (!File.Exists(file)) continue;
+
+                        Target t = new Target();
+                        t.Rel = rel;
+                        t.BaseName = Path.GetFileName(rel);
+                        t.Phase = i;
+                        t.Solid = VideoSolid[i];
+                        using (Bitmap b = new Bitmap(file)) { t.W = b.Width; t.H = b.Height; }
+                        // 贴图比渲染分辨率高时只画可见那部分（比例才对）
+                        t.VisW = rw > 0 ? Math.Min(t.W, rw) : t.W;
+                        t.VisH = rh > 0 ? Math.Min(t.H, rh) : t.H;
+                        t.Back = new byte[t.W * t.H * 4];
+                        t.Front = new byte[t.W * t.H * 4];
+                        t.Row = new byte[t.W * 4];
+                        if (t.Solid) FillSolid(t);
+                        list.Add(t);
+                    }
+
+                    if (list.Count == 0) { Log("video: 找不到可用的背景贴图，跳过"); return; }
+
+                    lock (gate)
+                    {
+                        targets = list;
+                        activePath = path;
+                        lastTick = Environment.TickCount;
+                        for (int k = 0; k < lastPhaseTick.Length; k++) lastPhaseTick[k] = 0;
+                        loggedLobbyTick = false;
+                        loggedListTick = false;
+                        loggedMenuTick = false;
+                        framesSinceLog = 0;
+                        fpsClock = Environment.TickCount;
+                        running = true;
+
+                        Thread t = new Thread(delegate()
+                        {
+                            if (IsGif(activePath)) GifLoop(list);
+                            else Loop(list);
+                        });
+                        t.IsBackground = true;
+                        t.Name = "MoLanRelay-video";
+                        worker = t;
+                        t.Start();
+                    }
+                    Log("video: 开始播放 " + path);
+                }
+                catch (Exception ex)
+                {
+                    Log("video: 启动失败 " + ex.Message);
+                    Stop();
+                }
+            }
+
+            /// <summary>停止播放并等线程退出（最多 1.5 秒，超时就让它自己结束）。</summary>
+            public static void Stop()
+            {
+                Thread t;
+                List<Target> old;
+                lock (gate)
+                {
+                    if (!running && worker == null) { activePath = ""; return; }
+                    running = false;
+                    t = worker;
+                    worker = null;
+                    old = targets;
+                    targets = new List<Target>();
+                    activePath = "";
+                }
+
+                if (t != null) { try { t.Join(1500); } catch { } }
+
+                if (old != null)
+                {
+                    foreach (Target x in old) x.Textures = null;
+                }
+            }
+
+            /// <summary>主菜单 / 大厅的渲染分辨率（拿不到就返回 0，用贴图尺寸兜底）。</summary>
+            static void GetRenderResolution(out int w, out int h)
+            {
+                w = 0;
+                h = 0;
+                try
+                {
+                    object wm = currentMainMenu == null ? null : GetMember(currentMainMenu, "WindowManager");
+                    if (wm == null) return;
+                    w = GetInt(wm, "RenderResolutionX", 0);
+                    h = GetInt(wm, "RenderResolutionY", 0);
+                }
+                catch { w = 0; h = 0; }
+            }
+
+            /// <summary>
+            /// 拿到真实渲染分辨率后重算「可见区域」与裁切。
+            /// 主菜单贴图是 1280x768 但实际画在 1280x720 里，按 5:3 裁画面比例会偏。
+            /// </summary>
+            static void RefreshVisible(List<Target> local)
+            {
+                int rw, rh;
+                GetRenderResolution(out rw, out rh);
+                if (rw <= 0 || rh <= 0) return;
+
+                foreach (Target t in local)
+                {
+                    int vw = Math.Min(t.W, rw);
+                    int vh = Math.Min(t.H, rh);
+                    if (vw == t.VisW && vh == t.VisH) continue;
+
+                    t.VisW = vw;
+                    t.VisH = vh;
+                    if (lastVw > 0 && lastVh > 0) PrepareCrop(t, lastVw, lastVh);
+                    Log("video: 「" + t.BaseName + "」可见区域 " + vw + "x" + vh);
+                }
+            }
+
+            /// <summary>当前有没有需要解码的（非纯色）画面。大厅和房间都是纯色时就别解码了。</summary>
+            static bool AnyVideoActive(List<Target> local)
+            {
+                foreach (Target t in local)
+                    if (!t.Solid && IsPhaseActive(t.Phase)) return true;
+                return false;
+            }
+
+            /// <summary>这一屏现在是否真的在显示（主菜单隐藏时它的 Update 照样会被调）。</summary>
+            static bool IsPhaseActive(int phase)
+            {
+                if (phase < 0 || phase >= lastPhaseTick.Length) return false;
+                int t = lastPhaseTick[phase];
+                return t != 0 && unchecked(Environment.TickCount - t) < 800;
+            }
+
+            /// <summary>
+            /// 每帧调用：主菜单传 0，房间传 1，局域网大厅传 2。只有 visible=true 的窗口才算「在看」，
+            /// 否则会两个窗口同时 tick，解码线程不知道该往哪张画。
+            /// </summary>
+            public static void Tick(int phase, bool visible)
+            {
+                if (!running) return;
+                if (!visible) return;
+
+                lastTick = Environment.TickCount;
+                if (phase >= 0 && phase < lastPhaseTick.Length) lastPhaseTick[phase] = lastTick;
+                if (phase == 1 && !loggedLobbyTick) { loggedLobbyTick = true; Log("video: 房间窗口的 Tick 已到达"); }
+                if (phase == 2 && !loggedListTick) { loggedListTick = true; Log("video: 局域网大厅的 Tick 已到达"); }
+                if (phase == 0 && !loggedMenuTick) { loggedMenuTick = true; Log("video: 主菜单 Tick 已到达"); }
+
+                List<Target> local;
+                lock (gate) local = targets;
+                if (local == null || local.Count == 0) return;
+
+                int now = Environment.TickCount;
+                if (unchecked(now - lastResolve) > 1000 || setDataMethod == null)
+                {
+                    lastResolve = now;
+                    ResolveTextures(local);
+                    RefreshVisible(local);
+                }
+
+                MethodInfo setData = setDataMethod;
+                Type ct = colorType;
+                if (setData == null || ct == null) return;
+
+                foreach (Target t in local)
+                {
+                    if (t.Phase != phase) continue;             // 只上传当前这一屏
+                    if (!IsPhaseActive(t.Phase)) continue;
+                    object[] texs = t.Textures;
+                    if (texs == null || texs.Length == 0) continue;
+
+                    lock (t.Sync)
+                    {
+                        if (!t.HasNew)
+                        {
+                            if (t.Solid) continue;      // 纯色只传一次，没有「新帧」是正常的
+                            // 真正连续 3 秒没上传才算「没动」，不能按帧判断（Tick 比帧快得多）
+                            int now2 = Environment.TickCount;
+                            if (unchecked(now2 - t.LastUploadMs) > 3000 && unchecked(now2 - t.StarvedAt) > 3000)
+                            {
+                                t.StarvedAt = now2;
+                                Log("video: 「" + t.BaseName + "」3 秒没有新帧（可见 " + t.VisW + "x" + t.VisH + "）");
+                            }
+                            continue;
+                        }
+                        t.HasNew = false;
+                        if (t.Colors == null) t.Colors = Array.CreateInstance(ct, t.W * t.H);
+
+                        GCHandle pin = GCHandle.Alloc(t.Colors, GCHandleType.Pinned);
+                        try { Marshal.Copy(t.Front, 0, pin.AddrOfPinnedObject(), t.Front.Length); }
+                        finally { pin.Free(); }
+                        t.LastUploadMs = Environment.TickCount;
+
+                        if (!t.UploadLogged)
+                        {
+                            t.UploadLogged = true;
+                            Log("video: 首帧已上传到「" + t.BaseName + "」(" + t.W + "x" + t.H
+                                + "，可见 " + t.VisW + "x" + t.VisH + ")");
+                        }
+                    }
+
+                    foreach (object tex in texs)
+                    {
+                        try { setData.Invoke(tex, new object[] { t.Colors }); }
+                        catch (Exception ex)
+                        {
+                            // 贴图被销毁 / 尺寸对不上：丢掉引用，下一秒重找，并把原因写进日志
+                            t.Textures = null;
+                            Log("video: SetData 失败「" + t.BaseName + "」：" + ex.Message);
+                        }
+                    }
+                }
+            }
+
+            // ---------------- 动图（GIF） ----------------
+
+            static bool IsGif(string path)
+            {
+                try { return string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase); }
+                catch { return false; }
+            }
+
+            /// <summary>
+            /// GIF 是自己逐帧喂的：GDI+ 按文件里的帧间隔切帧，缩放到目标尺寸后
+            /// 走与视频一样的双缓冲。帧率跟着 GIF 本身，不受 15fps 限制。
+            /// </summary>
+            static void GifLoop(List<Target> local)
+            {
+                MemoryStream ms = null;
+                Image img = null;
+                List<Bitmap> canvases = new List<Bitmap>();
+
+                try
+                {
+                    ms = new MemoryStream(File.ReadAllBytes(activePath));
+                    img = Image.FromStream(ms);
+
+                    int vw = img.Width;
+                    int vh = img.Height;
+                    if (vw <= 0 || vh <= 0) { Log("video: GIF 尺寸异常"); return; }
+                    lastVw = vw;
+                    lastVh = vh;
+
+                    int count = 1;
+                    try { count = img.GetFrameCount(FrameDimension.Time); }
+                    catch { count = 1; }
+
+                    if (count <= 1) { Log("video: 这张 GIF 只有一帧，保留静态壁纸"); return; }
+
+                    int[] delays = null;
+                    try
+                    {
+                        PropertyItem pi = img.GetPropertyItem(0x5100);     // FrameDelay（1/100 秒）
+                        if (pi != null && pi.Value != null && pi.Value.Length >= count * 4)
+                        {
+                            delays = new int[count];
+                            Buffer.BlockCopy(pi.Value, 0, delays, 0, count * 4);
+                        }
+                    }
+                    catch { }
+
+                    foreach (Target t in local)
+                    {
+                        PrepareCrop(t, vw, vh);
+                        canvases.Add(new Bitmap(t.W, t.H, PixelFormat.Format32bppArgb));
+                    }
+                    Log("video: GIF " + vw + "x" + vh + "，" + count + " 帧，开始循环播放");
+
+                    while (running)
+                    {
+                        for (int i = 0; i < count && running; i++)
+                        {
+                            if (unchecked(Environment.TickCount - lastTick) > 3000)
+                            {
+                                Thread.Sleep(150);
+                                i--;
+                                continue;
+                            }
+
+                            try { img.SelectActiveFrame(FrameDimension.Time, i); }
+                            catch { break; }
+
+                            for (int k = 0; k < local.Count; k++)
+                            {
+                                if (local[k].Solid) continue;
+                                if (IsPhaseActive(local[k].Phase)) RenderGif(local[k], img, canvases[k]);
+                            }
+
+                            int delay = (delays != null && delays[i] > 0) ? delays[i] * 10 : 100;
+                            if (delay < 20) delay = 20;
+                            if (delay > 1000) delay = 1000;
+                            Thread.Sleep(delay);
+                        }
+                    }
+                }
+                catch (Exception ex) { Log("video: GIF 播放异常 " + ex.Message); }
+                finally
+                {
+                    foreach (Bitmap b in canvases) { try { b.Dispose(); } catch { } }
+                    if (img != null) { try { img.Dispose(); } catch { } }
+                    if (ms != null) { try { ms.Dispose(); } catch { } }
+                }
+            }
+
+            static void RenderGif(Target t, Image img, Bitmap canvas)
+            {
+                try
+                {
+                    int dw = t.VisW, dh = t.VisH;
+                    if (dw <= 0 || dh <= 0) return;
+
+                    using (Graphics g = Graphics.FromImage(canvas))
+                    {
+                        g.CompositingMode = CompositingMode.SourceCopy;
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                        g.Clear(Color.Black);
+                        g.DrawImage(img, new Rectangle(0, 0, dw, dh),
+                            t.SrcX, t.SrcY, t.SrcW, t.SrcH, GraphicsUnit.Pixel);
+                    }
+
+                    BitmapData bd = canvas.LockBits(new Rectangle(0, 0, dw, dh),
+                        ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    try
+                    {
+                        int stride = bd.Stride;
+                        if (t.Row == null || t.Row.Length < stride) t.Row = new byte[stride];
+
+                        byte[] dst = t.Back;
+                        for (int y = 0; y < dh; y++)
+                        {
+                            Marshal.Copy(new IntPtr(bd.Scan0.ToInt64() + (long)y * stride), t.Row, 0, stride);
+                            int o = y * t.W * 4;
+                            int i = 0;
+                            for (int x = 0; x < dw; x++)
+                            {
+                                dst[o] = t.Row[i + 2];        // R
+                                dst[o + 1] = t.Row[i + 1];    // G
+                                dst[o + 2] = t.Row[i];        // B
+                                dst[o + 3] = 255;             // A
+                                o += 4;
+                                i += 4;
+                            }
+                        }
+
+                        int fullRow = t.W * 4;
+                        for (int y = dh; y < t.H; y++)
+                            Buffer.BlockCopy(dst, (dh - 1) * fullRow, dst, y * fullRow, fullRow);
+                    }
+                    finally { canvas.UnlockBits(bd); }
+
+                    lock (t.Sync)
+                    {
+                        byte[] swap = t.Front;
+                        t.Front = t.Back;
+                        t.Back = swap;
+                        t.HasNew = true;
+                    }
+                }
+                catch { }
+            }
+
+            // ---------------- 解码线程 ----------------
+
+            static void PrepareCrop(Target t, int vw, int vh)
+            {
+                float scale = Math.Max((float)t.VisW / vw, (float)t.VisH / vh);
+                int sw = Math.Max(1, Math.Min(vw, (int)Math.Round(t.VisW / scale)));
+                int sh = Math.Max(1, Math.Min(vh, (int)Math.Round(t.VisH / scale)));
+                t.SrcW = sw;
+                t.SrcH = sh;
+                t.SrcX = (vw - sw) / 2;
+                t.SrcY = (vh - sh) / 2;
+            }
+
+            static void Loop(List<Target> local)
+            {
+                bool comInit = false;
+                try
+                {
+                    // MF 要求线程有 COM 环境；失败也不致命
+                    try { comInit = CoInitializeEx(IntPtr.Zero, 0) >= 0; } catch { }
+
+                    if (MFStartup(MfVersion, 0) < 0)
+                    {
+                        Log("video: Media Foundation 初始化失败，保留静态壁纸");
+                        return;
+                    }
+
+                    while (running)
+                    {
+                        IMFSourceReader reader = null;
+                        try
+                        {
+                            bool nv12;
+                            reader = OpenReader(activePath, out nv12);
+                            if (reader == null) return;
+                            srcNv12 = nv12;
+
+                            int vw, vh;
+                            bool bottomUp;
+                            if (!ReadSize(reader, out vw, out vh, out bottomUp))
+                            {
+                                Log("video: 读不到视频尺寸，保留静态壁纸");
+                                return;
+                            }
+
+                            int stride = srcStride;
+                            int bufSize = nv12 ? stride * vh * 3 / 2 : vw * vh * 4;
+                            if (bufSize <= 0) return;
+
+                            byte[] raw = new byte[bufSize];
+                            lastVw = vw;
+                            lastVh = vh;
+                            PrepareCrops(local, vw, vh);
+                            Log("video: " + vw + "x" + vh + " " + (nv12 ? "NV12（硬解）" : "RGB32")
+                                + (bottomUp ? " 底朝上" : "") + "，开始逐帧播放");
+
+                            int lastPublish = 0;
+                            while (running)
+                            {
+                                // 三秒没有 Tick（多半进游戏了）就暂停解码，省 CPU
+                                if (unchecked(Environment.TickCount - lastTick) > 3000)
+                                {
+                                    Thread.Sleep(150);
+                                    continue;
+                                }
+
+                                // 当前显示的全是纯色背景（大厅/房间）：不用解码
+                                if (!AnyVideoActive(local))
+                                {
+                                    Thread.Sleep(80);
+                                    continue;
+                                }
+
+                                int actual, flags;
+                                long ts;
+                                IMFSample sample = null;
+                                int hr = reader.ReadSample(FirstVideoStream, 0,
+                                    out actual, out flags, out ts, out sample);
+                                if (hr < 0) break;                       // 解码出错 → 重建再试
+                                if ((flags & EndOfStream) != 0)
+                                {
+                                    if (sample != null) Marshal.ReleaseComObject(sample);
+                                    break;                               // 播完 → 从头再来
+                                }
+                                if (sample == null) { Thread.Sleep(1); continue; }
+
+                                try { Publish(sample, raw, vw, vh, bottomUp, nv12, stride, local); }
+                                finally { Marshal.ReleaseComObject(sample); }
+
+                                int now = Environment.TickCount;
+                                int wait = FrameMs - unchecked(now - lastPublish);
+                                lastPublish = now;
+                                if (wait > 0) Thread.Sleep(wait);
+                            }
+                        }
+                        finally
+                        {
+                            if (reader != null) { try { Marshal.ReleaseComObject(reader); } catch { } }
+                        }
+
+                        if (running) Thread.Sleep(200);              // 循环播放前歇一下
+                    }
+                }
+                catch (Exception ex) { Log("video: 播放线程异常 " + ex.Message); }
+                finally
+                {
+                    try { MFShutdown(); } catch { }
+                    if (comInit) { try { CoUninitialize(); } catch { } }
+                }
+            }
+
+            /// <summary>按解码尺寸算好每个目标的 cover 裁切矩形（只算一次）。</summary>
+            static void PrepareCrops(List<Target> local, int vw, int vh)
+            {
+                foreach (Target t in local) PrepareCrop(t, vw, vh);
+            }
+
+            static void Publish(IMFSample sample, byte[] raw, int vw, int vh, bool bottomUp,
+                bool nv12, int stride, List<Target> local)
+            {
+                IMFMediaBuffer buf = null;
+                if (sample.ConvertToContiguousBuffer(out buf) < 0 || buf == null) return;
+
+                try
+                {
+                    IntPtr p;
+                    int maxLen, curLen;
+                    if (buf.Lock(out p, out maxLen, out curLen) < 0) return;
+                    try
+                    {
+                        int copy = curLen > 0 ? Math.Min(curLen, raw.Length) : raw.Length;
+                        if (copy <= 0) return;
+                        Marshal.Copy(p, raw, 0, copy);
+                    }
+                    finally { buf.Unlock(); }
+                }
+                finally { try { Marshal.ReleaseComObject(buf); } catch { } }
+
+                // 只画当前看得见的那几张：窗口隐藏后的 tick 不算
+                foreach (Target t in local)
+                {
+                    if (t.Solid) continue;                      // 纯色的那张不画视频
+                    if (!IsPhaseActive(t.Phase)) continue;
+                    if (nv12) RenderNv12(t, raw, vw, vh, stride, bottomUp);
+                    else RenderRgb32(t, raw, vw, vh, bottomUp);
+                }
+
+                framesSinceLog++;
+                if (framesSinceLog >= 90)
+                {
+                    int nowT = Environment.TickCount;
+                    int dt = unchecked(nowT - fpsClock);
+                    if (dt > 0) Log("video: " + ((framesSinceLog * 1000.0) / dt).ToString("F1") + " fps");
+                    framesSinceLog = 0;
+                    fpsClock = nowT;
+                }
+            }
+
+            /// <summary>
+            /// 一帧源数据（RGB32）→ 目标尺寸的 RGBA。逐像素抽样，不经过 GDI+
+            /// （4K 用 GDI+ 双三次要 90ms 以上，这里 2x2 平均值既快又不闪）。
+            /// </summary>
+            static void RenderRgb32(Target t, byte[] raw, int vw, int vh, bool bottomUp)
+            {
+                try
+                {
+                    byte[] dst = t.Back;
+                    int dw = t.VisW, dh = t.VisH;
+                    if (dw <= 0 || dh <= 0) return;
+
+                    int stepX = (t.SrcW << 16) / dw;
+                    int stepY = (t.SrcH << 16) / dh;
+                    int rowMax = t.SrcY + t.SrcH - 1;
+                    int colMax = t.SrcX + t.SrcW - 1;
+
+                    // 缩小取 2x2 平均（半个步长），放大就取单点
+                    bool shrink = t.SrcW > dw || t.SrcH > dh;
+                    int halfX = shrink ? Math.Max(1, stepX >> 17) : 0;
+                    int halfY = shrink ? Math.Max(1, stepY >> 17) : 0;
+
+                    for (int y = 0; y < dh; y++)
+                    {
+                        int sy = t.SrcY + (y * stepY >> 16);
+                        if (sy > rowMax) sy = rowMax;
+                        int sy2 = sy + halfY;
+                        if (sy2 > rowMax) sy2 = rowMax;
+
+                        int row0 = (bottomUp ? (vh - 1 - sy) : sy) * vw;
+                        int row1 = (bottomUp ? (vh - 1 - sy2) : sy2) * vw;
+                        int o = y * t.W * 4;
+
+                        for (int x = 0; x < dw; x++)
+                        {
+                            int sx = t.SrcX + (x * stepX >> 16);
+                            if (sx > colMax) sx = colMax;
+                            int sx2 = sx + halfX;
+                            if (sx2 > colMax) sx2 = colMax;
+
+                            int i00 = (row0 + sx) * 4;
+                            int i01 = (row0 + sx2) * 4;
+                            int i10 = (row1 + sx) * 4;
+                            int i11 = (row1 + sx2) * 4;
+
+                            if (shrink)
+                            {
+                                dst[o] = (byte)((raw[i00 + 2] + raw[i01 + 2] + raw[i10 + 2] + raw[i11 + 2]) >> 2);
+                                dst[o + 1] = (byte)((raw[i00 + 1] + raw[i01 + 1] + raw[i10 + 1] + raw[i11 + 1]) >> 2);
+                                dst[o + 2] = (byte)((raw[i00] + raw[i01] + raw[i10] + raw[i11]) >> 2);
+                            }
+                            else
+                            {
+                                dst[o] = raw[i00 + 2];
+                                dst[o + 1] = raw[i00 + 1];
+                                dst[o + 2] = raw[i00];
+                            }
+                            dst[o + 3] = 255;
+                            o += 4;
+                        }
+                    }
+
+                    // 贴图比可见区域高/宽的部分（多在屏幕外）复制最后一行，避免残留上一帧
+                    int fullRow = t.W * 4;
+                    for (int y = dh; y < t.H; y++)
+                        Buffer.BlockCopy(dst, (dh - 1) * fullRow, dst, y * fullRow, fullRow);
+
+                    lock (t.Sync)
+                    {
+                        byte[] swap = t.Front;
+                        t.Front = t.Back;
+                        t.Back = swap;
+                        t.HasNew = true;
+                    }
+                }
+                catch { }
+            }
+
+            /// <summary>
+            /// NV12 → RGBA。Y 平面 stride 可能带对齐填充；色度是 2x2 共享的半分辨率平面。
+            /// 缩小取 2x2 平均（先平均 YUV 再转一次 RGB，省算力也不闪）。
+            /// </summary>
+            static void RenderNv12(Target t, byte[] raw, int vw, int vh, int stride, bool bottomUp)
+            {
+                try
+                {
+                    byte[] dst = t.Back;
+                    int dw = t.VisW, dh = t.VisH;
+                    if (dw <= 0 || dh <= 0) return;
+
+                    int stepX = (t.SrcW << 16) / dw;
+                    int stepY = (t.SrcH << 16) / dh;
+                    int rowMax = t.SrcY + t.SrcH - 1;
+                    int colMax = t.SrcX + t.SrcW - 1;
+
+                    bool shrink = t.SrcW > dw || t.SrcH > dh;
+                    int halfX = shrink ? Math.Max(1, stepX >> 17) : 0;
+                    int halfY = shrink ? Math.Max(1, stepY >> 17) : 0;
+
+                    int uvBase = stride * vh;
+                    int uvRows = vh >> 1;
+                    if (uvRows <= 0) uvRows = 1;
+
+                    for (int y = 0; y < dh; y++)
+                    {
+                        int sy = t.SrcY + (y * stepY >> 16);
+                        if (sy > rowMax) sy = rowMax;
+                        int sy2 = sy + halfY;
+                        if (sy2 > rowMax) sy2 = rowMax;
+
+                        int row0 = bottomUp ? (vh - 1 - sy) : sy;
+                        int row1 = bottomUp ? (vh - 1 - sy2) : sy2;
+                        int y0 = row0 * stride;
+                        int y1 = row1 * stride;
+
+                        int uvR0 = bottomUp ? (uvRows - 1 - (row0 >> 1)) : (row0 >> 1);
+                        int uvR1 = bottomUp ? (uvRows - 1 - (row1 >> 1)) : (row1 >> 1);
+                        int uv0 = uvBase + uvR0 * stride;
+                        int uv1 = uvBase + uvR1 * stride;
+
+                        int o = y * t.W * 4;
+
+                        for (int x = 0; x < dw; x++)
+                        {
+                            int sx = t.SrcX + (x * stepX >> 16);
+                            if (sx > colMax) sx = colMax;
+                            int sx2 = sx + halfX;
+                            if (sx2 > colMax) sx2 = colMax;
+
+                            int Y, U, V;
+                            if (shrink)
+                            {
+                                Y = (raw[y0 + sx] + raw[y0 + sx2] + raw[y1 + sx] + raw[y1 + sx2]) >> 2;
+                                int u0 = uv0 + ((sx >> 1) << 1);
+                                int u1 = uv0 + ((sx2 >> 1) << 1);
+                                int u2 = uv1 + ((sx >> 1) << 1);
+                                int u3 = uv1 + ((sx2 >> 1) << 1);
+                                U = (raw[u0] + raw[u1] + raw[u2] + raw[u3]) >> 2;
+                                V = (raw[u0 + 1] + raw[u1 + 1] + raw[u2 + 1] + raw[u3 + 1]) >> 2;
+                            }
+                            else
+                            {
+                                int yi = y0 + sx;
+                                Y = raw[yi];
+                                int ui = uv0 + ((sx >> 1) << 1);
+                                U = raw[ui];
+                                V = raw[ui + 1];
+                            }
+
+                            int c = Y - 16, d = U - 128, e = V - 128;
+                            int r = (298 * c + 459 * e + 128) >> 8;
+                            int g = (298 * c - 55 * d - 136 * e + 128) >> 8;
+                            int b = (298 * c + 541 * d + 128) >> 8;
+                            if (r < 0) r = 0; else if (r > 255) r = 255;
+                            if (g < 0) g = 0; else if (g > 255) g = 255;
+                            if (b < 0) b = 0; else if (b > 255) b = 255;
+
+                            dst[o] = (byte)r;
+                            dst[o + 1] = (byte)g;
+                            dst[o + 2] = (byte)b;
+                            dst[o + 3] = 255;
+                            o += 4;
+                        }
+                    }
+
+                    int fullRow = t.W * 4;
+                    for (int y = dh; y < t.H; y++)
+                        Buffer.BlockCopy(dst, (dh - 1) * fullRow, dst, y * fullRow, fullRow);
+
+                    lock (t.Sync)
+                    {
+                        byte[] swap = t.Front;
+                        t.Front = t.Back;
+                        t.Back = swap;
+                        t.HasNew = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (!t.RenderErrorLogged)
+                    {
+                        t.RenderErrorLogged = true;
+                        Log("video: 渲染「" + t.BaseName + "」失败：" + ex.Message);
+                    }
+                }
+            }
+
+            // ---------------- 找贴图（每秒刷新，界面切来切去也会重新找到） ----------------
+
+            static void ResolveTextures(List<Target> local)
+            {
+                try
+                {
+                    Type texType = FindXnaType("Microsoft.Xna.Framework.Graphics.Texture2D");
+                    colorType = FindXnaType("Microsoft.Xna.Framework.Color");
+                    Type loaderType = FindXnaType("Rampastring.XNAUI.AssetLoader");
+                    if (texType == null || colorType == null || loaderType == null) return;
+
+                    FieldInfo cacheField = loaderType.GetField("textureCache",
+                        BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                    if (cacheField == null) return;
+                    IList cache = cacheField.GetValue(null) as IList;
+                    if (cache == null) return;
+
+                    PropertyInfo nameProp = texType.GetProperty("Name");
+                    PropertyInfo widthProp = texType.GetProperty("Width");
+                    PropertyInfo heightProp = texType.GetProperty("Height");
+                    if (nameProp == null || widthProp == null || heightProp == null) return;
+
+                    if (setDataMethod == null)
+                    {
+                        foreach (MethodInfo m in texType.GetMethods())
+                        {
+                            if (m.Name == "SetData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
+                            {
+                                setDataMethod = m.MakeGenericMethod(colorType);
+                                break;
+                            }
+                        }
+                    }
+                    if (setDataMethod == null) return;
+
+                    foreach (Target t in local)
+                    {
+                        if (t.Textures != null) continue;         // 已经找到，不用每秒重扫
+
+                        // 先看活动窗口自己挂的那张：大厅/房间窗口每次进来都可能换一张贴图，
+                        // 缓存里那份不一定是正在画的那份
+                        object[] fromWindow = FindWindowBackground(t.BaseName, t.W, t.H);
+                        if (fromWindow != null)
+                        {
+                            t.Textures = fromWindow;
+                            if (t.Solid) FillSolid(t);
+                            Log("video: 「" + t.BaseName + "」从窗口背景里找到 " + fromWindow.Length + " 个贴图");
+                            continue;
+                        }
+
+                        List<object> found = new List<object>();
+                        foreach (object tex in cache)
+                        {
+                            if (tex == null) continue;
+                            try
+                            {
+                                string nm = nameProp.GetValue(tex, null) as string;
+                                if (string.IsNullOrEmpty(nm)) continue;
+                                if (!string.Equals(Path.GetFileName(nm.Replace('/', '\\')), t.BaseName,
+                                        StringComparison.OrdinalIgnoreCase)) continue;
+                                if ((int)widthProp.GetValue(tex, null) != t.W) continue;
+                                if ((int)heightProp.GetValue(tex, null) != t.H) continue;
+
+                                found.Add(tex);
+                                if (found.Count >= 4) break;
+                            }
+                            catch { }
+                        }
+                        if (found.Count > 0)
+                        {
+                            t.Textures = found.ToArray();
+                            if (t.Solid) FillSolid(t);
+                            Log("video: 「" + t.BaseName + "」找到 " + found.Count + " 个贴图");
+                        }
+                    }
+                }
+                catch (Exception ex) { Log("video: 查找贴图失败 " + ex.Message); }
+            }
+
+            /// <summary>
+            /// 从当前显示着的大厅 / 房间窗口里取 BackgroundTexture。
+            /// 尺寸必须和主题文件一致（SetData 的像素数要对得上）。
+            /// </summary>
+            static object[] FindWindowBackground(string baseName, int w, int h)
+            {
+                try
+                {
+                    object wm = currentMainMenu == null ? null : GetMember(currentMainMenu, "WindowManager");
+                    IList controls = GetMember(wm, "Controls") as IList;
+                    if (controls == null) return null;
+
+                    List<object> found = new List<object>();
+                    for (int i = 0; i < controls.Count; i++)
+                    {
+                        object win = controls[i];
+                        if (win == null) continue;
+
+                        string tn = win.GetType().Name;
+                        bool lobbyLike = tn.IndexOf("Lobby", StringComparison.OrdinalIgnoreCase) >= 0
+                                      || tn.IndexOf("GameRoom", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!lobbyLike) continue;
+
+                        object tex = GetMember(win, "BackgroundTexture");
+                        if (tex == null) continue;
+                        if (GetInt(tex, "Width", 0) != w) continue;
+                        if (GetInt(tex, "Height", 0) != h) continue;
+
+                        string nm = GetMember(tex, "Name") as string;
+                        if (!string.IsNullOrEmpty(nm) &&
+                            !string.Equals(Path.GetFileName(nm.Replace('/', '\\')), baseName,
+                                StringComparison.OrdinalIgnoreCase)) continue;
+
+                        found.Add(tex);
+                        if (found.Count >= 4) break;
+                    }
+                    return found.Count == 0 ? null : found.ToArray();
+                }
+                catch { return null; }
+            }
+
+            // ---------------- Media Foundation（只用到解码这一小部分） ----------------
+
+            [DllImport("mfplat.dll", ExactSpelling = true)]
+            static extern int MFStartup(int version, int dwFlags);
+
+            [DllImport("mfplat.dll", ExactSpelling = true)]
+            static extern int MFShutdown();
+
+            [DllImport("mfplat.dll", ExactSpelling = true)]
+            static extern int MFCreateAttributes(out IMFAttributes attributes, int cInitialSize);
+
+            [DllImport("mfplat.dll", ExactSpelling = true)]
+            static extern int MFCreateMediaType(out IMFAttributes mediaType);
+
+            [DllImport("mfreadwrite.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
+            static extern int MFCreateSourceReaderFromURL(
+                [MarshalAs(UnmanagedType.LPWStr)] string url, IMFAttributes attributes,
+                out IMFSourceReader reader);
+
+            [DllImport("ole32.dll", ExactSpelling = true)]
+            static extern int CoInitializeEx(IntPtr pvReserved, int dwCoInit);
+
+            [DllImport("ole32.dll", ExactSpelling = true)]
+            static extern void CoUninitialize();
+
+            static readonly Guid KeyMajorType = new Guid("48EBA18E-F8C9-4687-BF11-0A74C9F96A8F");
+            static readonly Guid KeySubtype = new Guid("F7E34C9A-42E8-4714-B74B-CB29D72C35E5");
+            static readonly Guid KeyFrameSize = new Guid("1652C33D-D6B2-4012-B834-72030849A37D");
+            static readonly Guid KeyDefaultStride = new Guid("644B4E48-1E02-4516-B0EB-C01CA9D49AC6");
+            static readonly Guid MediaTypeVideo = new Guid("73646976-0000-0010-8000-00AA00389B71");
+            static readonly Guid VideoFormatRgb32 = new Guid("00000016-0000-0010-8000-00AA00389B71");
+            static readonly Guid VideoFormatNv12 = new Guid("3231564E-0000-0010-8000-00AA00389B71");
+            static readonly Guid AttrVideoProcessing = new Guid("FB394F3D-CCF1-42EE-BBB3-F9B845D5681D");
+            static readonly Guid AttrAdvancedProcessing = new Guid("0F81DA2C-B537-4672-A8B2-A8F5CD6C4B2A");
+
+            // 当前视频源格式：NV12 是硬解直出（4K 也能 30fps），RGB32 是兜底
+            static bool srcNv12;
+            static int srcStride;
+
+            /// <summary>
+            /// 打开视频。先要 NV12：不设视频处理器时 MF 才走显卡硬解
+            /// （实测 4K H.264：硬解 20ms/帧，走视频处理器要 129ms/帧）。
+            /// 硬解不了再退回 RGB32 + 视频处理器。
+            /// </summary>
+            static IMFSourceReader OpenReader(string path, out bool nv12)
+            {
+                nv12 = false;
+                if (!File.Exists(path)) return null;
+
+                IMFSourceReader reader = TryOpen(path, false);
+                if (reader != null) { nv12 = true; return reader; }
+
+                reader = TryOpen(path, true);
+                if (reader != null) return reader;
+
+                Log("video: 打不开视频（" + Path.GetFileName(path) + "）");
+                return null;
+            }
+
+            static IMFSourceReader TryOpen(string path, bool rgb32)
+            {
+                IMFAttributes attrs = null;
+                IMFAttributes mt = null;
+                IMFSourceReader created = null;
+
+                try
+                {
+                    if (rgb32)
+                    {
+                        if (MFCreateAttributes(out attrs, 2) < 0 || attrs == null) return null;
+                        Guid k1 = AttrVideoProcessing;
+                        attrs.SetUINT32(ref k1, 1);
+                        Guid k2 = AttrAdvancedProcessing;
+                        attrs.SetUINT32(ref k2, 1);
+                    }
+
+                    int hr = MFCreateSourceReaderFromURL(path, attrs, out created);
+                    if (hr < 0 || created == null) return null;
+
+                    if (MFCreateMediaType(out mt) < 0 || mt == null) return null;
+
+                    Guid key = KeyMajorType;
+                    Guid val = MediaTypeVideo;
+                    mt.SetGUID(ref key, ref val);
+
+                    key = KeySubtype;
+                    val = rgb32 ? VideoFormatRgb32 : VideoFormatNv12;
+                    mt.SetGUID(ref key, ref val);
+
+                    hr = created.SetCurrentMediaType(FirstVideoStream, IntPtr.Zero, mt);
+                    if (hr < 0)
+                    {
+                        Log("video: 输出 " + (rgb32 ? "RGB32" : "NV12") + " 失败 0x" + hr.ToString("X8"));
+                        return null;
+                    }
+
+                    IMFSourceReader result = created;
+                    created = null;                         // 交出去，finally 别再释放
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    Log("video: 打开失败 " + ex.Message);
+                    return null;
+                }
+                finally
+                {
+                    if (mt != null) { try { Marshal.ReleaseComObject(mt); } catch { } }
+                    if (attrs != null) { try { Marshal.ReleaseComObject(attrs); } catch { } }
+                    if (created != null) { try { Marshal.ReleaseComObject(created); } catch { } }
+                }
+            }
+
+            static bool ReadSize(IMFSourceReader reader, out int w, out int h, out bool bottomUp)
+            {
+                w = 0;
+                h = 0;
+                bottomUp = true;
+                IMFAttributes mt = null;
+                try
+                {
+                    if (reader.GetCurrentMediaType(FirstVideoStream, out mt) < 0 || mt == null) return false;
+
+                    Guid key = KeyFrameSize;
+                    long packed;
+                    if (mt.GetUINT64(ref key, out packed) < 0) return false;
+
+                    w = (int)(packed >> 32);
+                    h = (int)(packed & 0xFFFFFFFFL);
+                    if (w <= 0 || h <= 0 || (long)w * h > 8192L * 8192L) return false;
+
+                    Guid sk = KeyDefaultStride;
+                    int stride;
+                    int shr = mt.GetUINT32(ref sk, out stride);
+
+                    if (srcNv12)
+                    {
+                        // NV12 的 Y 行宽可能被对齐（比如 3840 对齐到 4096）
+                        srcStride = (shr == 0 && stride != 0) ? Math.Abs(stride) : w;
+                        if (srcStride < w) srcStride = w;
+                    }
+                    else
+                    {
+                        srcStride = w * 4;
+                    }
+
+                    bottomUp = !(shr == 0 && stride > 0);
+                    return true;
+                }
+                catch { return false; }
+                finally { if (mt != null) { try { Marshal.ReleaseComObject(mt); } catch { } } }
+            }
+
+            [ComImport, Guid("2CD2D921-C447-44A7-A13C-4ADABFC247E3"),
+             InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IMFAttributes
+            {
+                [PreserveSig] int GetItem(ref Guid guidKey, IntPtr pValue);
+                [PreserveSig] int GetItemType(ref Guid guidKey, out int pType);
+                [PreserveSig] int CompareItem(ref Guid guidKey, IntPtr value, out int pbResult);
+                [PreserveSig] int Compare(IMFAttributes pTheirs, int matchType, out int pbResult);
+                [PreserveSig] int GetUINT32(ref Guid guidKey, out int punValue);
+                [PreserveSig] int GetUINT64(ref Guid guidKey, out long punValue);
+                [PreserveSig] int GetDouble(ref Guid guidKey, out double pfValue);
+                [PreserveSig] int GetGUID(ref Guid guidKey, out Guid pguidValue);
+                [PreserveSig] int GetStringLength(ref Guid guidKey, out int pcchLength);
+                [PreserveSig] int GetString(ref Guid guidKey,
+                    [MarshalAs(UnmanagedType.LPWStr)] StringBuilder pwszValue, int cchBufSize, out int pcchLength);
+                [PreserveSig] int GetAllocatedString(ref Guid guidKey, out IntPtr ppwszValue, out int pcchLength);
+                [PreserveSig] int GetBlobSize(ref Guid guidKey, out int pcbBlobSize);
+                [PreserveSig] int GetBlob(ref Guid guidKey, byte[] pBuf, int cbBufSize, out int pcbBlobSize);
+                [PreserveSig] int GetAllocatedBlob(ref Guid guidKey, out IntPtr ppBuf, out int pcbSize);
+                [PreserveSig] int GetUnknown(ref Guid guidKey, ref Guid riid, out IntPtr ppv);
+                [PreserveSig] int SetItem(ref Guid guidKey, IntPtr value);
+                [PreserveSig] int DeleteItem(ref Guid guidKey);
+                [PreserveSig] int DeleteAllItems();
+                [PreserveSig] int SetUINT32(ref Guid guidKey, int unValue);
+                [PreserveSig] int SetUINT64(ref Guid guidKey, long unValue);
+                [PreserveSig] int SetDouble(ref Guid guidKey, double fValue);
+                [PreserveSig] int SetGUID(ref Guid guidKey, ref Guid guidValue);
+                [PreserveSig] int SetString(ref Guid guidKey, [MarshalAs(UnmanagedType.LPWStr)] string wszValue);
+                [PreserveSig] int SetBlob(ref Guid guidKey, byte[] pBuf, int cbBufSize);
+                [PreserveSig] int SetUnknown(ref Guid guidKey, object pUnknown);
+                [PreserveSig] int LockStore();
+                [PreserveSig] int UnlockStore();
+                [PreserveSig] int GetCount(out int pcItems);
+                [PreserveSig] int GetItemByIndex(int unIndex, out Guid pguidKey, IntPtr pValue);
+                [PreserveSig] int CopyAllItems(IMFAttributes pDest);
+            }
+
+            [ComImport, Guid("C40A00F2-B93A-4D80-AE8C-5A1C634F58E4"),
+             InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IMFSample
+            {
+                // 前 30 个与 IMFAttributes 完全一致（COM 接口继承 = vtable 前缀）
+                [PreserveSig] int GetItem(ref Guid guidKey, IntPtr pValue);
+                [PreserveSig] int GetItemType(ref Guid guidKey, out int pType);
+                [PreserveSig] int CompareItem(ref Guid guidKey, IntPtr value, out int pbResult);
+                [PreserveSig] int Compare(IMFAttributes pTheirs, int matchType, out int pbResult);
+                [PreserveSig] int GetUINT32(ref Guid guidKey, out int punValue);
+                [PreserveSig] int GetUINT64(ref Guid guidKey, out long punValue);
+                [PreserveSig] int GetDouble(ref Guid guidKey, out double pfValue);
+                [PreserveSig] int GetGUID(ref Guid guidKey, out Guid pguidValue);
+                [PreserveSig] int GetStringLength(ref Guid guidKey, out int pcchLength);
+                [PreserveSig] int GetString(ref Guid guidKey,
+                    [MarshalAs(UnmanagedType.LPWStr)] StringBuilder pwszValue, int cchBufSize, out int pcchLength);
+                [PreserveSig] int GetAllocatedString(ref Guid guidKey, out IntPtr ppwszValue, out int pcchLength);
+                [PreserveSig] int GetBlobSize(ref Guid guidKey, out int pcbBlobSize);
+                [PreserveSig] int GetBlob(ref Guid guidKey, byte[] pBuf, int cbBufSize, out int pcbBlobSize);
+                [PreserveSig] int GetAllocatedBlob(ref Guid guidKey, out IntPtr ppBuf, out int pcbSize);
+                [PreserveSig] int GetUnknown(ref Guid guidKey, ref Guid riid, out IntPtr ppv);
+                [PreserveSig] int SetItem(ref Guid guidKey, IntPtr value);
+                [PreserveSig] int DeleteItem(ref Guid guidKey);
+                [PreserveSig] int DeleteAllItems();
+                [PreserveSig] int SetUINT32(ref Guid guidKey, int unValue);
+                [PreserveSig] int SetUINT64(ref Guid guidKey, long unValue);
+                [PreserveSig] int SetDouble(ref Guid guidKey, double fValue);
+                [PreserveSig] int SetGUID(ref Guid guidKey, ref Guid guidValue);
+                [PreserveSig] int SetString(ref Guid guidKey, [MarshalAs(UnmanagedType.LPWStr)] string wszValue);
+                [PreserveSig] int SetBlob(ref Guid guidKey, byte[] pBuf, int cbBufSize);
+                [PreserveSig] int SetUnknown(ref Guid guidKey, object pUnknown);
+                [PreserveSig] int LockStore();
+                [PreserveSig] int UnlockStore();
+                [PreserveSig] int GetCount(out int pcItems);
+                [PreserveSig] int GetItemByIndex(int unIndex, out Guid pguidKey, IntPtr pValue);
+                [PreserveSig] int CopyAllItems(IMFAttributes pDest);
+
+                [PreserveSig] int GetSampleFlags(out int pdwSampleFlags);
+                [PreserveSig] int SetSampleFlags(int dwSampleFlags);
+                [PreserveSig] int GetSampleTime(out long pllSampleTime);
+                [PreserveSig] int SetSampleTime(long llSampleTime);
+                [PreserveSig] int GetSampleDuration(out long pllSampleDuration);
+                [PreserveSig] int SetSampleDuration(long llSampleDuration);
+                [PreserveSig] int GetBufferCount(out int pdwBufferCount);
+                [PreserveSig] int GetBufferByIndex(int dwIndex, out IMFMediaBuffer ppBuffer);
+                [PreserveSig] int ConvertToContiguousBuffer(out IMFMediaBuffer ppBuffer);
+                [PreserveSig] int AddBuffer(IMFMediaBuffer pBuffer);
+                [PreserveSig] int RemoveBufferByIndex(int dwIndex);
+                [PreserveSig] int RemoveAllBuffers();
+                [PreserveSig] int GetTotalLength(out int pcbTotalLength);
+                [PreserveSig] int CopyToBuffer(IMFMediaBuffer pBuffer);
+            }
+
+            [ComImport, Guid("045FA593-8799-42B8-BC8D-8968C6453507"),
+             InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IMFMediaBuffer
+            {
+                [PreserveSig] int Lock(out IntPtr ppbBuffer, out int pcbMaxLength, out int pcbCurrentLength);
+                [PreserveSig] int Unlock();
+                [PreserveSig] int GetCurrentLength(out int pcbCurrentLength);
+                [PreserveSig] int SetCurrentLength(int cbCurrentLength);
+                [PreserveSig] int GetMaxLength(out int pcbMaxLength);
+            }
+
+            [ComImport, Guid("70AE66F2-C809-4E4F-8915-BDCB406B7993"),
+             InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IMFSourceReader
+            {
+                [PreserveSig] int GetStreamSelection(int dwStreamIndex, out int pfSelected);
+                [PreserveSig] int SetStreamSelection(int dwStreamIndex, int fSelected);
+                [PreserveSig] int GetNativeMediaType(int dwStreamIndex, int dwMediaTypeIndex, out IMFAttributes ppMediaType);
+                [PreserveSig] int GetCurrentMediaType(int dwStreamIndex, out IMFAttributes ppMediaType);
+                [PreserveSig] int SetCurrentMediaType(int dwStreamIndex, IntPtr pReserved, IMFAttributes pMediaType);
+                [PreserveSig] int SetCurrentPosition(ref Guid guidTimeFormat, IntPtr varPosition);
+                [PreserveSig] int ReadSample(int dwStreamIndex, int dwControlFlags,
+                    out int pdwActualStreamIndex, out int pdwStreamFlags, out long pllTimestamp,
+                    out IMFSample ppSample);
+                [PreserveSig] int Flush(int dwStreamIndex);
+                [PreserveSig] int GetServiceForStream(int dwStreamIndex, ref Guid guidService, ref Guid riid, out IntPtr ppvObject);
+                [PreserveSig] int GetPresentationAttribute(int dwStreamIndex, ref Guid guidAttribute, IntPtr pvarAttribute);
+            }
+        }
+
+        // ---------------- 启动时自动套用玻璃按钮 ----------------
+        // 主题面板要手动点「应用」才换按钮，没应用过主题的机器也应该看到新样式：
+        // 第一次进主菜单时后台生成一遍，用当前主题配色（没有主题就用默认蓝灰）。
+
+        static bool glassBootStarted;
+        static bool glassBootPending;
+        static List<string> glassBootFiles;
+
+        static string GlassMarker()
+        {
+            string root = ThemeRoot();      // 已经是 <游戏>\Resources\MoThemes
+            return root.Length == 0 ? "" : Path.Combine(root, ".glass-v2");
+        }
+
+        static string GlassOffMarker()
+        {
+            string root = ThemeRoot();
+            return root.Length == 0 ? "" : Path.Combine(root, ".glass-off");
+        }
+
+        static void TryAutoGlass()
+        {
+            if (glassBootStarted) return;
+            glassBootStarted = true;
+
+            try
+            {
+                string marker = GlassMarker();
+                if (marker.Length > 0 && File.Exists(marker)) return;
+
+                string off = GlassOffMarker();
+                if (off.Length > 0 && File.Exists(off)) return;
+
+                string accent = themeAccentHex;
+                if (string.IsNullOrEmpty(accent) || accent.Length < 6) accent = "3E5C86";
+                int ar = Convert.ToInt32(accent.Substring(0, 2), 16);
+                int ag = Convert.ToInt32(accent.Substring(2, 2), 16);
+                int ab = Convert.ToInt32(accent.Substring(4, 2), 16);
+
+                Thread t = new Thread(delegate()
+                {
+                    try
+                    {
+                        string backup = ThemeBackup();
+                        Directory.CreateDirectory(backup);
+
+                        List<string> files = new List<string>();
+                        foreach (string rel in ThemeButtonTargets)
+                        {
+                            string target = Path.Combine(ResDir(), rel);
+                            if (!File.Exists(target)) continue;
+
+                            string bak = Path.Combine(backup, rel);
+                            if (!File.Exists(bak))
+                            {
+                                Directory.CreateDirectory(Path.GetDirectoryName(bak));
+                                File.Copy(target, bak, false);
+                            }
+
+                            bool keepText = rel.StartsWith("MainMenu", StringComparison.OrdinalIgnoreCase);
+                            bool hover = rel.IndexOf("_c.", StringComparison.OrdinalIgnoreCase) >= 0;
+                            MakeGlass(bak, target, ar, ag, ab, hover, keepText);
+                            files.Add(rel);
+                        }
+
+                        // 控件（下拉箭头/滚动条/复选框/滑杆）
+                        foreach (string rel in ThemeChromeTargets)
+                        {
+                            string target = Path.Combine(ResDir(), rel);
+                            if (!File.Exists(target)) continue;
+
+                            string bak = Path.Combine(backup, rel);
+                            if (!File.Exists(bak))
+                            {
+                                Directory.CreateDirectory(Path.GetDirectoryName(bak));
+                                File.Copy(target, bak, false);
+                            }
+
+                            HueShift(bak, target, ar, ag, ab, 0.9f);
+                            files.Add(rel);
+                        }
+
+                        if (marker.Length > 0) File.WriteAllText(marker, "1");
+                        glassBootFiles = files;
+                        glassBootPending = true;
+                        Log("theme: 启动时生成玻璃按钮 " + files.Count + " 张");
+                    }
+                    catch (Exception ex) { Log("theme: 自动玻璃按钮失败: " + ex.Message); }
+                });
+                t.IsBackground = true;
+                t.Start();
+            }
+            catch (Exception ex) { Log("theme: 自动玻璃按钮失败: " + ex.Message); }
+        }
+
+        static void GlassBootTick()
+        {
+            if (!glassBootPending || glassBootFiles == null) return;
+            List<string> files = glassBootFiles;
+            glassBootPending = false;
+            glassBootFiles = null;
+            int n = HotReloadAll(files);
+            Log("theme: 玻璃按钮热加载 " + n + " 张");
+        }
+
+        // ---------------- 设置窗口里的「主题与壁纸」面板 ----------------
+
+        /// <summary>把多列列表的选中行颜色从紫色改成主题色。</summary>
+        static void ApplyListAccent(object list)
+        {
+            try
+            {
+                IList inner = GetMember(list, "listBoxes") as IList;
+                if (inner == null) return;
+
+                Color sel = Color.FromArgb(135, 119, 156, 202);
+                if (themeAccentColor is Color) sel = Color.FromArgb(135, (Color)themeAccentColor);
+
+                for (int i = 0; i < inner.Count; i++) SetMember(inner[i], "FocusColor", sel);
+            }
+            catch { }
+        }
+
+        static object themePanel, themeList, themeHint, themeHostWindow;
+        static readonly List<string> themeListNames = new List<string>();
+
+        static void OpenThemePanelClick(object sender, EventArgs e)
+        {
+            try
+            {
+                object win = optionsPatchedWindow;
+                if (win == null) return;
+                if (themePanel == null || !ReferenceEquals(themeHostWindow, win))
+                {
+                    themePanel = null;
+                    themeList = null;
+                    themeHostWindow = win;
+                    BuildThemeGui(win);
+                }
+                if (themePanel == null) { Log("theme: 面板没建出来"); return; }
+
+                RefreshThemeGui();
+                SetMember(themePanel, "Visible", true);
+            }
+            catch (Exception ex) { Log("theme: 打开面板失败: " + ex.Message); }
+        }
+
+        static void BuildThemeGui(object win)
+        {
+            try
+            {
+                object wm = GetMember(win, "WindowManager");
+                Type panelType = FindType("Rampastring.XNAUI.XNAControls.XNAPanel");
+                Type listType = FindType("Rampastring.XNAUI.XNAControls.XNAMultiColumnListBox");
+                Type lblType = FindType("Rampastring.XNAUI.XNAControls.XNALabel")
+                            ?? FindType("ClientGUI.XNALabel");
+                if (wm == null || panelType == null || listType == null)
+                {
+                    Log("theme: 面板缺少控件类型");
+                    return;
+                }
+
+                int W = 560, H = 330;
+                int ww = GetInt(win, "Width", 576), wh = GetInt(win, "Height", 435);
+                int X = (ww - W) / 2, Y = (wh - H) / 2;
+                if (X < 0) X = 0;
+                if (Y < 0) Y = 0;
+
+                object panel = Activator.CreateInstance(panelType, new object[] { wm });
+                SetMember(panel, "Name", "panMoTheme");
+                SetMember(panel, "X", X);
+                SetMember(panel, "Y", Y);
+                SetMember(panel, "Width", W);
+                SetMember(panel, "Height", H);
+
+                // 借设置窗口自己的背景，跟原版风格一致
+                object bg = GetMember(win, "BackgroundTexture");
+                if (bg != null) SetMember(panel, "BackgroundTexture", bg);
+                AddChildTo(win, panel);
+
+                if (lblType != null)
+                {
+                    object title = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(title, "Text", "主题与壁纸");
+                    SetMember(title, "X", 14);
+                    SetMember(title, "Y", 10);
+                    AddChildTo(panel, title);
+
+                    object hint = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(hint, "Text", "选中主题后点「应用」：背景壁纸原样铺满，立即生效");
+                    try
+                    {
+                        Color hintColor = themeAccentColor is Color
+                            ? (Color)themeAccentColor
+                            : Color.FromArgb(200, 210, 220);
+                        SetMember(hint, "TextColor", hintColor);
+                    }
+                    catch { }
+                    SetMember(hint, "X", 14);
+                    SetMember(hint, "Y", 32);
+                    AddChildTo(panel, hint);
+                    themeHint = hint;
+                }
+
+                object list = Activator.CreateInstance(listType, new object[] { wm });
+                SetMember(list, "Name", "lbMoTheme");
+                SetMember(list, "X", 14);
+                SetMember(list, "Y", 58);
+                SetMember(list, "Width", W - 28);
+                SetMember(list, "Height", H - 58 - 50);
+                AddChildTo(panel, list);
+
+                MethodInfo addCol = listType.GetMethod("AddColumn", new Type[] { typeof(string), typeof(int) });
+                if (addCol != null)
+                {
+                    addCol.Invoke(list, new object[] { "主题", 170 });
+                    addCol.Invoke(list, new object[] { "配色", 90 });
+                    addCol.Invoke(list, new object[] { "内容", W - 28 - 170 - 90 - 12 });
+                }
+                themeList = list;
+
+                // 选中行默认是紫色，改成主题色
+                ApplyListAccent(list);
+
+                // 底部一行：左边「打开目录」，右边三个主操作靠右排（关闭最右）
+                object refBtn = FindControl(win, "btnSave") ?? FindControl(win, "btnCancel");
+                int by = H - 33;
+                int bw = 96, gap = 8;
+                int closeX = W - 14 - bw;
+                int applyX = closeX - gap - bw;
+                int restoreX = applyX - gap - bw;
+
+                AddOptionButton(panel, wm, refBtn, "btnMoThemeFolder", "打开目录", 14, by, 96, 23, "ThemeGuiOpenFolder");
+                AddOptionButton(panel, wm, refBtn, "btnMoThemeRestore", "还原默认", restoreX, by, bw, 23, "ThemeGuiRestore");
+                AddOptionButton(panel, wm, refBtn, "btnMoThemeApply", "应用", applyX, by, bw, 23, "ThemeGuiApply");
+                AddOptionButton(panel, wm, refBtn, "btnMoThemeClose", "关闭", closeX, by, bw, 23, "ThemeGuiClose");
+
+                SetMember(panel, "Visible", false);
+                themePanel = panel;
+                Log("theme: 面板已建好");
+            }
+            catch (Exception ex)
+            {
+                Log("theme: 建面板失败: " + ex.Message);
+                themePanel = null;
+            }
+        }
+
+        static void RefreshThemeGui()
+        {
+            try
+            {
+                if (themeList == null) return;
+
+                MethodInfo clear = FindMethod(themeList.GetType(), "ClearItems", 0);
+                if (clear != null) clear.Invoke(themeList, null);
+                themeListNames.Clear();
+
+                MethodInfo addItem = themeList.GetType().GetMethod("AddItem",
+                    new Type[] { typeof(string[]), typeof(bool) });
+                if (addItem == null) { Log("theme: 列表找不到 AddItem"); return; }
+
+                string root = ThemeRoot();
+                if (root.Length == 0) return;
+
+                foreach (string dir in Directory.GetDirectories(root))
+                {
+                    string name = Path.GetFileName(dir);
+                    if (name.StartsWith("_")) continue;
+
+                    string accent = ThemeIniValue(dir, "Accent");
+                    string summary = ThemeSummary(dir);
+                    if (string.Equals(name, themeName, StringComparison.OrdinalIgnoreCase))
+                        summary += "（使用中）";
+
+                    addItem.Invoke(themeList, new object[] {
+                        new string[] { name, accent.Length > 0 ? "#" + accent : "-", summary }, true });
+                    themeListNames.Add(name);
+                }
+            }
+            catch (Exception ex) { Log("theme: 刷新列表失败: " + ex.Message); }
+        }
+
+        static void ThemeGuiApply(object sender, EventArgs e)
+        {
+            try
+            {
+                int idx = GetInt(themeList, "SelectedIndex", -1);
+                if (idx < 0 || idx >= themeListNames.Count)
+                {
+                    if (themeHint != null) SetMember(themeHint, "Text", "先在列表里选一个主题");
+                    return;
+                }
+
+                string name = themeListNames[idx];
+                ApplyTheme(null, name, true);
+                lastStatusColor = "";      // 让状态条立刻换成本主题配色
+                RefreshThemeGui();
+                if (themeHint != null)
+                    SetMember(themeHint, "Text", "已应用「" + name + "」并热加载；个别还没进过的界面会在进入时用新图");
+            }
+            catch (Exception ex) { Log("theme: 应用失败: " + ex.Message); }
+        }
+
+        static void ThemeGuiRestore(object sender, EventArgs e)
+        {
+            try
+            {
+                RestoreTheme(null);
+                lastStatusColor = "";
+                RefreshThemeGui();
+                if (themeHint != null) SetMember(themeHint, "Text", "已还原默认贴图并热加载");
+            }
+            catch (Exception ex) { Log("theme: 还原失败: " + ex.Message); }
+        }
+
+        static void ThemeGuiOpenFolder(object sender, EventArgs e)
+        {
+            try
+            {
+                string root = ThemeRoot();
+                if (root.Length == 0) return;
+                Directory.CreateDirectory(root);
+                Process.Start("explorer.exe", "\"" + root + "\"");
+            }
+            catch (Exception ex) { Log("theme: 打开目录失败: " + ex.Message); }
+        }
+
+        static void ThemeGuiClose(object sender, EventArgs e)
+        {
+            try { if (themePanel != null) SetMember(themePanel, "Visible", false); } catch { }
+        }
 
         static void DisableButton(object root, string name)
         {
@@ -1231,7 +4259,7 @@ namespace MoLanRelay
                 ? "HMOL not running"
                 : "HMOL v" + versionLabelHmol;
 
-            return "Patch v" + Version + "  |  " + hmol;
+            return "Patch v" + Version + " · 最终版  |  " + hmol;
         }
 
         /// <summary>读 HMOL 启动前写的会话标记；不是这次启动留下的旧文件就算"没在跑"。</summary>
@@ -1326,10 +4354,36 @@ namespace MoLanRelay
         }
 
 
+        /// <summary>由 LANLobby::Update 每帧调用 —— 局域网大厅（房间列表）那屏的背景也要动。</summary>
+        public static void WindowTick(object window, object gameTime)
+        {
+            try { ThemeVideo.Tick(2, IsWindowVisible(window)); }
+            catch { }
+        }
+
+        /// <summary>窗口现在是否在显示（隐藏的窗口 Update 照样会被调用）。</summary>
+        static bool IsWindowVisible(object window)
+        {
+            try
+            {
+                object v = window == null ? null : GetMember(window, "Visible");
+                return v is bool ? (bool)v : true;
+            }
+            catch { return true; }
+        }
+
         /// <summary>由 LANGameLobby::Update 的补丁每帧调用 —— 热键轮询 / 版本自检 / 语音。</summary>
         public static void Tick(object lobby, object gameTime)
         {
             LoadSettings();
+
+            // v0.16.4 是最后一个版本：进房间后在聊天区提示一次
+            try { ShowFinalNotice(lobby); }
+            catch { }
+
+            // 视频壁纸：大厅里的背景也逐帧刷新
+            try { ThemeVideo.Tick(1, IsWindowVisible(lobby)); }
+            catch { }
 
             // 网络线程投递的 UI 动作（通知/聊天），统一在 UI 线程执行
             FlushUi();
@@ -1375,9 +4429,28 @@ namespace MoLanRelay
             try { MapSyncTick(lobby); }
             catch (Exception ex) { Log("mapsync tick error: " + ex.Message); }
 
+            // 引擎拓展检测（房间广播 + 状态条标记）
+            try { ExtensionCheckTick(lobby); } catch { }
+
+            // 底部「快捷语」按钮与面板
+            try { QuickPanelTick(lobby); } catch { }
+
+            // 大厅背景图（自定义 Resources\MoLobbyBg.png）
+            try { LobbyBackgroundTick(); } catch { }
+
             // 客机进房自动勾上「准备」；有人重名时提示一次
             try { AutoReadyTick(lobby); } catch { }
             try { DupNameTick(lobby); } catch { }
+
+            // 房间公告：房主给新进房的人私发一次
+            try
+            {
+                IList pl = GetMember(lobby, "Players") as IList;
+                MotdTick(lobby, pl, isHost);
+            }
+            catch { }
+            // 状态栏右侧「日志」按钮 + 实时日志面板
+            try { LogPanelTick(lobby); } catch { }
 
             // 进大厅后自动报一次版本（Patch + HMOL）
             try { VersionAnnounceTick(lobby); } catch { }
@@ -1572,7 +4645,16 @@ namespace MoLanRelay
             {
                 if (IsHostOf(lobby))
                 {
-                    SendToPlayer(target, frame);
+                    // 这里不能走 FindPlayer：它查的是静态字段 players，而那要等开局
+                    // （WriteSpawnIni → Relay.Start）才有值。大厅阶段用它必然找不到人，
+                    // 表现为「清单能发到客机、地图分片却一片都收不到」（WarnOnce 还只打一次日志）。
+                    LANPlayerInfo lp = FindPlayerIn(lobby, target);
+                    if (lp == null)
+                    {
+                        WarnOnce("ctrlplayer", target, "ctrl 发送失败：大厅玩家表里找不到 '" + target + "'");
+                        return;
+                    }
+                    SendLocked(lp, frame);
                     return;
                 }
 
@@ -1580,6 +4662,28 @@ namespace MoLanRelay
                 if (send != null) send.Invoke(lobby, new object[] { frame });
             }
             catch (Exception ex) { Log("ctrl: 回发失败: " + ex.Message); }
+        }
+
+        /// <summary>从大厅对象当前的玩家表里按名字找人（大厅阶段唯一可靠的查找方式）。</summary>
+        static LANPlayerInfo FindPlayerIn(object lobby, string name)
+        {
+            try
+            {
+                IList list = GetMember(lobby, "Players") as IList;
+                if (list == null) return null;
+
+                object[] arr = new object[list.Count];
+                try { list.CopyTo(arr, 0); } catch { return null; }
+
+                foreach (object o in arr)
+                {
+                    LANPlayerInfo lp = o as LANPlayerInfo;
+                    if (lp == null) continue;
+                    if (SameName(lp.Name, name) || SameName(CleanName(lp), name)) return lp;
+                }
+            }
+            catch { }
+            return null;
         }
 
         static void OnPong(string from, string b64)
@@ -1628,6 +4732,7 @@ namespace MoLanRelay
         // ==================================================================
 
         static object statusLabel;
+        static string lastStatusColor = "";
         static object statusLabelLobby;
         static DateTime lastStatusUpdate = DateTime.MinValue;
 
@@ -1642,6 +4747,88 @@ namespace MoLanRelay
         // ==================================================================
 
         const string SettingsFileName = "MoLanPatch.ini";
+
+        // ==================================================================
+        // 局域网 TCP 端口（默认 1233）
+        //   原客户端把 1233 写死在三个地方，已被 IL 补丁（lanport 模式）换成调本方法：
+        //     · LANGameLobby::ListenForClients  → new TcpListener(IPAddress.Any, 1233)  房主监听
+        //     · LANGameLobby::SetUp             → Connect("127.0.0.1", 1233)            房主自连
+        //     · LANLobby::LbGameList_DoubleLeftClick                                    客机双击加入
+        //   端口来源（按顺序取第一个有效值）：
+        //     1. Resources\HMOL.session.txt 里的 LANPORT=（HMOL 启动器写）
+        //     2. Resources\MoLanPatch.ini   里的 LANPort=（手改也行）
+        //     3. HMOL.session.txt 在游戏根也有一份，兜底再看一次
+        //     4. 都没有 → 1233
+        // ==================================================================
+
+        static int lanPortCache;
+
+        /// <summary>本机局域网用的 TCP 端口（1..65535）。由 IL 插桩在监听/自连/双击加入时调用。</summary>
+        public static int LANPort()
+        {
+            if (lanPortCache > 0) return lanPortCache;
+
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string source = "";
+            int port = 0;
+
+            port = ReadPortSetting(Path.Combine(baseDir, SessionStampFileName), "LANPORT");
+            if (port > 0) source = "HMOL.session.txt";
+
+            if (port <= 0)
+            {
+                port = ReadPortSetting(Path.Combine(baseDir, SettingsFileName), "LANPort");
+                if (port > 0) source = SettingsFileName;
+            }
+
+            if (port <= 0)
+            {
+                try
+                {
+                    string parent = Path.GetDirectoryName(baseDir.TrimEnd('\\', '/'));
+                    if (!string.IsNullOrEmpty(parent))
+                    {
+                        port = ReadPortSetting(Path.Combine(parent, SessionStampFileName), "LANPORT");
+                        if (port > 0) source = "游戏根\\HMOL.session.txt";
+                    }
+                }
+                catch { }
+            }
+
+            if (port < 1 || port > 65535)
+            {
+                if (port != 0) WarnOnce("lanport", "invalid", "局域网端口 " + port + " 不合法，已回退 1233（有效范围 1..65535）");
+                port = 1233;
+                source = "默认";
+            }
+
+            lanPortCache = port;
+            Log("lanport: 局域网 TCP 端口 = " + port + "（" + source + "）");
+            return port;
+        }
+
+        /// <summary>从 ini/session 文本里读一个整数端口；没有这个键或解析失败返回 0。</summary>
+        static int ReadPortSetting(string path, string key)
+        {
+            try
+            {
+                if (!File.Exists(path)) return 0;
+
+                foreach (string raw in File.ReadAllLines(path, Encoding.UTF8))
+                {
+                    string line = raw == null ? "" : raw.Trim();
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    if (!string.Equals(line.Substring(0, eq).Trim(), key, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    int value;
+                    if (int.TryParse(line.Substring(eq + 1).Trim(), out value)) return value;
+                }
+            }
+            catch { }
+            return 0;
+        }
+
         static bool settingsLoaded;
         static bool statusBarEnabled = true;
         static object settingsSoundCheck;
@@ -1656,6 +4843,24 @@ namespace MoLanRelay
         static bool showPingEnabled = true;          // 状态条：Ping
         static bool showVersionEnabled = true;       // 状态条：Patch / HMOL
         static bool topBarRttEnabled = true;         // 顶部「局域网大厅 · 23ms」
+        // 同步地图时要不要连预览图（.png）一起发。默认不发：走樱花 Frp 时流量是按量算的，
+        // 预览图动辄几百 KB~3 MB，纯粹是列表里的缩略图，不影响开局。
+        // 需要的话在 Resources\MoLanPatch.ini 里写 SyncPreview=1。
+        static bool syncPreviewEnabled;
+        // v0.12.2 新增，默认全开；都能在设置里单独关掉
+        static bool quickPanelEnabled = true;        // 大厅底部「快捷语」按钮与面板
+        static bool extCheckEnabled = true;          // 引擎拓展检测（房间广播 + 状态条标记）
+        static bool chatLogEnabled = true;           // 聊天记录留档到 对局记录\聊天_日期.txt
+        // v0.12.3：娱乐 / 美化，同样都能在设置里关
+        static bool miniGamesEnabled = true;         // /dice /coin /rps /8ball
+        static bool motdEnabled = true;              // 房主 /motd 房间公告
+        static bool lobbyBgEnabled = true;           // Resources\MoLobbyBg.png 换大厅背景
+        static bool statusColorEnabled = true;       // 状态条按状态变色
+        static string themeName = "";                // 当前应用的主题目录名（空=默认）
+        static int solidR = 0x14, solidG = 0x18, solidB = 0x1D;   // 大厅/房间背景用的纯色
+        static string themeCurrent = "";             // 本次会话已应用的（用于界面标记）
+        static string themeAccentHex = "";           // 该主题从壁纸里提取的文字色
+        static object themeAccentColor;
 
         static object optionsPatchedWindow;
         static int optionsPatchAttempts;
@@ -1688,7 +4893,7 @@ namespace MoLanRelay
 
                     if (string.Equals(key, "MentionSound", StringComparison.OrdinalIgnoreCase)) mentionSoundEnabled = on;
                     if (string.Equals(key, "AutoReady", StringComparison.OrdinalIgnoreCase)) autoReadyEnabled = on;
-                    if (string.Equals(key, "ChatTimestamp", StringComparison.OrdinalIgnoreCase)) chatTimestampEnabled = on;
+                    else if (string.Equals(key, "DupNameWarn", StringComparison.OrdinalIgnoreCase)) dupNameWarnEnabled = on;
                     else if (string.Equals(key, "StatusBar", StringComparison.OrdinalIgnoreCase)) statusBarEnabled = on;
                     else if (string.Equals(key, "TabComplete", StringComparison.OrdinalIgnoreCase)) tabCompleteEnabled = on;
                     else if (string.Equals(key, "OfflineNotice", StringComparison.OrdinalIgnoreCase)) offlineNoticeEnabled = on;
@@ -1698,9 +4903,24 @@ namespace MoLanRelay
                     else if (string.Equals(key, "StatusPing", StringComparison.OrdinalIgnoreCase)) showPingEnabled = on;
                     else if (string.Equals(key, "StatusVersion", StringComparison.OrdinalIgnoreCase)) showVersionEnabled = on;
                     else if (string.Equals(key, "TopBarRtt", StringComparison.OrdinalIgnoreCase)) topBarRttEnabled = on;
+                    else if (string.Equals(key, "SyncPreview", StringComparison.OrdinalIgnoreCase)) syncPreviewEnabled = on;
+                    else if (string.Equals(key, "QuickPanel", StringComparison.OrdinalIgnoreCase)) quickPanelEnabled = on;
+                    else if (string.Equals(key, "ExtCheck", StringComparison.OrdinalIgnoreCase)) extCheckEnabled = on;
+                    else if (string.Equals(key, "ChatLog", StringComparison.OrdinalIgnoreCase)) chatLogEnabled = on;
+                    else if (string.Equals(key, "MiniGames", StringComparison.OrdinalIgnoreCase)) miniGamesEnabled = on;
+                    else if (string.Equals(key, "Motd", StringComparison.OrdinalIgnoreCase)) motdEnabled = on;
+                    else if (string.Equals(key, "LobbyBg", StringComparison.OrdinalIgnoreCase)) lobbyBgEnabled = on;
+                    else if (string.Equals(key, "StatusColor", StringComparison.OrdinalIgnoreCase)) statusColorEnabled = on;
+                    else if (string.Equals(key, "Theme", StringComparison.OrdinalIgnoreCase)) themeName = val;
+                    else if (string.Equals(key, "MenuLayout", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string lv = val.ToLowerInvariant();
+                        if (Array.IndexOf(MenuLayouts, lv) >= 0) menuLayout = lv;
+                    }
                 }
 
                 settingsLoaded = true;
+                LoadThemeAccent();
                 Log("settings: MentionSound=" + (mentionSoundEnabled ? "1" : "0")
                     + " StatusBar=" + (statusBarEnabled ? "1" : "0")
                     + " TabComplete=" + (tabCompleteEnabled ? "1" : "0")
@@ -1723,7 +4943,7 @@ namespace MoLanRelay
                 Dictionary<string, string> known = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 known["MentionSound"] = mentionSoundEnabled ? "1" : "0";
                 known["AutoReady"] = autoReadyEnabled ? "1" : "0";
-                known["ChatTimestamp"] = chatTimestampEnabled ? "1" : "0";
+                known["DupNameWarn"] = dupNameWarnEnabled ? "1" : "0";
                 known["StatusBar"] = statusBarEnabled ? "1" : "0";
                 known["TabComplete"] = tabCompleteEnabled ? "1" : "0";
                 known["OfflineNotice"] = offlineNoticeEnabled ? "1" : "0";
@@ -1733,6 +4953,16 @@ namespace MoLanRelay
                 known["StatusPing"] = showPingEnabled ? "1" : "0";
                 known["StatusVersion"] = showVersionEnabled ? "1" : "0";
                 known["TopBarRtt"] = topBarRttEnabled ? "1" : "0";
+                known["SyncPreview"] = syncPreviewEnabled ? "1" : "0";
+                known["QuickPanel"] = quickPanelEnabled ? "1" : "0";
+                known["ExtCheck"] = extCheckEnabled ? "1" : "0";
+                known["ChatLog"] = chatLogEnabled ? "1" : "0";
+                known["MiniGames"] = miniGamesEnabled ? "1" : "0";
+                known["Motd"] = motdEnabled ? "1" : "0";
+                known["LobbyBg"] = lobbyBgEnabled ? "1" : "0";
+                known["StatusColor"] = statusColorEnabled ? "1" : "0";
+                known["Theme"] = themeName;
+                known["MenuLayout"] = menuLayout;
 
                 // 读-改-写：只替换我们认识的键，用户手写的注释 / 其它键 / 行序都保留，
                 // 免得每点一下开关就把整份 ini 覆盖成固定 10 行。
@@ -1816,6 +5046,15 @@ namespace MoLanRelay
                     case "chkMoPing":        showPingEnabled = on; break;
                     case "chkMoVersion":     showVersionEnabled = on; break;
                     case "chkMoTopBarRtt":   topBarRttEnabled = on; break;
+                    case "chkMoAutoReady":   autoReadyEnabled = on; break;
+                    case "chkMoDupName":     dupNameWarnEnabled = on; break;
+                    case "chkMoQuickPanel":  quickPanelEnabled = on; break;
+                    case "chkMoExtCheck":    extCheckEnabled = on; break;
+                    case "chkMoChatLog":     chatLogEnabled = on; break;
+                    case "chkMoMiniGames":   miniGamesEnabled = on; break;
+                    case "chkMoMotd":        motdEnabled = on; break;
+                    case "chkMoLobbyBg":     lobbyBgEnabled = on; break;
+                    case "chkMoStatusColor": statusColorEnabled = on; break;
                     default: return;
                 }
 
@@ -1886,18 +5125,8 @@ namespace MoLanRelay
                 HideAllChildren(page);
                 AddPatchCheckBoxes(win, page);
 
-                // 2) 重建 optionsPanels：只留 显示/音频/游戏 + 复用后的 CnCNet 页
-                //    组件面板本来就没有标签（被 ini 移除），直接丢弃。
-                if (panels != null && panelCount >= 4)
-                {
-                    Array neu = Array.CreateInstance(panels.GetType().GetElementType(), 4);
-                    neu.SetValue(panels.GetValue(0), 0);
-                    neu.SetValue(panels.GetValue(1), 1);
-                    neu.SetValue(panels.GetValue(2), 2);
-                    neu.SetValue(page, 3);
-                    SetMember(win, "optionsPanels", neu);
-                    panels = neu;
-                }
+                // 2) 不再裁剪 optionsPanels —— 「更新」页要留下来改造成「地图」页。
+                //    （组件页已被 ini 移除，所以数组下标和标签下标仍然一一对应）
 
                 // 3) 复用 CnCNet 的标签槽位：直接改名成「联机补丁」
                 //    （不用 AddTab —— 新标签的位置/贴图依赖内部计算，实测可能看不见）
@@ -1911,18 +5140,21 @@ namespace MoLanRelay
                     }
                 }
 
-                // 4) 移除「更新」标签（只删这一个，CnCNet 那个已经被改名复用）
-                if (tabControl != null && idxUpdate >= 0)
+                // 4) 「更新」页改造成「地图」页：里面的更新控件全部藏掉，换成已同步地图清单
+                object updatePage = (panels != null && idxUpdate >= 0 && idxUpdate < panels.Length)
+                    ? panels.GetValue(idxUpdate) : null;
+                if (updatePage != null)
                 {
-                    SetMember(tabControl, "DisposeTexturesOnTabRemove", false);
-                    MethodInfo removeTab = tabControl.GetType().GetMethod("RemoveTab", new[] { typeof(int) });
-                    if (removeTab != null)
+                    IList tabs2 = tabControl == null ? null : GetMember(tabControl, "Tabs") as IList;
+                    if (tabs2 != null && idxUpdate < tabs2.Count)
                     {
-                        removeTab.Invoke(tabControl, new object[] { idxUpdate });
-                        Log("options: 已移除「更新」标签，Tabs=" + TabCount(tabControl));
+                        SetMember(tabs2[idxUpdate], "Text", "地图");
+                        Log("options: 已把「更新」标签改名为「地图」");
                     }
-                    else Log("options: 找不到 RemoveTab");
+                    HideAllChildren(updatePage);
+                    BuildMapTab(win, updatePage);
                 }
+                else Log("options: 找不到「更新」页，做不了地图页");
 
                 // 5) 隐藏「下载音乐包」按钮
                 object soundtrack = FindControl(win, "btnSoundtrack");
@@ -2006,50 +5238,143 @@ namespace MoLanRelay
             MethodInfo addChild = FindMethod(page.GetType(), "AddChild", 1);
             if (addChild == null) { Log("options: 找不到 AddChild"); return; }
 
-            const int x = 16;
+            // 两列排：面板只有 342 高，一列放 15 项会顶出底边。
+            // 右列从 y=44 开始，给右上角那三个按钮让出位置。
+            const int x1 = 16;
+            const int x2 = 292;
             int y = 14;
 
             settingsSoundCheck = AddCheckBox(checkType, wm, addChild, page,
-                "chkMoMentionSound", "@ 提示音（F9 也可切换）", x, y, mentionSoundEnabled,
+                "chkMoMentionSound", "@ 提示音（F9 也可切换）", x1, y, mentionSoundEnabled,
                 "OnMentionSoundToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoTabComplete", "@ 时按 Tab 补全玩家名", x, y, tabCompleteEnabled,
+                "chkMoTabComplete", "@ 时按 Tab 补全玩家名", x1, y, tabCompleteEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoOffline", "有人掉线时在聊天区提示", x, y, offlineNoticeEnabled,
+                "chkMoOffline", "有人掉线时在聊天区提示", x1, y, offlineNoticeEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoAnnounce", "进房间自动报一次版本", x, y, announceVersionEnabled,
+                "chkMoAnnounce", "进房间自动报一次版本", x1, y, announceVersionEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoPreflight", "开赛前 3 秒核对版本与已装包", x, y, preflightCheckEnabled,
+                "chkMoPreflight", "开赛前 3 秒核对版本与已装包", x1, y, preflightCheckEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             settingsStatusCheck = AddCheckBox(checkType, wm, addChild, page,
-                "chkMoStatusBar", "在聊天框上方显示状态条", x, y, statusBarEnabled,
+                "chkMoStatusBar", "在聊天框上方显示状态条", x1, y, statusBarEnabled,
                 "OnStatusBarToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoFps", "状态条：显示 FPS", x, y, showFpsEnabled,
+                "chkMoFps", "状态条：显示 FPS", x1, y, showFpsEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoPing", "状态条：显示 Ping", x, y, showPingEnabled,
+                "chkMoPing", "状态条：显示 Ping", x1, y, showPingEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoVersion", "状态条：显示版本号（Patch / HMOL）", x, y, showVersionEnabled,
+                "chkMoMiniGames", "小游戏命令（/dice /coin /rps /8ball）", x1, y, miniGamesEnabled,
                 "OnOptionToggled");
-            y += 30;
+            y += 26;
             AddCheckBox(checkType, wm, addChild, page,
-                "chkMoTopBarRtt", "顶部「局域网大厅」后显示延迟", x, y, topBarRttEnabled,
+                "chkMoMotd", "允许房主用 /motd 发房间公告", x1, y, motdEnabled,
+                "OnOptionToggled");
+            y += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoLobbyBg", "大厅背景图（Resources\\MoLobbyBg.png）", x1, y, lobbyBgEnabled,
+                "OnOptionToggled");
+            y += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoStatusColor", "状态条按状态变色", x1, y, statusColorEnabled,
                 "OnOptionToggled");
 
-            Log("options: 联机补丁页已就绪（10 个开关）");
+            int y2 = 44;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoVersion", "状态条：显示版本号", x2, y2, showVersionEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoTopBarRtt", "顶部栏显示延迟", x2, y2, topBarRttEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoAutoReady", "客机进房自动准备", x2, y2, autoReadyEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoDupName", "同名玩家提醒", x2, y2, dupNameWarnEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoQuickPanel", "显示「快捷语」按钮", x2, y2, quickPanelEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoExtCheck", "引擎拓展检测与纯净提示", x2, y2, extCheckEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+            AddCheckBox(checkType, wm, addChild, page,
+                "chkMoChatLog", "聊天留档到「对局记录」", x2, y2, chatLogEnabled,
+                "OnOptionToggled");
+            y2 += 26;
+
+            // 右上角两个按钮：外观整套照抄设置窗口自己的「保存」按钮
+            int pw = GetInt(page, "Width", 552);
+            if (pw < 300) pw = 552;
+            object refBtn = FindControl(win, "btnSave") ?? FindControl(win, "btnCancel");
+            int bw = GetInt(refBtn, "Width", 92);
+            int bh = GetInt(refBtn, "Height", 25);
+            if (bw <= 0) bw = 92;
+            if (bh <= 0) bh = 25;
+            AddOptionButton(page, wm, refBtn, "btnMoOpenLog", "打开日志",
+                pw - bw * 3 - 32, 10, bw, bh, "LogButtonClick");
+            AddOptionButton(page, wm, refBtn, "btnMoExportDiag", "导出诊断",
+                pw - bw * 2 - 24, 10, bw, bh, "LogExportClick");
+            AddOptionButton(page, wm, refBtn, "btnMoOpenMatch", "对局记录",
+                pw - bw - 16, 10, bw, bh, "OpenMatchFolderClick");
+
+            // 主题与壁纸：右列最后一项下面，点开是一个居中的主题面板
+            AddOptionButton(page, wm, refBtn, "btnMoTheme", "主题与壁纸…",
+                x2, y2, 176, bh, "OpenThemePanelClick");
+
+            AddOptionButton(page, wm, refBtn, "btnMoMenuLayout", "主页布局：" + MenuLayoutText(),
+                x2, y2 + 30, 176, bh, "MenuLayoutClick");
+
+            Log("options: 联机补丁页已就绪（19 个开关 + 打开日志/导出诊断/对局记录/主题）");
+        }
+
+        static void AddOptionButton(object parent, object wm, object refBtn, string name, string text,
+                                    int x, int y, int w, int h, string handlerName)
+        {
+            try
+            {
+                Type btnType = FindType("ClientGUI.XNAClientButton");
+                if (btnType == null) { Log("options: 找不到 XNAClientButton"); return; }
+                MethodInfo addChild = FindMethod(parent.GetType(), "AddChild", 1);
+                if (addChild == null) return;
+
+                object btn = Activator.CreateInstance(btnType, new object[] { wm });
+                SetMember(btn, "Name", name);
+                SetMember(btn, "Text", text);
+                CopyButtonLook(refBtn, btn);      // 贴图/字号/文字颜色照抄原版按钮
+                SetMember(btn, "X", x);
+                SetMember(btn, "Y", y);
+                SetMember(btn, "Width", w);
+                SetMember(btn, "Height", h);
+                addChild.Invoke(parent, new object[] { btn });
+
+                MethodInfo addClick = btnType.GetMethod("add_LeftClick",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                MethodInfo handler = typeof(Relay).GetMethod(handlerName,
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                if (addClick != null && handler != null)
+                    addClick.Invoke(btn, new object[] { Delegate.CreateDelegate(typeof(EventHandler), handler) });
+            }
+            catch (Exception ex) { Log("options: 创建按钮失败(" + name + "): " + ex.Message); }
         }
 
         static object AddCheckBox(Type checkType, object wm, MethodInfo addChild, object parent,
@@ -2088,6 +5413,9 @@ namespace MoLanRelay
         static void StatusTick(object lobby)
         {
             if (lobby == null) return;
+
+            // 聊天留档：攒够 2 秒的聊天一次性写盘（被刷屏时也只写这一处）
+            try { ChatLogTick(); } catch { }
 
             DateTime now = DateTime.Now;
 
@@ -2140,6 +5468,24 @@ namespace MoLanRelay
                 {
                     if (GetMember(label, "Visible") is bool v && !v) SetMember(label, "Visible", true);
                     if ((GetMember(label, "Text") as string) != text) SetMember(label, "Text", text);
+
+                    // 配色：同步中=天蓝，非纯净=橙，其它=主题色（没主题就浅灰）。
+                    // 只在颜色真的变了才写属性，避免每帧触发重绘。
+                    if (statusColorEnabled)
+                    {
+                        string want = syncText.Length > 0 ? "SkyBlue"
+                                    : (extCheckEnabled && extShortResult.Length > 0 ? "Orange"
+                                    : (themeAccentColor != null ? "theme:" + themeAccentHex : "LightGray"));
+                        if (want != lastStatusColor)
+                        {
+                            object c = want.StartsWith("theme:") ? themeAccentColor : MakeColor(want);
+                            if (c != null)
+                            {
+                                SetMember(label, "TextColor", c);
+                                lastStatusColor = want;
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception ex) { Log("status: 更新状态条失败: " + ex.Message); }
@@ -2189,6 +5535,7 @@ namespace MoLanRelay
                 parts.Add("Patch v" + Version);
                 parts.Add("HMOL " + hmol);
             }
+            if (extCheckEnabled && extShortResult.Length > 0) parts.Add("非纯净 " + extShortResult);
 
             return parts.Count == 0 ? "" : string.Join("   |   ", parts.ToArray());
         }
@@ -2514,6 +5861,35 @@ namespace MoLanRelay
                 if (preflightLobby != null && ReferenceEquals(preflightLobby, lobby)
                     && DateTime.Now < preflightDeadline) return true;
 
+                // 客机：本地没有房主选中的地图就别开始。
+                // 客户端 WriteSpawnIni 的第一句就是 Map.IsCoop()（上游没判空），
+                // 缺图时开局 = 直接 KABOOOOOOM，比留在大厅难受得多。
+                if (!IsHostOf(lobby) && !LocalHasSelectedMap(lobby))
+                {
+                    // 顺手告诉房主"我这边没这张图"，不然房主只看到客机没进来
+                    try { SendCtrlTo(lobby, "", CtrlFrame(MapMissKind, "")); } catch { }
+
+                    Notice(lobby, "本地没有这张地图，已阻止开始。请点「接收地图」让房主同步，或让房主换图", false);
+                    Log("preflight: 客机缺图，已拦下 StartGame 并通知房主");
+                    return true;
+                }
+
+                // 客机：本地有这张图，但和房主的版本不一样（同名不同内容）→ 一样开不了局
+                if (!IsHostOf(lobby) && remoteMapSha.Length > 0)
+                {
+                    string localSha = LocalMapSha(lobby);
+                    if (localSha.Length > 0
+                        && !string.Equals(localSha, remoteMapSha, StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { SendCtrlTo(lobby, "", CtrlFrame(MapMissKind, "")); } catch { }
+
+                        Notice(lobby, "你这张地图的版本和房主不一致，已阻止开始。请点「接收地图」重新同步", false);
+                        Log("preflight: 地图版本不一致 local=" + localSha.Substring(0, 12)
+                            + " remote=" + remoteMapSha.Substring(0, 12));
+                        return true;
+                    }
+                }
+
                 if (launchHooked) return false;             // 已经由 HostLaunchGame 卡过，这里直接放行
 
                 // ---- 兜底路径（老 exe / 钩子没挂上）----
@@ -2539,6 +5915,29 @@ namespace MoLanRelay
             }
         }
 
+        /// <summary>当前大厅选中的地图，本地文件在不在（客机开局前的安全检查）。</summary>
+        static bool LocalHasSelectedMap(object lobby)
+        {
+            try
+            {
+                object map = GetMember(lobby, "Map");
+                if (map == null)
+                {
+                    object gm = GetMember(lobby, "GameModeMap");
+                    map = gm == null ? null : GetMember(gm, "Map");
+                }
+                if (map == null) return false;
+
+                string path = Convert.ToString(GetMember(map, "CompleteFilePath"));
+                return !string.IsNullOrEmpty(path) && File.Exists(path);
+            }
+            catch
+            {
+                // 判断不出来就放行，别把正常开局挡住
+                return true;
+            }
+        }
+
         /// <summary>
         /// 由 LANGameLobby::HandleClientMessage 的补丁在开头调用：这条玩家的连接是不是已经废了。
         ///
@@ -2558,11 +5957,22 @@ namespace MoLanRelay
                 TcpClient t = lp.TcpClient;
                 if (t == null) return true;
 
-                // 只看 TcpClient.Connected（它缓存的是"最近一次 IO 的结果"，socket 被释放后为 false）。
-                // 不要去读 RemoteEndPoint：那个虽然在"已释放"时能抛异常，但在活连接上也可能失败，
-                // 一旦误判就会把正常消息全丢掉（表现：房主收不到客机的检查回信）。
-                try { return !t.Connected; }
-                catch { return false; }   // 判断不了就当它是活的，宁可漏拦也别误丢
+                // 先看 TcpClient.Connected（它缓存的是"最近一次 IO 的结果"，socket 被释放后通常为 false）。
+                try { if (!t.Connected) return true; }
+                catch { }
+
+                // Connected 有滞后性：socket 刚 Dispose 完它可能仍返回 true，
+                // 随后客户端在"未知命令"日志里调 ToString() → RemoteEndPoint → 直接崩进程。
+                // 所以再碰一次 RemoteEndPoint：只有 ObjectDisposedException 才算"连接已废"，
+                // 其它异常（比如还没连上）不当作已死，避免把正常消息误丢掉。
+                try
+                {
+                    Socket s = t.Client;
+                    if (s == null) return true;
+                    return (s.RemoteEndPoint as IPEndPoint) == null;
+                }
+                catch (ObjectDisposedException) { return true; }
+                catch { return false; }
             }
             catch { return false; }
         }
@@ -3321,9 +6731,9 @@ namespace MoLanRelay
                 string kind = parts[1];
                 string from = Clean(parts[2]);
 
-                // base64 从第 4 段开始（base64 不含 \u0001，这里再切一次保险）
-                int idx = message.IndexOf('\u0001', CtrlTag.Length + CtrlSep.Length + kind.Length + 1 + parts[2].Length + 1);
-                string b64 = idx >= 0 ? message.Substring(idx + 1) : parts[3];
+                // 负载 = 第 4 段及之后的全部内容。负载内部本身也可能含 \u0001（地图同步的字段分隔就是它），
+                // 所以不能再"从某处往后找下一个 \u0001"——那会把负载的第一段切掉。
+                string b64 = parts.Length > 3 ? string.Join("\u0001", parts, 3, parts.Length - 3) : "";
 
                 bool mine = from.Length > 0 && SameName(from, MyPlayerName());
 
@@ -3386,6 +6796,30 @@ namespace MoLanRelay
                     if (!mine && !IsHostOf(lobby)) OnMapHello(lobby, from, b64);
                     return;
                 }
+                else if (kind == MapAskKind)
+                {
+                    // 客机点「接收地图」→ 请房主把当前选中地图的清单发过来
+                    if (!mine && IsHostOf(lobby)) OnMapAsk(lobby, from);
+                    return;
+                }
+                else if (kind == MapMissKind)
+                {
+                    // 客机缺图、StartGame 被拦下 → 告诉房主"有人没这张图，点同步"
+                    if (!mine && IsHostOf(lobby)) OnMapMiss(lobby, from);
+                    return;
+                }
+                else if (kind == MapHaveQKind)
+                {
+                    // 房主问"你有哪些图"→ 客机只回，不再转发
+                    if (!mine && !IsHostOf(lobby)) OnMapHaveQ(lobby);
+                    return;
+                }
+                else if (kind == MapHaveKind)
+                {
+                    // 客机回报的地图清单
+                    if (!mine && IsHostOf(lobby)) OnMapHave(lobby, from, b64);
+                    return;
+                }
                 else if (kind == MapReqKind)
                 {
                     // 客机点「接收」后回头要文件
@@ -3400,6 +6834,28 @@ namespace MoLanRelay
                 else if (kind == MapEndKind)
                 {
                     if (!mine && !IsHostOf(lobby)) OnMapEnd(lobby, from, b64);
+                    return;
+                }
+                else if (kind == MapHashKind)
+                {
+                    // 房主广播"我当前选中的地图 + 它的 SHA-256"，客机开局前用来核对版本
+                    if (!mine && !IsHostOf(lobby)) OnMapHash(b64);
+                    return;
+                }
+                else if (kind == PmKind)
+                {
+                    // 私聊：负载 = 目标玩家名 \u0001 正文。房主负责转交，别人谁都看不到。
+                    if (!mine)
+                    {
+                        string[] pp = (b64 ?? "").Split(new char[] { MapField }, 2);
+                        string target = pp.Length > 1 ? pp[0].Trim() : "";
+                        string body = pp.Length > 1 ? pp[1] : b64;
+
+                        if (IsHostOf(lobby) && target.Length > 0 && !SameName(target, MyPlayerName()))
+                            SendCtrlTo(lobby, target, CtrlFrame(PmKind, target + MapField + body));
+                        else
+                            OnPrivateMessage(lobby, from, body);
+                    }
                     return;
                 }
                 else if (kind == DenyKind)
@@ -4590,15 +8046,37 @@ namespace MoLanRelay
         const string MapReqKind = "MAPREQ";
         const string MapDataKind = "MAPDATA";
         const string MapEndKind = "MAPEND";
-        const char MapField = '\u0002';      // 负载内部字段分隔（\u0001 是帧分隔）
-        const int MapChunkBytes = 512;       // 每帧 512 字节 → base64 后约 700 字符，一帧一条消息
-        const int MapChunkDelayMs = 6;       // 别把大厅读线程灌满
+        const string MapAskKind = "MAPASK";   // 客机点「接收地图」→ 请房主发现清单
+        const string MapHaveQKind = "MAPHAVEQ";  // 房主问客机：你本地有哪些图
+        const string MapHaveKind = "MAPHAVE";    // 客机回报清单（deflate + Base91）
+        const string MapMissKind = "MAPMISS"; // 客机缺图拦下开局 → 提醒房主点「同步地图」
+        const string MapHashKind = "MAPHASH"; // 房主广播当前地图的 SHA-256（开局前核对版本）
+        const string PmKind = "PM";       // 私聊（只发给指定玩家，房主负责转交）
+        // 客户端的大厅分帧用 '\u0002'（HandleServerCommunication 里 IndexOf((char)2)），
+        // 所以这里的字段分隔**绝不能**用 \u0002 —— 否则整帧会被客户端切成碎片，
+        // 每片都因为段数不够被 OnCtrl 丢掉（表现为"按钮点了但双方都没反应"）。
+        // 用 \u0001 是安全的：客户端不按它切，而 OnCtrl 是把第 4 段之后整体当负载。
+        const char MapField = '\u0001';      // 负载内部字段分隔
+        // 提速：每帧 32 KB（base64 后约 43 KB），不再人为 sleep。
+        // 客户端的接收缓冲已经被 rxbuf 补丁调到 64 KB，一条消息基本一次 Read 就能读完；
+        // 发送端靠 TCP 自身的流控（写满就阻塞在 Write 上），不需要我们再限速。
+        // 之前的 512 B + 6 ms 只有 ~33 KB/s，这也是地图同步慢的主要原因。
+        const int MapChunkBytes = 32768;
+        static int MapChunkDelayMs = 0;                // 0 = 不限速，整条 TCP 灌满为止
+        const long MapPackMaxBytes = 48L * 1024 * 1024;   // 超过这个大就不压了（省内存）
 
         class MapFile
         {
             public string Rel;      // 相对游戏根目录，'/' 分隔
             public long Size;
             public string Sha;      // SHA-256 大写十六进制
+            public long PackedSize; // deflate 后的大小；0 = 不压缩，按原样发
+            public byte[] Packed;   // 压好的字节（只在房主这一单里缓存，传完即弃）
+            /// <summary>
+            /// 这个文件所属地图在 MentalOmegaMaps.ini 里的注册段（只有该图的 .map 这个文件带，
+            /// 同一张图的 .ini/预览图留空）。多图批量同步时每个文件各带各的。
+            /// </summary>
+            public string IniSection = "";
         }
 
         class MapJob
@@ -4607,18 +8085,27 @@ namespace MoLanRelay
             public string Name;
             public long Total;
             public List<MapFile> Files = new List<MapFile>();
+            /// <summary>
+            /// 房主 INI\MentalOmegaMaps.ini 里这张图的注册段（含 [节名] 与各行）。
+            /// MapsMO\ 下的图不是靠扫目录登记的，缺这段客机就算有文件也不会出现在地图列表里。
+            /// </summary>
+            public string IniSection = "";
+            /// <summary>客机：这次要收哪些文件（序号）。</summary>
+            public List<int> Req;
+            /// <summary>客机：每个文件从哪个字节继续（断点续传）。</summary>
+            public Dictionary<int, long> Resume;
         }
 
         static MapJob hostMapJob;                                              // 房主：当前这一单
         static readonly Dictionary<string, MapJob> clientMapJobs =
             new Dictionary<string, MapJob>(StringComparer.OrdinalIgnoreCase);   // 客机：已接收的任务
-        static readonly Dictionary<string, MemoryStream> clientMapBuffers =
-            new Dictionary<string, MemoryStream>(StringComparer.OrdinalIgnoreCase);
         static MapJob pendingMapJob;
         static object pendingMapLobby;
         static List<int> pendingMapMissing;
         static object mapSyncButton;
         static object mapSyncButtonLobby;
+        static object lastMapRefreshLobby;       // 已热刷新过的房间（同一张图只刷一次）
+        static string lastMapRefreshRel = "";
         static DateTime lastMapButtonCheck = DateTime.MinValue;
 
         static string CtrlFrame(string kind, string payload)
@@ -4626,19 +8113,485 @@ namespace MoLanRelay
             return CtrlTag + CtrlSep + kind + CtrlSep + Clean(MyPlayerName()) + CtrlSep + payload;
         }
 
+        // ---------------- 地图版本一致性（房主广播当前地图的 SHA-256） ----------------
+        //
+        // 光有"文件存在"不够：同一个名字的图，两边版本不同一样开不了局（读条就崩）。
+        // 房主每次选图变化就把 rel + SHA-256 广播一次，客机在开局前拿本地算的比对。
+
+        static string announcedMapRel = "";
+        static string pendingHashRel = "", pendingHashSha = "";
+        static bool hashThreadRunning;
+        static string remoteMapRel = "", remoteMapSha = "";
+
+        static string CurrentMapRel(object lobby)
+        {
+            try
+            {
+                object map = GetMember(lobby, "Map");
+                if (map == null)
+                {
+                    object gm = GetMember(lobby, "GameModeMap");
+                    map = gm == null ? null : GetMember(gm, "Map");
+                }
+                if (map == null) return "";
+
+                string full = Convert.ToString(GetMember(map, "CompleteFilePath"));
+                if (string.IsNullOrEmpty(full)) return "";
+
+                string root = SafeGetGamePath();
+                return RelativeToRoot(full, root) ?? "";
+            }
+            catch { return ""; }
+        }
+
+        static string LocalMapSha(object lobby)
+        {
+            try
+            {
+                string rel = CurrentMapRel(lobby);
+                if (rel.Length == 0) return "";
+                string root = SafeGetGamePath();
+                return Sha256Of(Path.Combine(root, rel.Replace('/', '\\')));
+            }
+            catch { return ""; }
+        }
+
+        static void MapHashTick(object lobby)
+        {
+            try
+            {
+                if (!IsHostOf(lobby)) return;
+                string rel = CurrentMapRel(lobby);
+                if (rel.Length == 0) return;
+
+                if (!string.Equals(rel, announcedMapRel, StringComparison.OrdinalIgnoreCase) && !hashThreadRunning)
+                {
+                    hashThreadRunning = true;
+                    string root = SafeGetGamePath();
+                    string relCopy = rel;
+                    Thread t = new Thread(delegate()
+                    {
+                        string sha = "";
+                        try { sha = Sha256Of(Path.Combine(root, relCopy.Replace('/', '\\'))); } catch { }
+                        if (sha.Length > 0) { pendingHashRel = relCopy; pendingHashSha = sha; }
+                        hashThreadRunning = false;
+                    });
+                    t.IsBackground = true;
+                    t.Name = "MoMapHash";
+                    t.Start();
+                }
+
+                if (pendingHashRel.Length > 0
+                    && !string.Equals(pendingHashRel, announcedMapRel, StringComparison.OrdinalIgnoreCase))
+                {
+                    announcedMapRel = pendingHashRel;
+                    SendCtrlToPeers(lobby, CtrlFrame(MapHashKind,
+                        pendingHashRel + MapField + pendingHashSha));
+                    Log("mapsync: 已广播地图版本 " + pendingHashRel + " sha="
+                        + pendingHashSha.Substring(0, Math.Min(12, pendingHashSha.Length)));
+                }
+            }
+            catch { }
+        }
+
+        static void OnMapHash(string payload)
+        {
+            try
+            {
+                string[] p = payload.Split(MapField);
+                if (p.Length < 2) return;
+                remoteMapRel = p[0];
+                remoteMapSha = p[1];
+                Log("mapsync: 房主地图版本 " + remoteMapRel + " sha="
+                    + remoteMapSha.Substring(0, Math.Min(12, remoteMapSha.Length)));
+            }
+            catch { }
+        }
+
+        // ------------------------------------------------------------------
+        // 引擎拓展检测（借鉴 MO_ExperienceEnhancements 的 PvpNotice 思路）
+        //
+        // 那类插件（MOExperience / 自动装车 / Phobos / 透明迷雾）只装在自己机器上，
+        // 对方在客户端里完全看不出来，PVP 时等于隐形加成。我们在**大厅房间**里
+        // 各自扫一遍自己的游戏根目录，命中就广播一条 —— 比它每 30 秒在游戏内
+        // 刷一遍温和得多，而且在开局前就能看到。
+        // 只做提示，不阻止开局；没装的人不会发任何消息。
+        // ------------------------------------------------------------------
+
+        static object extCheckLobby;
+        static volatile string extCheckResult;        // null=还没扫完；""=干净；其它=命中的组件（全名）
+        static volatile string extShortResult = "";   // 状态条用的短名，如 "MOExp、迷雾"
+        static bool extCheckStarted;
+        static bool extCheckAnnounced;
+        static int extCheckAnnouncedCount;
+
+        static void ExtensionCheckTick(object lobby)
+        {
+            if (lobby == null || !extCheckEnabled) return;
+
+            // 换房间（或重进大厅）就重新扫：同一次进程里文件不会变，但房间对象会换
+            if (!ReferenceEquals(extCheckLobby, lobby))
+            {
+                extCheckLobby = lobby;
+                extCheckResult = null;
+                extShortResult = "";
+                extCheckStarted = false;
+                extCheckAnnounced = false;
+                extCheckAnnouncedCount = 0;
+            }
+
+            // 扫描本身不设人数门槛：一个人的时候状态条也能显示「非纯净」
+            if (!extCheckStarted)
+            {
+                extCheckStarted = true;
+                Thread t = new Thread(delegate()
+                {
+                    try { DetectEngineExtensions(); }
+                    catch (Exception ex) { extCheckResult = ""; Log("extcheck: 扫描失败: " + ex.Message); }
+                });
+                t.IsBackground = true;
+                t.Start();
+                return;
+            }
+
+            // 还在扫 / 本机是纯净的：什么都不发
+            if (extCheckResult == null || extCheckResult.Length == 0) return;
+
+            // 房间广播只在有人时做；新人进来会补报一次
+            int count = 0;
+            try
+            {
+                IList players = GetMember(lobby, "Players") as IList;
+                count = players == null ? 0 : players.Count;
+            }
+            catch { }
+            if (count < 2)
+            {
+                extCheckAnnounced = false;
+                extCheckAnnouncedCount = 0;
+                return;
+            }
+
+            if (extCheckAnnounced && extCheckAnnouncedCount >= count) return;
+            extCheckAnnounced = true;
+            extCheckAnnouncedCount = count;
+
+            Log("extcheck: 广播 " + extCheckResult);
+            BroadcastChat(lobby, "【纯净提示】" + MyPlayerName() + " 的本机装了：" + extCheckResult + "（联机对战请自行判断公平性）");
+        }
+
+        /// <summary>扫游戏根目录。只列会改变游戏行为/视野的组件；
+        /// ddraw.dll（cnc-ddraw）只是渲染包装，MO 自带，不算。</summary>
+        static void DetectEngineExtensions()
+        {
+            string root = SafeGetGamePath();
+            if (string.IsNullOrEmpty(root))
+            {
+                try { root = Path.GetDirectoryName(typeof(Relay).Assembly.Location); }
+                catch { }
+            }
+            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+            {
+                extCheckResult = "";
+                extShortResult = "";
+                return;
+            }
+
+            string[,] items =
+            {
+                { "MOExperience.dll", "MOExperience 功能拓展", "MOExp" },
+                { "AutoLoad_nolog.dll", "自动装车拓展", "装车" },
+                { "AutoLoad.dll", "自动装车拓展", "装车" },
+                { "Phobos.dll", "Phobos 引擎拓展", "Phobos" },
+                { "shroud.shp", "透明迷雾替换", "迷雾" },
+            };
+
+            List<string> full = new List<string>();
+            List<string> shortNames = new List<string>();
+            for (int i = 0; i < items.GetLength(0); i++)
+            {
+                try
+                {
+                    if (!File.Exists(Path.Combine(root, items[i, 0]))) continue;
+                    if (!full.Contains(items[i, 1])) full.Add(items[i, 1]);
+                    if (!shortNames.Contains(items[i, 2])) shortNames.Add(items[i, 2]);
+                }
+                catch { }
+            }
+
+            extCheckResult = full.Count == 0 ? "" : string.Join("、", full.ToArray());
+            extShortResult = shortNames.Count == 0 ? "" : string.Join("、", shortNames.ToArray());
+            Log("extcheck: 根目录=" + root + " 命中=" + full.Count);
+        }
+
+        // ------------------------------------------------------------------
+        // 快捷语面板
+        //
+        // 底部按钮行 x=380 起是空的（锁定房间/自动准备右边，地图预览底边到 y=670，
+        // 变道/退出在 x=862 以后），按钮放这里不会压住任何原版控件。
+        // 面板本身照抄地图选择框的做法：XNAPanel + XNAMultiColumnListBox，
+        // 背景贴图借聊天框的（自建 DarkeningPanel 在这个客户端里画不出来）。
+        // ------------------------------------------------------------------
+
+        static object quickButton, quickButtonLobby;
+        static DateTime lastQuickBtnCheck = DateTime.MinValue;
+        static object quickPanel, quickList, quickGuiLobby;
+        static readonly List<string> quickListTexts = new List<string>();
+
+        static void QuickPanelTick(object lobby)
+        {
+            if (lobby == null) return;
+            try
+            {
+                // 换了大厅实例：旧控件跟着旧窗口一起没了，引用清空重建
+                if (!ReferenceEquals(quickButtonLobby, lobby))
+                {
+                    quickButton = null;
+                    quickButtonLobby = lobby;
+                    quickPanel = null;
+                    quickList = null;
+                    quickGuiLobby = lobby;
+                    quickListTexts.Clear();
+                }
+
+                if (!quickPanelEnabled)
+                {
+                    if (quickButton != null) SetMember(quickButton, "Visible", false);
+                    if (quickPanel != null) SetMember(quickPanel, "Visible", false);
+                    return;
+                }
+
+                if (quickButton != null)
+                {
+                    SetMember(quickButton, "Visible", true);
+                    return;
+                }
+
+                if ((DateTime.Now - lastQuickBtnCheck).TotalMilliseconds < 500) return;
+                lastQuickBtnCheck = DateTime.Now;
+                EnsureQuickButton(lobby);
+            }
+            catch (Exception ex) { Log("quick: tick 失败: " + ex.Message); }
+        }
+
+        static void EnsureQuickButton(object lobby)
+        {
+            object wm = GetMember(lobby, "WindowManager");
+            Type btnType = FindType("ClientGUI.XNAClientButton");
+            if (wm == null || btnType == null) return;
+
+            try
+            {
+                object btn = Activator.CreateInstance(btnType, new object[] { wm });
+                SetMember(btn, "Name", "btnMoQuickText");
+                SetMember(btn, "Text", "快捷语");
+                CopyButtonLook(GetMember(lobby, "btnLockGame") ?? GetMember(lobby, "btnLaunchGame"), btn);
+                SetMember(btn, "X", 380);
+                SetMember(btn, "Y", 678);
+                SetMember(btn, "Width", 80);
+                SetMember(btn, "Height", 23);
+                AddChildTo(lobby, btn);
+
+                MethodInfo addClick = btnType.GetMethod("add_LeftClick",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                MethodInfo handler = typeof(Relay).GetMethod("QuickButtonClick",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                if (addClick != null && handler != null)
+                    addClick.Invoke(btn, new object[] { Delegate.CreateDelegate(typeof(EventHandler), handler) });
+
+                quickButton = btn;
+                Log("quick: 已创建「快捷语」按钮 (380,678)");
+            }
+            catch (Exception ex) { Log("quick: 创建按钮失败: " + ex.Message); }
+        }
+
+        static void QuickButtonClick(object sender, EventArgs e)
+        {
+            try
+            {
+                object lobby = quickButtonLobby;
+                if (lobby == null) return;
+                if (quickPanel == null || !ReferenceEquals(quickGuiLobby, lobby))
+                {
+                    quickPanel = null;
+                    quickList = null;
+                    quickGuiLobby = lobby;
+                    BuildQuickTextGui(lobby);
+                }
+                if (quickPanel == null) { Log("quick: 面板没建出来"); return; }
+
+                RefreshQuickTextGui();
+                SetMember(quickPanel, "Visible", true);
+            }
+            catch (Exception ex) { Log("quick: 打开面板失败: " + ex.Message); }
+        }
+
+        static void CloseQuickTextGui()
+        {
+            try { if (quickPanel != null) SetMember(quickPanel, "Visible", false); } catch { }
+        }
+
+        static void BuildQuickTextGui(object lobby)
+        {
+            try
+            {
+                object wm = GetMember(lobby, "WindowManager");
+                Type panelType = FindType("Rampastring.XNAUI.XNAControls.XNAPanel");
+                Type listType = FindType("Rampastring.XNAUI.XNAControls.XNAMultiColumnListBox");
+                Type lblType = FindType("Rampastring.XNAUI.XNAControls.XNALabel")
+                            ?? FindType("ClientGUI.XNALabel");
+                Type btnType = FindType("ClientGUI.XNAClientButton");
+                if (wm == null || panelType == null || listType == null || btnType == null)
+                {
+                    Log("quick: 面板缺少控件类型");
+                    return;
+                }
+
+                int W = 560, H = 320;
+                int lw = GetInt(lobby, "Width", 1024), lh = GetInt(lobby, "Height", 720);
+                int X = (lw - W) / 2, Y = (lh - H) / 2;
+                if (X < 0) X = 0;
+                if (Y < 0) Y = 0;
+
+                object panel = Activator.CreateInstance(panelType, new object[] { wm });
+                SetMember(panel, "Name", "panMoQuickText");
+                SetMember(panel, "X", X);
+                SetMember(panel, "Y", Y);
+                SetMember(panel, "Width", W);
+                SetMember(panel, "Height", H);
+
+                object chat = GetMember(lobby, "lbChatMessages");
+                if (chat != null)
+                {
+                    object bg = GetMember(chat, "BackgroundTexture");
+                    if (bg != null) SetMember(panel, "BackgroundTexture", bg);
+                    object dm = GetMember(chat, "DrawMode");
+                    if (dm != null) SetMember(panel, "DrawMode", dm);
+                }
+                AddChildTo(lobby, panel);
+
+                if (lblType != null)
+                {
+                    object title = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(title, "Text", "快捷语");
+                    SetMember(title, "X", 14);
+                    SetMember(title, "Y", 10);
+                    AddChildTo(panel, title);
+
+                    object hint = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(hint, "Text", "选中一条后点「发送」；来源见下方（MOExperience.ini 存在时会自动合并）");
+                    SetMember(hint, "X", 14);
+                    SetMember(hint, "Y", 34);
+                    AddChildTo(panel, hint);
+                }
+
+                object list = Activator.CreateInstance(listType, new object[] { wm });
+                SetMember(list, "Name", "lbMoQuickText");
+                SetMember(list, "X", 14);
+                SetMember(list, "Y", 58);
+                SetMember(list, "Width", W - 28);
+                SetMember(list, "Height", H - 58 - 42);
+                AddChildTo(panel, list);
+
+                MethodInfo addCol = listType.GetMethod("AddColumn", new Type[] { typeof(string), typeof(int) });
+                if (addCol != null)
+                {
+                    addCol.Invoke(list, new object[] { "序号", 50 });
+                    addCol.Invoke(list, new object[] { "内容", W - 28 - 50 - 12 });
+                }
+                quickList = list;
+                ApplyListAccent(list);
+
+                object refBtn = GetMember(lobby, "btnLockGame") ?? GetMember(lobby, "btnLaunchGame");
+                int by = H - 34;
+                AddOptionButton(panel, wm, refBtn, "btnMoQuickSend", "发送", 14, by, 90, 23, "QuickGuiSend");
+                AddOptionButton(panel, wm, refBtn, "btnMoQuickClose", "关闭", 110, by, 90, 23, "QuickGuiClose");
+
+                SetMember(panel, "Visible", false);
+                quickPanel = panel;
+                Log("quick: 面板已建好");
+            }
+            catch (Exception ex)
+            {
+                Log("quick: 建面板失败: " + ex.Message);
+                quickPanel = null;
+            }
+        }
+
+        static void RefreshQuickTextGui()
+        {
+            try
+            {
+                if (quickList == null) return;
+
+                MethodInfo clear = FindMethod(quickList.GetType(), "ClearItems", 0);
+                if (clear != null) clear.Invoke(quickList, null);
+                quickListTexts.Clear();
+
+                MethodInfo addItem = quickList.GetType().GetMethod("AddItem",
+                    new Type[] { typeof(string[]), typeof(bool) });
+                if (addItem == null) { Log("quick: 列表找不到 AddItem"); return; }
+
+                string[] texts = QuickTexts();
+                for (int i = 0; i < texts.Length; i++)
+                {
+                    addItem.Invoke(quickList, new object[] { new string[] { (i + 1).ToString(), texts[i] }, true });
+                    quickListTexts.Add(texts[i]);
+                }
+            }
+            catch (Exception ex) { Log("quick: 刷新列表失败: " + ex.Message); }
+        }
+
+        static void QuickGuiSend(object sender, EventArgs e)
+        {
+            try
+            {
+                object lobby = quickButtonLobby;
+                if (lobby == null) return;
+
+                int idx = GetInt(quickList, "SelectedIndex", -1);
+                if (idx < 0 || idx >= quickListTexts.Count)
+                {
+                    Notice(lobby, "先在列表里选一条快捷语", false);
+                    return;
+                }
+
+                string text = quickListTexts[idx];
+                CloseQuickTextGui();
+                BroadcastChat(lobby, text);
+            }
+            catch (Exception ex) { Log("quick: 发送失败: " + ex.Message); }
+        }
+
+        static void QuickGuiClose(object sender, EventArgs e) { CloseQuickTextGui(); }
+
         static void MapSyncTick(object lobby)
         {
             if (lobby == null) return;
 
-            // 按钮只在房主侧放出来；客机看不到（也没意义）
+            // 房主：当前地图变了就把它的 SHA-256 广播出去（客机开局前拿它核对版本）
+            try { MapHashTick(lobby); } catch { }
+
+            // 房主与客机都有这个按钮：房主「同步地图」/「取消同步」，客机「接收地图」
             if (mapSyncButton != null && ReferenceEquals(mapSyncButtonLobby, lobby))
             {
                 try
                 {
-                    SetMember(mapSyncButton, "Visible", IsHostOf(lobby));
-                    string label = mapSyncTxActive ? "取消同步" : "同步地图";
+                    bool host = IsHostOf(lobby);
+
+                    // 两边都要有这个按钮：房主用「同步地图」主动推，客机用「接收地图」请房主发。
+                    // 位置已经和「锁定房间」对齐，客机页同样有这一排按钮，所以不会突兀。
+                    SetMember(mapSyncButton, "Visible", true);
+
+                    string label = mapSyncTxActive ? "取消同步"
+                                 : mapSyncRxActive ? "接收中…"
+                                 : (host ? "推送地图" : "接收地图");
                     if ((GetMember(mapSyncButton, "Text") as string) != label)
                         SetMember(mapSyncButton, "Text", label);
+                    SetMember(mapSyncButton, "Enabled", !mapSyncRxActive);
+
+                    // 布局可能比按钮晚算好，每帧校正一次位置（内部只在变化时才写）
+                    PositionMapSyncButton(lobby);
                 }
                 catch { }
                 return;
@@ -4666,22 +8619,22 @@ namespace MoLanRelay
             {
                 object btn = Activator.CreateInstance(btnType, new object[] { wm });
                 SetMember(btn, "Name", "btnMoMapSync");
-                SetMember(btn, "Text", "同步地图");
+                SetMember(btn, "Text", "推送地图");
 
-                int x = GetInt(mapList, "X", 0);
-                int y = GetInt(mapList, "Y", 0);
-                int h = GetInt(mapList, "Height", 0);
-                int w = GetInt(mapList, "Width", 0);
-                if (w <= 0) w = 160;
-                if (w < 120) w = 120;
+                // 先给个保守的初始位置，真正的位置由 PositionMapSyncButton 每帧校正
+                // （创建这一刻大厅的布局可能还没算出来，Width/Right 都是 0）
+                bool hostNow = IsHostOf(lobby);
+                object anchor = hostNow
+                    ? (GetMember(lobby, "btnLockGame") ?? GetMember(lobby, "btnLaunchGame"))
+                    : (GetMember(lobby, "btnLaunchGame") ?? GetMember(lobby, "btnLockGame"));
+                CopyButtonLook(anchor, btn);      // 和旁边那个原版按钮同一套贴图/字体
 
-                SetMember(btn, "X", x);
-                SetMember(btn, "Y", y + h + 4);
-                SetMember(btn, "Width", w);
-                SetMember(btn, "Height", 25);
+                SetMember(btn, "X", GetInt(mapList, "X", 12));
+                SetMember(btn, "Y", GetInt(mapList, "Y", 0) + GetInt(mapList, "Height", 0) + 4);
+                SetMember(btn, "Width", SyncButtonWidth);
+                SetMember(btn, "Height", 23);
 
-                object parent = GetMember(mapList, "Parent");
-                if (parent == null) parent = lobby;
+                object parent = GetMember(anchor, "Parent") ?? GetMember(mapList, "Parent") ?? lobby;
                 MethodInfo add = FindMethod(parent.GetType(), "AddChild", 1);
                 if (add == null) { Log("mapsync: 找不到 AddChild"); return; }
                 add.Invoke(parent, new object[] { btn });
@@ -4698,8 +8651,9 @@ namespace MoLanRelay
 
                 mapSyncButton = btn;
                 mapSyncButtonLobby = lobby;
-                try { SetMember(btn, "Visible", IsHostOf(lobby)); } catch { }
-                Log("mapsync: 已在大厅加「同步地图」按钮");
+                try { SetMember(btn, "Visible", true); } catch { }
+                PositionMapSyncButton(lobby);
+                Log("mapsync: 已在大厅加「同步地图 / 接收地图」按钮（底部按钮行，host=" + hostNow + "）");
             }
             catch (Exception ex)
             {
@@ -4709,14 +8663,492 @@ namespace MoLanRelay
             }
         }
 
+        /// <summary>同步按钮的宽度（比原版按钮窄，塞进底部按钮行的空档）。</summary>
+        const int SyncButtonWidth = 88;
+
+        /// <summary>
+        /// 底部按钮行里，紧跟在「开始游戏」右边的那个控件：
+        ///   房主是「锁定房间」(btnLockGame)
+        ///   客机是「自动准备」勾选框(chkAutoReady，同样是 x≈224)
+        /// 两个角色是同一个槽位，所以同步按钮都要塞进它们和「开始游戏」之间的空档。
+        /// </summary>
+        static object BottomRowNeighbor(object lobby)
+        {
+            object autoChk = GetMember(lobby, "chkAutoReady");
+            object lockBtn = GetMember(lobby, "btnLockGame");
+
+            if (IsShown(autoChk)) return autoChk;
+            if (IsShown(lockBtn)) return lockBtn;
+            return IsHostOf(lobby) ? (lockBtn ?? autoChk) : (autoChk ?? lockBtn);
+        }
+
+        static bool IsShown(object o)
+        {
+            if (o == null) return false;
+            object v = GetMember(o, "Visible");
+            return v is bool && (bool)v;
+        }
+
+        /// <summary>
+        /// 每帧校正「同步地图 / 接收地图」的位置。房主和客机底部按钮行不一样：
+        ///   房主：开始游戏 | 空档 | 锁定房间 | … | 退出游戏
+        ///   客机：开始游戏 | 空档 | 自动准备 | … | 退出游戏
+        /// 两边的空档都只有 ~79px，所以按钮宽度必须跟着空档算，
+        /// 不能照抄 133px 的原版按钮（那就是之前压住「开始游戏」的原因）。
+        /// </summary>
+        static void PositionMapSyncButton(object lobby)
+        {
+            if (mapSyncButton == null || lobby == null) return;
+            try
+            {
+                bool host = IsHostOf(lobby);
+                object launch = GetMember(lobby, "btnLaunchGame");
+                object neighbor = BottomRowNeighbor(lobby);
+                if (launch == null || neighbor == null) return;
+
+                int launchX = GetInt(launch, "X", -1);
+                int launchRight = launchX < 0 ? 0 : launchX + GetInt(launch, "Width", 0);
+
+                int nx = GetInt(neighbor, "X", -1);
+                int ny = GetInt(neighbor, "Y", -1);
+                int ah = GetInt(launch, "Height", 0);
+                if (nx < 0 || ny <= 0) return;        // 布局还没算好，下一帧再说
+                if (ah <= 0) ah = 23;
+
+                int gap = (launchRight > 0 && nx > launchRight) ? nx - launchRight : 0;
+
+                int w = SyncButtonWidth;
+                if (gap > 0)
+                {
+                    w = gap - 10;                     // 两边各留 5px
+                    if (w > SyncButtonWidth) w = SyncButtonWidth;
+                    if (w < 40) w = 40;
+                }
+
+                int x = nx - w - 5;
+                int y = ny;
+
+                // 极端情况（空档比按钮还窄）：贴住「开始游戏」右侧，绝不让两边重叠
+                if (launchRight > 0 && x < launchRight + 4)
+                {
+                    x = launchRight + 4;
+                    w = nx - x - 4;
+                    if (w < 32) w = 32;
+                }
+
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+
+                bool changed = GetInt(mapSyncButton, "X", -1) != x
+                            || GetInt(mapSyncButton, "Y", -1) != y
+                            || GetInt(mapSyncButton, "Width", -1) != w
+                            || GetInt(mapSyncButton, "Height", -1) != ah;
+                if (!changed) return;
+
+                SetMember(mapSyncButton, "AdaptiveText", true);   // 窄的时候文字自动缩，不溢出
+                SetMember(mapSyncButton, "X", x);
+                SetMember(mapSyncButton, "Y", y);
+                SetMember(mapSyncButton, "Width", w);
+                SetMember(mapSyncButton, "Height", ah);
+                Log("mapsync: 位置 host=" + host + " x=" + x + " y=" + y + " w=" + w
+                    + "（开始游戏右边缘=" + launchRight + "，右侧邻居 x=" + nx + " 空档=" + gap + "）");
+            }
+            catch { }
+        }
+
         static void MapSyncButtonClick(object sender, EventArgs e)
         {
             try
             {
-                if (mapSyncTxActive) { CancelMapSync(mapSyncButtonLobby); return; }
-                StartMapSync(mapSyncButtonLobby);
+                object lobby = mapSyncButtonLobby;
+                if (lobby == null) return;
+
+                if (mapSyncTxActive) { CancelMapSync(lobby); return; }
+                if (IsHostOf(lobby)) OpenMapSyncGui(lobby);   // 房主：弹出选择框（单张 / 多张）
+                else RequestMapSync(lobby);                    // 客机：直接要当前图
             }
             catch (Exception ex) { Log("mapsync: 点按钮出错: " + ex.Message); }
+        }
+
+        // ==================================================================
+        // 大厅内「地图同步」选择框（房主）
+        //   点「同步地图」弹出：可以只推当前地图，也可以选中多张一起推。
+        //   控件直接挂在大厅上、贴图从聊天框/底部按钮借，不用自建面板——
+        //   之前那套 DarkeningPanel + ChatListBox 在这个客户端里画不出来（全透明）。
+        // ==================================================================
+
+        static object mapGuiPanel, mapGuiList, mapGuiHint;
+        static object mapGuiLobby;
+        // 过滤档位：0 = 只列对方缺的（默认）；1 = 只看第三方图；2 = 全部（含官方）
+        static int mapGuiFilter = 0;
+        static readonly string[] mapGuiFilterText = { "只缺图", "只看第三方", "查看全部" };
+
+        // 客机上报的"我有哪些图"（键 = 相对路径|大小）。只有收到过清单，"只缺图"才有意义。
+        static readonly HashSet<string> peerHaveKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        static bool peerHaveReceived;
+        static object peerHaveLobby;
+
+        static string lastScanRoot = "";
+        static readonly HashSet<string> mapGuiPicked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        static readonly List<string> mapGuiRels = new List<string>();
+
+        static void AddChildTo(object parent, object child)
+        {
+            if (parent == null || child == null) return;
+            MethodInfo add = FindMethod(parent.GetType(), "AddChild", 1);
+            if (add != null) add.Invoke(parent, new object[] { child });
+        }
+
+        static void OpenMapSyncGui(object lobby)
+        {
+            try
+            {
+                if (lobby == null) return;
+                if (!ReferenceEquals(mapGuiLobby, lobby))
+                {
+                    mapGuiPanel = null; mapGuiList = null; mapGuiHint = null; mapGuiLobby = lobby;
+                    mapGuiPicked.Clear();
+                }
+                if (mapGuiPanel == null) BuildMapSyncGui(lobby);
+                if (mapGuiPanel == null) { Log("mapsync: 建不出选择框，直接推当前图"); StartMapSync(lobby); return; }
+
+                // 先问一遍"客机有哪些图"，这样列表能只列对方缺的（省得误推、白花流量）
+                if (!ReferenceEquals(peerHaveLobby, lobby) || !peerHaveReceived)
+                {
+                    peerHaveLobby = lobby;
+                    peerHaveKeys.Clear();
+                    peerHaveReceived = false;
+                    SendCtrlToPeers(lobby, CtrlFrame(MapHaveQKind, ""));
+                    Log("mapsync: 已向客机请求本地地图清单");
+                }
+
+                RefreshMapGui();
+                SetMember(mapGuiPanel, "Visible", true);
+                Log("mapsync: 已打开地图同步选择框（可选 " + mapGuiRels.Count + " 张）");
+            }
+            catch (Exception ex) { Log("mapsync: 打开选择框失败: " + ex.Message); }
+        }
+
+        static void CloseMapSyncGui()
+        {
+            try { if (mapGuiPanel != null) SetMember(mapGuiPanel, "Visible", false); } catch { }
+        }
+
+        static void BuildMapSyncGui(object lobby)
+        {
+            try
+            {
+                object wm = GetMember(lobby, "WindowManager");
+                Type panelType = FindType("Rampastring.XNAUI.XNAControls.XNAPanel");
+                Type listType = FindType("Rampastring.XNAUI.XNAControls.XNAMultiColumnListBox");
+                Type lblType = FindType("Rampastring.XNAUI.XNAControls.XNALabel")
+                            ?? FindType("ClientGUI.XNALabel");
+                Type btnType = FindType("ClientGUI.XNAClientButton");
+                if (wm == null || panelType == null || listType == null || btnType == null)
+                {
+                    Log("mapsync: 选择框缺少控件类型");
+                    return;
+                }
+
+                int W = 640, H = 400;
+                int lw = GetInt(lobby, "Width", 1024), lh = GetInt(lobby, "Height", 720);
+                int X = (lw - W) / 2, Y = (lh - H) / 2;
+                if (X < 0) X = 0;
+                if (Y < 0) Y = 0;
+
+                object panel = Activator.CreateInstance(panelType, new object[] { wm });
+                SetMember(panel, "Name", "panMoMapGui");
+                SetMember(panel, "X", X);
+                SetMember(panel, "Y", Y);
+                SetMember(panel, "Width", W);
+                SetMember(panel, "Height", H);
+
+                // 背景贴图借用聊天框的：保证有实底，不会整块透明
+                object chat = GetMember(lobby, "lbChatMessages");
+                if (chat != null)
+                {
+                    object bg = GetMember(chat, "BackgroundTexture");
+                    if (bg != null) SetMember(panel, "BackgroundTexture", bg);
+                    object dm = GetMember(chat, "DrawMode");
+                    if (dm != null) SetMember(panel, "DrawMode", dm);
+                }
+                AddChildTo(lobby, panel);
+
+                if (lblType != null)
+                {
+                    object title = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(title, "Text", "地图同步");
+                    SetMember(title, "X", 14);
+                    SetMember(title, "Y", 10);
+                    AddChildTo(panel, title);
+
+                    object hint = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(hint, "Text", "选一行后点「加入选中」可以攒多张；也可以直接「推送当前地图」");
+                    SetMember(hint, "X", 14);
+                    SetMember(hint, "Y", 34);
+                    AddChildTo(panel, hint);
+                    mapGuiHint = hint;
+                }
+
+                object list = Activator.CreateInstance(listType, new object[] { wm });
+                SetMember(list, "Name", "lbMoMapGui");
+                SetMember(list, "X", 14);
+                SetMember(list, "Y", 58);
+                SetMember(list, "Width", W - 28);
+                SetMember(list, "Height", H - 58 - 42);
+                AddChildTo(panel, list);
+
+                MethodInfo addCol = listType.GetMethod("AddColumn", new Type[] { typeof(string), typeof(int) });
+                if (addCol != null)
+                {
+                    addCol.Invoke(list, new object[] { "选", 34 });
+                    addCol.Invoke(list, new object[] { "地图", 230 });
+                    addCol.Invoke(list, new object[] { "大小", 80 });
+                    addCol.Invoke(list, new object[] { "位置", W - 28 - 34 - 230 - 80 - 12 });
+                }
+                mapGuiList = list;
+                ApplyListAccent(list);
+
+                // 按钮外观照抄大厅底部那个「锁定房间」
+                object refBtn = GetMember(lobby, "btnLockGame") ?? GetMember(lobby, "btnLaunchGame");
+                int by = H - 34;
+                AddOptionButton(panel, wm, refBtn, "btnMoGuiPushCur", "推送当前地图", 14, by, 116, 23, "MapGuiPushCurrent");
+                AddOptionButton(panel, wm, refBtn, "btnMoGuiAdd", "加入选中", 138, by, 84, 23, "MapGuiAddPicked");
+                AddOptionButton(panel, wm, refBtn, "btnMoGuiRemove", "移出选中", 228, by, 84, 23, "MapGuiRemovePicked");
+                AddOptionButton(panel, wm, refBtn, "btnMoGuiPushSel", "推送已选", 318, by, 96, 23, "MapGuiPushPicked");
+                AddOptionButton(panel, wm, refBtn, "btnMoGuiClose", "关闭", 420, by, 72, 23, "MapGuiClose");
+                AddOptionButton(panel, wm, refBtn, "btnMoGuiFilter", mapGuiFilterText[mapGuiFilter], 500, by, 110, 23, "MapGuiToggleFilter");
+
+                SetMember(panel, "Visible", false);
+                mapGuiPanel = panel;
+                Log("mapsync: 选择框已建好");
+            }
+            catch (Exception ex)
+            {
+                Log("mapsync: 建选择框失败: " + ex.Message);
+                mapGuiPanel = null;
+            }
+        }
+
+        static void RefreshMapGui()
+        {
+            try
+            {
+                if (mapGuiList == null) return;
+
+                MethodInfo clear = FindMethod(mapGuiList.GetType(), "ClearItems", 0);
+                if (clear != null) clear.Invoke(mapGuiList, null);
+                mapGuiRels.Clear();
+
+                string root = MapLibraryRoot(SafeGetGamePath());
+                // 0=只缺图 / 1=只看第三方 都排除官方图；2=全部
+                List<string> lib = ScanMapLibrary(root, mapGuiFilter != 2);
+
+                MethodInfo addItem = mapGuiList.GetType().GetMethod("AddItem", new Type[] { typeof(string[]), typeof(bool) });
+                if (addItem == null) { Log("mapsync: 选择框找不到 AddItem"); return; }
+
+                bool missingOnly = (mapGuiFilter == 0 && peerHaveReceived);
+
+                foreach (string rel in lib)
+                {
+                    string full = Path.Combine(root, rel.Replace('/', '\\'));
+                    long size = 0;
+                    try { FileInfo fi = new FileInfo(full); if (fi.Exists) size = fi.Length; } catch { }
+
+                    // "只缺图"：客机已经有同名同大小的，就不列出来
+                    if (missingOnly && peerHaveKeys.Contains(rel + "|" + size)) continue;
+
+                    string name = Path.GetFileNameWithoutExtension(rel);
+                    string dir = Path.GetDirectoryName(rel) ?? "";
+                    string mark = mapGuiPicked.Contains(rel) ? "√" : "";
+                    addItem.Invoke(mapGuiList, new object[] { new string[] { mark, name, FormatSize(size), dir }, true });
+                    mapGuiRels.Add(rel);
+                }
+
+                if (mapGuiRels.Count == 0)
+                {
+                    string why;
+                    if (missingOnly) why = "（对方已有全部第三方地图，没什么要推的）";
+                    else why = "（没找到地图文件，根=" + lastScanRoot + "）";
+                    addItem.Invoke(mapGuiList, new object[] { new string[] { "", why, "", "" }, true });
+                }
+
+                if (mapGuiHint != null)
+                {
+                    string filterName = mapGuiFilterText[mapGuiFilter];
+                    if (mapGuiFilter == 0 && !peerHaveReceived)
+                        filterName = "只缺图（还没收到对方清单，等同只看第三方）";
+
+                    SetMember(mapGuiHint, "Text", mapGuiRels.Count == 0
+                        ? "列表为空：" + filterName + "；已选 " + mapGuiPicked.Count + " 张"
+                        : "已选 " + mapGuiPicked.Count + " 张，列表 " + mapGuiRels.Count + " 张（" + filterName + "）");
+                }
+            }
+            catch (Exception ex) { Log("mapsync: 刷新选择框失败: " + ex.Message); }
+        }
+
+        /// <summary>客机收到"你有哪些图"：把自己第三方地图的 路径+大小 压缩后回给房主。</summary>
+        static void OnMapHaveQ(object lobby)
+        {
+            try
+            {
+                string root = MapLibraryRoot(SafeGetGamePath());
+                List<string> lib = ScanMapLibrary(root, true);   // 官方那几百张不发了，没必要
+                StringBuilder sb = new StringBuilder(lib.Count * 48);
+                foreach (string rel in lib)
+                {
+                    long size = 0;
+                    try
+                    {
+                        FileInfo fi = new FileInfo(Path.Combine(root, rel.Replace('/', '\\')));
+                        if (fi.Exists) size = fi.Length;
+                    }
+                    catch { }
+                    sb.Append(rel).Append('|').Append(size).Append('\n');
+                }
+
+                byte[] raw = Encoding.UTF8.GetBytes(sb.ToString());
+                byte[] packed = Deflate(raw);
+                string payload = packed.Length + ":" + raw.Length + ":" + ToBase91(packed, 0, packed.Length);
+                SendCtrlTo(lobby, "", CtrlFrame(MapHaveKind, payload));
+                Log("mapsync: 已上报本地地图清单 " + lib.Count + " 张（" + payload.Length + " 字符）");
+            }
+            catch (Exception ex) { Log("mapsync: 上报地图清单失败: " + ex.Message); }
+        }
+
+        /// <summary>房主收到客机的地图清单：存起来，"只缺图"过滤用它。</summary>
+        static void OnMapHave(object lobby, string from, string payload)
+        {
+            try
+            {
+                string[] head = (payload ?? "").Split(new char[] { ':' }, 3);
+                if (head.Length < 3) { Log("mapsync: 地图清单格式不对"); return; }
+
+                int packedLen = int.Parse(head[0]);
+                int rawLen = int.Parse(head[1]);
+                byte[] packed = FromBase91(head[2], packedLen);
+                string text = Encoding.UTF8.GetString(Inflate(packed, rawLen));
+
+                peerHaveKeys.Clear();
+                foreach (string line in text.Split('\n'))
+                {
+                    string s = line.Trim();
+                    if (s.Length == 0) continue;
+                    peerHaveKeys.Add(s);
+                }
+                peerHaveReceived = true;
+
+                Log("mapsync: 收到 '" + from + "' 的地图清单 " + peerHaveKeys.Count + " 张");
+                if (mapGuiPanel != null) RefreshMapGui();
+            }
+            catch (Exception ex) { Log("mapsync: 解析地图清单失败: " + ex.Message); }
+        }
+
+        static string MapGuiSelectedRel()
+        {
+            try
+            {
+                if (mapGuiList == null) return null;
+                int idx = GetInt(mapGuiList, "SelectedIndex", -1);
+                if (idx < 0 || idx >= mapGuiRels.Count) return null;
+                return mapGuiRels[idx];
+            }
+            catch { return null; }
+        }
+
+        static void MapGuiPushCurrent(object sender, EventArgs e)
+        {
+            object lobby = mapGuiLobby;
+            if (lobby == null) return;
+            CloseMapSyncGui();
+            StartMapSync(lobby);
+        }
+
+        static void MapGuiAddPicked(object sender, EventArgs e)
+        {
+            string rel = MapGuiSelectedRel();
+            if (rel == null) { Log("mapsync: 选择框没有选中行"); return; }
+            mapGuiPicked.Add(rel);
+            RefreshMapGui();
+        }
+
+        static void MapGuiRemovePicked(object sender, EventArgs e)
+        {
+            string rel = MapGuiSelectedRel();
+            if (rel == null) return;
+            mapGuiPicked.Remove(rel);
+            RefreshMapGui();
+        }
+
+        static void MapGuiPushPicked(object sender, EventArgs e)
+        {
+            object lobby = mapGuiLobby;
+            if (lobby == null) return;
+
+            string root = MapLibraryRoot(SafeGetGamePath());
+            List<MapTarget> targets = new List<MapTarget>();
+            foreach (string rel in mapGuiPicked)
+            {
+                string full = Path.Combine(root, rel.Replace('/', '\\'));
+                if (!File.Exists(full)) continue;
+                targets.Add(new MapTarget { Full = full, Name = Path.GetFileNameWithoutExtension(rel) });
+            }
+            if (targets.Count == 0)
+            {
+                Notice(lobby, "还没选地图：选一行点「加入选中」，或直接点「推送当前地图」", false);
+                return;
+            }
+            CloseMapSyncGui();
+            Log("mapsync: 从选择框推送 " + targets.Count + " 张");
+            StartMapSyncTargets(lobby, targets);
+        }
+
+        static void MapGuiClose(object sender, EventArgs e) { CloseMapSyncGui(); }
+
+        /// <summary>在「只缺图 → 只看第三方 → 查看全部」三档之间循环。</summary>
+        static void MapGuiToggleFilter(object sender, EventArgs e)
+        {
+            mapGuiFilter = (mapGuiFilter + 1) % mapGuiFilterText.Length;
+            try
+            {
+                object btn = FindControl(mapGuiPanel, "btnMoGuiFilter");
+                if (btn != null) SetMember(btn, "Text", mapGuiFilterText[mapGuiFilter]);
+            }
+            catch { }
+            RefreshMapGui();
+        }
+
+        /// <summary>房主收到客机的缺图报告：直接在聊天区提醒去点「同步地图」。</summary>
+        static void OnMapMiss(object lobby, string from)
+        {
+            string who = string.IsNullOrEmpty(from) ? "有玩家" : from;
+            Notice(lobby, who + " 没有当前这张地图，已阻止开局。请点「同步地图」把图发过去", false);
+            Log("mapsync: " + who + " 报告缺图，已提示房主同步");
+        }
+
+        /// <summary>客机点「接收地图」：只发一个请求，清单仍由房主那边按自己选中的地图发。</summary>
+        static void RequestMapSync(object lobby)
+        {
+            if (lobby == null) return;
+            SendCtrlTo(lobby, "", CtrlFrame(MapAskKind, ""));
+            Notice(lobby, "已请房主发送当前选中的地图，等对方把清单发过来…", true);
+            Log("mapsync: 已向房主请求同步地图");
+        }
+
+        /// <summary>房主收到客机的同步请求：把自己选中的那张图的清单发出去。</summary>
+        static void OnMapAsk(object lobby, string from)
+        {
+            string who = string.IsNullOrEmpty(from) ? "客机" : from;
+            Log("mapsync: " + who + " 请求同步地图");
+
+            if (mapSyncTxActive)
+            {
+                Notice(lobby, who + " 想同步地图，但当前正在传输，等这次传完再点一次", false);
+                return;
+            }
+
+            Notice(lobby, who + " 请求同步地图，正在发送清单…", true);
+            StartMapSync(lobby);
         }
 
         static void StartMapSync(object lobby)
@@ -4737,37 +9169,169 @@ namespace MoLanRelay
             if (string.IsNullOrEmpty(root)) { Notice(lobby, "拿不到游戏目录，无法同步", false); return; }
 
             string name = Convert.ToString(GetMember(map, "Name"));
-            List<MapFile> files = CollectMapFiles(map, root);
-            if (files.Count == 0) { Notice(lobby, "这张图没有找到可发送的文件", false); return; }
+            string complete = Convert.ToString(GetMember(map, "CompleteFilePath"));
+            if (string.IsNullOrEmpty(complete) || !File.Exists(complete))
+            {
+                Notice(lobby, "这张图没有找到可发送的文件", false);
+                return;
+            }
+
+            List<MapTarget> targets = new List<MapTarget>(1);
+            targets.Add(new MapTarget
+            {
+                Full = complete,
+                Name = string.IsNullOrEmpty(name) ? "这张地图" : name,
+                Map = map
+            });
+            StartMapSyncTargets(lobby, targets);
+        }
+
+        /// <summary>一次要同步的一张图（单图同步 / 设置页多选批量同步都走这里）。</summary>
+        class MapTarget
+        {
+            public string Full;    // 地图文件绝对路径
+            public string Name;    // 显示名
+            public object Map;     // 可选：客户端的 Map 对象（用来取 PreviewPath）
+        }
+
+        /// <summary>按一组地图生成一单任务并广播清单（多图时共用一条连接、一份清单）。</summary>
+        static void StartMapSyncTargets(object lobby, List<MapTarget> targets)
+        {
+            if (lobby == null) return;
+            if (!IsHostOf(lobby)) { Notice(lobby, "只有房主能同步地图", false); return; }
+
+            string root = SafeGetGamePath();
+            if (string.IsNullOrEmpty(root)) { Notice(lobby, "拿不到游戏目录，无法同步", false); return; }
+            if (targets == null || targets.Count == 0) { Notice(lobby, "先选一张图，再点「同步地图」", false); return; }
+
+            List<MapFile> files = new List<MapFile>();
+            int mapCount = 0;
+            string firstName = "这张地图";
+
+            foreach (MapTarget t in targets)
+            {
+                List<MapFile> one = CollectTargetFiles(root, t);
+                if (one.Count == 0) { Log("mapsync: 跳过没有文件的图 " + t.Name); continue; }
+                if (mapCount == 0) firstName = t.Name;
+                mapCount++;
+
+                foreach (MapFile f in one)
+                {
+                    bool dup = false;
+                    foreach (MapFile have in files)
+                        if (string.Equals(have.Rel, f.Rel, StringComparison.OrdinalIgnoreCase)) { dup = true; break; }
+                    if (!dup) files.Add(f);
+                }
+            }
+            if (files.Count == 0) { Notice(lobby, "没有找到可发送的文件", false); return; }
+
+            // 先压一遍：地图文件里有大量重复/零填充，deflate 常能压到一半以下
+            // （实测 4.4 MB 的图压到 219 KB，2.0 MB 的压到 1.2 MB）。
+            long txTotal = 0;
+            foreach (MapFile f in files)
+            {
+                try
+                {
+                    string full = Path.Combine(root, f.Rel.Replace('/', '\\'));
+                    if (!File.Exists(full) || f.Size > MapPackMaxBytes) { txTotal += f.Size; continue; }
+
+                    byte[] raw = File.ReadAllBytes(full);
+                    byte[] packed = Deflate(raw);
+                    if (packed.Length < raw.Length - raw.Length / 12)     // 至少省 8% 才用
+                    {
+                        f.Packed = packed;
+                        f.PackedSize = packed.Length;
+                    }
+                    txTotal += f.PackedSize > 0 ? f.PackedSize : f.Size;
+                }
+                catch (Exception ex)
+                {
+                    Log("mapsync: 压缩失败 " + f.Rel + ": " + ex.Message);
+                    txTotal += f.Size;
+                }
+            }
 
             MapJob job = new MapJob();
             job.Id = DateTime.Now.Ticks.ToString("x");
-            job.Name = string.IsNullOrEmpty(name) ? "这张地图" : name;
+            job.Name = mapCount <= 1 ? firstName : (mapCount + " 张地图");
             job.Files = files;
+            // 兼容 v1 的全局段字段：取第一张图的
+            foreach (MapFile f in files) if (!string.IsNullOrEmpty(f.IniSection)) { job.IniSection = f.IniSection; break; }
+
             long total = 0;
-            foreach (MapFile f in files) total += f.Size;
+            foreach (MapFile f in files) total += f.Size;      // 原始大小（弹窗里给人看的）
             job.Total = total;
             hostMapJob = job;
 
             mapSyncCancelRequested = false;
             mapSyncTxActive = false;
             mapSyncTxBytes = 0;
-            mapSyncTxTotal = total;
+            mapSyncTxTotal = txTotal;                          // 进度按"实际要发多少字节"算
 
+            // v2 清单：每个文件自带自己的注册段（多图批量同步时各带各的）
             StringBuilder sb = new StringBuilder();
-            sb.Append("v1").Append(MapField).Append(job.Id).Append(MapField)
+            sb.Append("v2").Append(MapField).Append(job.Id).Append(MapField)
               .Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(job.Name))).Append(MapField)
               .Append(total).Append(MapField).Append(files.Count);
             foreach (MapFile f in files)
             {
                 sb.Append(MapField)
                   .Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(f.Rel)))
-                  .Append('\t').Append(f.Size).Append('\t').Append(f.Sha);
+                  .Append('\t').Append(f.Size).Append('\t').Append(f.Sha)
+                  .Append('\t').Append(f.PackedSize)                       // 0 = 未压缩
+                  .Append('\t').Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(f.IniSection ?? "")));
             }
 
             SendCtrlToPeers(lobby, CtrlFrame(MapHelloKind, sb.ToString()));
-            Notice(lobby, "已把「" + job.Name + "」的清单发给客机（" + files.Count + " 个文件，" + FormatSize(total) + "），等对方点接收", true);
-            Log("mapsync: 发出清单 id=" + job.Id + " 文件=" + files.Count + " 共 " + total + " B");
+            Notice(lobby, "已把「" + job.Name + "」的清单发给客机（" + files.Count + " 个文件，"
+                + FormatSize(total) + "，走隧道约 " + FormatSize(EstTraffic(txTotal)) + " 流量）", true);
+            Log("mapsync: 发出清单 id=" + job.Id + " 图=" + mapCount + " 文件=" + files.Count
+                + " 原始=" + total + " B 压缩后=" + txTotal + " B");
+        }
+
+        /// <summary>收集一张图的文件：地图本体 + 同目录同名的附属文件（+ 可选预览图）。</summary>
+        static List<MapFile> CollectTargetFiles(string root, MapTarget t)
+        {
+            List<MapFile> result = new List<MapFile>();
+            try
+            {
+                if (t == null || string.IsNullOrEmpty(t.Full) || !File.Exists(t.Full)) return result;
+
+                AddMapFile(result, t.Full, root);
+
+                string dir = Path.GetDirectoryName(t.Full);
+                string stem = Path.GetFileNameWithoutExtension(t.Full);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    foreach (string f in Directory.GetFiles(dir))
+                    {
+                        if (!string.Equals(Path.GetFileNameWithoutExtension(f), stem,
+                                StringComparison.OrdinalIgnoreCase)) continue;
+                        AddMapFile(result, f, root);
+                    }
+                }
+
+                if (t.Map != null)
+                {
+                    string preview = Convert.ToString(GetMember(t.Map, "PreviewPath"));
+                    if (!string.IsNullOrEmpty(preview))
+                    {
+                        string p = Path.IsPathRooted(preview) ? preview : Path.Combine(root, preview);
+                        AddMapFile(result, p, root);
+                    }
+                }
+
+                // 这张图的注册段挂到它的 .map 条目上（客机缺这段的话文件对了列表里也看不到）
+                string mapRel = RelativeToRoot(t.Full, root);
+                if (!string.IsNullOrEmpty(mapRel))
+                {
+                    string sec = ReadMapIniSection(root, mapRel);
+                    foreach (MapFile f in result)
+                        if (string.Equals(f.Rel, mapRel, StringComparison.OrdinalIgnoreCase)) f.IniSection = sec;
+                }
+            }
+            catch (Exception ex) { Log("mapsync: 收集文件失败: " + ex.Message); }
+            return result;
         }
 
         /// <summary>
@@ -4825,6 +9389,14 @@ namespace MoLanRelay
                 if (rel == null) return;
                 foreach (MapFile f in list) if (string.Equals(f.Rel, rel, StringComparison.OrdinalIgnoreCase)) return;
 
+                // 省流量：预览图（同名的 .png/.jpg 等）默认不发。
+                // 它只是地图列表里的缩略图，缺了不影响开局；要发就 SyncPreview=1。
+                if (!syncPreviewEnabled && IsPreviewImage(rel))
+                {
+                    Log("mapsync: 跳过预览图 " + rel + "（省流量；需要的话在 MoLanPatch.ini 里设 SyncPreview=1）");
+                    return;
+                }
+
                 MapFile mf = new MapFile();
                 mf.Rel = rel;
                 mf.Size = new FileInfo(full).Length;
@@ -4832,6 +9404,12 @@ namespace MoLanRelay
                 list.Add(mf);
             }
             catch (Exception ex) { Log("mapsync: 读文件失败 " + full + ": " + ex.Message); }
+        }
+
+        static bool IsPreviewImage(string rel)
+        {
+            string ext = (Path.GetExtension(rel) ?? "").ToLowerInvariant();
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".gif";
         }
 
         /// <summary>把绝对路径转成「相对游戏根目录、'/' 分隔」；不在游戏目录内则返回 null。</summary>
@@ -4848,6 +9426,303 @@ namespace MoLanRelay
             catch { return null; }
         }
 
+        // ---------------- MentalOmegaMaps.ini 的注册段 ----------------
+        //
+        // MapsMO\ 底下的图不是靠"扫描目录"登记的，而是靠 INI\MentalOmegaMaps.ini 里的
+        // 一个段（段名就是相对路径去掉扩展名，如 [MapsMO\Defend\GuardPresident]）。
+        // 客机缺图时这段通常也没有，所以只把 .map/.png 传过去，地图列表里仍然看不到。
+
+        /// <summary>地图对应的 ini 段名，如 "MapsMO\Defend\GuardPresident"。</summary>
+        static string MapIniSectionName(string rel)
+        {
+            int dot = rel.LastIndexOf('.');
+            string stem = dot > 0 ? rel.Substring(0, dot) : rel;
+            return stem.Replace('/', '\\');
+        }
+
+        /// <summary>房主：从自己的 INI\MentalOmegaMaps.ini 里取出这张图的注册段（含段名行）。</summary>
+        static string ReadMapIniSection(string root, string rel)
+        {
+            try
+            {
+                string ini = Path.Combine(root, "INI\\MentalOmegaMaps.ini");
+                if (!File.Exists(ini)) return "";
+
+                string wanted = "[" + MapIniSectionName(rel) + "]";
+                StringBuilder sb = new StringBuilder();
+                bool inSection = false;
+
+                foreach (string raw in File.ReadAllLines(ini, Encoding.UTF8))
+                {
+                    string line = raw == null ? "" : raw.Trim();
+                    if (line.StartsWith("["))
+                    {
+                        if (inSection) break;                       // 到下一个段就收工
+                        if (string.Equals(line, wanted, StringComparison.OrdinalIgnoreCase))
+                        {
+                            inSection = true;
+                            sb.AppendLine(line);
+                            continue;
+                        }
+                    }
+                    if (inSection) sb.AppendLine(raw);
+                }
+
+                return inSection ? sb.ToString() : "";
+            }
+            catch (Exception ex)
+            {
+                Log("mapsync: 读注册段失败: " + ex.Message);
+                return "";
+            }
+        }
+
+        /// <summary>客机：本地 ini 里没有这段就追加进去（已有则不动，免得覆盖别的地图信息）。</summary>
+        static bool ApplyMapIniSection(string root, string rel, string sectionText)
+        {
+            try
+            {
+                string ini = Path.Combine(root, "INI\\MentalOmegaMaps.ini");
+                if (!File.Exists(ini)) { Log("mapsync: 本地没有 INI\\MentalOmegaMaps.ini，无法注册地图"); return false; }
+
+                string wanted = "[" + MapIniSectionName(rel) + "]";
+                string sectionName = MapIniSectionName(rel);
+                string text = File.ReadAllText(ini, Encoding.UTF8);
+                bool changed = false;
+
+                // (1) 地图自己的段：[MapsMO\Defend\Xxx]
+                bool hasSection = false;
+                foreach (string line in text.Split('\n'))
+                {
+                    if (string.Equals(line.Trim(), wanted, StringComparison.OrdinalIgnoreCase)) { hasSection = true; break; }
+                }
+
+                if (!hasSection && !string.IsNullOrEmpty(sectionText))
+                {
+                    string tail = text.EndsWith("\n") ? "" : "\r\n";
+                    File.AppendAllText(ini, tail + sectionText.TrimEnd() + "\r\n", new UTF8Encoding(false));
+                    Log("mapsync: 已把 " + wanted + " 注册段写入 INI");
+                    text = File.ReadAllText(ini, Encoding.UTF8);
+                    changed = true;
+                }
+                else if (hasSection)
+                {
+                    Log("mapsync: 本地 INI 已有 " + wanted + "，不重复写入");
+                }
+
+                // (2) [MultiMaps] 里的登记行（LoadMultiMaps 只遍历这里的键，光有上面的段没用）
+                if (AddMultiMapsEntry(ini, sectionName))
+                {
+                    Log("mapsync: 已在 [MultiMaps] 里登记 " + sectionName);
+                    changed = true;
+                }
+                else if (!HasMultiMapsEntry(ini, sectionName))
+                {
+                    Log("mapsync: [MultiMaps] 段不存在或登记失败，地图可能仍然不显示");
+                }
+
+                return changed;
+            }
+            catch (Exception ex)
+            {
+                Log("mapsync: 写注册段失败: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>[MultiMaps] 里是否已经有这条地图。</summary>
+        static bool HasMultiMapsEntry(string ini, string sectionName)
+        {
+            try
+            {
+                foreach (string raw in File.ReadAllLines(ini, Encoding.UTF8))
+                {
+                    string line = raw == null ? "" : raw.Trim();
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    if (string.Equals(line.Substring(eq + 1).Trim(), sectionName, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>往 [MultiMaps] 段末尾插一行「序号 = 地图段名」；已有则返回 false。</summary>
+        static bool AddMultiMapsEntry(string ini, string sectionName)
+        {
+            try
+            {
+                List<string> lines = new List<string>(File.ReadAllLines(ini, Encoding.UTF8));
+                int start = -1, end = -1;
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    string t = lines[i] == null ? "" : lines[i].Trim();
+                    if (!t.StartsWith("[")) continue;
+                    if (start < 0)
+                    {
+                        if (string.Equals(t, "[MultiMaps]", StringComparison.OrdinalIgnoreCase)) start = i;
+                    }
+                    else { end = i; break; }
+                }
+
+                if (start < 0) return false;
+                if (end < 0) end = lines.Count;
+
+                int maxIdx = -1;
+                for (int i = start + 1; i < end; i++)
+                {
+                    string t = lines[i] == null ? "" : lines[i].Trim();
+                    int eq = t.IndexOf('=');
+                    if (eq <= 0) continue;
+
+                    string val = t.Substring(eq + 1).Trim();
+                    if (string.Equals(val, sectionName, StringComparison.OrdinalIgnoreCase)) return false;   // 已有
+
+                    int idx;
+                    if (int.TryParse(t.Substring(0, eq).Trim(), out idx) && idx > maxIdx) maxIdx = idx;
+                }
+
+                lines.Insert(end, (maxIdx + 1) + "\t=\t" + sectionName);
+                File.WriteAllLines(ini, lines, new UTF8Encoding(false));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log("mapsync: 写 [MultiMaps] 失败: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 同步完成后把这张图注册进大厅并刷新地图列表，不必重启客户端。
+        /// 用 LoadMultiMaps 重读 ini（这样 Description/Briefing/预览尺寸等字段才完整），
+        /// 但它内部不判重，所以调用后必须按 CompleteFilePath 去重，否则列表里每张图都会翻倍。
+        /// </summary>
+        static bool RefreshMapListAfterSync(object lobby, string root, MapJob job, string rel)
+        {
+            try
+            {
+                // 同一房间里同一张图只刷一次：客机反复点「接收地图」时不必反复重建列表
+                if (ReferenceEquals(lastMapRefreshLobby, lobby)
+                    && string.Equals(lastMapRefreshRel, rel, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                object loader = GetMember(lobby, "MapLoader");
+                if (loader == null) loader = GetMember(lobby, "mapLoader");
+                if (loader == null) { Log("mapsync: 找不到 MapLoader，跳过热刷新（重启客户端后可见）"); return false; }
+
+                string relName = MapIniSectionName(rel);       // MapsMO\Defend\GuardPresident
+                string full = Path.Combine(root, rel.Replace('/', '\\'));
+                if (!File.Exists(full)) { Log("mapsync: 热刷新时地图文件不存在: " + full); return false; }
+
+                // 不用 LoadCustomMap：它只解析 .map 本身，ini 里的 Description / Briefing /
+                // PreviewSize / 任务文本全都拿不到（表现就是"能进游戏但没字幕"）。
+                // 改成重新跑一遍 LoadMultiMaps，让它按 ini 注册段建出完整的 Map 对象。
+                Type iniType = FindType("Rampastring.Tools.IniFile");
+                if (iniType == null) { Log("mapsync: 找不到 IniFile 类型，跳过热刷新"); return false; }
+
+                string iniPath = Path.Combine(root, "INI\\MentalOmegaMaps.ini");
+                if (!File.Exists(iniPath)) { Log("mapsync: 找不到 " + iniPath); return false; }
+
+                MethodInfo loadMulti = FindMethod(loader.GetType(), "LoadMultiMaps", 1);
+                if (loadMulti == null) { Log("mapsync: 找不到 LoadMultiMaps，跳过热刷新"); return false; }
+
+                object ini = Activator.CreateInstance(iniType, new object[] { iniPath });
+                loadMulti.Invoke(loader, new object[] { ini });
+
+                // LoadMultiMaps 会把整份 ini 重新注册一遍（它内部不判重），
+                // 所以下面按 CompleteFilePath 去重：保留先出现的（原有对象），删掉后来加进来的副本。
+                IList gmList = GetMember(loader, "GameModes") as IList;
+                if (gmList == null) { Log("mapsync: 取不到 GameModes，跳过热刷新"); return false; }
+
+                foreach (object gm in gmList)
+                {
+                    if (gm == null) continue;
+                    IList maps = GetMember(gm, "Maps") as IList;
+                    if (maps == null) continue;
+
+                    HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    for (int i = maps.Count - 1; i >= 0; i--)
+                    {
+                        object m = maps[i];
+                        string key = Convert.ToString(GetMember(m, "CompleteFilePath"));
+                        if (string.IsNullOrEmpty(key)) key = Convert.ToString(GetMember(m, "Name"));
+                        if (string.IsNullOrEmpty(key)) continue;
+                        if (!seen.Add(key)) maps.RemoveAt(i);
+                    }
+                }
+
+                // 在注册表里找到刚加进来的这张图（按相对路径匹配），设成客机当前选图。
+                // 不设的话 Map 仍是 null，开局会被 WriteSpawnIni 的 Map.IsCoop() 打崩。
+                object target = null;
+                object firstMode = null;
+                string wantPath = Path.GetFullPath(full);
+                foreach (object gm in gmList)
+                {
+                    if (gm == null) continue;
+                    IList maps = GetMember(gm, "Maps") as IList;
+                    if (maps == null) continue;
+                    foreach (object m in maps)
+                    {
+                        string mp = Convert.ToString(GetMember(m, "CompleteFilePath"));
+                        if (string.IsNullOrEmpty(mp)) continue;
+                        if (!string.Equals(Path.GetFullPath(mp), wantPath, StringComparison.OrdinalIgnoreCase)) continue;
+                        target = m;
+                        firstMode = gm;
+                        break;
+                    }
+                    if (target != null) break;
+                }
+
+                if (target == null)
+                {
+                    Log("mapsync: ini 里没找到 " + relName + " 的注册项，跳过热刷新");
+                    return false;
+                }
+
+                // 设 Map/GameMode 期间临时关掉"游戏选项变更广播"，免得客机反向把房主的选图改掉
+                SetMember(lobby, "disableGameOptionUpdateBroadcast", true);
+                try
+                {
+                    SetMember(lobby, "GameMode", firstMode);
+                    SetMember(lobby, "Map", target);
+                }
+                finally
+                {
+                    SetMember(lobby, "disableGameOptionUpdateBroadcast", false);
+                }
+
+                // 重建地图列表（真正显示新图的地方）
+                MethodInfo listMaps = FindMethod(lobby.GetType(), "ListMaps", 0);
+                if (listMaps != null)
+                {
+                    try { listMaps.Invoke(lobby, null); }
+                    catch (Exception ex) { Log("mapsync: ListMaps 失败: " + ex.Message); }
+                }
+
+                // 再刷一次模式下拉框
+                MethodInfo refresh = FindMethod(lobby.GetType(), "RefreshMapSelectionUI", 0);
+                if (refresh != null)
+                {
+                    try { refresh.Invoke(lobby, null); }
+                    catch (Exception ex) { Log("mapsync: 刷新地图列表失败: " + ex.Message); }
+                }
+
+                Log("mapsync: 已热刷新地图列表（" + relName + "），无需重启客户端");
+                lastMapRefreshLobby = lobby;
+                lastMapRefreshRel = rel;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log("mapsync: 热刷新失败（重启客户端后可见）: " + ex.Message);
+                return false;
+            }
+        }
         static string Sha256Of(string path)
         {
             using (FileStream fs = File.OpenRead(path))
@@ -4872,11 +9747,166 @@ namespace MoLanRelay
             return sb.ToString();
         }
 
+        // ---------------- deflate：地图文件压缩/解压 ----------------
+        // 地图文件里大量重复/零填充，deflate 很划算（实测 4.4 MB → 219 KB、2.0 MB → 1.2 MB）。
+        // 只在真能省 8% 以上时才压；.png 这类已经压过的会原样发。
+
+        static byte[] Deflate(byte[] data)
+        {
+            using (MemoryStream outMs = new MemoryStream())
+            {
+                using (DeflateStream ds = new DeflateStream(outMs, CompressionMode.Compress, true))
+                    ds.Write(data, 0, data.Length);
+                return outMs.ToArray();
+            }
+        }
+
+        static byte[] Inflate(byte[] data, int expected)
+        {
+            using (MemoryStream inMs = new MemoryStream(data))
+            using (DeflateStream ds = new DeflateStream(inMs, CompressionMode.Decompress))
+            using (MemoryStream outMs = new MemoryStream(expected > 0 ? expected : 1 << 20))
+            {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = ds.Read(buf, 0, buf.Length)) > 0) outMs.Write(buf, 0, n);
+                return outMs.ToArray();
+            }
+        }
+
+        // ---------------- Ascii85：比 Base64 少约 6% 流量 ----------------
+        // 樱花 Frp 是按流量算的：Base64 每 3 字节变 4 个字符（+33%），
+        // Ascii85 每 4 字节变 5 个字符（+25%），传输同样的数据少 6~7% 的字节。
+        // 字符范围是 '!'(33) ~ 'u'(117)，全是可打印 ASCII，不含 \u0001/\u0002，安全。
+
+        static string ToAscii85(byte[] data, int offset, int count)
+        {
+            StringBuilder sb = new StringBuilder((count / 4 + 1) * 5);
+            int end = offset + count;
+            char[] c = new char[5];
+
+            for (int i = offset; i < end; i += 4)
+            {
+                int n = Math.Min(4, end - i);
+                uint v = 0;
+                for (int k = 0; k < 4; k++) v = (v << 8) | (uint)(k < n ? data[i + k] : 0);
+                for (int k = 4; k >= 0; k--) { c[k] = (char)(v % 85 + 33); v /= 85; }
+                sb.Append(c, 0, n + 1);
+            }
+            return sb.ToString();
+        }
+
+        // ---------------- Base91：比 Base64 省 10% 左右、比 Ascii85 再省 1.6% ----------------
+        // 樱花 Frp 按流量计费，能省就省：Base64 膨胀 33%、Ascii85 25%、Base91 约 23%。
+        // 字母表里没有 \u0001/\u0002，不会破坏大厅的文本分帧。
+
+        const string B91Alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\"";
+
+        static readonly byte[] B91Rev = BuildB91Rev();
+
+        static byte[] BuildB91Rev()
+        {
+            byte[] rev = new byte[128];
+            for (int i = 0; i < rev.Length; i++) rev[i] = 0xFF;
+            for (int i = 0; i < B91Alphabet.Length; i++) rev[B91Alphabet[i]] = (byte)i;
+            return rev;
+        }
+
+        static string ToBase91(byte[] data, int offset, int count)
+        {
+            StringBuilder sb = new StringBuilder((count * 23 / 20) + 4);
+            int b = 0, n = 0;
+            int end = offset + count;
+
+            for (int i = offset; i < end; i++)
+            {
+                b |= data[i] << n;
+                n += 8;
+                if (n > 13)
+                {
+                    int v = b & 8191;
+                    if (v > 88) { b >>= 13; n -= 13; }
+                    else { v = b & 16383; b >>= 14; n -= 14; }
+                    sb.Append(B91Alphabet[v % 91]).Append(B91Alphabet[v / 91]);
+                }
+            }
+            if (n > 0) sb.Append(B91Alphabet[b % 91]);
+            if (n > 7 || b > 90) sb.Append(B91Alphabet[b / 91]);
+
+            return sb.ToString();
+        }
+
+        static byte[] FromBase91(string s, int expectedLen)
+        {
+            byte[] outBuf = new byte[expectedLen];
+            int oi = 0;
+            int b = 0, n = 0, v = -1;
+
+            foreach (char ch in s)
+            {
+                int c = ch < 128 ? B91Rev[ch] : 0xFF;
+                if (c == 0xFF) throw new FormatException("Base91 非法字符: " + (int)ch);
+
+                if (v < 0) { v = c; }
+                else
+                {
+                    v += c * 91;
+                    b |= v << n;
+                    n += (v & 8191) > 88 ? 13 : 14;
+                    while (n > 7)
+                    {
+                        if (oi < outBuf.Length) outBuf[oi++] = (byte)(b & 0xFF);
+                        b >>= 8;
+                        n -= 8;
+                    }
+                    v = -1;
+                }
+            }
+            if (v > -1 && oi < outBuf.Length) outBuf[oi++] = (byte)((b | (v << n)) & 0xFF);
+            return outBuf;
+        }
+
+        static byte[] FromAscii85(string s, int expectedLen)
+        {
+            byte[] outBuf = new byte[expectedLen];
+            byte[] tmp = new byte[4];
+            int oi = 0, i = 0;
+
+            while (i < s.Length && oi < expectedLen)
+            {
+                int n = Math.Min(5, s.Length - i);
+                ulong v = 0;          // 用 ulong 累加：85^5 超过 uint 上限，避免溢出回绕
+                for (int k = 0; k < 5; k++)
+                {
+                    int c = (k < n ? s[i + k] - 33 : 84);
+                    if (c < 0 || c > 84) throw new FormatException("Ascii85 字符越界: " + c);
+                    v = v * 85 + (ulong)c;
+                }
+                for (int k = 3; k >= 0; k--) { tmp[k] = (byte)(v & 0xFF); v >>= 8; }
+
+                int emit = Math.Min(n - 1, expectedLen - oi);
+                for (int k = 0; k < emit; k++) outBuf[oi++] = tmp[k];
+                i += n;
+            }
+            return outBuf;
+        }
+
         static string FormatSize(long bytes)
         {
             if (bytes < 1024) return bytes + " B";
             if (bytes < 1024 * 1024) return (bytes / 1024.0).ToString("0.0") + " KB";
             return (bytes / 1024.0 / 1024.0).ToString("0.0") + " MB";
+        }
+
+        /// <summary>
+        /// 估算这次传输会消耗多少"隧道流量"：数据已经 deflate 过，再乘 Ascii85 的 1.25 倍，
+        /// 加上每帧几十字节的协议头。樱花 Frp 按流量计费，推送前给用户一个数好判断。
+        /// </summary>
+        static long EstTraffic(long packedBytes)
+        {
+            if (packedBytes <= 0) return 0;
+            return (long)(packedBytes * 1.23) + packedBytes / 200;
         }
 
         // ---------------- 客机侧 ----------------
@@ -4887,6 +9917,8 @@ namespace MoLanRelay
             {
                 string[] parts = payload.Split(MapField);
                 if (parts.Length < 5) return;
+
+                bool v2 = string.Equals(parts[0], "v2", StringComparison.OrdinalIgnoreCase);
 
                 MapJob job = new MapJob();
                 job.Id = parts[1];
@@ -4903,26 +9935,69 @@ namespace MoLanRelay
                     f.Rel = Encoding.UTF8.GetString(Convert.FromBase64String(rec[0]));
                     f.Size = long.Parse(rec[1]);
                     f.Sha = rec[2];
+                    if (rec.Length >= 4) long.TryParse(rec[3], out f.PackedSize);   // 0 或空 = 未压缩
+                    if (v2 && rec.Length >= 5 && rec[4].Length > 0)
+                    {
+                        try { f.IniSection = Encoding.UTF8.GetString(Convert.FromBase64String(rec[4])); }
+                        catch { f.IniSection = ""; }
+                    }
                     job.Files.Add(f);
+                }
+
+                // v1 的清单：注册段单独放在最后一段，挂到第一张图的 .map 上
+                if (!v2 && parts.Length > 5 + count)
+                {
+                    try { job.IniSection = Encoding.UTF8.GetString(Convert.FromBase64String(parts[5 + count])); }
+                    catch { job.IniSection = ""; }
+                    if (job.Files.Count > 0) job.Files[0].IniSection = job.IniSection;
                 }
 
                 string root = SafeGetGamePath();
                 List<int> missing = new List<int>();
+                Dictionary<int, long> resume = new Dictionary<int, long>();
                 long need = 0;
+
                 for (int i = 0; i < job.Files.Count; i++)
                 {
                     if (MapFileMatches(root, job.Files[i])) continue;
                     missing.Add(i);
-                    need += job.Files[i].Size;
+
+                    long total = job.Files[i].PackedSize > 0 ? job.Files[i].PackedSize : job.Files[i].Size;
+                    long have = PartLength(root, job.Files[i]);
+
+                    // 断点续传：上次没收完的那部分留着，这次只补剩下的字节
+                    if (have > 0 && have < total)
+                    {
+                        resume[i] = have;
+                        need += total - have;
+                        Log("mapsync: 断点续传 " + job.Files[i].Rel + " 已有 " + have + "/" + total + " B");
+                    }
+                    else
+                    {
+                        if (have >= total && have > 0) DeletePart(root, job.Files[i]);   // 旧的半成品不可信，重来
+                        need += total;
+                    }
                 }
 
                 if (missing.Count == 0)
                 {
+                    // 文件都在，但注册段可能缺（缺图的机器往往两样都缺）：
+                    // 补写 ini 后直接热刷新，用户不用重启也能在列表里看到。
+                    bool iniAdded0 = ApplySectionsFromJob(root, job);
+                    string firstRel0 = FirstMapRel(job);
+                    bool refreshed0 = firstRel0.Length > 0 && RefreshMapListAfterSync(lobby, root, job, firstRel0);
+
                     string msg0 = "地图「" + job.Name + "」与房主一致，不需要同步";
+                    if (refreshed0) msg0 += "（地图列表已刷新）";
+                    else if (iniAdded0) msg0 += "（注册信息已补写，重启客户端后可见）";
+
                     PostUi(delegate { Notice(lobby, msg0, true); });
-                    Log("mapsync: 本地已齐全，忽略清单 id=" + job.Id);
+                    Log("mapsync: 本地已齐全，忽略清单 id=" + job.Id + "（iniAdded=" + iniAdded0 + " refreshed=" + refreshed0 + "）");
                     return;
                 }
+
+                job.Req = missing;
+                job.Resume = resume;
 
                 pendingMapJob = job;
                 pendingMapLobby = lobby;
@@ -4935,6 +10010,57 @@ namespace MoLanRelay
                 Log("mapsync: 收到清单「" + job.Name + "」，缺 " + missing.Count + " 个文件 / " + need + " B");
             }
             catch (Exception ex) { Log("mapsync: 处理清单失败: " + ex.Message); }
+        }
+
+        // ---------------- 断点续传：未收完的分片存在 Resources\MoMapPart\<sha>.part ----------------
+
+        static string PartDir(string root)
+        {
+            return Path.Combine(root, "Resources\\MoMapPart");
+        }
+
+        static string PartPath(string root, MapFile f)
+        {
+            string sha = (f.Sha ?? "").ToUpperInvariant();
+            if (sha.Length > 32) sha = sha.Substring(0, 32);
+            return Path.Combine(PartDir(root), sha + ".part");
+        }
+
+        static long PartLength(string root, MapFile f)
+        {
+            try
+            {
+                string p = PartPath(root, f);
+                return File.Exists(p) ? new FileInfo(p).Length : 0;
+            }
+            catch { return 0; }
+        }
+
+        static void DeletePart(string root, MapFile f)
+        {
+            try { string p = PartPath(root, f); if (File.Exists(p)) File.Delete(p); } catch { }
+        }
+
+        /// <summary>把清单里每个文件自带的注册段写进 INI（多图批量时会有多段）。</summary>
+        static bool ApplySectionsFromJob(string root, MapJob job)
+        {
+            bool any = false;
+            foreach (MapFile f in job.Files)
+            {
+                if (string.IsNullOrEmpty(f.IniSection)) continue;
+                if (ApplyMapIniSection(root, f.Rel, f.IniSection)) any = true;
+            }
+            return any;
+        }
+
+        static string FirstMapRel(MapJob job)
+        {
+            foreach (MapFile f in job.Files)
+            {
+                string ext = (Path.GetExtension(f.Rel) ?? "").ToLowerInvariant();
+                if (ext == ".map" || ext == ".mpr" || ext == ".yrm") return f.Rel;
+            }
+            return job.Files.Count > 0 ? job.Files[0].Rel : "";
         }
 
         static bool MapFileMatches(string root, MapFile f)
@@ -4966,8 +10092,12 @@ namespace MoLanRelay
                 }
                 if (showYesNo == null) { Log("mapsync: 找不到 ShowYesNoDialog"); return; }
 
-                // 弹窗正文只有一行，必须短
-                string text = "同步「" + job.Name + "」？" + missing.Count + " 个文件 / " + FormatSize(need);
+                // 弹窗正文只有一行，必须短。大小按"原始大小"报，
+                // 压缩后更小就顺带写一句，免得用户以为图变小了。
+                long raw = 0;
+                foreach (int i in missing) if (i >= 0 && i < job.Files.Count) raw += job.Files[i].Size;
+                string text = "同步「" + job.Name + "」？" + missing.Count + " 个文件 / " + FormatSize(raw)
+                    + (need > 0 ? "（走隧道约 " + FormatSize(EstTraffic(need)) + " 流量）" : "");
                 object box = showYesNo.Invoke(null, new object[] { wm, "地图同步", text });
                 if (box == null) { Log("mapsync: 弹窗创建失败"); return; }
 
@@ -4991,21 +10121,33 @@ namespace MoLanRelay
             clientMapJobs[job.Id] = job;
 
             long need = 0;
-            foreach (int i in missing) need += job.Files[i].Size;
+            foreach (int i in missing)
+            {
+                long total = job.Files[i].PackedSize > 0 ? job.Files[i].PackedSize : job.Files[i].Size;
+                long have = 0;
+                if (job.Resume != null) job.Resume.TryGetValue(i, out have);
+                need += total - have;
+            }
             mapSyncRxActive = true;
             mapSyncRxBytes = 0;
             mapSyncRxTotal = need;
+            mapSyncRxStartedAt = DateTime.Now;
 
+            // 请求格式：id | idx:偏移, idx:偏移, ...（没有偏移就是 0，也就是从头收）
             StringBuilder sb = new StringBuilder();
             sb.Append(job.Id).Append(MapField);
             for (int i = 0; i < missing.Count; i++)
             {
                 if (i > 0) sb.Append(',');
-                sb.Append(missing[i]);
+                int idx = missing[i];
+                long off = 0;
+                if (job.Resume != null) job.Resume.TryGetValue(idx, out off);
+                sb.Append(idx);
+                if (off > 0) sb.Append(':').Append(off);
             }
 
             SendCtrlTo(lobby, "", CtrlFrame(MapReqKind, sb.ToString()));
-            Log("mapsync: 用户已接收，向房主请求 " + missing.Count + " 个文件");
+            Log("mapsync: 用户已接收，向房主请求 " + missing.Count + " 个文件（含断点续传）");
         }
 
         static void MapSyncDialogNo(object box)
@@ -5021,33 +10163,41 @@ namespace MoLanRelay
             try
             {
                 string[] p = payload.Split(MapField);
-                if (p.Length < 4) return;
+                if (p.Length < 5) return;
 
                 string id = p[0];
                 int idx = int.Parse(p[1]);
                 int off = int.Parse(p[2]);
+                int len = int.Parse(p[3]);
 
                 MapJob job;
                 if (!clientMapJobs.TryGetValue(id, out job)) return;
                 if (idx < 0 || idx >= job.Files.Count) return;
 
-                byte[] bytes = Convert.FromBase64String(p[3]);
-                string key = id + ":" + idx;
+                MapFile f = job.Files[idx];
+                byte[] bytes = FromBase91(p[4], len);
 
-                MemoryStream ms;
-                if (!clientMapBuffers.TryGetValue(key, out ms) || off == 0)
-                {
-                    ms = new MemoryStream();
-                    clientMapBuffers[key] = ms;
-                }
-                else if (ms.Length != off)
-                {
-                    // TCP 是有序的，正常不会走到这；真乱序了就丢掉这一段，靠最后的校验兜底
-                    Log("mapsync: 分片偏移不符（期望 " + ms.Length + "，收到 " + off + "），丢弃");
-                    return;
-                }
+                // 直接落到 Resources\MoMapPart\<sha>.part：断线/取消后这部分不用重传
+                string root = SafeGetGamePath();
+                string part = PartPath(root, f);
+                string dir = Path.GetDirectoryName(part);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-                ms.Write(bytes, 0, bytes.Length);
+                using (FileStream fs = new FileStream(part, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+                {
+                    if (fs.Length != off)
+                    {
+                        if (fs.Length > off) return;      // 重发的旧分片，忽略
+                        Log("mapsync: 分片偏移不符（磁盘 " + fs.Length + "，收到 " + off + "），丢弃");
+                        return;
+                    }
+                    if (off == 0)
+                        Log("mapsync: 开始接收 " + f.Rel + "（" + f.Size + " B"
+                            + (f.PackedSize > 0 ? "，压缩后 " + f.PackedSize + " B" : "") + "）");
+
+                    fs.Seek(off, SeekOrigin.Begin);
+                    fs.Write(bytes, 0, bytes.Length);
+                }
                 mapSyncRxBytes += bytes.Length;
             }
             catch (Exception ex) { Log("mapsync: 接收分片失败: " + ex.Message); }
@@ -5069,20 +10219,54 @@ namespace MoLanRelay
                 string root = SafeGetGamePath();
                 int ok = 0, bad = 0;
 
-                for (int i = 0; i < job.Files.Count; i++)
+                List<int> req = job.Req;
+                if (req == null)
                 {
-                    string key = id + ":" + i;
-                    MemoryStream ms;
-                    if (!clientMapBuffers.TryGetValue(key, out ms)) continue;
-                    clientMapBuffers.Remove(key);
+                    req = new List<int>();
+                    for (int i = 0; i < job.Files.Count; i++) req.Add(i);
+                }
 
+                foreach (int i in req)
+                {
+                    if (i < 0 || i >= job.Files.Count) continue;
                     MapFile f = job.Files[i];
-                    byte[] data = ms.ToArray();
+
+                    long total = f.PackedSize > 0 ? f.PackedSize : f.Size;
+                    long have = PartLength(root, f);
+                    if (have != total)
+                    {
+                        // 不完整：留着，下次点「接收地图」自动接着收
+                        bad++;
+                        Log("mapsync: 文件不完整 " + f.Rel + "（" + have + "/" + total + " B，已保留待续传）");
+                        continue;
+                    }
+
+                    byte[] data;
+                    try { data = File.ReadAllBytes(PartPath(root, f)); }
+                    catch (Exception ex)
+                    {
+                        bad++;
+                        Log("mapsync: 读临时文件失败 " + f.Rel + ": " + ex.Message);
+                        continue;
+                    }
+
+                    if (f.PackedSize > 0)
+                    {
+                        try { data = Inflate(data, (int)f.Size); }
+                        catch (Exception ex)
+                        {
+                            bad++;
+                            DeletePart(root, f);
+                            Log("mapsync: 解压失败 " + f.Rel + ": " + ex.Message);
+                            continue;
+                        }
+                    }
 
                     if (data.Length != f.Size ||
                         !string.Equals(Sha256Of(data), f.Sha, StringComparison.OrdinalIgnoreCase))
                     {
                         bad++;
+                        DeletePart(root, f);      // 内容不对，别留着污染下次续传
                         Log("mapsync: 校验失败 " + f.Rel + "（长度 " + data.Length + "/" + f.Size + "）");
                         continue;
                     }
@@ -5090,6 +10274,7 @@ namespace MoLanRelay
                     try
                     {
                         WriteMapFile(root, f.Rel, data);
+                        DeletePart(root, f);
                         ok++;
                     }
                     catch (Exception ex)
@@ -5100,17 +10285,33 @@ namespace MoLanRelay
                 }
 
                 clientMapJobs.Remove(id);
-                List<string> stale = new List<string>();
-                foreach (string k in clientMapBuffers.Keys)
-                    if (k.StartsWith(id + ":", StringComparison.OrdinalIgnoreCase)) stale.Add(k);
-                foreach (string k in stale) clientMapBuffers.Remove(k);
 
                 string name = job.Name;
-                string msg = bad == 0
-                    ? "地图「" + name + "」已同步（" + ok + " 个文件）。退出并重新进入局域网大厅后，地图列表里就能看到"
-                    : "地图「" + name + "」同步完成但有 " + bad + " 个文件失败，详见 MoLanRelay.log";
+                string firstRel = FirstMapRel(job);
+
+                // 注册段（多图时逐个写）+ 热刷新：文件写对了但 ini 里没登记，地图列表照样看不到
+                bool iniAdded = ApplySectionsFromJob(root, job);
+                bool refreshed = bad == 0 && firstRel.Length > 0
+                                 && RefreshMapListAfterSync(lobby, root, job, firstRel);
+
+                string msg;
+                if (bad == 0)
+                {
+                    msg = "地图「" + name + "」已同步（" + ok + " 个文件）"
+                        + (refreshed ? "，地图列表已刷新"
+                                     : (iniAdded ? "，注册信息已补写，重启客户端后可见" : "，重启客户端后可见"));
+                }
+                else
+                {
+                    msg = "「" + name + "」有 " + bad + " 个文件没传完（已保留，下次接着收），详见 MoLanRelay.log";
+                }
                 PostUi(delegate { Notice(lobby, msg, bad == 0); });
-                Log("mapsync: 接收完成 ok=" + ok + " bad=" + bad);
+                double rxSecs = mapSyncRxStartedAt == DateTime.MinValue
+                    ? 0 : (DateTime.Now - mapSyncRxStartedAt).TotalSeconds;
+                double rxKbps = rxSecs > 0.001 ? (mapSyncRxBytes / 1024.0 / rxSecs) : 0;
+                mapSyncRxStartedAt = DateTime.MinValue;
+                Log("mapsync: 接收完成 ok=" + ok + " bad=" + bad + " root=" + root
+                    + " 用时=" + rxSecs.ToString("0.0") + "s 速度=" + rxKbps.ToString("0") + " KB/s");
             }
             catch (Exception ex) { Log("mapsync: 收尾失败: " + ex.Message); }
         }
@@ -5134,7 +10335,490 @@ namespace MoLanRelay
             if (File.Exists(full)) File.Delete(full);
             File.Move(tmp, full);
 
+            RecordSyncedMap(root, clean);
             Log("mapsync: 已写入 " + rel + "（" + data.Length + " B）");
+        }
+
+        // ---------------- 已同步地图的清单与清理 ----------------
+        //
+        // 只记录"本机通过地图同步接收到的文件"。清理时只删这些，
+        // 用户自己放进去的地图一概不碰 —— 这是这个功能的安全边界。
+
+        static readonly object syncedMapLock = new object();
+
+        static string SyncedMapListPath(string root)
+        {
+            return Path.Combine(root, "Resources\\MoLanSyncedMaps.txt");
+        }
+
+        static void RecordSyncedMap(string root, string rel)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(rel)) return;
+                string file = SyncedMapListPath(root);
+                lock (syncedMapLock)
+                {
+                    if (File.Exists(file))
+                    {
+                        foreach (string raw in File.ReadAllLines(file, Encoding.UTF8))
+                            if (string.Equals((raw ?? "").Trim(), rel, StringComparison.OrdinalIgnoreCase)) return;
+                    }
+                    else
+                    {
+                        try { Directory.CreateDirectory(Path.GetDirectoryName(file)); } catch { }
+                        File.WriteAllText(file, "", new UTF8Encoding(false));
+                    }
+                    File.AppendAllText(file, rel + "\r\n", new UTF8Encoding(false));
+                }
+            }
+            catch (Exception ex) { Log("clearmaps: 记录清单失败: " + ex.Message); }
+        }
+
+        static List<string> LoadSyncedMapList(string root)
+        {
+            List<string> list = new List<string>();
+            try
+            {
+                string file = SyncedMapListPath(root);
+                if (!File.Exists(file)) return list;
+                foreach (string raw in File.ReadAllLines(file, Encoding.UTF8))
+                {
+                    string s = (raw ?? "").Replace('/', '\\').Trim().TrimStart('\\');
+                    if (s.Length == 0 || s.Contains("..")) continue;
+
+                    bool dup = false;
+                    foreach (string have in list)
+                        if (string.Equals(have, s, StringComparison.OrdinalIgnoreCase)) { dup = true; break; }
+                    if (!dup) list.Add(s);
+                }
+            }
+            catch (Exception ex) { Log("clearmaps: 读清单失败: " + ex.Message); }
+            return list;
+        }
+
+        /// <summary>从 INI\MentalOmegaMaps.ini 里删掉这张图的注册段和 [MultiMaps] 登记行。</summary>
+        static bool RemoveMapIniSection(string root, string rel)
+        {
+            try
+            {
+                string ini = Path.Combine(root, "INI\\MentalOmegaMaps.ini");
+                if (!File.Exists(ini)) return false;
+
+                string sectionName = MapIniSectionName(rel);
+                string wanted = "[" + sectionName + "]";
+                List<string> lines = new List<string>(File.ReadAllLines(ini, Encoding.UTF8));
+                bool changed = false;
+
+                // (1) 删段：从段名行删到下一个 '[' 之前
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    string t = lines[i] == null ? "" : lines[i].Trim();
+                    if (!string.Equals(t, wanted, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    int end = i + 1;
+                    while (end < lines.Count)
+                    {
+                        string n = lines[end] == null ? "" : lines[end].Trim();
+                        if (n.StartsWith("[")) break;
+                        end++;
+                    }
+                    lines.RemoveRange(i, end - i);
+                    changed = true;
+                    break;
+                }
+
+                // (2) 删 [MultiMaps] 里的登记行
+                int start = -1, stop = -1;
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    string t = lines[i] == null ? "" : lines[i].Trim();
+                    if (!t.StartsWith("[")) continue;
+                    if (start < 0)
+                    {
+                        if (string.Equals(t, "[MultiMaps]", StringComparison.OrdinalIgnoreCase)) start = i;
+                    }
+                    else { stop = i; break; }
+                }
+                if (start >= 0)
+                {
+                    if (stop < 0) stop = lines.Count;
+                    for (int i = stop - 1; i > start; i--)
+                    {
+                        string t = lines[i] == null ? "" : lines[i].Trim();
+                        int eq = t.IndexOf('=');
+                        if (eq <= 0) continue;
+                        if (string.Equals(t.Substring(eq + 1).Trim(), sectionName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            lines.RemoveAt(i);
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (changed)
+                {
+                    File.WriteAllLines(ini, lines, new UTF8Encoding(false));
+                    Log("clearmaps: 已从 INI 里移除 " + wanted);
+                }
+                return changed;
+            }
+            catch (Exception ex)
+            {
+                Log("clearmaps: 清理注册段失败(" + rel + "): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>设置页「清理已同步地图」按钮：先弹确认框，确认后才真删。</summary>
+        static void AskCleanSyncedMaps(object owner)
+        {
+            try
+            {
+                string root = SafeGetGamePath();
+                List<string> rels = LoadSyncedMapList(root);
+                if (rels.Count == 0)
+                {
+                    ShowMessageBox(topBar, "清理已同步地图", "还没有通过地图同步接收过地图。");
+                    return;
+                }
+
+                object wm = GetMember(owner, "WindowManager");
+                Type boxType = FindType("ClientGUI.XNAMessageBox");
+                if (wm == null || boxType == null) { Log("clearmaps: 弹不出确认框"); return; }
+
+                MethodInfo showYesNo = null;
+                foreach (MethodInfo mi in boxType.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                {
+                    if (mi.Name == "ShowYesNoDialog" && mi.GetParameters().Length == 3) { showYesNo = mi; break; }
+                }
+                if (showYesNo == null) { Log("clearmaps: 找不到 ShowYesNoDialog"); return; }
+
+                string text = "本机通过同步接收过 " + rels.Count + " 个地图文件，全部删除?";
+                object box = showYesNo.Invoke(null, new object[] { wm, "清理已同步地图", text });
+                if (box == null) { Log("clearmaps: 确认框创建失败"); return; }
+
+                bool okYes = SetMember(box, "YesClickedAction", MakeBoxAction(boxType, "CleanMapsYes"));
+                bool okNo = SetMember(box, "NoClickedAction", MakeBoxAction(boxType, "CleanMapsNo"));
+                if (!okYes || !okNo)
+                {
+                    Log("clearmaps: 按钮动作绑定失败，关掉确认框");
+                    try { CallMethod(box, "Hide"); } catch { }
+                }
+            }
+            catch (Exception ex) { Log("clearmaps: 失败: " + ex.Message); }
+        }
+
+        static void CleanMapsYes(object box)
+        {
+            try { CallMethod(box, "Hide"); } catch { }
+            CleanSyncedMaps();
+        }
+
+        static void CleanMapsNo(object box)
+        {
+            try { CallMethod(box, "Hide"); } catch { }
+            Log("clearmaps: 用户取消");
+        }
+
+        static void CleanSyncedMaps()
+        {
+            try
+            {
+                string root = SafeGetGamePath();
+                List<string> rels = LoadSyncedMapList(root);
+                if (rels.Count == 0) return;
+
+                int files = 0, failed = 0, maps = 0;
+
+                foreach (string rel in rels)
+                {
+                    string ext = Path.GetExtension(rel) ?? "";
+                    if (ext.Equals(".map", StringComparison.OrdinalIgnoreCase)
+                        || ext.Equals(".mpr", StringComparison.OrdinalIgnoreCase)
+                        || ext.Equals(".yrm", StringComparison.OrdinalIgnoreCase))
+                        maps++;
+
+                    if (DeleteSyncedFile(root, rel)) files++;
+                    else failed++;
+                }
+
+                try { File.Delete(SyncedMapListPath(root)); } catch { }
+
+                Log("clearmaps: 删除 " + files + " 个文件 / " + maps + " 张地图，失败 " + failed);
+                ShowMessageBox(topBar, "清理已同步地图",
+                    "已删除 " + files + " 个文件（" + maps + " 张地图）"
+                    + (failed > 0 ? "，" + failed + " 个删除失败（可能被占用）" : "")
+                    + "。\n\n地图列表要重启客户端后才会更新。");
+            }
+            catch (Exception ex) { Log("clearmaps: 清理失败: " + ex.Message); }
+        }
+
+        /// <summary>删一个同步来的文件（连同 .mosync-part、INI 注册段、空目录）。</summary>
+        static bool DeleteSyncedFile(string root, string rel)
+        {
+            try
+            {
+                string full = Path.Combine(root, rel);
+                bool ok = true;
+
+                try { if (File.Exists(full + ".mosync-part")) File.Delete(full + ".mosync-part"); } catch { }
+                if (File.Exists(full))
+                {
+                    try { File.Delete(full); }
+                    catch (Exception ex) { ok = false; Log("clearmaps: 删除失败 " + rel + ": " + ex.Message); }
+                }
+
+                string ext = Path.GetExtension(rel) ?? "";
+                if (ext.Equals(".map", StringComparison.OrdinalIgnoreCase)
+                    || ext.Equals(".mpr", StringComparison.OrdinalIgnoreCase)
+                    || ext.Equals(".yrm", StringComparison.OrdinalIgnoreCase))
+                    RemoveMapIniSection(root, rel);
+
+                // 顺手删掉因为同步而建出来的空目录（只删空目录，删不掉就留着）
+                string dir = Path.GetDirectoryName(full);
+                while (!string.IsNullOrEmpty(dir) && dir.Length > root.Length
+                       && dir.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        if (Directory.GetFileSystemEntries(dir).Length > 0) break;
+                        Directory.Delete(dir);
+                    }
+                    catch { break; }
+                    dir = Path.GetDirectoryName(dir);
+                }
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                Log("clearmaps: 删除失败 " + rel + ": " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>从清单里去掉一行的相对路径。</summary>
+        static void RemoveSyncedMapEntry(string root, string rel)
+        {
+            try
+            {
+                string file = SyncedMapListPath(root);
+                if (!File.Exists(file)) return;
+
+                List<string> keep = new List<string>();
+                foreach (string raw in File.ReadAllLines(file, Encoding.UTF8))
+                {
+                    string s = (raw ?? "").Trim();
+                    if (s.Length == 0) continue;
+                    if (string.Equals(s, rel, StringComparison.OrdinalIgnoreCase)) continue;
+                    keep.Add(s);
+                }
+                File.WriteAllLines(file, keep.ToArray(), new UTF8Encoding(false));
+            }
+            catch (Exception ex) { Log("clearmaps: 更新清单失败: " + ex.Message); }
+        }
+
+        // ---------------- 设置窗口「地图」页：已同步地图清单 ----------------
+
+        static object mapTabPanel;
+        static object mapTabList;
+        static readonly List<string> mapTabRels = new List<string>();
+        static DateTime lastMapTabRefresh = DateTime.MinValue;
+
+        static void BuildMapTab(object win, object panel)
+        {
+            try
+            {
+                object wm = GetMember(win, "WindowManager");
+                if (wm == null) { Log("clearmaps: 拿不到 WindowManager"); return; }
+                MethodInfo addChild = FindMethod(panel.GetType(), "AddChild", 1);
+                if (addChild == null) return;
+
+                int pw = GetInt(panel, "Width", 552);
+                int ph = GetInt(panel, "Height", 342);
+                if (pw < 300) pw = 552;
+                if (ph < 200) ph = 342;
+
+                // 说明文字
+                Type lblType = FindType("Rampastring.XNAUI.XNAControls.XNALabel");
+                if (lblType != null)
+                {
+                    object lbl = Activator.CreateInstance(lblType, new object[] { wm });
+                    SetMember(lbl, "Name", "lblMoMapTabHint");
+                    SetMember(lbl, "Text", "本机通过「同步地图」接收到的文件（只删这些，自己的地图不受影响）");
+                    SetMember(lbl, "X", 16);
+                    SetMember(lbl, "Y", 12);
+                    addChild.Invoke(panel, new object[] { lbl });
+                }
+
+                // 清单
+                Type listType = FindType("Rampastring.XNAUI.XNAControls.XNAMultiColumnListBox");
+                if (listType == null) { Log("clearmaps: 找不到 XNAMultiColumnListBox"); return; }
+
+                object list = Activator.CreateInstance(listType, new object[] { wm });
+                SetMember(list, "Name", "lbMoMapTab");
+                SetMember(list, "X", 16);
+                SetMember(list, "Y", 40);
+                SetMember(list, "Width", pw - 32);
+                SetMember(list, "Height", ph - 40 - 44);
+                addChild.Invoke(panel, new object[] { list });
+
+                MethodInfo addCol = listType.GetMethod("AddColumn", new Type[] { typeof(string), typeof(int) });
+                if (addCol != null)
+                {
+                    int lw = pw - 32;
+                    addCol.Invoke(list, new object[] { "文件", lw * 42 / 100 });
+                    addCol.Invoke(list, new object[] { "大小", lw * 16 / 100 });
+                    addCol.Invoke(list, new object[] { "位置", lw * 42 / 100 });
+                }
+                mapTabList = list;
+                ApplyListAccent(list);
+
+                // 按钮：外观照抄设置窗口自己的「保存」按钮，位置按它的实际尺寸排
+                object refBtn = FindControl(win, "btnSave") ?? FindControl(win, "btnCancel");
+                int bw = GetInt(refBtn, "Width", 92);
+                int bh = GetInt(refBtn, "Height", 25);
+                if (bw <= 0) bw = 92;
+                if (bh <= 0) bh = 25;
+                int by = ph - bh - 10;
+                int bx = 16;
+                AddOptionButton(panel, wm, refBtn, "btnMoMapOpen", "打开目录", bx, by, bw, bh, "OnMapTabOpenFolder"); bx += bw + 8;
+                AddOptionButton(panel, wm, refBtn, "btnMoMapPreview", "看预览", bx, by, bw, bh, "OnMapTabPreview"); bx += bw + 8;
+                AddOptionButton(panel, wm, refBtn, "btnMoMapDeleteSel", "删除选中", bx, by, bw, bh, "OnMapTabDeleteSel"); bx += bw + 8;
+                AddOptionButton(panel, wm, refBtn, "btnMoMapDeleteAll", "全部删除", bx, by, bw, bh, "OnMapTabDeleteAll"); bx += bw + 8;
+                AddOptionButton(panel, wm, refBtn, "btnMoMapRefresh", "刷新", bx, by, bw, bh, "OnMapTabRefresh");
+
+                mapTabPanel = panel;
+                RefreshMapTab(true);
+                Log("options: 「地图」页已就绪");
+            }
+            catch (Exception ex) { Log("clearmaps: 建地图页失败: " + ex.Message); }
+        }
+
+        static void RefreshMapTab(bool force)
+        {
+            try
+            {
+                if (mapTabList == null) return;
+                if (!force && (DateTime.Now - lastMapTabRefresh).TotalMilliseconds < 700) return;
+                lastMapTabRefresh = DateTime.Now;
+
+                string root = SafeGetGamePath();
+                List<string> rels = LoadSyncedMapList(root);
+
+                MethodInfo clear = FindMethod(mapTabList.GetType(), "ClearItems", 0);
+                if (clear != null) clear.Invoke(mapTabList, null);
+                mapTabRels.Clear();
+
+                MethodInfo addItem = mapTabList.GetType().GetMethod("AddItem", new Type[] { typeof(string[]), typeof(bool) });
+                if (addItem == null) { Log("clearmaps: 找不到 AddItem(string[])"); return; }
+
+                foreach (string rel in rels)
+                {
+                    string name = Path.GetFileName(rel);
+                    string dir = Path.GetDirectoryName(rel) ?? "";
+                    long size = 0;
+                    try
+                    {
+                        FileInfo fi = new FileInfo(Path.Combine(root, rel.Replace('/', '\\')));
+                        if (fi.Exists) size = fi.Length;
+                    }
+                    catch { }
+                    addItem.Invoke(mapTabList, new object[] { new string[] { name, FormatSize(size), dir }, true });
+                    mapTabRels.Add(rel);
+                }
+                if (rels.Count == 0)
+                    addItem.Invoke(mapTabList, new object[] { new string[] { "（还没有同步接收过地图）", "", "" }, true });
+            }
+            catch (Exception ex) { Log("clearmaps: 刷新列表失败: " + ex.Message); }
+        }
+
+        /// <summary>设置窗口开着「地图」页时每帧调一次（内部有 700ms 节流）。</summary>
+        static void MapTabTick()
+        {
+            try
+            {
+                if (mapTabPanel == null || mapTabList == null) return;
+                object vis = GetMember(mapTabPanel, "Visible");
+                if (!(vis is bool) || !(bool)vis) return;
+                RefreshMapTab(false);
+            }
+            catch { }
+        }
+
+        static void OnMapTabDeleteSel(object sender, EventArgs e) { DeleteSelectedSyncedMap(); }
+
+        static void OnMapTabDeleteAll(object sender, EventArgs e)
+        {
+            AskCleanSyncedMaps(optionsPatchedWindow ?? topBar);
+            lastMapTabRefresh = DateTime.MinValue;      // 让下一帧重画
+        }
+
+        static void OnMapTabRefresh(object sender, EventArgs e) { RefreshMapTab(true); }
+
+        static string MapTabSelectedFull()
+        {
+            if (mapTabList == null) return null;
+            int idx = GetInt(mapTabList, "SelectedIndex", -1);
+            if (idx < 0 || idx >= mapTabRels.Count) return null;
+            string root = SafeGetGamePath();
+            if (string.IsNullOrEmpty(root)) return null;
+            string full = Path.Combine(root, mapTabRels[idx].Replace('/', '\\'));
+            return File.Exists(full) ? full : null;
+        }
+
+        /// <summary>在资源管理器里选中这一行对应的文件。</summary>
+        static void OnMapTabOpenFolder(object sender, EventArgs e)
+        {
+            try
+            {
+                string full = MapTabSelectedFull();
+                if (full == null) { Log("clearmaps: 打开目录时没有选中有效文件"); return; }
+                Process.Start("explorer.exe", "/select,\"" + full + "\"");
+            }
+            catch (Exception ex) { Log("clearmaps: 打开目录失败: " + ex.Message); }
+        }
+
+        /// <summary>用系统默认看图工具打开同名预览图（没有就提示）。</summary>
+        static void OnMapTabPreview(object sender, EventArgs e)
+        {
+            try
+            {
+                string full = MapTabSelectedFull();
+                if (full == null) { Log("clearmaps: 看预览时没有选中有效文件"); return; }
+
+                string png = Path.ChangeExtension(full, ".png");
+                if (!File.Exists(png))
+                {
+                    Log("clearmaps: 没有预览图 " + Path.GetFileName(png));
+                    return;
+                }
+                Process.Start(png);
+            }
+            catch (Exception ex) { Log("clearmaps: 看预览失败: " + ex.Message); }
+        }
+
+        static void DeleteSelectedSyncedMap()
+        {
+            try
+            {
+                if (mapTabList == null) return;
+
+                int idx = GetInt(mapTabList, "SelectedIndex", -1);
+                if (idx < 0 || idx >= mapTabRels.Count)
+                {
+                    Log("clearmaps: 没有选中任何一行");
+                    return;
+                }
+
+                string rel = mapTabRels[idx];
+                string root = SafeGetGamePath();
+                DeleteSyncedFile(root, rel);
+                RemoveSyncedMapEntry(root, rel);
+                Log("clearmaps: 已删除选中 " + rel);
+                RefreshMapTab(true);
+            }
+            catch (Exception ex) { Log("clearmaps: 删除选中失败: " + ex.Message); }
         }
 
         // ---------------- 房主侧发送 ----------------
@@ -5154,20 +10838,36 @@ namespace MoLanRelay
                 }
 
                 List<int> idx = new List<int>();
-                foreach (string s in p[1].Split(','))
+                Dictionary<int, long> offs = new Dictionary<int, long>();
+                foreach (string raw in p[1].Split(','))
                 {
-                    int v;
-                    if (int.TryParse(s, out v) && v >= 0 && v < job.Files.Count) idx.Add(v);
+                    string s = (raw ?? "").Trim();
+                    if (s.Length == 0) continue;
+
+                    int colon = s.IndexOf(':');
+                    int v; long off = 0;
+                    if (colon > 0)
+                    {
+                        if (!int.TryParse(s.Substring(0, colon), out v)) continue;
+                        long.TryParse(s.Substring(colon + 1), out off);
+                    }
+                    else if (!int.TryParse(s, out v)) continue;
+
+                    if (v < 0 || v >= job.Files.Count) continue;
+                    idx.Add(v);
+                    if (off > 0) offs[v] = off;
                 }
                 if (idx.Count == 0) return;
 
-                Log("mapsync: " + from + " 请求 " + idx.Count + " 个文件，开始发送");
-                SendMapTo(lobby, from, job, idx);
+                Log("mapsync: " + from + " 请求 " + idx.Count + " 个文件，开始发送"
+                    + (offs.Count > 0 ? "（" + offs.Count + " 个断点续传）" : ""));
+                SendMapTo(lobby, from, job, idx, offs);
             }
             catch (Exception ex) { Log("mapsync: 处理请求失败: " + ex.Message); }
         }
 
-        static void SendMapTo(object lobby, string target, MapJob job, List<int> idx)
+        static void SendMapTo(object lobby, string target, MapJob job, List<int> idx,
+                              Dictionary<int, long> offs)
         {
             Thread t = new Thread(delegate()
             {
@@ -5175,12 +10875,19 @@ namespace MoLanRelay
                 {
                     string root = SafeGetGamePath();
                     int done = 0;
+                    Stopwatch sw = Stopwatch.StartNew();   // 用来算实际速度（KB/s），排查慢的时候看日志
 
                     mapSyncCancelRequested = false;
                     mapSyncTxActive = true;
                     mapSyncTxBytes = 0;
                     mapSyncTxTotal = 0;
-                    foreach (int i in idx) mapSyncTxTotal += job.Files[i].Size;
+                    foreach (int i in idx)
+                    {
+                        long t = job.Files[i].PackedSize > 0 ? job.Files[i].PackedSize : job.Files[i].Size;
+                        long have = 0;
+                        if (offs != null) offs.TryGetValue(i, out have);
+                        mapSyncTxTotal += Math.Max(0, t - have);
+                    }
 
                     foreach (int i in idx)
                     {
@@ -5194,8 +10901,22 @@ namespace MoLanRelay
                             continue;
                         }
 
-                        byte[] data = File.ReadAllBytes(full);
+                        // 有压好的就用压好的；这一单没缓存（比如换了图）就现压一次
+                        byte[] data;
+                        if (f.PackedSize > 0 && f.Packed != null) data = f.Packed;
+                        else if (f.PackedSize > 0) data = Deflate(File.ReadAllBytes(full));
+                        else data = File.ReadAllBytes(full);
+
+                        // 断点续传：客机说已经收到 off 字节了，从这里接着发
                         int off = 0;
+                        long startOff = 0;
+                        if (offs != null) offs.TryGetValue(i, out startOff);
+                        if (startOff > 0)
+                        {
+                            if (startOff >= data.Length) off = data.Length;
+                            else { off = (int)startOff; Log("mapsync: 从 " + off + " B 处续传 " + f.Rel); }
+                        }
+
                         while (off < data.Length)
                         {
                             if (mapSyncCancelRequested) break;
@@ -5203,13 +10924,15 @@ namespace MoLanRelay
                             int n = data.Length - off;
                             if (n > MapChunkBytes) n = MapChunkBytes;
 
-                            string chunk = Convert.ToBase64String(data, off, n);
-                            string payload = job.Id + MapField + i + MapField + off + MapField + chunk;
+                            string chunk = ToBase91(data, off, n);
+                            // 多带一个 len，客机按它精确还原（Ascii85 末尾组是变长的）
+                            string payload = job.Id + MapField + i + MapField + off + MapField + n
+                                             + MapField + chunk;
                             SendCtrlTo(lobby, target, CtrlFrame(MapDataKind, payload));
 
                             off += n;
                             mapSyncTxBytes += n;
-                            Thread.Sleep(MapChunkDelayMs);
+                            if (MapChunkDelayMs > 0) Thread.Sleep(MapChunkDelayMs);
                         }
                         if (mapSyncCancelRequested) break;
 
@@ -5219,11 +10942,16 @@ namespace MoLanRelay
                     mapSyncTxActive = false;
                     SendCtrlTo(lobby, target, CtrlFrame(MapEndKind, job.Id + MapField + done));
 
+                    double secs = sw.Elapsed.TotalSeconds;
+                    double kbps = secs > 0.001 ? (mapSyncTxBytes / 1024.0 / secs) : 0;
+
                     string msg = mapSyncCancelRequested
                         ? "地图同步已取消（已发 " + done + " 个）"
                         : "地图文件已发送给 " + target + "（" + done + " 个）";
                     PostUi(delegate { Notice(lobby, msg, true); });
-                    Log("mapsync: 发送结束 " + done + "/" + idx.Count + " cancel=" + mapSyncCancelRequested);
+                    Log("mapsync: 发送结束 " + done + "/" + idx.Count + " cancel=" + mapSyncCancelRequested
+                        + " 用时=" + secs.ToString("0.0") + "s 速度=" + kbps.ToString("0") + " KB/s"
+                        + " 分片=" + MapChunkBytes + "B");
                 }
                 catch (Exception ex) { Log("mapsync: 发送失败: " + ex.Message); }
             });
@@ -5238,7 +10966,7 @@ namespace MoLanRelay
         // ==================================================================
 
         static bool autoReadyEnabled = true;
-        static bool chatTimestampEnabled = true;
+        static bool dupNameWarnEnabled = true;
         static object autoReadyLobby;
         static string lastNameSignature;
         static volatile bool mapSyncTxActive;
@@ -5248,6 +10976,7 @@ namespace MoLanRelay
         static long mapSyncTxTotal;
         static long mapSyncRxBytes;
         static long mapSyncRxTotal;
+        static DateTime mapSyncRxStartedAt = DateTime.MinValue;
 
         /// <summary>由 LANGameLobby::SendChatMessage 的补丁调用（大厅里自己敲的每一句都先过这里）。
         /// 返回 true 表示这条消息已被当成命令处理，不要再发出去。</summary>
@@ -5269,16 +10998,707 @@ namespace MoLanRelay
                     StartMapSync(lobby);
                     return true;
                 }
+                if (string.Equals(cmd, "/maps", StringComparison.OrdinalIgnoreCase))
+                {
+                    ListMapsForChat(lobby);
+                    return true;
+                }
+                if (cmd.StartsWith("/push", StringComparison.OrdinalIgnoreCase))
+                {
+                    string arg = cmd.Substring(5).Trim();
+                    PushMapsByIndex(lobby, arg);
+                    return true;
+                }
                 if (string.Equals(cmd, "/help", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(cmd, "/?", StringComparison.OrdinalIgnoreCase))
                 {
-                    Notice(lobby, "可用命令：/diag 导出诊断包　/sync 同步当前地图", true);
+                    Notice(lobby, "命令：/diag 诊断包　/sync 同步当前地图　/maps 列地图库　/push 1,3,5 批量推送", true);
+                    Notice(lobby, "　　　/w 玩家 内容 私聊　/r 内容 回复私聊　/me 动作 表情动作　/room 复制房间信息", true);
+                    Notice(lobby, "　　　/q 预设快捷语（/q 序号 发送）　/motd 房间公告（房主）", true);
+                    Notice(lobby, "小游戏：/dice [面数] 骰子　/coin 硬币　/rps 石头|剪刀|布　/8ball 问题", true);
+                    Notice(lobby, "快捷语：/gg /gl /hf /afk /brb /wait /1 /2 /3", true);
                     return true;
+                }
+
+                // ---------------- 私聊 ----------------
+                if (cmd.StartsWith("/w ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string rest = cmd.Substring(3).Trim();
+                    int sp = rest.IndexOf(' ');
+                    if (sp <= 0) { Notice(lobby, "用法：/w 玩家名 内容", false); return true; }
+                    SendPrivate(lobby, rest.Substring(0, sp).Trim(), rest.Substring(sp + 1).Trim());
+                    return true;
+                }
+                if (cmd.StartsWith("/r ", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrEmpty(lastPmFrom)) { Notice(lobby, "还没有人私聊你，没有可回复的对象", false); return true; }
+                    SendPrivate(lobby, lastPmFrom, cmd.Substring(3).Trim());
+                    return true;
+                }
+
+                // ---------------- 表情动作 ----------------
+                if (cmd.StartsWith("/me ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string act = cmd.Substring(4).Trim();
+                    if (act.Length == 0) { Notice(lobby, "用法：/me 动作", false); return true; }
+                    BroadcastChat(lobby, "* " + MyPlayerName() + " " + act);
+                    return true;
+                }
+
+                // ---------------- 房间信息 ----------------
+                if (string.Equals(cmd, "/room", StringComparison.OrdinalIgnoreCase))
+                {
+                    Notice(lobby, RoomInfoText(lobby), true);
+                    return true;
+                }
+
+                // ---------------- 小游戏 ----------------
+                string low = cmd.ToLowerInvariant();
+                if (miniGamesEnabled)
+                {
+                    if (low == "/coin") { MiniCoin(lobby); return true; }
+                    if (low == "/dice" || low.StartsWith("/dice ")) { MiniDice(lobby, cmd); return true; }
+                    if (low.StartsWith("/rps ")) { MiniRps(lobby, cmd); return true; }
+                    if (low.StartsWith("/8ball ")) { Mini8Ball(lobby, cmd); return true; }
+                }
+
+                // ---------------- 房间公告 ----------------
+                if (low == "/motd" || low.StartsWith("/motd ")) { MotdCommand(lobby, cmd); return true; }
+
+                // ---------------- 预设快捷语 ----------------
+                if (low == "/q") { ListQuickTexts(lobby); return true; }
+                if (low.StartsWith("/q "))
+                {
+                    SendQuickText(lobby, cmd.Substring(3).Trim());
+                    return true;
+                }
+
+                // ---------------- 快捷语 ----------------
+                for (int i = 0; i < QuickPhrases.Length; i += 2)
+                {
+                    if (low == QuickPhrases[i]) { BroadcastChat(lobby, QuickPhrases[i + 1]); return true; }
                 }
             }
             catch (Exception ex) { Log("chatcmd: " + ex.Message); }
 
             return false;
+        }
+
+        // ---------------- 聊天增强：私聊 / 表情动作 / 快捷语 / 房间信息 ----------------
+
+        static string lastPmFrom = "";   // 最后一个私聊我的人，/r 用它
+
+        static readonly string[] QuickPhrases =
+        {
+            "/gg",   "GG（打得好）",
+            "/gl",   "GL HF（好运）",
+            "/hf",   "HF（玩得开心）",
+            "/afk",  "AFK（我离开一下）",
+            "/brb",  "马上回来",
+            "/wait", "等我一下",
+            "/1",    "上",
+            "/2",    "撤",
+            "/3",    "这里需要支援",
+        };
+
+        // ---------------- 预设快捷语（与 MOExperience 的 QuickText 互通） ----------------
+        //
+        // MOExperience 把预设文本存在 MOExperience.ini 的 [MsgText] QuickText 里，用 \n 分隔。
+        // 我们在客户端大厅做同一件事：内置几条 MO 常用语，如果游戏目录里有那个 ini，
+        // 就把它的预设合并进来 —— 装了拓展的玩家不用记两套快捷语。
+        // （只读配置文本，不含对方任何代码。）
+
+        static string[] quickTextCache;
+        static DateTime quickTextCacheAt = DateTime.MinValue;
+        static string quickTextSource = "内置";
+
+        static string[] QuickTexts()
+        {
+            if (quickTextCache != null && (DateTime.Now - quickTextCacheAt).TotalSeconds < 60) return quickTextCache;
+
+            List<string> list = new List<string>
+            {
+                "我是萌新，大佬带我",
+                "禁空，不禁英雄/大碟子/机场/运输机",
+                "GG（打得好）",
+                "等我一下",
+                "这里需要支援",
+            };
+
+            string src = "内置";
+            try
+            {
+                string root = SafeGetGamePath();
+                string ini = root.Length == 0 ? "" : Path.Combine(root, "MOExperience.ini");
+                if (ini.Length > 0 && File.Exists(ini))
+                {
+                    string val = IniSectionValue(ReadTextSmart(ini), "MsgText", "QuickText");
+                    if (val.Length > 0)
+                    {
+                        src = "内置 + MOExperience.ini";
+                        foreach (string piece in val.Replace("\\n", "\n").Split('\n'))
+                        {
+                            string one = piece.Trim();
+                            if (one.Length == 0 || list.Contains(one)) continue;
+                            list.Add(one);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { Log("quicktext: 读取 MOExperience.ini 失败: " + ex.Message); }
+
+            quickTextSource = src;
+            quickTextCache = list.ToArray();
+            quickTextCacheAt = DateTime.Now;
+            return quickTextCache;
+        }
+
+        static void ListQuickTexts(object lobby)
+        {
+            try
+            {
+                string[] texts = QuickTexts();
+                Notice(lobby, "预设快捷语（/q 序号 发送，来源：" + quickTextSource + "）", true);
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < texts.Length; i++)
+                {
+                    string item = (i + 1) + "." + texts[i];
+                    if (sb.Length > 0 && sb.Length + item.Length > 80)
+                    {
+                        Notice(lobby, sb.ToString(), true);
+                        sb.Length = 0;
+                    }
+                    sb.Append(item).Append("  ");
+                }
+                if (sb.Length > 0) Notice(lobby, sb.ToString(), true);
+            }
+            catch (Exception ex) { Log("quicktext: 列表失败: " + ex.Message); }
+        }
+
+        static void SendQuickText(object lobby, string arg)
+        {
+            int n;
+            if (!int.TryParse(arg, out n))
+            {
+                Notice(lobby, "用法：/q 查看列表，/q 序号 发送", false);
+                return;
+            }
+            string[] texts = QuickTexts();
+            if (n < 1 || n > texts.Length)
+            {
+                Notice(lobby, "没有第 " + n + " 条（共 " + texts.Length + " 条），/q 查看列表", false);
+                return;
+            }
+            BroadcastChat(lobby, texts[n - 1]);
+        }
+
+        /// <summary>按字节读文本：有 BOM 认 BOM，没有就按严格 UTF-8 试，失败再按系统 ANSI（中文 GBK）。</summary>
+        static string ReadTextSmart(string path)
+        {
+            byte[] b = File.ReadAllBytes(path);
+            if (b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF)
+                return Encoding.UTF8.GetString(b, 3, b.Length - 3);
+            try { return new UTF8Encoding(false, true).GetString(b); }
+            catch { return Encoding.Default.GetString(b); }
+        }
+
+        /// <summary>取指定节下某个键的值（跳过行尾 ';' 注释）。</summary>
+        static string IniSectionValue(string text, string section, string key)
+        {
+            bool inSection = false;
+            foreach (string raw in text.Split('\n'))
+            {
+                string line = raw.Trim();
+                if (line.Length == 0 || line[0] == ';') continue;
+                if (line[0] == '[')
+                {
+                    inSection = string.Equals(line.Trim('[', ']').Trim(), section, StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+                if (!inSection) continue;
+                int eq = line.IndexOf('=');
+                if (eq <= 0) continue;
+                if (!string.Equals(line.Substring(0, eq).Trim(), key, StringComparison.OrdinalIgnoreCase)) continue;
+                string v = line.Substring(eq + 1);
+                int semi = v.IndexOf(';');
+                if (semi >= 0) v = v.Substring(0, semi);
+                return v.Trim();
+            }
+            return "";
+        }
+
+        static void OnPrivateMessage(object lobby, string from, string body)
+        {
+            try
+            {
+                string who = string.IsNullOrEmpty(from) ? "有人" : from;
+                lastPmFrom = who;
+                Notice(lobby, who + "（私聊）：" + body, true);
+                Log("pm: 收到 " + who + " 的私聊");
+            }
+            catch (Exception ex) { Log("pm: 显示失败: " + ex.Message); }
+        }
+
+        static void SendPrivate(object lobby, string to, string body)
+        {
+            SendPrivate(lobby, to, body, true);
+        }
+
+        /// <summary>quiet=false 时不打本地回显（房间公告自动下发用，免得房主聊天区被刷）。</summary>
+        static void SendPrivate(object lobby, string to, string body, bool quiet)
+        {
+            try
+            {
+                if (lobby == null) return;
+                to = Clean(to);
+                if (to.Length == 0) { Notice(lobby, "私聊目标为空", false); return; }
+                if (SameName(to, MyPlayerName())) { Notice(lobby, "不能私聊自己", false); return; }
+
+                string payload = to + MapField + body;
+                if (IsHostOf(lobby))
+                {
+                    if (FindPlayerIn(lobby, to) == null)
+                    {
+                        Notice(lobby, "找不到玩家「" + to + "」（名字要完全一致）", false);
+                        return;
+                    }
+                    SendCtrlTo(lobby, to, CtrlFrame(PmKind, payload));
+                }
+                else SendCtrlTo(lobby, "", CtrlFrame(PmKind, payload));
+
+                if (quiet) Notice(lobby, "→ " + to + "（私聊）：" + body, true);
+            }
+            catch (Exception ex) { Log("pm: 发送失败: " + ex.Message); }
+        }
+
+        /// <summary>给所有人发一条聊天消息（复用客户端的 GLCHAT 广播）。</summary>
+        static void BroadcastChat(object lobby, string text)
+        {
+            try
+            {
+                if (lobby == null) return;
+                MethodInfo bm = FindMethod(lobby.GetType(), "BroadcastMessage", 1);
+                if (bm != null && bm.GetParameters()[0].ParameterType == typeof(string))
+                    bm.Invoke(lobby, new object[] { "GLCHAT System\u00010\u0001" + text });
+                Notice(lobby, text, false);
+            }
+            catch (Exception ex) { Log("chat: 广播失败: " + ex.Message); }
+        }
+
+        // ------------------------------------------------------------------
+        // 小游戏
+        //
+        // 纯聊天命令，不碰任何协议之外的东西，结果用 BroadcastChat 发出去，
+        // 房间里装没装补丁的人都看得到。
+        // ------------------------------------------------------------------
+
+        static readonly Random rng = new Random(Environment.TickCount);
+
+        static int RandRange(int min, int maxInclusive)
+        {
+            lock (rng) { return rng.Next(min, maxInclusive + 1); }
+        }
+
+        static void MiniCoin(object lobby)
+        {
+            try
+            {
+                string side = RandRange(0, 1) == 0 ? "正面" : "反面";
+                BroadcastChat(lobby, "【硬币】" + MyPlayerName() + " 抛出：" + side + "！");
+            }
+            catch (Exception ex) { Log("game: 硬币失败: " + ex.Message); }
+        }
+
+        static void MiniDice(object lobby, string cmd)
+        {
+            try
+            {
+                // /dice 或 /dice 20（面数）
+                int faces = 100;
+                string arg = cmd.Length > 5 ? cmd.Substring(5).Trim() : "";
+                if (arg.Length > 0)
+                {
+                    int n;
+                    if (!int.TryParse(arg, out n) || n < 2 || n > 10000)
+                    {
+                        Notice(lobby, "用法：/dice 或 /dice 面数（2~10000）", false);
+                        return;
+                    }
+                    faces = n;
+                }
+                int v = RandRange(1, faces);
+                BroadcastChat(lobby, "【骰子】" + MyPlayerName() + " 掷出 1d" + faces + "：" + v);
+            }
+            catch (Exception ex) { Log("game: 骰子失败: " + ex.Message); }
+        }
+
+        static void MiniRps(object lobby, string cmd)
+        {
+            try
+            {
+                string pick = cmd.Length > 5 ? cmd.Substring(5).Trim() : "";
+                // 石头 剪刀 布 / 也认 R S P
+                int mine = -1;
+                if (pick == "石头" || pick == "剪刀" || pick == "布")
+                    mine = pick == "石头" ? 0 : (pick == "剪刀" ? 1 : 2);
+                else if (pick.Equals("r", StringComparison.OrdinalIgnoreCase)) mine = 0;
+                else if (pick.Equals("s", StringComparison.OrdinalIgnoreCase)) mine = 1;
+                else if (pick.Equals("p", StringComparison.OrdinalIgnoreCase)) mine = 2;
+
+                if (mine < 0)
+                {
+                    Notice(lobby, "用法：/rps 石头|剪刀|布（也可以 r|s|p）", false);
+                    return;
+                }
+
+                string[] names = { "石头", "剪刀", "布" };
+                int other = RandRange(0, 2);
+                string result;
+                if (mine == other) result = "平局";
+                else if ((mine + 1) % 3 == other) result = "你（" + MyPlayerName() + "）赢";
+                else result = "房间赢";
+
+                BroadcastChat(lobby, "【猜拳】" + MyPlayerName() + " 出 " + names[mine]
+                    + "，房间出 " + names[other] + " → " + result);
+            }
+            catch (Exception ex) { Log("game: 猜拳失败: " + ex.Message); }
+        }
+
+        static readonly string[] EightBallAnswers =
+        {
+            "肯定是的", "看起来不错", "八成会成", "可以试试", "先别急着定",
+            "再想想吧", "不太好说", "别指望了", "基本没戏", "完全不行",
+        };
+
+        static void Mini8Ball(object lobby, string cmd)
+        {
+            try
+            {
+                string q = cmd.Length > 7 ? cmd.Substring(7).Trim() : "";
+                if (q.Length == 0)
+                {
+                    Notice(lobby, "用法：/8ball 你的问题", false);
+                    return;
+                }
+                string ans = EightBallAnswers[RandRange(0, EightBallAnswers.Length - 1)];
+                BroadcastChat(lobby, "【问答】" + MyPlayerName() + " 问：" + q + " → " + ans);
+            }
+            catch (Exception ex) { Log("game: 问答失败: " + ex.Message); }
+        }
+
+        // ------------------------------------------------------------------
+        // 房间公告（MOTD）
+        //
+        // 房主用 /motd 设置一段文字，存在内存里；有人进房时房主自动私发给他。
+        // 不走广播，免得每次有人进来所有人的聊天区都被刷一遍。
+        // ------------------------------------------------------------------
+
+        static string roomMotd = "";
+        static readonly HashSet<string> motdSentTo = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        static void MotdCommand(object lobby, string cmd)
+        {
+            try
+            {
+                if (!motdEnabled)
+                {
+                    Notice(lobby, "房间公告已在设置里关闭", false);
+                    return;
+                }
+
+                string arg = cmd.Length > 5 ? cmd.Substring(5).Trim() : "";
+
+                if (!IsHostOf(lobby))
+                {
+                    // 客机：查看当前公告
+                    if (roomMotd.Length == 0) Notice(lobby, "房主还没设置房间公告", true);
+                    else Notice(lobby, "【房间公告】" + roomMotd, true);
+                    return;
+                }
+
+                if (arg.Length == 0)
+                {
+                    Notice(lobby, roomMotd.Length == 0
+                        ? "用法：/motd 内容（设为空则清除）"
+                        : "当前公告：" + roomMotd + "　（/motd - 清除）", true);
+                    return;
+                }
+
+                if (arg == "-" || arg == "清除")
+                {
+                    roomMotd = "";
+                    motdSentTo.Clear();
+                    Notice(lobby, "房间公告已清除", true);
+                    Log("motd: 已清除");
+                    return;
+                }
+
+                if (arg.Length > 200) arg = arg.Substring(0, 200);
+                roomMotd = arg;
+                motdSentTo.Clear();
+                Notice(lobby, "房间公告已设置：" + arg, true);
+                Log("motd: 已设置");
+            }
+            catch (Exception ex) { Log("motd: 失败: " + ex.Message); }
+        }
+
+        /// <summary>有人进房时把公告私发给他一次（只有房主做）。</summary>
+        static void MotdTick(object lobby, IList players, bool host)
+        {
+            try
+            {
+                if (!motdEnabled || !host || roomMotd.Length == 0 || players == null) return;
+
+                foreach (object o in players)
+                {
+                    LANPlayerInfo lp = o as LANPlayerInfo;
+                    if (lp == null) continue;
+                    string name = Clean(lp.Name);
+                    if (name.Length == 0) continue;
+                    if (SameName(name, MyPlayerName())) continue;
+                    if (!motdSentTo.Add(name)) continue;
+
+                    SendPrivate(lobby, name, "【房间公告】" + roomMotd, false);
+                    Log("motd: 已发给 " + name);
+                }
+            }
+            catch (Exception ex) { Log("motd: tick 失败: " + ex.Message); }
+        }
+
+        /// <summary>把当前房间的要点拼成一行，方便复制给朋友。</summary>
+        static string RoomInfoText(object lobby)
+        {
+            try
+            {
+                string map = "";
+                object m = GetMember(lobby, "Map");
+                if (m == null)
+                {
+                    object gm = GetMember(lobby, "GameModeMap");
+                    if (gm != null) m = GetMember(gm, "Map");
+                }
+                if (m != null) map = Convert.ToString(GetMember(m, "Name"));
+
+                object gm2 = GetMember(lobby, "GameMode");
+                string mode = gm2 == null ? "" : Convert.ToString(gm2);
+
+                IList list = GetMember(lobby, "Players") as IList;
+                StringBuilder sb = new StringBuilder();
+                if (list != null)
+                {
+                    object[] arr = new object[list.Count];
+                    try { list.CopyTo(arr, 0); } catch { arr = new object[0]; }
+                    foreach (object o in arr)
+                    {
+                        LANPlayerInfo lp = o as LANPlayerInfo;
+                        if (lp == null) continue;
+                        if (sb.Length > 0) sb.Append("、");
+                        sb.Append(Clean(lp.Name));
+                    }
+                }
+
+                return "房间：" + (mode.Length > 0 ? mode + " / " : "") + (map.Length > 0 ? map : "未选图")
+                     + "　玩家（" + (list == null ? 0 : list.Count) + "）：" + sb.ToString();
+            }
+            catch (Exception ex) { return "拿不到房间信息: " + ex.Message; }
+        }
+
+        // ---------------- 多图批量同步（聊天命令 /maps + /push） ----------------
+
+        /// <summary>
+        /// 扫描本机地图库。自定义图不一定在 Maps\Custom —— 很多人直接丢进 MapsMO\Defend，
+        /// 也可能在根目录下别的文件夹，所以默认把根目录下所有「不像系统目录」的都扫一遍；
+        /// 只有明确选「只 Maps\Custom」时才缩到那一个目录。
+        /// </summary>
+        static List<string> ScanMapLibrary(string root, bool customOnly)
+        {
+            List<string> list = new List<string>();
+            try
+            {
+                // 兜底：如果传进来的不是「含 MapsMO / Maps 的那一层」，往上找一级
+                root = MapLibraryRoot(root);
+                if (string.IsNullOrEmpty(root))
+                {
+                    Log("mapsync: 扫描失败：拿不到游戏根目录");
+                    return list;
+                }
+
+                lastScanRoot = root;
+                string[] roots;
+                {
+                    // customOnly = 默认模式：扫所有地图目录，但隐藏 MO 自带的 MapsMO
+                    List<string> ds = new List<string>();
+                    foreach (string d in Directory.GetDirectories(root))
+                    {
+                        string nm = Path.GetFileName(d);
+                        if (nm.Length == 0 || nm.StartsWith("_")) continue;
+                        if (string.Equals(nm, "Client", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(nm, "Resources", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(nm, "Saved Games", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(nm, "Screenshots", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(nm, "debug", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        ds.Add(nm);
+                    }
+                    roots = ds.ToArray();
+                }
+
+                foreach (string r in roots)
+                {
+                    string dir = Path.Combine(root, r);
+                    if (!Directory.Exists(dir)) continue;
+                    foreach (string f in Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories))
+                    {
+                        string ext = Path.GetExtension(f).ToLowerInvariant();
+                        if (ext != ".map" && ext != ".mpr" && ext != ".yrm") continue;
+
+                        string rel = RelativeToRoot(f, root);
+                        if (string.IsNullOrEmpty(rel)) continue;
+                        if (customOnly && IsOfficialMap(rel)) continue;   // 默认只看第三方图
+
+                        bool dup = false;
+                        foreach (string have in list)
+                            if (string.Equals(have, rel, StringComparison.OrdinalIgnoreCase)) { dup = true; break; }
+                        if (!dup) list.Add(rel);
+                    }
+                }
+                // 兜底：按目录扫一个都没找到时，直接整棵树递归找（跳过 Resources 等大目录）。
+                // 地图可能被塞在任何奇怪的位置，宁慢一点也别让列表空着。
+                if (list.Count == 0 && !customOnly)
+                {
+                    Log("mapsync: 目录扫描 0 命中，改用整树兜底扫描 root=" + root);
+                    CollectMapsRecursive(root, root, list, 0);
+                    list.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+
+                list.Sort(StringComparer.OrdinalIgnoreCase);
+                Log("mapsync: 扫描地图库 root=" + root + " customOnly=" + customOnly
+                    + " 命中=" + list.Count);
+            }
+            catch (Exception ex) { Log("mapsync: 扫描地图库失败: " + ex.Message); }
+            return list;
+        }
+
+        /// <summary>兜底：整棵树递归找地图（跳过 Resources / 存档 / 截图 / _ 备份目录）。</summary>
+        static void CollectMapsRecursive(string root, string dir, List<string> list, int depth)
+        {
+            if (depth > 6 || list.Count > 3000) return;
+            try
+            {
+                foreach (string f in Directory.GetFiles(dir))
+                {
+                    string ext = Path.GetExtension(f).ToLowerInvariant();
+                    if (ext != ".map" && ext != ".mpr" && ext != ".yrm") continue;
+
+                    string rel = RelativeToRoot(f, root);
+                    if (string.IsNullOrEmpty(rel)) continue;
+
+                    bool dup = false;
+                    foreach (string have in list)
+                        if (string.Equals(have, rel, StringComparison.OrdinalIgnoreCase)) { dup = true; break; }
+                    if (!dup) list.Add(rel);
+                }
+
+                foreach (string d in Directory.GetDirectories(dir))
+                {
+                    string nm = Path.GetFileName(d);
+                    if (nm.Length == 0 || nm.StartsWith("_")) continue;
+                    if (string.Equals(nm, "Resources", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(nm, "Saved Games", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(nm, "Screenshots", StringComparison.OrdinalIgnoreCase)) continue;
+                    CollectMapsRecursive(root, d, list, depth + 1);
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 判断一张图是不是 MO 官方图。用目录区分：官方那三套在 MapsMO\Standard /
+        /// MapsMO\Challenge / MapsMO\Cooperative；玩家自己加到 MapsMO\Defend 或其它目录的算第三方。
+        /// </summary>
+        static bool IsOfficialMap(string rel)
+        {
+            if (string.IsNullOrEmpty(rel)) return false;
+            string r = rel.Replace('/', '\\');
+            return r.StartsWith("MapsMO\\Standard\\", StringComparison.OrdinalIgnoreCase)
+                || r.StartsWith("MapsMO\\Challenge\\", StringComparison.OrdinalIgnoreCase)
+                || r.StartsWith("MapsMO\\Cooperative\\", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 地图库根目录：正常就是游戏根（下面有 MapsMO 或 Maps）。
+        /// 万一拿到的路径是 Resources 之类，就往上一级再试，避免列表永远空。
+        /// </summary>
+        static string MapLibraryRoot(string root)
+        {
+            try
+            {
+                string cur = (root ?? "").TrimEnd('\\');
+                for (int i = 0; i < 3 && cur.Length > 0; i++)
+                {
+                    if (Directory.Exists(Path.Combine(cur, "MapsMO"))
+                        || Directory.Exists(Path.Combine(cur, "Maps")))
+                        return cur;
+
+                    string parent = Path.GetDirectoryName(cur);
+                    if (string.IsNullOrEmpty(parent) || parent == cur) break;
+                    cur = parent;
+                }
+            }
+            catch { }
+            return root;
+        }
+
+        static void ListMapsForChat(object lobby)
+        {
+            string root = SafeGetGamePath();
+            List<string> lib = ScanMapLibrary(root, false);
+            if (lib.Count == 0) { Notice(lobby, "没找到地图文件（MapsMO / Maps 目录下）", false); return; }
+
+            Notice(lobby, "地图库共 " + lib.Count + " 张；用 /push 序号 批量推送，例如 /push 1,3,5", true);
+            int show = Math.Min(lib.Count, 30);
+            for (int i = 0; i < show; i++)
+            {
+                string rel = lib[i];
+                string name = Path.GetFileNameWithoutExtension(rel);
+                string dir = Path.GetDirectoryName(rel) ?? "";
+                Notice(lobby, (i + 1) + ". " + name + "    " + dir, true);
+            }
+            if (lib.Count > show) Notice(lobby, "……只显示前 " + show + " 条（用 /push 序号 仍可推任意一张）", true);
+        }
+
+        static void PushMapsByIndex(object lobby, string arg)
+        {
+            try
+            {
+                if (lobby == null) return;
+                if (!IsHostOf(lobby)) { Notice(lobby, "只有房主能推送地图", false); return; }
+                if (string.IsNullOrEmpty(arg)) { Notice(lobby, "用法：/push 1,3,5（先敲 /maps 看序号）", false); return; }
+
+                string root = MapLibraryRoot(SafeGetGamePath());
+                List<string> lib = ScanMapLibrary(root, false);
+                if (lib.Count == 0) { Notice(lobby, "没找到地图文件", false); return; }
+
+                List<MapTarget> targets = new List<MapTarget>();
+                foreach (string raw in arg.Split(new char[] { ',', ' ', '，' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int v;
+                    if (!int.TryParse(raw, out v)) continue;
+                    if (v < 1 || v > lib.Count) { Log("mapsync: 序号越界 " + v); continue; }
+
+                    string rel = lib[v - 1];
+                    targets.Add(new MapTarget
+                    {
+                        Full = Path.Combine(root, rel.Replace('/', '\\')),
+                        Name = Path.GetFileNameWithoutExtension(rel)
+                    });
+                }
+                if (targets.Count == 0) { Notice(lobby, "序号都不对，先敲 /maps 看列表", false); return; }
+
+                Log("mapsync: /push 选中 " + targets.Count + " 张图");
+                StartMapSyncTargets(lobby, targets);
+            }
+            catch (Exception ex) { Log("mapsync: /push 失败: " + ex.Message); }
         }
 
         // ---------------- 房主拒绝加入：给客机一句人话 ----------------
@@ -5334,6 +11754,111 @@ namespace MoLanRelay
         }
 
         // ---------------- /diag：把日志和版本信息打成一个 zip ----------------
+
+        // ==================================================================
+        // 客户端内「日志」
+        //
+        // 入口只有设置窗口：「联机补丁」页右上角的「打开日志」「导出诊断」。
+        //   「打开日志」→ 用记事本打开游戏根目录的 MoLanRelay.log
+        //   「导出诊断」→ 和 /diag 一样，把补丁日志 + 客户端日志 + 崩溃日志
+        //                 + spawn.ini + MoLanPatch.ini + 文件哈希打成桌面 zip
+        // 大厅顶部状态栏不再放这两个按钮（那里的按钮不好找）。
+        // ==================================================================
+        static object logLobbyCurrent;
+
+        /// <summary>把参考按钮的外观（贴图/字号/文字颜色/尺寸）整套复制过来。</summary>
+        static void CopyButtonLook(object from, object to)
+        {
+            if (from == null || to == null) return;
+            string[] names = new string[]
+            {
+                "IdleTexture", "HoverTexture", "FontIndex",
+                "TextColorIdle", "TextColorHover", "TextColorDisabled",
+                "TextXPosition", "TextYPosition", "AlphaRate",
+                "IdleTextureAlpha", "HoverTextureAlpha"
+            };
+            foreach (string n in names)
+            {
+                try
+                {
+                    object v = GetMember(from, n);
+                    if (v != null) SetMember(to, n, v);
+                }
+                catch { }
+            }
+            try
+            {
+                int w = GetInt(from, "Width", 0), h = GetInt(from, "Height", 0);
+                if (w > 0) SetMember(to, "Width", w);
+                if (h > 0) SetMember(to, "Height", h);
+            }
+            catch { }
+        }
+
+        static void LogButtonClick(object sender, EventArgs e) { OpenLogWindow(); }
+
+        static void LogExportClick(object sender, EventArgs e)
+        {
+            try
+            {
+                ExportDiagAsync(logLobbyCurrent);
+                if (logLobbyCurrent == null)
+                    ShowMessageBox(topBar, "导出日志", "正在收集诊断信息，完成后会在桌面生成 MO诊断-时间.zip");
+            }
+            catch (Exception ex) { Log("logpanel: 导出失败: " + ex.Message); }
+        }
+
+        /// <summary>打开「对局记录」目录（没有就建一个空目录，免得用户以为按钮坏了）。</summary>
+        static void OpenMatchFolderClick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(logPath)) ResolveFallbackLogPath();
+                string root = string.IsNullOrEmpty(logPath) ? SafeGetGamePath() : Path.GetDirectoryName(logPath);
+                if (string.IsNullOrEmpty(root)) return;
+
+                string dir = Path.Combine(root, "对局记录");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                Process.Start("explorer.exe", "\"" + dir + "\"");
+                Log("match: 已打开对局记录目录");
+            }
+            catch (Exception ex) { Log("match: 打开对局记录目录失败: " + ex.Message); }
+        }
+
+        /// <summary>打开跟随文件增长的实时日志窗口；PowerShell 不可用时退回记事本。</summary>
+        static void OpenLogWindow()
+        {
+            string path = null;
+            try
+            {
+                if (string.IsNullOrEmpty(logPath)) ResolveFallbackLogPath();
+                path = logPath;
+            }
+            catch { }
+
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                Log("logpanel: 还没有日志文件: " + (path ?? "?"));
+                if (logLobbyCurrent != null) Notice(logLobbyCurrent, "还没有日志文件", false);
+                else ShowMessageBox(topBar, "日志", "还没有日志文件。\n进过一次局域网大厅后就会有。");
+                return;
+            }
+
+            try
+            {
+                // 记事本：最朴素也最可靠（之前用 PowerShell 跟随窗口，实测在游戏里起不来）
+                Process.Start("notepad.exe", "\"" + path + "\"");
+                Log("logpanel: 已用记事本打开日志");
+            }
+            catch (Exception ex) { Log("logpanel: 打开日志失败: " + ex.Message); }
+        }
+
+        /// <summary>大厅里每帧：记住当前大厅（导出/提示要用）。</summary>
+        static void LogPanelTick(object lobby)
+        {
+            if (lobby == null) return;
+            logLobbyCurrent = lobby;
+        }
 
         static void ExportDiagAsync(object lobby)
         {
@@ -5575,6 +12100,19 @@ namespace MoLanRelay
             object chk = GetMember(lobby, "chkAutoReady");
             if (chk == null) return;
 
+            // 没有地图（房主还没选图 / 选了本地没有的图）就别替玩家勾「准备」：
+            // 勾了也开不了局，只会让人以为可以开始。等有了图下一帧再勾。
+            if (!LocalHasSelectedMap(lobby))
+            {
+                if (!loggedAutoReadyNoMap)
+                {
+                    loggedAutoReadyNoMap = true;
+                    Log("autoready: 本地还没有可用地图，先不自动准备");
+                }
+                return;
+            }
+            loggedAutoReadyNoMap = false;
+
             autoReadyLobby = lobby;
             try
             {
@@ -5585,9 +12123,11 @@ namespace MoLanRelay
             catch (Exception ex) { Log("autoready: " + ex.Message); }
         }
 
+        static bool loggedAutoReadyNoMap;
+
         static void DupNameTick(object lobby)
         {
-            if (lobby == null) return;
+            if (!dupNameWarnEnabled || lobby == null) return;
 
             try
             {

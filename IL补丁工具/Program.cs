@@ -18,7 +18,7 @@ class Program
     static readonly string[] KnownModes =
     {
         "ime", "imediag", "imekey", "chatcmd", "deny", "lanip", "relay", "relaysend", "relayhost", "lobbyfix", "kick",
-        "mention", "tab", "preflight", "verlabel", "rxbuf",
+        "mention", "tab", "preflight", "verlabel", "rxbuf", "lanport", "mapmsg", "lantick",
         "checkstack", "pinvokes", "refs", "methods", "fields", "types", "dumpm",
         "roundtrip", "patch",
         // 早期/停用方案，保留只为历史版本能复现，安装流水线不再调用
@@ -1734,6 +1734,42 @@ class Program
         }
 
         // ──────────────────────────────────────────────────────────────
+        // lantick：局域网大厅（LANLobby，房间列表那一屏）
+        //   LANLobby::Update 开头插 Relay.WindowTick(this, gameTime)，
+        //   中继里只做视频壁纸的逐帧上传（那一屏没有别的钩子）。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "lantick")
+        {
+            var lanT = mod.GetTypes().FirstOrDefault(t => t.Name == "LANLobby");
+            if (lanT == null) { Console.WriteLine("SKIP: 找不到 LANLobby"); return 0; }
+            var lanUpd = lanT.Methods.FirstOrDefault(m => m.Name == "Update");
+            if (lanUpd == null || !lanUpd.HasBody) { Console.WriteLine("SKIP: 找不到 LANLobby::Update"); return 0; }
+
+            bool doneL = false;
+            foreach (var i in lanUpd.Body.Instructions)
+            {
+                var im = i.Operand as IMethod;
+                if (im != null && im.Name == "WindowTick" && im.DeclaringType != null
+                    && (string)im.DeclaringType.Name == "Relay") { doneL = true; break; }
+            }
+            if (doneL) Console.WriteLine("  LANLobby::Update: 已改过，跳过");
+            else
+            {
+                var relayAsmL = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+                var relayTypeL = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmL);
+                var tickCallL = new MemberRefUser(mod, "WindowTick",
+                    MethodSig.CreateStatic(mod.CorLibTypes.Void, mod.CorLibTypes.Object, mod.CorLibTypes.Object), relayTypeL);
+                var uinsL = lanUpd.Body.Instructions;
+                uinsL.Insert(0, Instruction.Create(OpCodes.Call, tickCallL));
+                uinsL.Insert(0, Instruction.Create(OpCodes.Ldarg_1));
+                uinsL.Insert(0, Instruction.Create(OpCodes.Ldarg_0));
+                if (lanUpd.Body.MaxStack < 8) lanUpd.Body.MaxStack = 8;
+                Console.WriteLine("  LANLobby::Update: 已挂 Relay.WindowTick（视频壁纸逐帧上传）");
+            }
+            CheckStack(lanUpd);
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // shot：截图（局域网大厅）
         //   (a) LANGameLobby::Update 开头插 Relay.Tick(this, gameTime)
         //       —— 每帧轮询 F8，按下就截当前客户端窗口并发出去
@@ -2021,12 +2057,13 @@ class Program
         // ──────────────────────────────────────────────────────────────
         // rxbuf：把 LANPlayerInfo::ReceiveMessages 的接收缓冲从 1024 调大
         //   原版每读一次最多 1KB，游戏数据突发时要来回几十次 Read（每次一个系统调用），
-        //   而且还夹着 overMessage 的字符串拼接。调到 8KB 后同样的数据几次就读完。
+        //   而且还夹着 overMessage 的字符串拼接。调到 64KB 后，地图同步那种
+        //   一条 40 多 KB 的消息一次 Read 就能读完，速度差好几倍。
         //   只改 new byte[] 的那个长度常量，不动逻辑。
         // ──────────────────────────────────────────────────────────────
         if (mode == "rxbuf")
         {
-            const int WantBuffer = 8192;
+            const int WantBuffer = 65536;
 
             var lpi = mod.GetTypes().FirstOrDefault(t => t.Name == "LANPlayerInfo");
             if (lpi == null) { Console.WriteLine("SKIP: 找不到 LANPlayerInfo"); return 0; }
@@ -2056,6 +2093,117 @@ class Program
             }
 
             if (!changed) Console.WriteLine("  SKIP: 没找到 new byte[...]");
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // lanport：把写死的 1233 换成 Relay.LANPort()
+        //   原客户端三处硬编码：
+        //     LANGameLobby::ListenForClients       new TcpListener(IPAddress.Any, 1233)  房主监听
+        //     LANGameLobby::SetUp                  Connect("127.0.0.1", 1233)            房主自连
+        //     LANLobby::LbGameList_DoubleLeftClick Connect(ip, 1233)                     客机双击加入
+        //   替换成一次静态调用（栈效果相同，都是压入一个 int32），maxstack 不用动。
+        //   **必须排在 relay 之后**：relay 模式见到 MoLanRelay 的类型引用就认为已经打过。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "lanport")
+        {
+            var relayAsmP = new AssemblyRefUser("MoLanRelay", new Version(0, 0, 0, 0));
+            var relayTypeP = new TypeRefUser(mod, "MoLanRelay", "Relay", relayAsmP);
+            var callP = new MemberRefUser(mod, "LANPort",
+                MethodSig.CreateStatic(mod.CorLibTypes.Int32), relayTypeP);
+
+            var targets = new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>("LANGameLobby", "ListenForClients"),
+                new KeyValuePair<string, string>("LANGameLobby", "SetUp"),
+                new KeyValuePair<string, string>("LANLobby", "LbGameList_DoubleLeftClick"),
+            };
+
+            int replaced = 0, already = 0;
+            bool bad = false;
+
+            foreach (var target in targets)
+            {
+                var typeP = mod.GetTypes().FirstOrDefault(x => x.Name == target.Key);
+                var methodP = typeP == null ? null : typeP.Methods.FirstOrDefault(x => x.Name == target.Value);
+                string label = target.Key + "::" + target.Value;
+
+                if (methodP == null || !methodP.HasBody)
+                {
+                    Console.Error.WriteLine("  FAIL: " + label + " 没找到（不写出文件）");
+                    bad = true;
+                    continue;
+                }
+
+                List<Instruction> hits = new List<Instruction>();
+                bool doneP = false;
+                foreach (var i in methodP.Body.Instructions)
+                {
+                    if (i.OpCode.Code == Code.Ldc_I4 && i.GetLdcI4Value() == 1233) { hits.Add(i); continue; }
+                    var imP = i.Operand as IMethod;
+                    if (imP != null && imP.Name == "LANPort") doneP = true;
+                }
+
+                if (hits.Count == 0)
+                {
+                    if (doneP) { Console.WriteLine("  " + label + ": 已替换过，跳过"); already++; }
+                    else { Console.Error.WriteLine("  FAIL: " + label + " 里没有 1233 常量（不写出文件）"); bad = true; }
+                    continue;
+                }
+
+                if (hits.Count != 1)
+                {
+                    Console.Error.WriteLine("  FAIL: " + label + " 命中 " + hits.Count + " 处 1233（预期 1 处，不写出文件）");
+                    bad = true;
+                    continue;
+                }
+
+                foreach (var hit in hits)
+                {
+                    hit.OpCode = OpCodes.Call;
+                    hit.Operand = callP;
+                }
+                replaced += hits.Count;
+                Console.WriteLine("  " + label + ": 1233 → Relay.LANPort()");
+            }
+
+            if (bad) return 1;
+            if (replaced == 0 && already == targets.Count) { Console.WriteLine("  lanport: 三处都已替换过，跳过"); return 0; }
+            Console.WriteLine("  lanport: 共替换 " + replaced + " 处");
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // mapmsg：改一句客户端内置提示
+        //   客机发现"房主那边没有这张图"时，客户端原文是：
+        //     「…房主需要更换地图，否则将有玩家无法参与本场游戏。」
+        //   改成「房主需要同步地图」——本补丁的解法就是让房主点「同步地图」。
+        // ──────────────────────────────────────────────────────────────
+        if (mode == "mapmsg")
+        {
+            const string oldText = "房主需要更换地图";
+            const string newText = "房主需要同步地图";
+            int replacedMsg = 0;
+
+            foreach (var t in mod.GetTypes())
+            {
+                foreach (var m in t.Methods)
+                {
+                    if (!m.HasBody) continue;
+                    foreach (var i in m.Body.Instructions)
+                    {
+                        string s = i.Operand as string;
+                        if (s == null || s.IndexOf(oldText, StringComparison.Ordinal) < 0) continue;
+                        i.Operand = s.Replace(oldText, newText);
+                        replacedMsg++;
+                    }
+                }
+            }
+
+            if (replacedMsg == 0)
+            {
+                Console.Error.WriteLine("  FAIL: 没找到「" + oldText + "」，不写出文件");
+                return 1;
+            }
+            Console.WriteLine("  提示文案: 已替换 " + replacedMsg + " 处「" + oldText + "」→「" + newText + "」");
         }
 
         // ──────────────────────────────────────────────────────────────
