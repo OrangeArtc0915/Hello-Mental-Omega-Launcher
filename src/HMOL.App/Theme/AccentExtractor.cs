@@ -42,37 +42,6 @@ internal static class AccentExtractor
         }
     }
 
-    /// <summary>从内存里的位图取主色（视频抓帧等没有文件路径的场景）。</summary>
-    internal static Color? FromBitmap(BitmapSource? source)
-    {
-        if (source is null || source.PixelWidth <= 0 || source.PixelHeight <= 0) return null;
-
-        try
-        {
-            // 缩到 64 像素宽，像素越少统计越快，颜色分布足够判断主色
-            var scale = SampleWidth / (double)source.PixelWidth;
-
-            var small = new TransformedBitmap(source, new ScaleTransform(scale, scale));
-            var converted = new FormatConvertedBitmap(small, PixelFormats.Bgra32, null, 0);
-            converted.Freeze();
-
-            var width = converted.PixelWidth;
-            var height = converted.PixelHeight;
-            if (width <= 0 || height <= 0) return null;
-
-            var stride = width * 4;
-            var pixels = new byte[stride * height];
-            converted.CopyPixels(pixels, stride, 0);
-
-            return Dominant(pixels);
-        }
-        catch (Exception ex)
-        {
-            Log.Warn(Loc.F("从位图取色失败：{0}", ex.Message));
-            return null;
-        }
-    }
-
     private static byte[]? Decode(string path)
     {
         var image = new BitmapImage();
