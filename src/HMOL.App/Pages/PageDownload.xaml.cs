@@ -222,36 +222,92 @@ public partial class PageDownload : LauncherPage
         }
     }
 
-    /// <summary>顶部「运行环境」区块：列出运行时组件与状态，并提供「一键补全」。</summary>
+    /// <summary>顶部「运行环境」区块：联机功能整包 + 其它运行时组件，并提供「一键补全」。</summary>
     private void BuildRuntimeSection(IReadOnlyList<ManifestEntry> runtimeItems)
     {
         PanRuntimeItems.Children.Clear();
 
-        if (runtimeItems.Count == 0)
-        {
-            CardRuntime.Visibility = Visibility.Collapsed;
-            return;
-        }
+        // EasyTier / n2n / TAP / WinIPBroadcast 已经收进「联机功能」整包，不再单独列出来
+        var others = runtimeItems.Where(entry => !IsBundleComponent(entry)).ToList();
+        var bundleInstalled = RuntimeBundle.IsInstalled;
 
         CardRuntime.Visibility = Visibility.Visible;
 
-        var missing = runtimeItems.Count(entry => !IsRuntimeInstalled(entry));
+        var total = others.Count + 1;
+        var missing = others.Count(entry => !IsRuntimeInstalled(entry)) + (bundleInstalled ? 0 : 1);
 
         LabRuntimeHint.Text = missing == 0
-            ? Loc.F("共 {0} 个运行时组件，都已就绪。", runtimeItems.Count)
-            : Loc.F("共 {0} 个运行时组件，还缺 {1} 个；点「一键补全」按需下载并安装。", runtimeItems.Count, missing);
+            ? Loc.F("共 {0} 项，都已就绪。", total)
+            : Loc.F("共 {0} 项，还缺 {1} 项；点「一键补全」按需下载并安装。", total, missing);
 
         BtnCompleteRuntime.Content = missing == 0 ? Loc.T("全部重装") : Loc.F("一键补全（{0}）", missing);
         BtnCompleteRuntime.IsEnabled = !_busy;
 
-        for (var index = 0; index < runtimeItems.Count; index++)
+        PanRuntimeItems.Children.Add(BuildBundleRow(bundleInstalled));
+
+        for (var index = 0; index < others.Count; index++)
         {
-            var row = BuildEntryRow(runtimeItems[index]);
-            row.Margin = new Thickness(0, index == 0 ? 0 : 10, 0, 0);
+            var row = BuildEntryRow(others[index]);
+            row.Margin = new Thickness(0, 10, 0, 0);
             PanRuntimeItems.Children.Add(row);
         }
 
         UpdateRuntimeToggleText(PanRuntimeItems.Visibility == Visibility.Visible);
+    }
+
+    /// <summary>该条目是不是已经被「联机功能」整包吸收的四个组网组件之一。</summary>
+    private static bool IsBundleComponent(ManifestEntry entry)
+    {
+        if (!entry.IsRuntimeTarget || string.IsNullOrWhiteSpace(entry.Folder)) return false;
+
+        var folder = entry.Folder.Trim();
+
+        return RuntimeComponents.All.Any(component =>
+            string.Equals(folder, RuntimeComponents.FolderName(component), StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>「联机功能」整包那一行：状态 + 下载 / 重装。</summary>
+    private FrameworkElement BuildBundleRow(bool installed)
+    {
+        var panel = new StackPanel();
+
+        var name = new TextBlock { Text = Loc.T("联机功能（组网组件整包）"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "Text.Primary");
+        panel.Children.Add(name);
+
+        var note = new TextBlock
+        {
+            Text = Loc.T("EasyTier、n2n、TAP 虚拟网卡与 WinIPBroadcast 打包在一起，下载一次全部装好；Gitee 线路自动分卷合并。"),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 3, 0, 0)
+        };
+        note.SetResourceReference(TextBlock.ForegroundProperty, "Text.Tertiary");
+        panel.Children.Add(note);
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+
+        var status = new TextBlock
+        {
+            Text = installed ? Loc.T("已安装") : Loc.T("未安装"),
+            FontSize = 11.5,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0)
+        };
+        status.SetResourceReference(TextBlock.ForegroundProperty, installed ? "Status.Success" : "Text.Tertiary");
+        actions.Children.Add(status);
+
+        var button = new OutlineButton
+        {
+            Content = installed ? Loc.T("重新安装") : Loc.T("下载并安装"),
+            Tone = ButtonTone.Solid,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        button.Click += (_, _) => _ = CompleteRuntimeAsync();
+        actions.Children.Add(button);
+
+        panel.Children.Add(actions);
+        return panel;
     }
 
     private void OnToggleRuntimeClick(object sender, RoutedEventArgs e)
@@ -632,17 +688,18 @@ public partial class PageDownload : LauncherPage
     private void OnCompleteRuntimeClick(object sender, RoutedEventArgs e) => _ = CompleteRuntimeAsync();
 
     /// <summary>
-    /// 一键补全：把当前缺的运行时组件逐个下载并解压到 runtime\&lt;folder&gt;\，已装的跳过。
-    /// 组件清单与地址都由 download.json 决定，这里只照单执行。
+    /// 一键补全：先装「联机功能」整包（四个组网组件一次到位），再处理 7-Zip 等其它运行时条目。
+    /// 已就绪的会被跳过。
     /// </summary>
     private async Task CompleteRuntimeAsync()
     {
         if (_busy) return;
 
-        var runtimeItems = _entries.Where(entry => entry.IsRuntimeTarget).ToList();
+        var runtimeItems = _entries.Where(entry => entry.IsRuntimeTarget && !IsBundleComponent(entry)).ToList();
         var pending = runtimeItems.Where(entry => !IsRuntimeInstalled(entry)).ToList();
+        var bundleMissing = !RuntimeBundle.IsInstalled;
 
-        if (pending.Count == 0)
+        if (!bundleMissing && pending.Count == 0)
         {
             ShowNotice(Loc.T("运行时组件都已就绪，无需补全。"));
             return;
@@ -657,6 +714,17 @@ public partial class PageDownload : LauncherPage
 
         try
         {
+            if (bundleMissing)
+            {
+                progress.SetDetail(Loc.T("正在安装联机功能（组网组件整包）…"));
+
+                var (ok, message) = await RuntimeBundle.EnsureAsync(
+                    SettingsStore.Current.LauncherUpdateSource, progress.Progress, progress.Sample, progress.Token);
+
+                if (ok) installed++;
+                else issues.Add(message);
+            }
+
             for (var index = 0; index < pending.Count; index++)
             {
                 var entry = pending[index];

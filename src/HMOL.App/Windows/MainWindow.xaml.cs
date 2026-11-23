@@ -21,6 +21,7 @@ using HMOL.Core.Instances;
 using HMOL.Core.Layout;
 using HMOL.Core.Localization;
 using HMOL.Core.Logging;
+using HMOL.Core.Multiplayer;
 
 namespace HMOL.App.Windows;
 
@@ -148,6 +149,9 @@ public partial class MainWindow : Window
         {
             SwitchToPage(NavPages.Home);
             ApplyBackground();
+
+            // 联机功能是按需下载的：没装之前侧栏入口置灰
+            RefreshMultiplayerNav();
 
             // 主题变了要重铺一次：压暗层取的是主题里的窗口底色，得跟着主题走
             ThemeService.ThemeChanged += ApplyBackground;
@@ -572,6 +576,9 @@ public partial class MainWindow : Window
     /// <summary>切换到指定页面。页面实例会被缓存，切换时只切可见性并触发进入动画。</summary>
     public void SwitchToPage(int page)
     {
+        // 每次导航都复核一次：用户可能刚在「下载」页装好联机功能
+        RefreshMultiplayerNav();
+
         if (_currentPage == page) return;
 
         var target = GetPage(page);
@@ -683,6 +690,21 @@ public partial class MainWindow : Window
         SwitchToPage(page);
 
         Log.Info(Loc.F("界面语言已切到 {0}，页面已重建", Loc.Current));
+    }
+
+    /// <summary>
+    /// 联机功能是按需下载的整包：装好之前侧栏「联机」置灰，鼠标悬停给出原因；
+    /// 装好后自动恢复，不需要重启。
+    /// </summary>
+    private void RefreshMultiplayerNav()
+    {
+        var ready = RuntimeBundle.IsInstalled;
+
+        if (NavMultiplayer.IsEnabled == ready) return;
+
+        NavMultiplayer.IsEnabled = ready;
+        NavMultiplayer.Opacity = ready ? 1 : 0.4;
+        NavMultiplayer.ToolTip = ready ? null : Loc.T("联机功能尚未安装，请先到「下载」页安装。");
     }
 
     /// <summary>把侧栏选中态同步到当前页面。</summary>

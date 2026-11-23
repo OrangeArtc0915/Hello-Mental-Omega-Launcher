@@ -213,12 +213,20 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// v1.6.x 收尾公告：每次正常启动（显示主窗口）都提示一次。
-    /// 开机自启驻留托盘与截图自检走不到这里，避免开机打扰与干扰截图。
+    /// v1.6.x 收尾公告：只在第一次启动（显示主窗口）时提示一次，之后不再弹窗；
+    /// 主页顶部那条常驻说明不受影响。开机自启驻留托盘与截图自检走不到这里。
     /// </summary>
     private static void ShowEndOfLineNotice(Window owner)
-        => ChoiceWindow.Info(owner, Loc.T("开发计划"),
+    {
+        var settings = SettingsStore.Current;
+        if (settings.FinalNoticeShown) return;
+
+        settings.FinalNoticeShown = true;
+        SettingsStore.Save();
+
+        ChoiceWindow.Info(owner, Loc.T("开发计划"),
             Loc.T("v1.6.x 将是最后一个版本，之后只修复 BUG，不再更新新内容。"));
+    }
 
     // ————— 门锁（远程开关）—————
     /// <summary>

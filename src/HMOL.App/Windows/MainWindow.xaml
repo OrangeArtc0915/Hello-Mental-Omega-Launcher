@@ -184,6 +184,7 @@
                                                    Icon="lucide/network"
                                                    Tag="3"
                                                    Text="{loc:T '联机'}"
+                                                   ToolTipService.ShowOnDisabled="True"
                                                    Checked="OnNavChecked" />
                                         <c:NavItem x:Name="NavDownload"
                                                    GroupName="MainNav"

@@ -135,6 +135,35 @@ public static class HttpDownloader
         }
     }
 
+    /// <summary>
+    /// 只读响应头取文件体积，用于分卷探测。文件不存在（404）或网络失败时返回 null，不抛出。
+    /// </summary>
+    public static async Task<long?> GetContentLengthAsync(string url, string? userAgent = null,
+        CancellationToken token = default)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+
+        try
+        {
+            using var request = CreateRequest(url, userAgent);
+            using var response = await Client
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+
+            if (!response.IsSuccessStatusCode) return null;
+
+            return response.Content.Headers.ContentLength;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Loc.F("探测文件体积失败：{0}（{1}）", url, ex.Message));
+            return null;
+        }
+    }
+
     /// <summary>丢弃指定地址的内存缓存，供需要强制走网络的调用方使用。</summary>
     public static void InvalidateCache(string url)
     {

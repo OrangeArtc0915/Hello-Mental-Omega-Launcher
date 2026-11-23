@@ -25,6 +25,18 @@ public static class RequiredAssetDownloader
     /// <summary>下载页组件所在发行版的 tag。</summary>
     public const string ReleaseTag = "components";
 
+    /// <summary>
+    /// Gitee 对单个附件的体积有上限，超过这个大小的包按 40 MB 切卷上传（<c>.001</c> / <c>.002</c>…），
+    /// 客户端探测到第一卷就逐卷下载并合并。GitHub 不限制，仍传单个完整包。
+    /// </summary>
+    public const long VolumeSize = 40L * 1024 * 1024;
+
+    /// <summary>分卷编号上限，避免探测时无限循环。</summary>
+    private const int MaxVolumes = 99;
+
+    /// <summary>第 <paramref name="index"/> 卷（从 1 开始）的文件名，如 <c>foo.zip.001</c>。</summary>
+    public static string VolumeName(string fileName, int index) => $"{fileName}.{index:000}";
+
     /// <summary>GitHub 的发行版附件直链。</summary>
     public static string GitHubUrl(string fileName)
         => $"{AppInfo.GitHubUrl}/releases/download/{ReleaseTag}/{Uri.EscapeDataString(fileName)}";
@@ -55,8 +67,9 @@ public static class RequiredAssetDownloader
             // 换源前清掉上一段的半截分片：不同主机的 Range 混在一起会拼出坏文件
             TryDelete(destinationPath + ".part");
 
-            var result = await ResumableDownloader.DownloadAsync(url, destinationPath, progress, token)
-                .ConfigureAwait(false);
+            var result = name == "Gitee"
+                ? await DownloadFromGiteeAsync(fileName, destinationPath, progress, token).ConfigureAwait(false)
+                : await ResumableDownloader.DownloadAsync(url, destinationPath, progress, token).ConfigureAwait(false);
 
             if (!result.Success)
             {
@@ -79,6 +92,125 @@ public static class RequiredAssetDownloader
         }
 
         return new DownloadResult(false, null, 0, Loc.T("两个线路都下载失败：") + string.Join("；", errors));
+    }
+
+    /// <summary>
+    /// Gitee 优先按分卷处理：探测到 <c>.001</c> 就逐卷下载、按顺序拼回原文件；
+    /// 没有分卷则回退成普通单文件下载。
+    /// </summary>
+    private static async Task<DownloadResult> DownloadFromGiteeAsync(string fileName, string destinationPath,
+        IProgress<double>? progress, CancellationToken token)
+    {
+        var volumes = await TryDownloadGiteeVolumesAsync(fileName, destinationPath, progress, token)
+            .ConfigureAwait(false);
+
+        if (volumes is not null) return volumes;
+
+        return await ResumableDownloader.DownloadAsync(GiteeUrl(fileName), destinationPath, progress, token)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 探测并下载 Gitee 分卷。返回 null 表示该文件不是分卷，调用方应改走单文件下载。
+    /// </summary>
+    private static async Task<DownloadResult?> TryDownloadGiteeVolumesAsync(string fileName, string destinationPath,
+        IProgress<double>? progress, CancellationToken token)
+    {
+        var firstUrl = GiteeUrl(VolumeName(fileName, 1));
+        var firstSize = await HttpDownloader.GetContentLengthAsync(firstUrl, LauncherUpdater.UserAgent, token)
+            .ConfigureAwait(false);
+
+        if (firstSize is null or <= 0) return null;
+
+        var volumes = new List<(string Url, long Size)> { (firstUrl, firstSize.Value) };
+
+        for (var index = 2; index <= MaxVolumes; index++)
+        {
+            token.ThrowIfCancellationRequested();
+
+            var size = await HttpDownloader
+                .GetContentLengthAsync(GiteeUrl(VolumeName(fileName, index)), LauncherUpdater.UserAgent, token)
+                .ConfigureAwait(false);
+
+            if (size is null or <= 0) break;
+
+            volumes.Add((GiteeUrl(VolumeName(fileName, index)), size.Value));
+        }
+
+        Log.Info(Loc.F("Gitee 上 {0} 按 {1} 卷上传，开始逐卷下载", fileName, volumes.Count));
+
+        var totalBytes = volumes.Sum(volume => volume.Size);
+        var received = 0L;
+        var parts = new List<string>();
+
+        try
+        {
+            for (var index = 0; index < volumes.Count; index++)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var partPath = destinationPath + ".vol" + (index + 1).ToString("000");
+                var (url, size) = volumes[index];
+
+                TryDelete(partPath);
+
+                var baseBytes = received;
+                var report = progress is null
+                    ? null
+                    : new Progress<double>(value =>
+                    {
+                        var overall = totalBytes > 0
+                            ? (baseBytes + Math.Clamp(value, 0, 1) * size) / (double)totalBytes
+                            : 0;
+
+                        progress.Report(Math.Clamp(overall, 0, 0.999));
+                    });
+
+                var result = await ResumableDownloader.DownloadAsync(url, partPath, report, token)
+                    .ConfigureAwait(false);
+
+                if (!result.Success)
+                {
+                    TryDelete(partPath);
+                    return new DownloadResult(false, null, received,
+                        Loc.F("第 {0}/{1} 卷下载失败：{2}", index + 1, volumes.Count, result.Message));
+                }
+
+                parts.Add(partPath);
+                received += LengthOf(partPath);
+            }
+
+            using (var output = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                foreach (var part in parts)
+                {
+                    using var input = new FileStream(part, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    await input.CopyToAsync(output, token).ConfigureAwait(false);
+                }
+            }
+
+            foreach (var part in parts) TryDelete(part);
+
+            progress?.Report(1);
+
+            Log.Info(Loc.F("已合并 {0} 个分卷：{1}（{2}）", volumes.Count, destinationPath,
+                ResumableDownloader.FormatSize(received)));
+
+            return new DownloadResult(true, destinationPath, received,
+                Loc.F("已合并 {0} 个分卷", volumes.Count));
+        }
+        catch (OperationCanceledException)
+        {
+            foreach (var part in parts) TryDelete(part);
+            return new DownloadResult(false, null, received, Loc.T("下载已取消"));
+        }
+        catch (Exception ex)
+        {
+            foreach (var part in parts) TryDelete(part);
+
+            Log.Error(Loc.F("合并分卷失败：{0}", destinationPath), ex);
+            return new DownloadResult(false, null, received, ex.Message);
+        }
     }
 
     /// <summary>把下载物解压到目标目录。压缩包内若只有一个顶层目录，则以其为内容根。</summary>

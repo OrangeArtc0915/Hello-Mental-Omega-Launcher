@@ -401,6 +401,9 @@ public sealed class Settings
     /// <summary>「新手教程」的运行期提示是否已经出现过（只提示一次，点开或忽略都会置位）。</summary>
     public bool TutorialHintShown { get; set; }
 
+    /// <summary>「v1.6.x 是最后一个版本」的启动弹窗是否已经提示过（只弹一次，之后不再打扰）。</summary>
+    public bool FinalNoticeShown { get; set; }
+
     /// <summary>
     /// 点主窗口右上角 ×（或按 Alt+F4）时的行为。默认 <see cref="CloseAction.Ask"/>：每次弹窗让用户
     /// 自己选「最小化到托盘」还是「直接退出」。老配置文件里没有这个字段时按默认（每次询问）处理。
