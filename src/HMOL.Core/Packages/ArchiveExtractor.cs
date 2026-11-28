@@ -262,7 +262,7 @@ public static class ArchiveExtractor
         try
         {
             using var archive = ArchiveFactory.Open(archivePath);
-            return archive.Entries.Any(entry => entry.IsEncrypted);
+            return archive.Entries.Any(HasEncryptedPayload);
         }
         catch (Exception ex) when (IsPasswordException(ex))
         {
@@ -273,6 +273,26 @@ public static class ArchiveExtractor
         {
             Log.Warn(Loc.F("检测压缩包是否加密失败：{0}（{1}）", Path.GetFileName(archivePath), ex.Message));
             return format == "zip" && ZipHeaderEncrypted(archivePath);
+        }
+    }
+
+    /// <summary>
+    /// 只把「确实有内容、且标记为加密」的条目算作加密包。
+    /// SharpCompress 读 7z 时会把个别 0 字节条目误报成 IsEncrypted，
+    /// 单看标志位会让完全没加密的包被要求输入密码。
+    /// </summary>
+    private static bool HasEncryptedPayload(SharpCompress.Archives.IArchiveEntry entry)
+    {
+        if (!entry.IsEncrypted || entry.IsDirectory) return false;
+
+        try
+        {
+            return entry.Size > 0;
+        }
+        catch
+        {
+            // 元数据读不出来时按加密处理，宁可多问一次密码也不要解出错包
+            return true;
         }
     }
 
