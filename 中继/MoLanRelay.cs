@@ -47,7 +47,7 @@ namespace MoLanRelay
         // 每次改动都改这个号：日志开头的 "MoLanRelay vX" 就是它。
         // 三台机器版本不一致会导致"有的能收不能发"这类诡异现象，先看这个号。
         // 语义化版本 vX.Y.Z，主菜单右下角显示的也是它。
-        public const string Version = "0.17.0";
+        public const string Version = "0.17.1";
         const int MaxPeers = 8;
 
         class Peer
@@ -1102,6 +1102,15 @@ namespace MoLanRelay
         static bool positionLogged;          // 位置诊断只写一次日志
         static string versionLineCache;      // 版本行只拼一次（每帧比较用，避免反复分配字符串）
 
+        // 主菜单精简：固定隐藏 CnCNet 线上入口与社交图标，下方按钮上移补位。
+        // 这是本补丁的固定行为（局域网版不需要线上入口），不提供开关，也不涉及主题/美化。
+        static object mainMenuLayoutOwner;
+        static bool mainMenuShifted;
+        static object cncnetButton;
+        static bool cncnetLabelsHidden;
+        static object extraMenuOwner;
+        static bool extraMenuHidden;
+
         public static void MainMenuTick(object mainMenu)
         {
             if (mainMenu == null) return;
@@ -1110,6 +1119,13 @@ namespace MoLanRelay
 
             try { OptionsTick(mainMenu); }
             catch (Exception ex) { Log("options tick error: " + ex.Message); }
+
+            // 隐藏 CnCNet 线上入口与社交图标（局域网版固定精简，不需要线上入口）
+            try { ApplyMainMenuLayout(mainMenu); }
+            catch (Exception ex) { Log("verlabel: 调整主菜单布局失败: " + ex.Message); }
+
+            try { HideLeftoverLinks(mainMenu); }
+            catch (Exception ex) { Log("verlabel: 清理残留链接失败: " + ex.Message); }
 
             // 顶部栏：禁用「CnCNet 大厅」小按钮、把状态文字改成「局域网大厅」
             try { ApplyTopBarLayout(mainMenu); }
@@ -1179,6 +1195,150 @@ namespace MoLanRelay
             }
             return null;
         }
+
+
+        /// <summary>
+        /// 隐藏主菜单的 CnCNet 线上大厅入口，并把下面的按钮整体上移 42 像素。
+        /// 只在「按钮当前还是可见」时上移 —— 旧版安装器改过 MainMenu.ini（Visible=0 且已上移）
+        /// 的情况会跳过，不会二次位移。
+        /// </summary>
+        static void ApplyMainMenuLayout(object mainMenu)
+        {
+            // 换了一个 MainMenu 实例（客户端重建主菜单）就重新按新实例判断，
+            // 否则新控件的按钮停在原位、CnCNet 却被隐藏，会多出一个空位。
+            if (!ReferenceEquals(mainMenuLayoutOwner, mainMenu))
+            {
+                mainMenuLayoutOwner = mainMenu;
+                mainMenuShifted = false;
+                cncnetButton = null;
+                cncnetLabelsHidden = false;
+            }
+
+            if (cncnetButton == null)
+            {
+                cncnetButton = FindControl(mainMenu, "btnCnCNet");
+                if (cncnetButton == null) return;   // 布局还没建好，下一帧再试
+            }
+
+            bool hidden = GetMember(cncnetButton, "Visible") is bool v && !v;
+
+            if (!mainMenuShifted)
+            {
+                if (hidden)
+                {
+                    // 旧版安装器改过 MainMenu.ini（已经隐藏+上移），不要再动
+                    mainMenuShifted = true;
+                }
+                else
+                {
+                    // 所有按钮都找到了才动：只移动一部分的话，下一帧会对已移动的再移一次
+                    List<object> buttons = new List<object>(MenuButtons.Length);
+                    for (int i = 0; i < MenuButtons.Length; i++)
+                    {
+                        object b = FindControl(mainMenu, MenuButtons[i]);
+                        if (b == null) { buttons.Clear(); break; }
+                        buttons.Add(b);
+                    }
+
+                    if (buttons.Count == MenuButtons.Length)
+                    {
+                        for (int i = 0; i < buttons.Count; i++)
+                            SetMember(buttons[i], "Y", GetInt(buttons[i], "Y", 0) - MenuButtonShift);
+                        mainMenuShifted = true;
+                        Log("verlabel: 已隐藏 CnCNet 入口，下方按钮上移 " + MenuButtonShift + "px");
+                    }
+                }
+            }
+
+            if (!hidden) SetMember(cncnetButton, "Visible", false);
+
+            if (!cncnetLabelsHidden)
+            {
+                object st = FindControl(mainMenu, "lblCnCNetStatus");
+                object cnt = FindControl(mainMenu, "lblCnCNetPlayerCount");
+                if (st == null && cnt == null) return;     // 还没建好，下一帧再试
+                if (st != null) SetMember(st, "Visible", false);
+                if (cnt != null) SetMember(cnt, "Visible", false);
+                cncnetLabelsHidden = true;
+            }
+
+            // 主页的社交图标（推特/油管/脸书/Discord）和左下角更新状态一并关掉
+            if (!ReferenceEquals(extraMenuOwner, mainMenu))
+            {
+                extraMenuOwner = mainMenu;
+                extraMenuHidden = false;
+            }
+
+            if (!extraMenuHidden)
+            {
+                string[] extraNames = { "menu_fb", "menu_yt", "menu_tw", "menu_dc", "lblUpdateStatus", "btnCredits" };
+                int found = 0;
+                for (int i = 0; i < extraNames.Length; i++)
+                {
+                    object ctl = FindControl(mainMenu, extraNames[i]);
+                    if (ctl == null) continue;
+                    found++;
+                    SetMember(ctl, "Visible", false);
+                }
+                if (found == extraNames.Length)
+                {
+                    extraMenuHidden = true;
+                    Log("verlabel: 已关闭主页社交图标与更新状态 " + found + " 项");
+                }
+            }
+        }
+
+        // 「关于/制作人员」窗口里的 ModDB（官网）按钮：窗口是临时创建的，
+        // 所以每两秒扫一遍 WindowManager.Controls，见到就关掉。
+        static DateTime lastLinkSweep = DateTime.MinValue;
+        static bool moddbHiddenLogged;
+
+        static void HideLeftoverLinks(object mainMenu)
+        {
+            if ((DateTime.Now - lastLinkSweep).TotalSeconds < 2) return;
+            lastLinkSweep = DateTime.Now;
+
+            try
+            {
+                object wm = GetMember(mainMenu, "WindowManager");
+                if (wm == null) return;
+                IList controls = GetMember(wm, "Controls") as IList;
+                if (controls == null) return;
+
+                foreach (object ctl in controls)
+                {
+                    if (ctl == null) continue;
+
+                    string[] linkNames =
+                    {
+                        "btnModDB", "btnForums", "btnGooglePlus",
+                        "btnYouTube", "btnFacebook", "btnTwitter",
+                        // 主菜单右上角那个 24x24 的「附加」小方块：点开只有一个「返回」，
+                        // MO 里所有 Extras 按钮都是 Visible=0，留着纯占位，直接关掉
+                        "btnExtras",
+                    };
+
+                    for (int i = 0; i < linkNames.Length; i++)
+                    {
+                        object b = FindControl(ctl, linkNames[i]);
+                        if (b == null) continue;
+                        if (GetMember(b, "Visible") is bool v && !v) continue;
+                        SetMember(b, "Visible", false);
+                        if (!moddbHiddenLogged)
+                        {
+                            moddbHiddenLogged = true;
+                            Log("verlabel: 已关闭关于窗口里的官网/社交链接");
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        static readonly string[] MenuButtons =
+            { "btnLan", "btnLoadGame", "btnOptions", "btnMapEditor", "btnStatistics", "btnExit" };
+
+        const int MenuButtonShift = 42;
 
 
         // ==================================================================
@@ -1276,16 +1436,6 @@ namespace MoLanRelay
         }
 
         const string LanLobbyStatusText = "局域网大厅";
-
-        // ------------------------------------------------------------------
-        // 大厅背景图
-        //
-        // 客户端的大厅底板就是 Resources\gamelobbybg.png（局域网和在线大厅共用）。
-        // 换背景不做贴图注入，直接换文件：谁想要自定义就把图存成
-        //   Resources\MoLobbyBg.png
-        // 本机会自动备份原图（gamelobbybg.orig.png）再覆盖；关掉开关会还原。
-        // 改文件不影响联机同步 —— 这只影响自己看到的底图。
-        // ------------------------------------------------------------------
 
         static void DisableButton(object root, string name)
         {
